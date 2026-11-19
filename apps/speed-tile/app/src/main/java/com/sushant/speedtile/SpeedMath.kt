@@ -120,19 +120,20 @@ class TripTracker(initial: TripStats = TripStats()) {
         last = fix
         val kmh = raw?.let { SpeedMath.clean(it) } ?: return null
 
-        // Glitch filter: keep showing the previous speed and leave the records alone.
-        val uncertain = (fix.speedAccMps ?: 0f) > SpeedMath.MAX_SPEED_ACC_MPS
+        // Impossible jump = glitch: keep showing the previous speed, leave the records alone.
         val pk = lastKmh
         val jump = pk != null && fix.timeMs - lastKmhAt in 1L..3_000L &&
             SpeedMath.isImpossibleJump(pk, kmh, fix.timeMs - lastKmhAt)
-        if (uncertain || jump) {
+        if (jump) {
             lastGoodKmh = null
             return pk
         }
         lastKmh = kmh
         lastKmhAt = fix.timeMs
 
-        val good = (fix.accuracyM ?: 0f) <= SpeedMath.GOOD_ACCURACY_M
+        // An uncertain speed is still shown live, but never used for records.
+        val uncertain = (fix.speedAccMps ?: 0f) > SpeedMath.MAX_SPEED_ACC_MPS
+        val good = !uncertain && (fix.accuracyM ?: 0f) <= SpeedMath.GOOD_ACCURACY_M
         if (good) {
             var s = stats
             val steady = lastGoodKmh?.let { minOf(it, kmh) }

@@ -52,10 +52,16 @@ class SpeedService : Service() {
         override fun onStatusChanged(provider: String?, status: Int, extras: Bundle?) {}
     }
 
+    private var loggedSats = false
+
     private val gnss = object : GnssStatus.Callback() {
         override fun onSatelliteStatusChanged(status: GnssStatus) {
             var used = 0
             for (i in 0 until status.satelliteCount) if (status.usedInFix(i)) used++
+            if (!loggedSats && status.satelliteCount > 0) {
+                loggedSats = true
+                Log.i(TAG, "GNSS status: ${status.satelliteCount} satellites seen")
+            }
             app.engine.onSatellites(used, status.satelliteCount)
         }
     }
@@ -113,7 +119,7 @@ class SpeedService : Service() {
         if (!lm.isProviderEnabled(LocationManager.GPS_PROVIDER)) app.engine.onGpsDisabled()
         try {
             lm.requestLocationUpdates(LocationManager.GPS_PROVIDER, 1_000L, 0f, listener, Looper.getMainLooper())
-            Log.i(TAG, "GPS updates requested")
+            Log.i(TAG, "GPS updates requested (sdk ${Build.VERSION.SDK_INT})")
             lm.registerGnssStatusCallback(gnss, handler)
         } catch (e: SecurityException) {
             stopNow(StopReason.NO_PERMISSION)

@@ -57,8 +57,8 @@ class SpeedEngine(private val prefs: Prefs, private val clock: () -> Long = Syst
         if (kmh != null && kmh >= SpeedMath.MOVING_KMH) lastMovingAt = lastFixAt
         _state.update {
             it.copy(
-                status = if (kmh == null && it.speedKmh == null) Status.WAITING else Status.LIVE,
-                speedKmh = kmh ?: it.speedKmh,
+                status = Status.LIVE,
+                speedKmh = kmh ?: it.speedKmh ?: 0f,
                 accuracyM = fix.accuracyM,
                 trip = tracker.stats,
             )

@@ -81,6 +81,21 @@ jobs:
             adb logcat -d -t 3000 > /tmp/out/logcat.txt || true
             if [ ! -f e2e.sh ]; then adb logcat -d -s GrabbitE2E:I > /tmp/out/e2e-results.txt || true; fi
 
+      - name: Real-world e2e on Android 15
+        id: e2e35
+        if: hashFiles(format('{0}/e2e.sh', steps.target.outputs.dir)) != ''
+        continue-on-error: true
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          arch: x86_64
+          target: google_apis
+          profile: pixel_6
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -no-snapshot
+          working-directory: ${{ steps.target.outputs.dir }}
+          script: bash e2e.sh 35 || true
+
       - name: Collect reports
         if: always()
         working-directory: ${{ steps.target.outputs.dir }}

@@ -179,7 +179,7 @@ class TileViewTest {
     }
 
     @Test fun waiting_and_idle_states() {
-        assertEquals("Finding GPS…", TileView.from(SpeedState(running = true, status = Status.WAITING), false).subtitle)
+        assertEquals("Finding GPS · 0/0 sats", TileView.from(SpeedState(running = true, status = Status.WAITING), false).subtitle)
         assertEquals("Weak GPS signal", TileView.from(SpeedState(running = true, status = Status.WEAK), false).subtitle)
         assertEquals("Stopped · not moving", TileView.from(SpeedState(stopReason = StopReason.IDLE), false).subtitle)
     }

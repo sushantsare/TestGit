@@ -120,7 +120,7 @@ data class TileView(val active: Boolean, val label: String, val subtitle: String
                 }
                 Status.WEAK -> TileView(true, "-- km/h", "Weak GPS signal", null)
                 Status.GPS_OFF -> TileView(true, "Speed", "Location is off", null)
-                else -> TileView(true, "-- km/h", if (s.satsSeen > 0) "Finding GPS · ${s.satsSeen} sats" else "Finding GPS…", null)
+                else -> TileView(true, "-- km/h", "Finding GPS · ${s.satsUsed}/${s.satsSeen} sats", null)
             }
         }
     }
