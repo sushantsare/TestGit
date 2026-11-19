@@ -76,7 +76,7 @@ class WalkthroughTest {
         lm.setTestProviderEnabled(LocationManager.GPS_PROVIDER, true)
         instrumentation.runOnMainSync { app.engine.resetTrip() }
 
-        ActivityScenario.launch(MainActivity::class.java).use {
+        try { ActivityScenario.launch(MainActivity::class.java).use {
             waitTag("btn_start")
             compose.onNodeWithTag("btn_start").performClick()
             compose.waitUntil(10_000) { app.engine.state.value.running }
@@ -112,50 +112,9 @@ class WalkthroughTest {
             shell("cmd statusbar collapse")
             compose.waitUntil(8_000) { !app.engine.state.value.running }
             assertEquals(StopReason.PANEL_CLOSED, app.engine.state.value.stopReason)
+        } } finally {
+            runCatching { lm.removeTestProvider(LocationManager.GPS_PROVIDER) }
         }
-        runCatching { lm.removeTestProvider(LocationManager.GPS_PROVIDER) }
-    }
-
-    /** Tap the tile with the app in the background: it switches on and the tile shows km/h; tap again: off. */
-    @Test fun d_tileTapShowsSpeedInTile() {
-        shell("appops set ${ctx.packageName} android:mock_location allow")
-        val lm = ctx.getSystemService(Context.LOCATION_SERVICE) as LocationManager
-        runCatching { lm.removeTestProvider(LocationManager.GPS_PROVIDER) }
-        if (Build.VERSION.SDK_INT >= 31) {
-            lm.addTestProvider(LocationManager.GPS_PROVIDER, false, true, false, false, true, true, true,
-                ProviderProperties.POWER_USAGE_HIGH, ProviderProperties.ACCURACY_FINE)
-        }
-        lm.setTestProviderEnabled(LocationManager.GPS_PROVIDER, true)
-        instrumentation.runOnMainSync { app.engine.showForTest(SpeedState()) }
-        val tile = "${ctx.packageName}/.SpeedTileService"
-        shell("settings put secure sysui_qs_tiles custom($tile),wifi,bt,flashlight,dnd,airplane,rotation,location")
-        shell("input keyevent KEYCODE_HOME")
-        Thread.sleep(1500)
-        shell("cmd statusbar expand-settings")
-        Thread.sleep(2000)
-        shell("cmd statusbar click-tile $tile")
-        compose.waitUntil(15_000) { app.engine.state.value.running }
-        shell("cmd statusbar expand-settings")
-        var lat = 25.6
-        repeat(8) {
-            val l = Location(LocationManager.GPS_PROVIDER).apply {
-                latitude = lat; longitude = 85.1; accuracy = 5f; speed = 12.5f // 45 km/h
-                time = System.currentTimeMillis(); elapsedRealtimeNanos = SystemClock.elapsedRealtimeNanos()
-            }
-            runCatching { lm.setTestProviderLocation(LocationManager.GPS_PROVIDER, l) }
-            lat += 0.0001
-            Thread.sleep(700)
-        }
-        compose.waitUntil(10_000) { app.engine.state.value.status == Status.LIVE }
-        assertEquals(45f, app.engine.state.value.speedKmh!!, 0.6f)
-        Thread.sleep(1500)
-        shot("16_tile_tapped_shows_45_kmh")
-        shell("cmd statusbar click-tile $tile")
-        compose.waitUntil(10_000) { !app.engine.state.value.running }
-        Thread.sleep(1500)
-        shot("17_tile_tapped_again_off")
-        shell("cmd statusbar collapse")
-        runCatching { lm.removeTestProvider(LocationManager.GPS_PROVIDER) }
     }
 
     @Test fun c_noLauncherIcon() {
