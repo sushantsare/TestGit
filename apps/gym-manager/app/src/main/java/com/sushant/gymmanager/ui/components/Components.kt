@@ -47,6 +47,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Clear
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
@@ -62,6 +65,10 @@ import com.sushant.gymmanager.ui.theme.StatusAmber
 import com.sushant.gymmanager.ui.theme.StatusGreen
 import com.sushant.gymmanager.ui.theme.StatusRed
 import com.sushant.gymmanager.ui.theme.WhatsAppGreen
+import com.sushant.gymmanager.ui.theme.WhatsAppInk
+import com.sushant.gymmanager.ui.theme.StatusBlue
+import com.sushant.gymmanager.ui.theme.StatusGray
+import androidx.compose.runtime.ReadOnlyComposable
 import com.sushant.gymmanager.util.DateUtils
 import java.io.File
 
@@ -97,7 +104,8 @@ fun Pill(text: String, color: Color, modifier: Modifier = Modifier, filled: Bool
             text,
             modifier = Modifier.padding(horizontal = 10.dp, vertical = 3.dp),
             style = MaterialTheme.typography.labelSmall,
-            maxLines = 1
+            maxLines = 1,
+            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
         )
     }
 }
@@ -167,7 +175,7 @@ fun WhatsAppButton(onClick: () -> Unit, modifier: Modifier = Modifier, contentDe
         modifier = modifier.size(40.dp),
         colors = IconButtonDefaults.filledTonalIconButtonColors(
             containerColor = WhatsAppGreen.copy(alpha = 0.15f),
-            contentColor = Color(0xFF128C4A)
+            contentColor = WhatsAppInk
         )
     ) {
         Icon(Icons.AutoMirrored.Filled.Chat, contentDescription = contentDescription, modifier = Modifier.size(20.dp))
@@ -280,12 +288,13 @@ fun AppTimePickerDialog(title: String, initial: String, onPick: (String) -> Unit
 
 data class PlanStatus(val label: String, val color: Color)
 
-val FrozenBlue = Color(0xFF0284C7)
+val FrozenBlue: Color @Composable @ReadOnlyComposable get() = StatusBlue
 
 /** Labels are English keys; translate with t(status.label). */
+@Composable
 fun planStatus(membership: MembershipEntity?, thresholdDays: Int, frozen: Boolean = false): PlanStatus = when {
-    frozen -> PlanStatus("Frozen", FrozenBlue)
-    membership == null -> PlanStatus("No Plan", Color(0xFF64748B))
+    frozen -> PlanStatus("Frozen", StatusBlue)
+    membership == null -> PlanStatus("No Plan", StatusGray)
     DateUtils.isExpired(membership.expiryDate) -> PlanStatus("Expired", StatusRed)
     DateUtils.isExpiringSoon(membership.expiryDate, thresholdDays) -> PlanStatus("Expiring Soon", StatusAmber)
     else -> PlanStatus("Active", StatusGreen)
@@ -297,4 +306,46 @@ fun LabeledValue(label: String, value: String, modifier: Modifier = Modifier) {
         Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Text(value, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
     }
+}
+
+/** Rounded search box used above long lists. */
+@Composable
+fun SearchField(
+    query: String,
+    onChange: (String) -> Unit,
+    placeholder: String,
+    modifier: Modifier = Modifier,
+    tag: String = "search"
+) {
+    androidx.compose.material3.OutlinedTextField(
+        value = query,
+        onValueChange = onChange,
+        modifier = modifier.fillMaxWidth().testTag(tag),
+        placeholder = { Text(placeholder, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis) },
+        leadingIcon = { Icon(androidx.compose.material.icons.Icons.Default.Search, null) },
+        trailingIcon = {
+            if (query.isNotEmpty()) {
+                androidx.compose.material3.IconButton(onClick = { onChange("") }) {
+                    Icon(androidx.compose.material.icons.Icons.Default.Clear, t("Clear search"))
+                }
+            }
+        },
+        singleLine = true,
+        shape = RoundedCornerShape(16.dp),
+        colors = androidx.compose.material3.OutlinedTextFieldDefaults.colors(
+            unfocusedContainerColor = MaterialTheme.colorScheme.surface,
+            focusedContainerColor = MaterialTheme.colorScheme.surface,
+            unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant
+        )
+    )
+}
+
+/** Matches a member by name, roll number or (3+ digits of) WhatsApp number. */
+fun com.sushant.gymmanager.data.local.MemberEntity.matches(query: String): Boolean {
+    val term = query.trim()
+    if (term.isEmpty()) return true
+    val digits = term.filter { it.isDigit() }
+    return fullName.contains(term, ignoreCase = true) ||
+        rollNumber.contains(term, ignoreCase = true) ||
+        (digits.length >= 3 && whatsappNumber.filter { it.isDigit() }.contains(digits))
 }

@@ -157,7 +157,7 @@ class GymRepository(private val context: Context, private val db: AppDatabase) {
         if (old != null && old.photoUri != member.photoUri) PhotoStore.delete(old.photoUri)
 
         val current = memberships.getActiveFor(member.id)
-        val hasPayments = cycles.getFor(member.id).any { it.paidAmount > 0 }
+        val hasPayments = cycles.getFor(member.id).any { it.paidAmount > 0 || it.waivedAmount > 0 }
         val start = member.dateOfJoining.ifBlank { DateUtils.today() }
         if (current == null) {
             memberships.insert(
@@ -187,7 +187,7 @@ class GymRepository(private val context: Context, private val db: AppDatabase) {
     private suspend fun rebuildCycles(memberId: Long, today: LocalDate = LocalDate.now()) {
         val member = members.getById(memberId) ?: return
         val plan = memberships.getActiveFor(memberId) ?: return
-        val kept = cycles.getFor(memberId).filter { it.paidAmount > 0 }
+        val kept = cycles.getFor(memberId).filter { it.paidAmount > 0 || it.waivedAmount > 0 }
         cycles.deleteUntouchedFor(memberId)
         var newestEnd: String
         if (kept.isEmpty()) {
@@ -298,6 +298,14 @@ class GymRepository(private val context: Context, private val db: AppDatabase) {
     // ---------- Payments ----------
     private fun receiptNo(n: Long) = "GM-" + String.format(Locale.ENGLISH, "%05d", n)
 
+    /** Highest receipt number ever issued (settings counter, or the ledger for older data). */
+    private suspend fun lastReceiptNumber(): Long {
+        val fromLedger = payments.getAll().mapNotNull { parseReceiptNo(it.receiptNo) }.maxOrNull() ?: 0L
+        return maxOf(getSettings().lastReceiptNo, fromLedger)
+    }
+
+    fun unpaidFor(memberId: Long): Flow<List<PaymentCycleEntity>> = cycles.observeUnpaidFor(memberId)
+
     /**
      * Records money against cycles. [amounts] maps cycleId -> amount paid now (may be less than the balance
      * for a partial payment). One receipt is produced per member.
@@ -305,7 +313,7 @@ class GymRepository(private val context: Context, private val db: AppDatabase) {
     suspend fun recordPayments(amounts: Map<Long, Double>, mode: String, note: String? = null): List<ReceiptRef> = db.withTransaction {
         val now = DateUtils.nowTimestamp()
         val list = cycles.getByIds(amounts.keys.toList())
-        var counter = payments.maxId() + 1
+        var counter = lastReceiptNumber() + 1
         val refs = mutableListOf<ReceiptRef>()
         for ((memberId, memberCycles) in list.groupBy { it.memberId }) {
             val receipt = receiptNo(counter++)
@@ -320,13 +328,45 @@ class GymRepository(private val context: Context, private val db: AppDatabase) {
                     )
                 )
                 val paid = c.paidAmount + pay
-                val full = paid >= c.amount - 0.005
+                val full = c.settledWith(paid)
                 cycles.update(c.copy(paidAmount = paid, isPaid = full, paidDate = if (full) now else c.paidDate, paymentMode = mode))
                 total += pay
             }
             if (total > 0) refs += ReceiptRef(receipt, memberId, total)
         }
+        if (refs.isNotEmpty()) {
+            val used = refs.maxOf { parseReceiptNo(it.receiptNo) ?: 0L }
+            settingsDao.upsert(getSettings().copy(id = 1, lastReceiptNo = maxOf(getSettings().lastReceiptNo, used)))
+        }
         refs
+    }
+
+    /** Lets go of part or all of a due (discount, write-off or a due added by mistake). */
+    suspend fun waive(cycleId: Long, amount: Double, reason: String) = db.withTransaction {
+        val c = cycles.getById(cycleId) ?: return@withTransaction
+        val add = amount.coerceIn(0.0, c.balance)
+        if (add <= 0.0) return@withTransaction
+        val waived = c.waivedAmount + add
+        val full = c.settledWith(c.paidAmount, waived)
+        cycles.update(
+            c.copy(
+                waivedAmount = waived, waiveReason = reason.trim().ifBlank { null } ?: c.waiveReason,
+                isPaid = full, paidDate = if (full) (c.paidDate ?: DateUtils.nowTimestamp()) else c.paidDate
+            )
+        )
+    }
+
+    /** Puts a waived amount back as due (undo of [waive]). */
+    suspend fun unwaive(cycleId: Long, amount: Double) = db.withTransaction {
+        val c = cycles.getById(cycleId) ?: return@withTransaction
+        val waived = (c.waivedAmount - amount).coerceAtLeast(0.0)
+        val full = c.settledWith(c.paidAmount, waived)
+        cycles.update(
+            c.copy(
+                waivedAmount = waived, waiveReason = if (waived > 0) c.waiveReason else null,
+                isPaid = full, paidDate = if (full) c.paidDate else null
+            )
+        )
     }
 
     /** Pays the full balance of each cycle (quick "Mark as Paid"). */
@@ -341,7 +381,7 @@ class GymRepository(private val context: Context, private val db: AppDatabase) {
         payments.delete(paymentId)
         val c = cycles.getById(p.cycleId) ?: return@withTransaction
         val paid = (c.paidAmount - p.amount).coerceAtLeast(0.0)
-        val full = paid >= c.amount - 0.005
+        val full = c.settledWith(paid)
         cycles.update(c.copy(paidAmount = paid, isPaid = full, paidDate = if (full) c.paidDate else null))
     }
 
@@ -358,6 +398,45 @@ class GymRepository(private val context: Context, private val db: AppDatabase) {
     // ---------- Expenses ----------
     suspend fun saveExpense(e: ExpenseEntity) = expenses.upsert(e)
     suspend fun deleteExpense(id: Long) = expenses.delete(id)
+
+    // ---------- Bulk changes ----------
+    /** Re-sorts every member into Morning/Evening after the shift windows change. Returns how many moved. */
+    suspend fun reassignShifts(morningStart: String, morningEnd: String): Int = db.withTransaction {
+        var moved = 0
+        for (m in members.getAll()) {
+            val shift = DateUtils.determineShift(m.fromTime, morningStart, morningEnd)
+            if (shift != m.shift) {
+                members.setShift(m.id, shift)
+                moved++
+            }
+        }
+        moved
+    }
+
+    /**
+     * New fee for everyone on [planType]: the plan price changes, and dues that start from [fromDate] onwards
+     * and have no money against them use the new fee. Running and past dues keep their price.
+     */
+    suspend fun bulkChangeFee(planType: String, fee: Double, fromDate: String = DateUtils.today()): Int = db.withTransaction {
+        val plans = memberships.getAllActive().filter { it.planType == planType }
+        val ids = plans.map { it.memberId }.toSet()
+        plans.forEach { memberships.update(it.copy(fee = fee)) }
+        cycles.getUntouchedFrom(fromDate).filter { it.memberId in ids }.forEach { cycles.update(it.copy(amount = fee)) }
+        plans.size
+    }
+
+    /** Adds members from an import; rows whose roll number already exists are skipped. Returns added count. */
+    suspend fun importMembers(rows: List<Pair<MemberEntity, PlanInput>>): Int {
+        var added = 0
+        for ((m, plan) in rows) {
+            if (isRollTaken(m.rollNumber, 0)) continue
+            addMember(m, plan)
+            added++
+        }
+        return added
+    }
+
+    val lastSeen: Flow<List<com.sushant.gymmanager.data.local.LastSeen>> = attendance.observeLastSeen()
 
     // ---------- Attendance ----------
     fun attendanceForDate(date: String): Flow<List<AttendanceEntity>> = attendance.observeForDate(date)
@@ -454,6 +533,23 @@ class GymRepository(private val context: Context, private val db: AppDatabase) {
     }
 
     companion object {
+        fun parseReceiptNo(r: String): Long? = r.removePrefix("GM-").toLongOrNull()
+
+        /** Splits [amount] over [cycles], oldest first (partial payment across several dues). */
+        fun allocate(cycles: List<PaymentCycleEntity>, amount: Double): Map<Long, Double> {
+            var left = amount
+            val out = LinkedHashMap<Long, Double>()
+            for (c in cycles.sortedBy { it.cycleStart }) {
+                if (left <= 0.005) break
+                val pay = minOf(left, c.balance)
+                if (pay > 0) {
+                    out[c.id] = pay
+                    left -= pay
+                }
+            }
+            return out
+        }
+
         const val QR_PREFIX = "GYMMGR|"
         fun qrContent(roll: String) = QR_PREFIX + roll
         fun parseQr(code: String): String? {

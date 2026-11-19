@@ -90,7 +90,25 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.flatMapLatest
+import android.os.Build
+import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.material.icons.automirrored.filled.ReceiptLong
+import androidx.compose.material.icons.filled.NotificationsActive
+import androidx.compose.material3.Button
+import androidx.compose.material3.TextButton
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleEventEffect
+import com.sushant.gymmanager.ui.components.rememberGymApp
+import com.sushant.gymmanager.ui.components.rememberPermissionRequester
+import com.sushant.gymmanager.ui.members.MemberFilter
+import com.sushant.gymmanager.work.Notifications
 import java.time.LocalDate
+
+data class AwayItem(val member: MemberEntity, val lastSeen: String?, val days: Long)
 
 data class ExpiringItem(val member: MemberEntity, val membership: MembershipEntity, val daysLeft: Long, val dues: List<DuePeriod>)
 
@@ -109,22 +127,37 @@ data class DashboardState(
     val expiringCount: Int,
     val expiringDays: Int,
     val collectedThisMonth: Double,
-    val expiring: List<ExpiringItem>
+    val expiring: List<ExpiringItem>,
+    val expiredCount: Int = 0,
+    val away: List<AwayItem> = emptyList(),
+    val awayCount: Int = 0
 )
 
 class DashboardViewModel(app: Application) : AndroidViewModel(app) {
     private val repo = (app as GymApp).repository
 
+    /** Today's date; refreshed when the screen resumes so the dashboard moves on after midnight. */
+    private val day = MutableStateFlow(DateUtils.today())
+
     init {
         viewModelScope.launch { repo.checkAndGenerateAutoRenewalCycles() }
     }
 
+    fun refreshDay() {
+        val today = DateUtils.today()
+        if (day.value != today) {
+            day.value = today
+            viewModelScope.launch { repo.checkAndGenerateAutoRenewalCycles() }
+        }
+    }
+
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
     private val base = combine(
         repo.settings,
         repo.activeMembersWithPlans,
         repo.allMembers,
         repo.unpaidCycles,
-        repo.attendanceForDate(DateUtils.today())
+        day.flatMapLatest { repo.attendanceForDate(it) }
     ) { settings, active, all, unpaid, attendance -> Base(settings, active, all, unpaid, attendance) }
 
     private data class Base(
@@ -135,9 +168,10 @@ class DashboardViewModel(app: Application) : AndroidViewModel(app) {
         val attendance: List<com.sushant.gymmanager.data.local.AttendanceEntity>
     )
 
-    val state: StateFlow<DashboardState?> = combine(base, repo.allPayments) { b, payments ->
+    val state: StateFlow<DashboardState?> = combine(base, repo.allPayments, repo.lastSeen) { b, payments, seen ->
         val settings = b.settings
         val today = LocalDate.now()
+        val lastSeen = seen.associate { it.memberId to it.lastDate }
         val running = b.active.filter { it.member.frozenFrom == null }
         val known = b.all.map { it.id }.toSet()
         val unpaid = b.unpaid.filter { it.memberId in known }
@@ -154,6 +188,17 @@ class DashboardViewModel(app: Application) : AndroidViewModel(app) {
             )
         }.sortedBy { it.daysLeft }
         val monthPrefix = today.toString().take(7)
+        val expiredCount = running.count { mp -> mp.membership?.let { DateUtils.isExpired(it.expiryDate, today) } == true }
+        // Regulars who stopped coming: not marked present for 7+ days (and joined at least 7 days ago).
+        val away = running.mapNotNull { mp ->
+            val m = mp.member
+            val joined = DateUtils.parseDate(m.dateOfJoining) ?: return@mapNotNull null
+            if (java.time.temporal.ChronoUnit.DAYS.between(joined, today) < AWAY_DAYS) return@mapNotNull null
+            val last = lastSeen[m.id]
+            val from = DateUtils.parseDate(last) ?: joined
+            val days = java.time.temporal.ChronoUnit.DAYS.between(from, today)
+            if (days >= AWAY_DAYS) AwayItem(m, last, days) else null
+        }.sortedBy { it.days }
         DashboardState(
             gymName = settings.gymName,
             activeCount = b.active.size,
@@ -169,9 +214,16 @@ class DashboardViewModel(app: Application) : AndroidViewModel(app) {
             expiringCount = expiring.size,
             expiringDays = settings.expiringSoonDays,
             collectedThisMonth = payments.filter { it.paidAt.startsWith(monthPrefix) }.sumOf { it.amount },
-            expiring = expiring.take(5)
+            expiring = expiring.take(5),
+            expiredCount = expiredCount,
+            away = away.take(5),
+            awayCount = away.size
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
+
+    companion object {
+        const val AWAY_DAYS = 7L
+    }
 }
 
 @Composable
@@ -186,6 +238,19 @@ fun DashboardScreen(
     var openId by remember { mutableStateOf<Long?>(null) }
     val context = LocalContext.current
     val lang = currentLang()
+    val app = rememberGymApp()
+    var canPost by remember { mutableStateOf(Notifications.canPost(context)) }
+    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
+        vm.refreshDay()
+        canPost = Notifications.canPost(context)
+    }
+    val notifPermission = rememberPermissionRequester(
+        "android.permission.POST_NOTIFICATIONS",
+        title = t("Daily summary notification"),
+        reason = t("Allow notifications so the app can tell you each day which memberships are expiring and how much is pending."),
+        deniedMessage = t("Notifications are off, so the daily summary can't be shown.")
+    )
+    val settings by app.repository.settings.collectAsStateWithLifecycle(initialValue = null)
 
     Scaffold(
         topBar = {
@@ -209,49 +274,74 @@ fun DashboardScreen(
         ) {
             HeroBanner(s.collectedThisMonth)
 
+            // The daily summary is on but Android 13+ hasn't been allowed to show it yet: ask here, with the reason.
+            val st = settings
+            if (Build.VERSION.SDK_INT >= 33 && st != null && st.dailyReminderEnabled && !canPost) {
+                AppCard(Modifier.fillMaxWidth().testTag("notif_card")) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.NotificationsActive, null, tint = MaterialTheme.colorScheme.primary)
+                        Spacer(Modifier.width(12.dp))
+                        Column(Modifier.weight(1f)) {
+                            Text(t("Get a morning summary?"), style = MaterialTheme.typography.titleSmall)
+                            Text(
+                                t("One notification a day with expiring memberships and pending dues."),
+                                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                        TextButton(onClick = {
+                            app.appScope.launch { app.repository.saveSettings(app.repository.getSettings().copy(dailyReminderEnabled = false)) }
+                        }) { Text(t("Not now")) }
+                        Button(onClick = { notifPermission.request(onDenied = { canPost = false }) { canPost = true } }, modifier = Modifier.testTag("notif_allow")) {
+                            Text(t("Allow"))
+                        }
+                    }
+                }
+            }
+
             // 2 x 2 overview
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.height(IntrinsicSize.Min)) {
                     MetricCard(
-                        Modifier.weight(1f), Icons.Default.Groups, MaterialTheme.colorScheme.primary,
+                        Modifier.weight(1f).fillMaxHeight(), Icons.Default.Groups, MaterialTheme.colorScheme.primary,
                         s.activeCount.toString(), t("Active Members"),
                         if (s.frozenCount > 0) t("%d inactive • %d frozen", s.inactiveCount, s.frozenCount) else t("%d inactive", s.inactiveCount)
-                    ) { onNavigate(Routes.MEMBERS) }
+                    ) { onNavigate("members:${MemberFilter.ALL}") }
                     MetricCard(
-                        Modifier.weight(1f), Icons.Default.EventAvailable, StatusGreen,
+                        Modifier.weight(1f).fillMaxHeight(), Icons.Default.EventAvailable, StatusGreen,
                         "${s.morningPresent + s.eveningPresent}/${s.morningExpected + s.eveningExpected}",
                         t("Today's Attendance"), t("M: %d/%d • E: %d/%d", s.morningPresent, s.morningExpected, s.eveningPresent, s.eveningExpected)
                     ) { onNavigate(Routes.ATTENDANCE) }
                 }
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.height(IntrinsicSize.Min)) {
                     MetricCard(
-                        Modifier.weight(1f), Icons.Default.CurrencyRupee, StatusRed,
+                        Modifier.weight(1f).fillMaxHeight(), Icons.Default.CurrencyRupee, StatusRed,
                         Money.format(s.pendingTotal), t("Pending Dues"),
-                        if (s.overdueCycles == 0) t("All clear") else t(if (s.overdueCycles == 1) "%d overdue cycle" else "%d overdue cycles", s.overdueCycles)
+                        if (s.overdueCycles == 0) t("All clear") else t(if (s.membersWithDues == 1) "%d member owes" else "%d members owe", s.membersWithDues)
                     ) { onNavigate(Routes.PAYMENTS) }
                     MetricCard(
-                        Modifier.weight(1f), Icons.Default.HourglassBottom, StatusAmber,
-                        s.expiringCount.toString(), t("Expiring Soon"), t("Within %d days", s.expiringDays)
-                    ) { onNavigate(Routes.MEMBERS) }
+                        Modifier.weight(1f).fillMaxHeight(), Icons.Default.HourglassBottom, StatusAmber,
+                        s.expiringCount.toString(), t("Expiring Soon"),
+                        if (s.expiredCount > 0) t("Within %d days • %d expired", s.expiringDays, s.expiredCount) else t("Within %d days", s.expiringDays)
+                    ) { onNavigate("members:" + if (s.expiringCount == 0 && s.expiredCount > 0) MemberFilter.EXPIRED else MemberFilter.EXPIRING) }
                 }
             }
 
-            // Quick actions
+            // Quick actions (only things the tiles above don't already open)
             SectionTitle(t("Quick Actions"))
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                QuickAction(Modifier.weight(1f), Icons.Default.PersonAdd, t("Add Member"), onAddMember)
-                QuickAction(Modifier.weight(1f), Icons.Default.EventAvailable, t("Attendance")) { onNavigate(Routes.ATTENDANCE) }
-                QuickAction(Modifier.weight(1f), Icons.Default.Payments, t("Payments")) { onNavigate(Routes.PAYMENTS) }
-                QuickAction(Modifier.weight(1f), Icons.Default.BarChart, t("Reports")) { onNavigate(Routes.REPORTS) }
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.height(IntrinsicSize.Min)) {
+                QuickAction(Modifier.weight(1f).fillMaxHeight(), Icons.Default.PersonAdd, t("Add Member"), onAddMember)
+                QuickAction(Modifier.weight(1f).fillMaxHeight(), Icons.AutoMirrored.Filled.ReceiptLong, t("Expenses")) { onNavigate(Routes.EXPENSES) }
+                QuickAction(Modifier.weight(1f).fillMaxHeight(), Icons.Default.BarChart, t("Reports")) { onNavigate(Routes.REPORTS) }
+                QuickAction(Modifier.weight(1f).fillMaxHeight(), Icons.Default.Backup, t("Backup")) { onNavigate(Routes.BACKUP) }
             }
 
             // Expiring list
             SectionTitle(t("Memberships Expiring Soon")) {
-                if (s.expiringCount > 5) Text(
-                    t("+%d more", s.expiringCount - 5),
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.primary
-                )
+                if (s.expiringCount > 5) TextButton(onClick = { onNavigate("members:${MemberFilter.EXPIRING}") }) {
+                    Text(t("See all %d", s.expiringCount))
+                }
             }
             if (s.expiring.isEmpty()) {
                 AppCard(Modifier.fillMaxWidth()) {
@@ -291,9 +381,52 @@ fun DashboardScreen(
                     }
                 }
             }
+
+            // Members who stopped coming
+            if (s.away.isNotEmpty()) {
+                SectionTitle(t("Not seen for %d+ days", DashboardViewModel.AWAY_DAYS.toInt())) {
+                    if (s.awayCount > 5) Text(
+                        t("+%d more", s.awayCount - 5),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                AppCard(Modifier.fillMaxWidth().testTag("away_list"), contentPadding = PaddingValues(vertical = 4.dp)) {
+                    s.away.forEachIndexed { i, item ->
+                        AwayRow(item, onClick = { openId = item.member.id }) {
+                            WhatsAppHelper.open(context, item.member.whatsappNumber, WhatsAppHelper.buildMissYouMessage(item.member.fullName, s.gymName, lang))
+                        }
+                        if (i < s.away.lastIndex) {
+                            androidx.compose.material3.HorizontalDivider(
+                                Modifier.padding(start = 72.dp, end = 16.dp),
+                                color = MaterialTheme.colorScheme.outlineVariant
+                            )
+                        }
+                    }
+                }
+            }
         }
     }
     openId?.let { MemberCardDialog(it, onDismiss = { openId = null }, onEdit = onEditMember) }
+}
+
+@Composable
+private fun AwayRow(item: AwayItem, onClick: () -> Unit, onNudge: () -> Unit) {
+    Surface(onClick = onClick, color = Color.Transparent) {
+        Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+            MemberAvatar(item.member.photoUri, item.member.fullName, size = 44.dp)
+            Spacer(Modifier.width(12.dp))
+            Column(Modifier.weight(1f)) {
+                Text(item.member.fullName, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(
+                    if (item.lastSeen == null) t("No visits recorded yet") else t("Last came %s • %d days ago", DateUtils.formatShort(item.lastSeen), item.days),
+                    style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1, overflow = TextOverflow.Ellipsis
+                )
+            }
+            WhatsAppButton(onClick = onNudge, contentDescription = t("Message %s", item.member.fullName))
+        }
+    }
 }
 
 @Composable
@@ -330,7 +463,7 @@ private fun MetricCard(
     sub: String,
     onClick: () -> Unit
 ) {
-    AppCard(modifier = modifier.height(140.dp), onClick = onClick, contentPadding = PaddingValues(14.dp)) {
+    AppCard(modifier = modifier.heightIn(min = 140.dp), onClick = onClick, contentPadding = PaddingValues(14.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Box(
                 Modifier.size(36.dp).clip(RoundedCornerShape(10.dp)).background(tint.copy(alpha = 0.13f)),
@@ -339,9 +472,10 @@ private fun MetricCard(
             Spacer(Modifier.weight(1f))
             Icon(Icons.AutoMirrored.Filled.ArrowForward, null, Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f))
         }
+        Spacer(Modifier.height(12.dp))
         Spacer(Modifier.weight(1f))
         Text(value, style = MaterialTheme.typography.headlineSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
-        Text(label, style = MaterialTheme.typography.labelLarge, maxLines = 1)
+        Text(label, style = MaterialTheme.typography.labelLarge, maxLines = 2, overflow = TextOverflow.Ellipsis)
         Text(sub, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
 }
@@ -355,7 +489,7 @@ private fun QuickAction(modifier: Modifier, icon: ImageVector, label: String, on
                 contentAlignment = Alignment.Center
             ) { Icon(icon, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(22.dp)) }
             Spacer(Modifier.height(8.dp))
-            Text(label, style = MaterialTheme.typography.labelMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(label, style = MaterialTheme.typography.labelMedium, maxLines = 2, overflow = TextOverflow.Ellipsis, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
         }
     }
 }

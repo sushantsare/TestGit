@@ -1,6 +1,9 @@
 package com.sushant.gymmanager.ui.members
 
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.ui.unit.dp
+import com.sushant.gymmanager.ui.components.SearchField
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
@@ -27,22 +30,28 @@ fun DeactivatedMembersScreen(
     vm: MembersViewModel = viewModel()
 ) {
     val list by vm.inactive.collectAsStateWithLifecycle()
+    val total by vm.inactiveCount.collectAsStateWithLifecycle()
+    val query by vm.inactiveQuery.collectAsStateWithLifecycle()
     val settings by vm.settings.collectAsStateWithLifecycle()
     var openId by remember { mutableStateOf<Long?>(null) }
 
     Scaffold(
         topBar = {
             GymTopBar(
-                title = t("Deactivated (%d)", list?.size ?: 0),
+                title = t("Deactivated (%d)", total),
                 subtitle = t("Tap a member to reactivate, edit or delete"),
                 onBack = onBack
             )
         }
     ) { padding ->
-        Box(Modifier.fillMaxSize().padding(padding)) {
+        Column(Modifier.fillMaxSize().padding(padding)) {
+            if (total > 0) {
+                SearchField(query, { vm.inactiveQuery.value = it }, t("Search name, roll no. or WhatsApp"), Modifier.padding(horizontal = 16.dp, vertical = 4.dp))
+            }
             val items = list
             when {
-                items == null -> CircularProgressIndicator(Modifier.align(Alignment.Center))
+                items == null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
+                items.isEmpty() && query.isNotBlank() -> EmptyState(Icons.Default.HowToReg, t("No matches"), t("No deactivated member matches \"%s\".", query))
                 items.isEmpty() -> EmptyState(Icons.Default.HowToReg, t("No deactivated members"), t("Members you deactivate will appear here with their history intact."))
                 else -> MemberList(items, settings, onOpen = { openId = it })
             }

@@ -30,7 +30,7 @@ class AppLockScreenTest {
         }
         compose.onNodeWithTag("app_lock").assertIsDisplayed()
         compose.onNodeWithText("PowerFit Gym").assertIsDisplayed()
-        compose.onNodeWithText("Biometric Protection Enabled").assertIsDisplayed()
+        compose.onNodeWithText("App lock is on").assertIsDisplayed()
         compose.onNodeWithText("Unlock Application").assertIsDisplayed().performClick()
         assertEquals(1, clicks)
 

@@ -10,7 +10,7 @@
     </LinearLayout>
     <LinearLayout android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1"
         android:layout_marginTop="8dp" android:orientation="horizontal">
-        <LinearLayout android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1"
+        <LinearLayout android:id="@+id/w_cell_active" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1"
             android:layout_marginHorizontal="3dp" android:background="@drawable/widget_cell"
             android:gravity="center" android:orientation="vertical" android:padding="6dp">
             <TextView android:id="@+id/w_active" android:layout_width="wrap_content" android:layout_height="wrap_content"
@@ -18,7 +18,7 @@
             <TextView android:id="@+id/w_active_label" android:layout_width="wrap_content" android:layout_height="wrap_content"
                 android:textColor="#E6FFFFFF" android:textSize="11sp" android:maxLines="1" />
         </LinearLayout>
-        <LinearLayout android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1"
+        <LinearLayout android:id="@+id/w_cell_present" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1"
             android:layout_marginHorizontal="3dp" android:background="@drawable/widget_cell"
             android:gravity="center" android:orientation="vertical" android:padding="6dp">
             <TextView android:id="@+id/w_present" android:layout_width="wrap_content" android:layout_height="wrap_content"
@@ -26,7 +26,7 @@
             <TextView android:id="@+id/w_present_label" android:layout_width="wrap_content" android:layout_height="wrap_content"
                 android:textColor="#E6FFFFFF" android:textSize="11sp" android:maxLines="1" />
         </LinearLayout>
-        <LinearLayout android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1"
+        <LinearLayout android:id="@+id/w_cell_dues" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1"
             android:layout_marginHorizontal="3dp" android:background="@drawable/widget_cell"
             android:gravity="center" android:orientation="vertical" android:padding="6dp">
             <TextView android:id="@+id/w_dues" android:layout_width="wrap_content" android:layout_height="wrap_content"
@@ -34,7 +34,7 @@
             <TextView android:id="@+id/w_dues_label" android:layout_width="wrap_content" android:layout_height="wrap_content"
                 android:textColor="#E6FFFFFF" android:textSize="11sp" android:maxLines="1" />
         </LinearLayout>
-        <LinearLayout android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1"
+        <LinearLayout android:id="@+id/w_cell_expiring" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1"
             android:layout_marginHorizontal="3dp" android:background="@drawable/widget_cell"
             android:gravity="center" android:orientation="vertical" android:padding="6dp">
             <TextView android:id="@+id/w_expiring" android:layout_width="wrap_content" android:layout_height="wrap_content"

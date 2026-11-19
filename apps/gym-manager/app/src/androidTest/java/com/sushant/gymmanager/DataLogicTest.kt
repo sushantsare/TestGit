@@ -54,7 +54,8 @@ class DataLogicTest {
             ).forEach { db.execSQL(it) }
             db.version = 1
         }
-        val room = Room.databaseBuilder(ctx, AppDatabase::class.java, name).addMigrations(AppDatabase.MIGRATION_1_2).build()
+        val room = Room.databaseBuilder(ctx, AppDatabase::class.java, name)
+            .addMigrations(AppDatabase.MIGRATION_1_2, AppDatabase.MIGRATION_2_3).build()
         val repo = GymRepository(ctx, room)
         val snap = repo.snapshot()
         assertEquals(1, snap.members.size)
@@ -65,8 +66,80 @@ class DataLogicTest {
         assertEquals(0.0, snap.paymentCycles.first { it.id == 2L }.paidAmount, 0.01)
         assertEquals(1, snap.payments.size)
         assertEquals(1, snap.attendance.size)
+        // v2 -> v3 columns arrive with safe defaults and the receipt counter starts after the old ledger
+        assertEquals(0.0, paid.waivedAmount, 0.01)
+        assertTrue(snap.settings.lastReceiptNo >= 1)
         room.close()
         ctx.deleteDatabase(name)
+    }
+
+    /** Undoing the latest payment must never let its receipt number be issued again. */
+    @Test
+    fun receiptNumbersNeverRepeatAfterUndo(): Unit = runBlocking {
+        val (db, repo) = memoryRepo()
+        val a = repo.addMember(member("10", LocalDate.now()), PlanInput(PlanType.ONE_MONTH, 0, 0, 1000.0, true))
+        val b = repo.addMember(member("11", LocalDate.now()), PlanInput(PlanType.ONE_MONTH, 0, 0, 1000.0, true))
+        val first = repo.recordPayments(mapOf(repo.cyclesOf(a).single().id to 1000.0), PayMode.CASH).single().receiptNo
+        val second = repo.recordPayments(mapOf(repo.cyclesOf(b).single().id to 500.0), PayMode.CASH).single().receiptNo
+        repo.undoPayment(repo.paymentsFor(b).first().single().id)
+        val third = repo.recordPayments(mapOf(repo.cyclesOf(b).single().id to 500.0), PayMode.CASH).single().receiptNo
+        assertTrue(setOf(first, second, third).size == 3)
+        assertTrue(GymRepository.parseReceiptNo(third)!! > GymRepository.parseReceiptNo(second)!!)
+        db.close()
+    }
+
+    @Test
+    fun waiveAndUndoWaive(): Unit = runBlocking {
+        val (db, repo) = memoryRepo()
+        val id = repo.addMember(member("12", LocalDate.now()), PlanInput(PlanType.ONE_MONTH, 0, 0, 1000.0, true))
+        val c = repo.cyclesOf(id).single()
+        repo.recordPayments(mapOf(c.id to 600.0), PayMode.CASH)
+        repo.waive(c.id, 400.0, "Discount")
+        var now = repo.cyclesOf(id).single()
+        assertTrue(now.isPaid)
+        assertEquals(0.0, now.balance, 0.01)
+        repo.unwaive(c.id, 400.0)
+        now = repo.cyclesOf(id).single()
+        assertFalse(now.isPaid)
+        assertEquals(400.0, now.balance, 0.01)
+        db.close()
+    }
+
+    @Test
+    fun allocateFillsOldestDueFirst(): Unit = runBlocking {
+        val (db, repo) = memoryRepo()
+        val id = repo.addMember(member("13", LocalDate.now().minusDays(40)), PlanInput(PlanType.ONE_MONTH, 0, 0, 1000.0, true))
+        repo.checkAndGenerateAutoRenewalCycles()
+        val dues = repo.cyclesOf(id)
+        assertEquals(2, dues.size)
+        repo.recordPayments(GymRepository.allocate(dues, 1300.0), PayMode.UPI)
+        val after = repo.cyclesOf(id)
+        assertTrue(after.first().isPaid)
+        assertEquals(700.0, after.last().balance, 0.01)
+        db.close()
+    }
+
+    @Test
+    fun shiftWindowChangeMovesMembers(): Unit = runBlocking {
+        val (db, repo) = memoryRepo()
+        val id = repo.addMember(member("14", LocalDate.now()).copy(fromTime = "11:00", toTime = "12:00", shift = "EVENING"), PlanInput(PlanType.ONE_MONTH, 0, 0, 1000.0, true))
+        assertEquals(1, repo.reassignShifts("05:00", "12:00"))
+        assertEquals("MORNING", repo.getMember(id)!!.shift)
+        assertEquals(0, repo.reassignShifts("05:00", "12:00"))
+        db.close()
+    }
+
+    @Test
+    fun bulkFeeChangesOnlyFutureUntouchedDues(): Unit = runBlocking {
+        val (db, repo) = memoryRepo()
+        val id = repo.addMember(member("15", LocalDate.now().minusDays(5)), PlanInput(PlanType.ONE_MONTH, 0, 0, 1000.0, true))
+        assertEquals(1, repo.bulkChangeFee(PlanType.ONE_MONTH, 1200.0))
+        assertEquals(1200.0, repo.getActiveMembership(id)!!.fee, 0.01)
+        // The running due started before today, so it keeps its price
+        assertEquals(1000.0, repo.cyclesOf(id).single().amount, 0.01)
+        repo.renewMembership(id)
+        assertEquals(1200.0, repo.cyclesOf(id).last().amount, 0.01)
+        db.close()
     }
 
     private fun memoryRepo(): Pair<AppDatabase, GymRepository> {

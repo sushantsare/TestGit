@@ -70,6 +70,12 @@ import com.sushant.gymmanager.ui.theme.StatusRed
 import com.sushant.gymmanager.util.DateUtils
 import com.sushant.gymmanager.util.Money
 import kotlinx.coroutines.launch
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
+import androidx.compose.runtime.rememberCoroutineScope
+import com.sushant.gymmanager.ui.components.ConfirmDialog
 import java.time.LocalDate
 
 fun categoryIcon(category: String): ImageVector = when (category) {
@@ -87,9 +93,15 @@ fun ExpensesScreen(onOpenDrawer: () -> Unit) {
     val lang = currentLang()
     val list by app.repository.allExpenses.collectAsStateWithLifecycle(initialValue = null)
     var editing by remember { mutableStateOf<ExpenseEntity?>(null) }
+    var confirmDelete by remember { mutableStateOf<ExpenseEntity?>(null) }
     val thisMonth = LocalDate.now().toString().take(7)
+    val snackbar = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
+    val deletedMsg = t("Expense deleted")
+    val undoLabel = t("Undo")
 
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbar) },
         topBar = { GymTopBar(t("Expenses"), t("Rent, bills, salaries and more"), onMenu = onOpenDrawer) },
         floatingActionButton = {
             ExtendedFloatingActionButton(
@@ -153,12 +165,29 @@ fun ExpensesScreen(onOpenDrawer: () -> Unit) {
         }
     }
 
-    editing?.let { e -> ExpenseDialog(e, onDismiss = { editing = null }) }
+    editing?.let { e -> ExpenseDialog(e, onDismiss = { editing = null }, onDelete = { editing = null; confirmDelete = e }) }
+    confirmDelete?.let { e ->
+        ConfirmDialog(
+            title = t("Delete this expense?"),
+            message = t("%s • %s on %s will be removed from your reports.", I18n.categoryLabel(lang, e.category), Money.format(e.amount), DateUtils.formatShort(e.date)),
+            confirmText = t("Delete"),
+            destructive = true,
+            onConfirm = {
+                confirmDelete = null
+                app.appScope.launch { app.repository.deleteExpense(e.id) }
+                scope.launch {
+                    val r = snackbar.showSnackbar(deletedMsg, actionLabel = undoLabel, duration = SnackbarDuration.Long)
+                    if (r == SnackbarResult.ActionPerformed) app.appScope.launch { app.repository.saveExpense(e) }
+                }
+            },
+            onDismiss = { confirmDelete = null }
+        )
+    }
 }
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun ExpenseDialog(initial: ExpenseEntity, onDismiss: () -> Unit) {
+private fun ExpenseDialog(initial: ExpenseEntity, onDismiss: () -> Unit, onDelete: () -> Unit) {
     val app = rememberGymApp()
     val lang = currentLang()
     var date by remember { mutableStateOf(initial.date) }
@@ -208,7 +237,7 @@ private fun ExpenseDialog(initial: ExpenseEntity, onDismiss: () -> Unit) {
                 )
                 if (!isNew) {
                     TextButton(
-                        onClick = { app.appScope.launch { app.repository.deleteExpense(initial.id) }; onDismiss() },
+                        onClick = onDelete,
                         colors = androidx.compose.material3.ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
                     ) { Text(t("Delete expense")) }
                 }

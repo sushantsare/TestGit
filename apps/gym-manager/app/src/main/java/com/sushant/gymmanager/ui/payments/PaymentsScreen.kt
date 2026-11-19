@@ -99,6 +99,12 @@ import com.sushant.gymmanager.ui.theme.LocalExtraColors
 import com.sushant.gymmanager.ui.theme.StatusGreen
 import com.sushant.gymmanager.ui.theme.StatusRed
 import com.sushant.gymmanager.ui.theme.WhatsAppGreen
+import com.sushant.gymmanager.ui.theme.WhatsAppInk
+import com.sushant.gymmanager.ui.theme.OnStatus
+import com.sushant.gymmanager.ui.components.SearchField
+import com.sushant.gymmanager.ui.components.matches
+import com.sushant.gymmanager.util.ShareUtil
+import androidx.compose.material.icons.filled.Share
 import com.sushant.gymmanager.util.DateUtils
 import com.sushant.gymmanager.util.DuePeriod
 import com.sushant.gymmanager.util.Money
@@ -136,8 +142,13 @@ class PaymentsViewModel(app: Application) : AndroidViewModel(app) {
     val history: StateFlow<List<HistoryRow>?> = combine(repo.allPayments, repo.allMembers, repo.allCycles) { pays, members, cycles ->
         val mm = members.associateBy { it.id }
         val cc = cycles.associateBy { it.id }
-        pays.take(300).map { HistoryRow(it, mm[it.memberId], cc[it.cycleId]) }
+        pays.map { HistoryRow(it, mm[it.memberId], cc[it.cycleId]) }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
+
+    var duesQuery by mutableStateOf("")
+    var historyQuery by mutableStateOf("")
+    /** History shows this many rows; "Load more" adds another page. */
+    var historyLimit by mutableStateOf(50)
 
     var filter by mutableStateOf("ALL")
     var tab by mutableStateOf(0)
@@ -172,7 +183,7 @@ fun PaymentsScreen(onOpenDrawer: () -> Unit, vm: PaymentsViewModel = viewModel()
     val all by vm.dues.collectAsStateWithLifecycle()
     val history by vm.history.collectAsStateWithLifecycle()
     val settings by vm.settings.collectAsStateWithLifecycle()
-    val filtered = all?.filter { vm.filter == "ALL" || it.member.shift == vm.filter }
+    val filtered = all?.filter { (vm.filter == "ALL" || it.member.shift == vm.filter) && it.member.matches(vm.duesQuery) }
     val slots = remember(filtered) {
         filtered?.groupBy { it.member.fromTime to it.member.toTime }
             ?.map { (k, v) -> DuesSlot(k.first, k.second, v) }
@@ -182,6 +193,7 @@ fun PaymentsScreen(onOpenDrawer: () -> Unit, vm: PaymentsViewModel = viewModel()
     val selectedTotal = vm.selected.sumOf { cycleById[it]?.balance ?: 0.0 }
     var collecting by remember { mutableStateOf(false) }
     var receipts by remember { mutableStateOf<List<ReceiptRef>>(emptyList()) }
+    val shareTitle = t("Today's collection")
     var receiptNames by remember { mutableStateOf<Map<Long, String>>(emptyMap()) }
     var bulk by remember { mutableStateOf(false) }
     var undoRow by remember { mutableStateOf<HistoryRow?>(null) }
@@ -213,7 +225,7 @@ fun PaymentsScreen(onOpenDrawer: () -> Unit, vm: PaymentsViewModel = viewModel()
                             Spacer(Modifier.width(4.dp))
                             Button(
                                 onClick = { collecting = true },
-                                colors = ButtonDefaults.buttonColors(containerColor = StatusGreen, contentColor = Color.White),
+                                colors = ButtonDefaults.buttonColors(containerColor = StatusGreen, contentColor = OnStatus),
                                 modifier = Modifier.height(48.dp).testTag("mark_paid")
                             ) {
                                 Icon(Icons.Default.DoneAll, null, Modifier.size(18.dp)); Spacer(Modifier.width(6.dp)); Text(t("Collect Payment"))
@@ -241,7 +253,8 @@ fun PaymentsScreen(onOpenDrawer: () -> Unit, vm: PaymentsViewModel = viewModel()
                         verticalArrangement = Arrangement.spacedBy(12.dp),
                         modifier = Modifier.testTag("payments_list")
                     ) {
-                        item { SummaryBanner(filtered.orEmpty().sumOf { it.total }, filtered.orEmpty().size) }
+                        item { SummaryBanner(filtered.orEmpty().sumOf { it.total }, filtered.orEmpty().size, filtered.orEmpty().flatMap { it.cycles }) }
+                        item { SearchField(vm.duesQuery, { vm.duesQuery = it }, t("Search name, roll no. or WhatsApp"), tag = "dues_search") }
                         item {
                             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                 listOf("ALL" to "All Shifts", "MORNING" to "Morning", "EVENING" to "Evening").forEach { (key, label) ->
@@ -279,7 +292,17 @@ fun PaymentsScreen(onOpenDrawer: () -> Unit, vm: PaymentsViewModel = viewModel()
                     }
                 }
             } else {
-                HistoryList(history, onReceipt = { scope.launch { ShareActions.shareReceipt(context, it) } }, onUndo = { undoRow = it })
+                HistoryList(
+                    rows = history,
+                    query = vm.historyQuery,
+                    onQuery = { vm.historyQuery = it; vm.historyLimit = 50 },
+                    limit = vm.historyLimit,
+                    onMore = { vm.historyLimit += 50 },
+                    onShareToday = { text -> ShareUtil.shareText(context, text, shareTitle) },
+                    gymName = settings.gymName,
+                    onReceipt = { scope.launch { ShareActions.shareReceipt(context, it) } },
+                    onUndo = { undoRow = it }
+                )
             }
         }
     }
@@ -295,35 +318,12 @@ fun PaymentsScreen(onOpenDrawer: () -> Unit, vm: PaymentsViewModel = viewModel()
                 vm.record(amounts, mode, note) { refs ->
                     receiptNames = names
                     receipts = refs
-                    context.toast(I18n.tr(lang, "Payment recorded"))
                 }
             }
         )
     }
     if (receipts.isNotEmpty()) {
-        AlertDialog(
-            onDismissRequest = { receipts = emptyList() },
-            icon = { Icon(Icons.Default.CheckCircle, null, tint = StatusGreen) },
-            title = { Text(t("Payment recorded")) },
-            text = {
-                Column(Modifier.heightIn(max = 360.dp).verticalScroll(rememberScrollState())) {
-                    Text(t("Send a receipt on WhatsApp:"), style = MaterialTheme.typography.bodyMedium)
-                    Spacer(Modifier.height(8.dp))
-                    receipts.forEach { r ->
-                        Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Column(Modifier.weight(1f)) {
-                                Text(receiptNames[r.memberId].orEmpty(), style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                Text("${r.receiptNo} • ${Money.format(r.total)}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            }
-                            OutlinedButton(onClick = { scope.launch { ShareActions.shareReceipt(context, r.receiptNo) } }) {
-                                Icon(Icons.Default.Receipt, null, Modifier.size(16.dp)); Spacer(Modifier.width(6.dp)); Text(t("Send"))
-                            }
-                        }
-                    }
-                }
-            },
-            confirmButton = { TextButton(onClick = { receipts = emptyList() }, modifier = Modifier.testTag("receipts_done")) { Text(t("Done")) } }
-        )
+        ReceiptsDialog(receipts, receiptNames, onDismiss = { receipts = emptyList() })
     }
     if (bulk) {
         BulkReminderDialog(all.orEmpty(), settings.gymName, onDismiss = { bulk = false })
@@ -344,75 +344,6 @@ private fun remind(context: android.content.Context, d: MemberDues, gymName: Str
     val msg = WhatsAppHelper.buildReminderMessage(d.member.fullName, gymName, d.cycles.map { DuePeriod(it.cycleStart, it.cycleEnd, it.balance) }, lang)
     WhatsAppHelper.open(context, d.member.whatsappNumber, msg)
 }
-
-@Composable
-private fun CollectPaymentDialog(cycles: List<PaymentCycleEntity>, onDismiss: () -> Unit, onConfirm: (Map<Long, Double>, String, String) -> Unit) {
-    val single = cycles.size == 1
-    val total = cycles.sumOf { it.balance }
-    var mode by remember { mutableStateOf(PayMode.CASH) }
-    var amountText by remember { mutableStateOf(formatAmount(total)) }
-    var note by remember { mutableStateOf("") }
-    val amount = amountText.toDoubleOrNull()
-    val valid = if (single) amount != null && amount > 0 && amount <= total + 0.005 else true
-    val lang = currentLang()
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(t("Collect Payment")) },
-        text = {
-            Column {
-                Text(t("Payment mode"), style = MaterialTheme.typography.labelLarge)
-                Spacer(Modifier.height(6.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    PayMode.all.forEach { m ->
-                        FilterChip(
-                            selected = mode == m, onClick = { mode = m },
-                            label = { Text(I18n.payModeLabel(lang, m).substringBefore(" "), maxLines = 1) },
-                            modifier = Modifier.testTag("mode_$m")
-                        )
-                    }
-                }
-                Spacer(Modifier.height(12.dp))
-                if (single) {
-                    OutlinedTextField(
-                        value = amountText,
-                        onValueChange = { amountText = it.filter { c -> c.isDigit() || c == '.' }.take(9) },
-                        label = { Text(t("Amount received")) },
-                        prefix = { Text("₹") },
-                        singleLine = true,
-                        isError = !valid,
-                        supportingText = {
-                            val rest = (total - (amount ?: 0.0)).coerceAtLeast(0.0)
-                            Text(if (rest > 0.005) t("Partial payment • %s will remain due", Money.format(rest)) else t("Full payment"))
-                        },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                        modifier = Modifier.fillMaxWidth().testTag("pay_amount")
-                    )
-                } else {
-                    Text(t("%d cycles will be marked fully paid", cycles.size), style = MaterialTheme.typography.bodyMedium)
-                    Text(Money.format(total), style = MaterialTheme.typography.headlineSmall)
-                    Spacer(Modifier.height(8.dp))
-                }
-                OutlinedTextField(
-                    value = note, onValueChange = { note = it.take(80) }, label = { Text(t("Note (optional)")) },
-                    singleLine = true, modifier = Modifier.fillMaxWidth()
-                )
-            }
-        },
-        confirmButton = {
-            Button(
-                onClick = {
-                    val map = if (single) mapOf(cycles.first().id to (amount ?: 0.0)) else cycles.associate { it.id to it.balance }
-                    onConfirm(map, mode, note)
-                },
-                enabled = valid,
-                modifier = Modifier.testTag("confirm_payment")
-            ) { Text(t("Record Payment")) }
-        },
-        dismissButton = { TextButton(onClick = onDismiss) { Text(t("Cancel")) } }
-    )
-}
-
-private fun formatAmount(v: Double) = if (v % 1.0 == 0.0) v.toLong().toString() else String.format(java.util.Locale.ENGLISH, "%.2f", v)
 
 @Composable
 private fun BulkReminderDialog(dues: List<MemberDues>, gymName: String, onDismiss: () -> Unit) {
@@ -453,7 +384,7 @@ private fun BulkReminderDialog(dues: List<MemberDues>, gymName: String, onDismis
             if (next != null) {
                 Button(
                     onClick = { sent = sent + next.member.id; remind(context, next, gymName, lang) },
-                    colors = ButtonDefaults.buttonColors(containerColor = WhatsAppGreen, contentColor = Color.White),
+                    colors = ButtonDefaults.buttonColors(containerColor = WhatsAppInk, contentColor = OnStatus),
                     modifier = Modifier.testTag("send_next")
                 ) { Text(t("Send next: %s", next.member.fullName.substringBefore(" ")), maxLines = 1) }
             } else {
@@ -465,44 +396,83 @@ private fun BulkReminderDialog(dues: List<MemberDues>, gymName: String, onDismis
 }
 
 @Composable
-private fun HistoryList(rows: List<HistoryRow>?, onReceipt: (String) -> Unit, onUndo: (HistoryRow) -> Unit) {
+private fun HistoryList(
+    rows: List<HistoryRow>?,
+    query: String,
+    onQuery: (String) -> Unit,
+    limit: Int,
+    onMore: () -> Unit,
+    onShareToday: (String) -> Unit,
+    gymName: String,
+    onReceipt: (String) -> Unit,
+    onUndo: (HistoryRow) -> Unit
+) {
     val lang = currentLang()
     when {
         rows == null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
         rows.isEmpty() -> EmptyState(Icons.Default.History, t("No payments yet"), t("Payments you collect will be listed here with their receipts."))
-        else -> LazyColumn(
-            contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-            modifier = Modifier.testTag("history_list")
-        ) {
-            rows.groupBy { it.payment.paidAt.take(10) }.forEach { (day, list) ->
-                item(key = "day_$day") {
-                    Row(Modifier.padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Text(DateUtils.formatFull(day), style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1f))
-                        Text(Money.format(list.sumOf { it.payment.amount }), style = MaterialTheme.typography.labelLarge, color = StatusGreen)
+        else -> {
+            val term = query.trim()
+            val matching = if (term.isEmpty()) rows else rows.filter { r ->
+                r.payment.receiptNo.contains(term, ignoreCase = true) || (r.member?.matches(term) ?: false)
+            }
+            val shown = matching.take(limit)
+            val today = DateUtils.today()
+            val todayRows = rows.filter { it.payment.paidAt.startsWith(today) }
+            LazyColumn(
+                contentPadding = PaddingValues(16.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.testTag("history_list")
+            ) {
+                item(key = "closing") { TodayClosingCard(todayRows, gymName, lang, onShareToday) }
+                item(key = "hsearch") { SearchField(query, onQuery, t("Search name, roll no. or receipt no."), tag = "history_search") }
+                if (shown.isEmpty()) {
+                    item(key = "nomatch") { EmptyState(Icons.Default.History, t("No matches"), t("No payment matches \"%s\".", query)) }
+                }
+                shown.groupBy { it.payment.paidAt.take(10) }.forEach { (day, list) ->
+                    item(key = "day_$day") {
+                        Row(Modifier.padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Text(DateUtils.formatFull(day), style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1f))
+                            Text(Money.format(list.sumOf { it.payment.amount }), style = MaterialTheme.typography.labelLarge, color = StatusGreen)
+                        }
+                    }
+                    items(list, key = { it.payment.id }) { row ->
+                        AppCard(Modifier.fillMaxWidth(), contentPadding = PaddingValues(start = 12.dp, top = 10.dp, bottom = 10.dp, end = 4.dp)) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                MemberAvatar(row.member?.photoUri, row.member?.fullName ?: "?", size = 40.dp)
+                                Spacer(Modifier.width(10.dp))
+                                Column(Modifier.weight(1f)) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Text(
+                                            row.member?.fullName ?: t("Deleted member"), style = MaterialTheme.typography.titleSmall,
+                                            maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false)
+                                        )
+                                        Spacer(Modifier.width(6.dp))
+                                        Text(Money.format(row.payment.amount), style = MaterialTheme.typography.titleSmall, color = StatusGreen, maxLines = 1)
+                                    }
+                                    Text(
+                                        "${row.payment.receiptNo} • ${I18n.payModeLabel(lang, row.payment.mode)}",
+                                        style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        maxLines = 1, overflow = TextOverflow.Ellipsis
+                                    )
+                                    row.cycle?.let {
+                                        Text(
+                                            "${DateUtils.formatShort(it.cycleStart)} – ${DateUtils.formatShort(it.cycleEnd)}",
+                                            style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            maxLines = 1, overflow = TextOverflow.Ellipsis
+                                        )
+                                    }
+                                }
+                                IconButton(onClick = { onReceipt(row.payment.receiptNo) }) { Icon(Icons.Default.Receipt, t("Send receipt"), tint = MaterialTheme.colorScheme.primary) }
+                                IconButton(onClick = { onUndo(row) }) { Icon(Icons.AutoMirrored.Filled.Undo, t("Undo payment")) }
+                            }
+                        }
                     }
                 }
-                items(list, key = { it.payment.id }) { row ->
-                    AppCard(Modifier.fillMaxWidth(), contentPadding = PaddingValues(start = 12.dp, top = 10.dp, bottom = 10.dp, end = 4.dp)) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            MemberAvatar(row.member?.photoUri, row.member?.fullName ?: "?", size = 40.dp)
-                            Spacer(Modifier.width(10.dp))
-                            Column(Modifier.weight(1f)) {
-                                Text(row.member?.fullName ?: t("Deleted member"), style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                Text(
-                                    "${row.payment.receiptNo} • ${I18n.payModeLabel(lang, row.payment.mode)}",
-                                    style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1
-                                )
-                                row.cycle?.let {
-                                    Text(
-                                        "${DateUtils.formatShort(it.cycleStart)} – ${DateUtils.formatShort(it.cycleEnd)}",
-                                        style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1
-                                    )
-                                }
-                            }
-                            Text(Money.format(row.payment.amount), style = MaterialTheme.typography.titleSmall, color = StatusGreen)
-                            IconButton(onClick = { onReceipt(row.payment.receiptNo) }) { Icon(Icons.Default.Receipt, t("Send receipt"), tint = MaterialTheme.colorScheme.primary) }
-                            IconButton(onClick = { onUndo(row) }) { Icon(Icons.AutoMirrored.Filled.Undo, t("Undo payment")) }
+                if (matching.size > shown.size) {
+                    item(key = "more") {
+                        OutlinedButton(onClick = onMore, modifier = Modifier.fillMaxWidth().testTag("history_more")) {
+                            Text(t("Load more (%d left)", matching.size - shown.size))
                         }
                     }
                 }
@@ -511,13 +481,59 @@ private fun HistoryList(rows: List<HistoryRow>?, onReceipt: (String) -> Unit, on
     }
 }
 
+/** Today's cash closing: what came in today, split by payment mode, ready to share. */
 @Composable
-private fun SummaryBanner(total: Double, members: Int) {
+private fun TodayClosingCard(rows: List<HistoryRow>, gymName: String, lang: String, onShare: (String) -> Unit) {
+    val total = rows.sumOf { it.payment.amount }
+    val byMode = PayMode.all.associateWith { m -> rows.filter { it.payment.mode == m }.sumOf { it.payment.amount } }.filterValues { it > 0 }
+    AppCard(Modifier.fillMaxWidth().testTag("today_closing")) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text(t("TODAY'S COLLECTION"), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(Money.format(total), style = MaterialTheme.typography.headlineSmall)
+                Text(t(if (rows.size == 1) "%d payment" else "%d payments", rows.size), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            OutlinedButton(
+                onClick = {
+                    val lines = buildString {
+                        append(I18n.tr(lang, "%s • Collection for %s", gymName, DateUtils.formatFull(DateUtils.today()))).append("\n\n")
+                        byMode.forEach { (m, v) -> append(I18n.payModeLabel(lang, m)).append(": ").append(Money.format(v)).append("\n") }
+                        append(I18n.tr(lang, "Total: %s (%d payments)", Money.format(total), rows.size))
+                    }
+                    onShare(lines)
+                },
+                enabled = rows.isNotEmpty(),
+                modifier = Modifier.testTag("share_closing")
+            ) {
+                Icon(Icons.Default.Share, null, Modifier.size(16.dp)); Spacer(Modifier.width(6.dp)); Text(t("Share"))
+            }
+        }
+        if (byMode.isNotEmpty()) {
+            Spacer(Modifier.height(8.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                byMode.forEach { (m, v) ->
+                    Column {
+                        Text(I18n.payModeLabel(lang, m).substringBefore(" "), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(Money.format(v), style = MaterialTheme.typography.labelLarge)
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SummaryBanner(total: Double, members: Int, cycles: List<PaymentCycleEntity>) {
+    val today = java.time.LocalDate.now()
+    fun age(c: PaymentCycleEntity) = java.time.temporal.ChronoUnit.DAYS.between(DateUtils.parseDate(c.cycleStart) ?: today, today)
+    val fresh = cycles.filter { age(it) <= 30 }.sumOf { it.balance }
+    val mid = cycles.filter { age(it) in 31..60 }.sumOf { it.balance }
+    val old = cycles.filter { age(it) > 60 }.sumOf { it.balance }
     Box(
         Modifier.fillMaxWidth().clip(RoundedCornerShape(20.dp))
             .background(
                 if (total > 0) Brush.linearGradient(listOf(Color(0xFFDC2626), Color(0xFF9F1239)))
-                else Brush.linearGradient(listOf(Color(0xFF16A34A), Color(0xFF0D9488)))
+                else Brush.linearGradient(listOf(Color(0xFF15803D), Color(0xFF0F766E)))
             )
             .padding(20.dp)
     ) {
@@ -526,8 +542,27 @@ private fun SummaryBanner(total: Double, members: Int) {
             Text(Money.format(total), style = MaterialTheme.typography.headlineLarge, color = Color.White, modifier = Modifier.testTag("dues_total"))
             Text(
                 if (members == 0) t("Nothing pending") else t(if (members == 1) "%d member has unpaid cycles" else "%d members have unpaid cycles", members),
-                style = MaterialTheme.typography.bodyMedium, color = Color.White.copy(alpha = 0.9f)
+                style = MaterialTheme.typography.bodyMedium, color = Color.White.copy(alpha = 0.95f)
             )
+            if (total > 0) {
+                // How old the dues are, so the oldest get chased first.
+                Spacer(Modifier.height(12.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.testTag("dues_age")) {
+                    AgeBox(Modifier.weight(1f), t("0–30 days"), fresh)
+                    AgeBox(Modifier.weight(1f), t("31–60 days"), mid)
+                    AgeBox(Modifier.weight(1f), t("60+ days"), old)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun AgeBox(modifier: Modifier, label: String, amount: Double) {
+    Surface(modifier, shape = RoundedCornerShape(12.dp), color = Color.Black.copy(alpha = 0.22f)) {
+        Column(Modifier.padding(horizontal = 10.dp, vertical = 8.dp)) {
+            Text(label, style = MaterialTheme.typography.labelSmall, color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(Money.format(amount), style = MaterialTheme.typography.titleSmall, color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
     }
 }
@@ -554,7 +589,7 @@ private fun DuesCard(d: MemberDues, selected: Set<Long>, onToggle: (Long) -> Uni
             OutlinedButton(
                 onClick = onRemind,
                 contentPadding = PaddingValues(horizontal = 12.dp),
-                colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFF128C4A)),
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = WhatsAppInk),
                 border = BorderStroke(1.dp, WhatsAppGreen.copy(alpha = 0.6f))
             ) {
                 Icon(Icons.AutoMirrored.Filled.Send, null, Modifier.size(16.dp)); Spacer(Modifier.width(6.dp)); Text(t("Remind"))
@@ -570,9 +605,10 @@ private fun DuesCard(d: MemberDues, selected: Set<Long>, onToggle: (Long) -> Uni
                 Checkbox(checked = checked, onCheckedChange = { onToggle(c.id) }, modifier = Modifier.testTag("cycle_${c.id}"))
                 Column(Modifier.weight(1f)) {
                     Text("${DateUtils.formatShort(c.cycleStart)} – ${DateUtils.formatShort(c.cycleEnd)}", style = MaterialTheme.typography.bodyMedium)
-                    if (c.paidAmount > 0) {
+                    if (c.paidAmount > 0 || c.waivedAmount > 0) {
                         Text(
-                            t("%s paid of %s", Money.format(c.paidAmount), Money.format(c.amount)),
+                            if (c.waivedAmount > 0) t("%s paid, %s waived of %s", Money.format(c.paidAmount), Money.format(c.waivedAmount), Money.format(c.amount))
+                            else t("%s paid of %s", Money.format(c.paidAmount), Money.format(c.amount)),
                             style = MaterialTheme.typography.labelSmall, color = StatusGreen
                         )
                     }

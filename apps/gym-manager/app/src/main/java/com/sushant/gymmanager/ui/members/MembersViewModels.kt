@@ -6,6 +6,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.viewModelScope
 import com.sushant.gymmanager.GymApp
 import com.sushant.gymmanager.data.local.GymSettingsEntity
@@ -24,13 +25,50 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.map
+import com.sushant.gymmanager.ui.components.matches
+import com.sushant.gymmanager.ui.navigation.NavRequests
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+
+object MemberFilter {
+    const val ALL = "ALL"
+    const val EXPIRING = "EXPIRING"
+    const val EXPIRED = "EXPIRED"
+    const val DUES = "DUES"
+    const val FROZEN = "FROZEN"
+    const val MORNING = "MORNING"
+    const val EVENING = "EVENING"
+    val all = listOf(ALL, EXPIRING, EXPIRED, DUES, FROZEN, MORNING, EVENING)
+}
+
+object MemberSort {
+    const val ROLL = "ROLL"
+    const val NAME = "NAME"
+    const val EXPIRY = "EXPIRY"
+    const val JOINED = "JOINED"
+    val all = listOf(ROLL, NAME, EXPIRY, JOINED)
+}
 
 class MembersViewModel(app: Application) : AndroidViewModel(app) {
     private val repo = (app as GymApp).repository
 
     val query = MutableStateFlow("")
+    val inactiveQuery = MutableStateFlow("")
+    val filter = MutableStateFlow(MemberFilter.ALL)
+    val sort = MutableStateFlow(MemberSort.ROLL)
+
+    init {
+        // A dashboard tile can ask for a filter ("Expiring soon").
+        viewModelScope.launch {
+            NavRequests.memberFilter.collect { f ->
+                if (f != null) {
+                    filter.value = f
+                    NavRequests.memberFilter.value = null
+                }
+            }
+        }
+    }
 
     val settings: StateFlow<GymSettingsEntity> =
         repo.settings.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), GymSettingsEntity())
@@ -38,22 +76,43 @@ class MembersViewModel(app: Application) : AndroidViewModel(app) {
     val allActive: StateFlow<List<MemberWithPlan>?> =
         repo.activeMembersWithPlans.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
-    val filtered: StateFlow<List<MemberWithPlan>?> = combine(repo.activeMembersWithPlans, query) { list, q ->
-        val term = q.trim()
-        if (term.isEmpty()) list else {
-            val digits = term.filter { it.isDigit() }
-            list.filter { (m, _) ->
-                m.fullName.contains(term, ignoreCase = true) ||
-                    m.rollNumber.contains(term, ignoreCase = true) ||
-                    (digits.length >= 3 && m.whatsappNumber.filter { it.isDigit() }.contains(digits))
+    /** Member ids that owe money. */
+    private val owing = repo.unpaidCycles.map { list -> list.filter { it.balance > 0.0 }.map { it.memberId }.toSet() }
+
+    private val options = combine(query, filter, sort) { q, f, so -> Triple(q, f, so) }
+
+    val filtered: StateFlow<List<MemberWithPlan>?> = combine(repo.activeMembersWithPlans, options, owing, repo.settings) { list, opt, dues, st ->
+        val (q, f, so) = opt
+        val days = st.expiringSoonDays
+        list.filter { (m, plan) ->
+            m.matches(q) && when (f) {
+                MemberFilter.EXPIRING -> m.frozenFrom == null && plan != null && DateUtils.isExpiringSoon(plan.expiryDate, days)
+                MemberFilter.EXPIRED -> m.frozenFrom == null && plan != null && DateUtils.isExpired(plan.expiryDate)
+                MemberFilter.DUES -> m.id in dues
+                MemberFilter.FROZEN -> m.frozenFrom != null
+                MemberFilter.MORNING -> m.shift == com.sushant.gymmanager.data.local.Shift.MORNING
+                MemberFilter.EVENING -> m.shift == com.sushant.gymmanager.data.local.Shift.EVENING
+                else -> true
+            }
+        }.let { l ->
+            when (so) {
+                MemberSort.NAME -> l.sortedBy { it.member.fullName.lowercase() }
+                MemberSort.EXPIRY -> l.sortedBy { it.membership?.expiryDate ?: "9999" }
+                MemberSort.JOINED -> l.sortedByDescending { it.member.dateOfJoining }
+                else -> l
             }
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
-    val inactive: StateFlow<List<MemberWithPlan>?> =
-        repo.inactiveMembersWithPlans.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
+    val inactive: StateFlow<List<MemberWithPlan>?> = combine(repo.inactiveMembersWithPlans, inactiveQuery) { list, q ->
+        list.filter { it.member.matches(q) }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
+
+    val inactiveCount: StateFlow<Int> = repo.inactiveMembers.map { it.size }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
 }
 
+@kotlinx.serialization.Serializable
 data class MemberForm(
     val photoPath: String? = null,
     val rollNumber: String = "",
@@ -72,7 +131,8 @@ data class MemberForm(
     val autoRenew: Boolean = true
 )
 
-class AddEditMemberViewModel(app: Application) : AndroidViewModel(app) {
+class AddEditMemberViewModel(app: Application, private val handle: SavedStateHandle) : AndroidViewModel(app) {
+    private val json = kotlinx.serialization.json.Json { ignoreUnknownKeys = true }
     private val gymApp = app as GymApp
     private val repo = gymApp.repository
 
@@ -92,6 +152,34 @@ class AddEditMemberViewModel(app: Application) : AndroidViewModel(app) {
         private set
     var photoImporting by mutableStateOf(false)
         private set
+    /** Fields the user has left at least once; their errors are shown from then on. */
+    var touched by mutableStateOf(handle.get<Array<String>>("touched")?.toSet() ?: emptySet())
+        private set
+    /** Set after a Save attempt with errors, so every remaining error shows. */
+    var saveAttempted by mutableStateOf(handle.get<Boolean>("saveAttempted") ?: false)
+        private set
+
+    fun touch(key: String) {
+        if (key !in touched) {
+            touched = touched + key
+            handle["touched"] = touched.toTypedArray()
+        }
+    }
+
+    fun markSaveAttempted() {
+        saveAttempted = true
+        handle["saveAttempted"] = true
+    }
+
+    fun showError(key: String): Boolean = (key in touched || saveAttempted) && errors.containsKey(key)
+
+    private fun persistForm() {
+        handle["form"] = json.encodeToString(MemberForm.serializer(), form)
+        handle["original"] = json.encodeToString(MemberForm.serializer(), original)
+    }
+
+    private fun restoredForm(key: String): MemberForm? =
+        handle.get<String>(key)?.let { runCatching { json.decodeFromString(MemberForm.serializer(), it) }.getOrNull() }
 
     private var existing: MemberEntity? = null
     private var currentExpiry: String? = null
@@ -107,6 +195,8 @@ class AddEditMemberViewModel(app: Application) : AndroidViewModel(app) {
         memberId = id
         viewModelScope.launch {
             settings = repo.getSettings()
+            val savedForm = restoredForm("form")
+            val savedOriginal = restoredForm("original")
             if (id > 0) {
                 val m = repo.getMember(id)
                 val plan = repo.getActiveMembership(id)
@@ -137,6 +227,13 @@ class AddEditMemberViewModel(app: Application) : AndroidViewModel(app) {
                 val f = MemberForm(fee = formatFee(settings.fee1Month))
                 form = f; original = f
             }
+            // Coming back after Android closed the app in the background: restore what was typed.
+            if (savedForm != null && savedOriginal != null) {
+                form = savedForm; original = savedOriginal
+                savedForm.photoPath?.let { if (it != savedOriginal.photoPath) sessionPhotos += it }
+            }
+            persistForm()
+            if (form.rollNumber.isNotBlank() && form.rollNumber != original.rollNumber) checkRoll(form.rollNumber)
             loading = false
         }
     }
@@ -146,6 +243,7 @@ class AddEditMemberViewModel(app: Application) : AndroidViewModel(app) {
     fun update(transform: (MemberForm) -> MemberForm) {
         val before = form
         form = transform(form)
+        persistForm()
         if (form.rollNumber != before.rollNumber) checkRoll(form.rollNumber)
     }
 
@@ -255,6 +353,7 @@ class AddEditMemberViewModel(app: Application) : AndroidViewModel(app) {
             if (memberId == 0L) repo.addMember(member, plan) else repo.updateMember(member, plan)
             savedPhoto = f.photoPath
             original = form
+            persistForm()
             saving = false
             onSaved()
         }

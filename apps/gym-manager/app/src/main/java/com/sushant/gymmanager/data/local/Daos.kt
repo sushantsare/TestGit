@@ -51,6 +51,9 @@ interface MemberDao {
     @Query("UPDATE members SET isActive = :active WHERE id = :id")
     suspend fun setActive(id: Long, active: Boolean)
 
+    @Query("UPDATE members SET shift = :shift WHERE id = :id")
+    suspend fun setShift(id: Long, shift: String)
+
     @Query("UPDATE members SET frozenFrom = :from WHERE id = :id")
     suspend fun setFrozen(id: Long, from: String?)
 
@@ -74,6 +77,9 @@ interface MembershipDao {
 
     @Query("SELECT * FROM memberships")
     suspend fun getAll(): List<MembershipEntity>
+
+    @Query("SELECT * FROM memberships WHERE isActive = 1")
+    suspend fun getAllActive(): List<MembershipEntity>
 
     @Insert
     suspend fun insert(membership: MembershipEntity): Long
@@ -129,7 +135,13 @@ interface CycleDao {
     @Update
     suspend fun update(cycle: PaymentCycleEntity)
 
-    @Query("DELETE FROM payment_cycles WHERE memberId = :memberId AND paidAmount <= 0")
+    @Query("SELECT * FROM payment_cycles WHERE memberId = :memberId AND isPaid = 0 ORDER BY cycleStart")
+    fun observeUnpaidFor(memberId: Long): Flow<List<PaymentCycleEntity>>
+
+    @Query("SELECT * FROM payment_cycles WHERE isPaid = 0 AND paidAmount <= 0 AND waivedAmount <= 0 AND cycleStart >= :fromDate")
+    suspend fun getUntouchedFrom(fromDate: String): List<PaymentCycleEntity>
+
+    @Query("DELETE FROM payment_cycles WHERE memberId = :memberId AND paidAmount <= 0 AND waivedAmount <= 0")
     suspend fun deleteUntouchedFor(memberId: Long)
 
     @Query("DELETE FROM payment_cycles WHERE memberId = :memberId")
@@ -210,6 +222,9 @@ interface AttendanceDao {
     @Query("SELECT * FROM attendance WHERE memberId = :memberId ORDER BY attendanceDate")
     fun observeForMember(memberId: Long): Flow<List<AttendanceEntity>>
 
+    @Query("SELECT memberId, MAX(attendanceDate) AS lastDate FROM attendance WHERE isPresent = 1 GROUP BY memberId")
+    fun observeLastSeen(): Flow<List<LastSeen>>
+
     @Query("SELECT COUNT(*) FROM attendance WHERE memberId = :memberId AND isPresent = 1")
     fun observePresentCount(memberId: Long): Flow<Int>
 
@@ -246,3 +261,6 @@ interface SettingsDao {
     @Query("DELETE FROM gym_settings")
     suspend fun deleteAll()
 }
+
+/** The latest day a member was marked present. */
+data class LastSeen(val memberId: Long, val lastDate: String)

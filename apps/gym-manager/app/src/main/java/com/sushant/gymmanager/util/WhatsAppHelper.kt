@@ -49,6 +49,14 @@ object WhatsAppHelper {
             tr("Please renew to keep training without a break.") + " 💪"
     }
 
+    /** A friendly nudge for a member who hasn't come in for a while. */
+    fun buildMissYouMessage(memberName: String, gymName: String, lang: String = Lang.EN): String {
+        fun tr(t: String, vararg a: Any) = I18n.tr(lang, t, *a)
+        return tr("Hello %s,", memberName) + "\n\n" +
+            tr("We haven't seen you at %s for a few days. Hope all is well!", gymName) + "\n\n" +
+            tr("Come back soon, your workout is waiting.") + " 💪"
+    }
+
     fun generateWhatsAppUrl(phone: String, message: String? = null): String {
         val number = normalizePhone(phone)
         if (message.isNullOrEmpty()) return "https://wa.me/$number"

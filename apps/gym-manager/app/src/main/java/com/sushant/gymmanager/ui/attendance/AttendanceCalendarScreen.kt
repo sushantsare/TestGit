@@ -34,6 +34,11 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
+import com.sushant.gymmanager.ui.theme.OnStatus
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -150,8 +155,8 @@ fun AttendanceCalendarScreen(memberId: Long, onBack: () -> Unit) {
                 }
                 Spacer(Modifier.height(10.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(14.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Legend(StatusGreen, t("Present"))
-                    Legend(StatusRed, t("Absent"))
+                    Legend(StatusGreen, t("✓ Present"))
+                    Legend(StatusRed, t("✗ Absent"))
                     Legend(MaterialTheme.colorScheme.outlineVariant, t("No record"))
                 }
             }
@@ -165,16 +170,28 @@ private fun DayCell(day: LocalDate?, present: Boolean?, isToday: Boolean, modifi
         if (day != null) {
             val bg = when (present) {
                 true -> StatusGreen
-                false -> StatusRed.copy(alpha = 0.85f)
+                false -> StatusRed
                 null -> MaterialTheme.colorScheme.surfaceContainerHigh
             }
-            val fg = if (present != null) Color.White else MaterialTheme.colorScheme.onSurfaceVariant
+            val fg = if (present != null) OnStatus else MaterialTheme.colorScheme.onSurfaceVariant
+            val label = when (present) {
+                true -> t("%d, present", day.dayOfMonth)
+                false -> t("%d, absent", day.dayOfMonth)
+                null -> day.dayOfMonth.toString()
+            }
             Box(
                 Modifier.fillMaxSize().clip(RoundedCornerShape(10.dp)).background(bg)
-                    .then(if (isToday) Modifier.border(2.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(10.dp)) else Modifier),
+                    .then(if (isToday) Modifier.border(2.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(10.dp)) else Modifier)
+                    .clearAndSetSemantics { contentDescription = label },
                 contentAlignment = Alignment.Center
             ) {
-                Text(day.dayOfMonth.toString(), color = fg, style = MaterialTheme.typography.labelLarge, fontWeight = if (isToday) FontWeight.Bold else null)
+                // A tick or cross as well as the colour, so it reads without colour vision.
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(day.dayOfMonth.toString(), color = fg, style = MaterialTheme.typography.labelLarge, fontWeight = if (isToday) FontWeight.Bold else null)
+                    if (present != null) {
+                        Icon(if (present) Icons.Default.Check else Icons.Default.Close, null, tint = fg, modifier = Modifier.size(12.dp))
+                    }
+                }
             }
         }
     }

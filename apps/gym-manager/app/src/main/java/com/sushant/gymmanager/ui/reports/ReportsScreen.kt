@@ -89,6 +89,10 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.runtime.remember
+import com.sushant.gymmanager.ui.components.rememberDownloadsAccess
+import com.sushant.gymmanager.ui.theme.StatusTeal
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.time.YearMonth
@@ -142,6 +146,7 @@ fun ReportsScreen(onOpenDrawer: () -> Unit, vm: ReportsViewModel = viewModel()) 
     val data by vm.data.collectAsStateWithLifecycle()
     val exportedMsg = t("PDF report saved to Downloads/GymManager")
     val failedMsg = t("Could not create the report")
+    val downloadsAccess = rememberDownloadsAccess()
     val doExport = {
         vm.export { file, saved ->
             if (file == null) {
@@ -154,9 +159,7 @@ fun ReportsScreen(onOpenDrawer: () -> Unit, vm: ReportsViewModel = viewModel()) 
     }
 
     Scaffold(topBar = {
-        GymTopBar(t("Reports"), t("Revenue, expenses and profit"), onMenu = onOpenDrawer, actions = {
-            IconButton(onClick = doExport, enabled = data != null && !vm.exporting) { Icon(Icons.Default.PictureAsPdf, t("Export PDF report")) }
-        })
+        GymTopBar(t("Reports"), t("Revenue, expenses and profit"), onMenu = onOpenDrawer)
     }) { padding ->
         val d = data
         if (d == null) {
@@ -164,15 +167,20 @@ fun ReportsScreen(onOpenDrawer: () -> Unit, vm: ReportsViewModel = viewModel()) 
             return@Scaffold
         }
         val key = vm.month.toString()
-        val monthPays = d.payments.filter { it.paidAt.startsWith(key) }
-        val collected = monthPays.sumOf { it.amount }
-        val spent = d.expenses.filter { it.date.startsWith(key) }.sumOf { it.amount }
+        // Worked out once per data/month change, not on every redraw.
+        val monthPays = remember(d, key) { d.payments.filter { it.paidAt.startsWith(key) } }
+        val collected = remember(monthPays) { monthPays.sumOf { it.amount } }
+        val spent = remember(d, key) { d.expenses.filter { it.date.startsWith(key) }.sumOf { it.amount } }
         val profit = collected - spent
-        val pending = d.unpaid.sumOf { it.balance }
-        val joined = d.members.count { it.dateOfJoining.startsWith(key) }
-        val series = (5 downTo 0).map { vm.month.minusMonths(it.toLong()) }.map { ym ->
-            val k = ym.toString()
-            Triple(ym, d.payments.filter { it.paidAt.startsWith(k) }.sumOf { it.amount }, d.expenses.filter { it.date.startsWith(k) }.sumOf { it.amount })
+        val pending = remember(d) { d.unpaid.sumOf { it.balance } }
+        val joined = remember(d, key) { d.members.count { it.dateOfJoining.startsWith(key) } }
+        val series = remember(d, key) {
+            val payByMonth = d.payments.groupBy { it.paidAt.take(7) }.mapValues { (_, v) -> v.sumOf { it.amount } }
+            val expByMonth = d.expenses.groupBy { it.date.take(7) }.mapValues { (_, v) -> v.sumOf { it.amount } }
+            (5 downTo 0).map { vm.month.minusMonths(it.toLong()) }.map { ym ->
+                val k = ym.toString()
+                Triple(ym, payByMonth[k] ?: 0.0, expByMonth[k] ?: 0.0)
+            }
         }
 
         Column(
@@ -195,7 +203,7 @@ fun ReportsScreen(onOpenDrawer: () -> Unit, vm: ReportsViewModel = viewModel()) 
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 Tile(
                     Modifier.weight(1f), if (profit >= 0) Icons.Default.Savings else Icons.AutoMirrored.Filled.TrendingDown,
-                    if (profit >= 0) Teal600 else StatusRed, Money.format(profit), t(if (profit >= 0) "Profit" else "Loss"), t("Collected − expenses")
+                    if (profit >= 0) StatusTeal else StatusRed, Money.format(profit), t(if (profit >= 0) "Profit" else "Loss"), t("Collected − expenses")
                 )
                 Tile(Modifier.weight(1f), Icons.Default.HourglassBottom, StatusAmber, Money.format(pending), t("Pending Dues"), t("All members, today"))
             }
@@ -243,7 +251,7 @@ fun ReportsScreen(onOpenDrawer: () -> Unit, vm: ReportsViewModel = viewModel()) 
             }
 
             Button(
-                onClick = doExport,
+                onClick = { downloadsAccess({ doExport() }) { doExport() } },
                 enabled = !vm.exporting,
                 modifier = Modifier.fillMaxWidth().height(52.dp).testTag("export_pdf")
             ) {
@@ -263,14 +271,15 @@ fun ReportsScreen(onOpenDrawer: () -> Unit, vm: ReportsViewModel = viewModel()) 
 
 @Composable
 private fun Tile(modifier: Modifier, icon: ImageVector, tint: Color, value: String, label: String, sub: String) {
-    AppCard(modifier.height(132.dp), contentPadding = PaddingValues(14.dp)) {
+    AppCard(modifier.heightIn(min = 132.dp), contentPadding = PaddingValues(14.dp)) {
         Box(Modifier.size(34.dp).clip(RoundedCornerShape(10.dp)).background(tint.copy(alpha = 0.13f)), contentAlignment = Alignment.Center) {
             Icon(icon, null, tint = tint, modifier = Modifier.size(20.dp))
         }
+        Spacer(Modifier.height(12.dp))
         Spacer(Modifier.weight(1f))
         Text(value, style = MaterialTheme.typography.titleLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
-        Text(label, style = MaterialTheme.typography.labelLarge, maxLines = 1)
-        Text(sub, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
+        Text(label, style = MaterialTheme.typography.labelLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text(sub, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
 }
 

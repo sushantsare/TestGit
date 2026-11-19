@@ -30,6 +30,12 @@ data class GymBackup(
     val version: Int = 2,
     val createdAt: Long,
     val gymName: String,
+    /** Summary written before the data so the backup list can show it without reading the whole file. */
+    val memberCount: Int = -1,
+    val membershipCount: Int = -1,
+    val attendanceCount: Int = -1,
+    val cycleCount: Int = -1,
+    val photoCount: Int = -1,
     val members: List<MemberEntity>,
     val memberPhotosBase64: Map<String, String> = emptyMap(),
     val memberships: List<MembershipEntity>,
@@ -86,6 +92,11 @@ class BackupManager(private val context: Context, private val repository: GymRep
         return GymBackup(
             createdAt = System.currentTimeMillis(),
             gymName = data.settings.gymName,
+            memberCount = data.members.size,
+            membershipCount = data.memberships.size,
+            attendanceCount = data.attendance.size,
+            cycleCount = data.paymentCycles.size,
+            photoCount = photos.size,
             members = data.members,
             memberPhotosBase64 = photos,
             memberships = data.memberships,
@@ -123,16 +134,36 @@ class BackupManager(private val context: Context, private val repository: GymRep
         backupsDir().listFiles { f -> f.name.endsWith(EXTENSION) }.orEmpty()
             .sortedByDescending { it.lastModified() }
             .map { f ->
-                val parsed = runCatching { parse(f.readText()) }.getOrNull()
+                val header = readHeader(f)
                 BackupFileInfo(
                     file = f,
-                    createdAt = parsed?.createdAt ?: f.lastModified(),
+                    createdAt = header?.first ?: f.lastModified(),
                     sizeKb = (f.length() + 1023) / 1024,
                     isSafety = f.name.startsWith("Safety_"),
-                    counts = parsed?.counts
+                    counts = header?.second
                 )
             }
     }
+
+    /** Reads only the start of a backup for its date and counts; older backups fall back to a full read. */
+    private fun readHeader(f: File): Pair<Long, BackupCounts>? = runCatching {
+        val head = f.bufferedReader().use { r ->
+            val buf = CharArray(4096)
+            val n = r.read(buf)
+            if (n > 0) String(buf, 0, n) else ""
+        }
+        fun num(key: String): Long? = Regex("\"$key\"\\s*:\\s*(-?\\d+)").find(head)?.groupValues?.get(1)?.toLongOrNull()
+        val members = num("memberCount")
+        if (members != null && members >= 0) {
+            (num("createdAt") ?: f.lastModified()) to BackupCounts(
+                members.toInt(), (num("membershipCount") ?: 0).toInt(), (num("attendanceCount") ?: 0).toInt(),
+                (num("cycleCount") ?: 0).toInt(), (num("photoCount") ?: 0).toInt()
+            )
+        } else {
+            val parsed = parse(f.readText())
+            parsed.createdAt to parsed.counts
+        }
+    }.getOrNull()
 
     fun parse(text: String): GymBackup {
         val backup = try {

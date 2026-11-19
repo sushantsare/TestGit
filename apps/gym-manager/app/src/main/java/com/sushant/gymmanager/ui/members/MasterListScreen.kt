@@ -14,6 +14,11 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.material.icons.automirrored.filled.Sort
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material3.FilterChip
+import com.sushant.gymmanager.ui.components.SearchField
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Clear
@@ -72,8 +77,11 @@ fun MasterListScreen(
 ) {
     val all by vm.allActive.collectAsStateWithLifecycle()
     val list by vm.filtered.collectAsStateWithLifecycle()
-    val inactive by vm.inactive.collectAsStateWithLifecycle()
+    val inactiveCount by vm.inactiveCount.collectAsStateWithLifecycle()
     val query by vm.query.collectAsStateWithLifecycle()
+    val filter by vm.filter.collectAsStateWithLifecycle()
+    val sort by vm.sort.collectAsStateWithLifecycle()
+    var sortMenu by remember { mutableStateOf(false) }
     val settings by vm.settings.collectAsStateWithLifecycle()
     var menu by remember { mutableStateOf(false) }
     var openId by remember { mutableStateOf<Long?>(null) }
@@ -85,10 +93,22 @@ fun MasterListScreen(
                 subtitle = t("Active members"),
                 onMenu = onOpenDrawer,
                 actions = {
+                    Box {
+                        IconButton(onClick = { sortMenu = true }, modifier = Modifier.testTag("sort")) { Icon(Icons.AutoMirrored.Filled.Sort, t("Sort members")) }
+                        DropdownMenu(expanded = sortMenu, onDismissRequest = { sortMenu = false }) {
+                            MemberSort.all.forEach { key ->
+                                DropdownMenuItem(
+                                    text = { Text(t(sortLabel(key))) },
+                                    leadingIcon = { if (sort == key) Icon(Icons.Default.Check, null) },
+                                    onClick = { vm.sort.value = key; sortMenu = false }
+                                )
+                            }
+                        }
+                    }
                     IconButton(onClick = { menu = true }) { Icon(Icons.Default.MoreVert, t("More options")) }
                     DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
                         DropdownMenuItem(
-                            text = { Text(t("Deactivated Members (%d)", inactive?.size ?: 0)) },
+                            text = { Text(t("Deactivated Members (%d)", inactiveCount)) },
                             leadingIcon = { Icon(Icons.Default.PersonOff, null) },
                             onClick = { menu = false; onOpenDeactivated() }
                         )
@@ -106,27 +126,27 @@ fun MasterListScreen(
         }
     ) { padding ->
         Column(Modifier.fillMaxSize().padding(padding)) {
-            OutlinedTextField(
-                value = query,
-                onValueChange = { vm.query.value = it },
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp).testTag("search"),
-                placeholder = { Text(t("Search name, roll no. or WhatsApp")) },
-                leadingIcon = { Icon(Icons.Default.Search, null) },
-                trailingIcon = {
-                    if (query.isNotEmpty()) IconButton(onClick = { vm.query.value = "" }) { Icon(Icons.Default.Clear, t("Clear search")) }
-                },
-                singleLine = true,
-                shape = RoundedCornerShape(16.dp),
-                colors = OutlinedTextFieldDefaults.colors(
-                    unfocusedContainerColor = MaterialTheme.colorScheme.surface,
-                    focusedContainerColor = MaterialTheme.colorScheme.surface,
-                    unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant
-                )
-            )
+            SearchField(query, { vm.query.value = it }, t("Search name, roll no. or WhatsApp"), Modifier.padding(horizontal = 16.dp, vertical = 4.dp))
+            LazyRow(
+                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.testTag("member_filters")
+            ) {
+                items(MemberFilter.all) { key ->
+                    FilterChip(
+                        selected = filter == key,
+                        onClick = { vm.filter.value = key },
+                        label = { Text(t(filterLabel(key))) },
+                        leadingIcon = if (filter == key) { { Icon(Icons.Default.Check, null, Modifier.size(16.dp)) } } else null,
+                        modifier = Modifier.testTag("filter_$key")
+                    )
+                }
+            }
             val items = list
             when {
                 items == null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
                 items.isEmpty() && query.isNotBlank() -> EmptyState(Icons.Default.PersonSearch, t("No matches"), t("No active member matches \"%s\".", query))
+                items.isEmpty() && filter != MemberFilter.ALL -> EmptyState(Icons.Default.PersonSearch, t("Nobody here"), t("No active member is in \"%s\" right now.", t(filterLabel(filter))))
                 items.isEmpty() -> EmptyState(Icons.Default.GroupAdd, t("No members yet"), t("Tap Add Member to register your first gym member."))
                 else -> MemberList(items, settings, onOpen = { openId = it })
             }
@@ -134,6 +154,23 @@ fun MasterListScreen(
     }
 
     openId?.let { id -> MemberCardDialog(memberId = id, onDismiss = { openId = null }, onEdit = onEditMember) }
+}
+
+fun filterLabel(key: String): String = when (key) {
+    MemberFilter.EXPIRING -> "Expiring soon"
+    MemberFilter.EXPIRED -> "Expired"
+    MemberFilter.DUES -> "Has dues"
+    MemberFilter.FROZEN -> "Frozen"
+    MemberFilter.MORNING -> "Morning"
+    MemberFilter.EVENING -> "Evening"
+    else -> "All"
+}
+
+fun sortLabel(key: String): String = when (key) {
+    MemberSort.NAME -> "Name (A–Z)"
+    MemberSort.EXPIRY -> "Expiry date (soonest first)"
+    MemberSort.JOINED -> "Newest members first"
+    else -> "Roll number"
 }
 
 @Composable

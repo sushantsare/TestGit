@@ -97,9 +97,15 @@ data class PaymentCycleEntity(
     val notes: String? = null,
     val createdAt: Long = System.currentTimeMillis(),
     val paidAmount: Double = 0.0,
-    val paymentMode: String? = null
+    val paymentMode: String? = null,
+    /** Amount the owner let go (discount / write-off / mistaken due). */
+    val waivedAmount: Double = 0.0,
+    val waiveReason: String? = null
 ) {
-    val balance: Double get() = (amount - paidAmount).coerceAtLeast(0.0)
+    val balance: Double get() = (amount - paidAmount - waivedAmount).coerceAtLeast(0.0)
+
+    /** True when nothing is left to pay (paid and/or waived). */
+    fun settledWith(paid: Double, waived: Double = waivedAmount): Boolean = paid + waived >= amount - 0.005
 }
 
 /** One money transaction against a billing cycle (supports partial payments). */
@@ -176,7 +182,9 @@ data class GymSettingsEntity(
     val dailyReminderEnabled: Boolean = true,
     val reminderHour: Int = 9,
     val gymPhone: String = "",
-    val gymAddress: String = ""
+    val gymAddress: String = "",
+    /** Last receipt number issued. Only ever goes up, so a number is never reused after an undo. */
+    val lastReceiptNo: Long = 0
 ) {
     fun defaultFeeFor(planType: String): Double? = when (planType) {
         PlanType.ONE_MONTH -> fee1Month

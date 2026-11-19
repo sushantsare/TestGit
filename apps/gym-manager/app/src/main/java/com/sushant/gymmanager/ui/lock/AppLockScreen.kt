@@ -36,9 +36,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 
 @Composable
-fun AppLockScreen(gymName: String, onUnlock: () -> Unit) {
+fun AppLockScreen(gymName: String, onUnlock: () -> Unit, onExit: () -> Unit = {}) {
     val scheme = MaterialTheme.colorScheme
-    BackHandler {} // the app stays locked
+    BackHandler { onExit() } // Back leaves the app; it never skips the lock
     Box(
         Modifier
             .fillMaxSize()
@@ -71,7 +71,7 @@ fun AppLockScreen(gymName: String, onUnlock: () -> Unit) {
                 ) {
                     Icon(Icons.Default.Lock, null, modifier = Modifier.size(14.dp), tint = scheme.onSecondaryContainer)
                     Spacer(Modifier.size(6.dp))
-                    Text(t("Biometric Protection Enabled"), style = MaterialTheme.typography.labelMedium, color = scheme.onSecondaryContainer)
+                    Text(t("App lock is on"), style = MaterialTheme.typography.labelMedium, color = scheme.onSecondaryContainer)
                 }
             }
             Spacer(Modifier.height(48.dp))

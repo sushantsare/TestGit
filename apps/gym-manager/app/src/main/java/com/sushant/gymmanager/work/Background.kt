@@ -27,6 +27,7 @@ import com.sushant.gymmanager.data.repository.WidgetStats
 import com.sushant.gymmanager.i18n.I18n
 import com.sushant.gymmanager.util.DateUtils
 import com.sushant.gymmanager.util.Money
+import com.sushant.gymmanager.ui.navigation.NavRequests
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -96,8 +97,13 @@ object Notifications {
             if (s.expiring > 0) add(I18n.tr(lang, "%d memberships expiring soon", s.expiring))
             if (s.pending > 0) add(I18n.tr(lang, "%s pending from %d members", Money.format(s.pending), s.membersWithDues))
         }
+        // Tapping the summary opens the screen it talks about.
+        val route = if (s.pending > 0) "payments" else "members:EXPIRING"
         val open = PendingIntent.getActivity(
-            context, 0, Intent(context, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP),
+            context, 0,
+            Intent(context, MainActivity::class.java)
+                .putExtra(NavRequests.EXTRA_OPEN, route)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP),
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
         val n = NotificationCompat.Builder(context, CHANNEL)
@@ -149,11 +155,19 @@ object GymWidget {
             setTextViewText(R.id.w_dues_label, tr("Dues"))
             setTextViewText(R.id.w_expiring, s.expiring.toString())
             setTextViewText(R.id.w_expiring_label, tr("Expiring"))
-            val open = PendingIntent.getActivity(
-                context, 1, Intent(context, MainActivity::class.java),
+            fun openRoute(code: Int, route: String?): PendingIntent = PendingIntent.getActivity(
+                context, code,
+                Intent(context, MainActivity::class.java).apply {
+                    if (route != null) putExtra(NavRequests.EXTRA_OPEN, route)
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+                },
                 PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
             )
-            setOnClickPendingIntent(R.id.w_root, open)
+            setOnClickPendingIntent(R.id.w_root, openRoute(1, null))
+            setOnClickPendingIntent(R.id.w_cell_active, openRoute(2, "members:ALL"))
+            setOnClickPendingIntent(R.id.w_cell_present, openRoute(3, "attendance"))
+            setOnClickPendingIntent(R.id.w_cell_dues, openRoute(4, "payments"))
+            setOnClickPendingIntent(R.id.w_cell_expiring, openRoute(5, "members:EXPIRING"))
         }
         manager.updateAppWidget(ids, views)
     }

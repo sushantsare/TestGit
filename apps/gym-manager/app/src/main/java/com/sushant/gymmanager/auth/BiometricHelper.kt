@@ -5,6 +5,9 @@ import android.content.ContextWrapper
 import android.widget.Toast
 import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricManager.Authenticators.BIOMETRIC_WEAK
+import androidx.biometric.BiometricManager.Authenticators.DEVICE_CREDENTIAL
+import android.app.KeyguardManager
+import android.os.Build
 import androidx.biometric.BiometricPrompt
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.FragmentActivity
@@ -14,13 +17,26 @@ enum class ProtectedAction { APP_LAUNCH, ADD_MEMBER, DELETE_MEMBER, RESTORE_BACK
 
 object BiometricHelper {
 
-    fun status(context: Context): Int = BiometricManager.from(context).canAuthenticate(BIOMETRIC_WEAK)
+    /** Fingerprint/face, with the phone's PIN, pattern or password as a fallback (e.g. wet fingers). */
+    private val allowed: Int
+        get() = if (Build.VERSION.SDK_INT >= 30) BIOMETRIC_WEAK or DEVICE_CREDENTIAL else BIOMETRIC_WEAK
+
+    fun status(context: Context): Int {
+        val s = BiometricManager.from(context).canAuthenticate(allowed)
+        if (s != BiometricManager.BIOMETRIC_SUCCESS && Build.VERSION.SDK_INT < 30 && isDeviceSecure(context)) {
+            return BiometricManager.BIOMETRIC_SUCCESS
+        }
+        return s
+    }
+
+    private fun isDeviceSecure(context: Context): Boolean =
+        context.getSystemService(KeyguardManager::class.java)?.isDeviceSecure == true
 
     fun isAvailable(context: Context): Boolean = status(context) == BiometricManager.BIOMETRIC_SUCCESS
 
     fun statusMessage(context: Context): String = when (status(context)) {
-        BiometricManager.BIOMETRIC_SUCCESS -> "Biometric authentication is ready on this device"
-        BiometricManager.BIOMETRIC_ERROR_NONE_ENROLLED -> "No fingerprint or face enrolled. Add one in phone settings."
+        BiometricManager.BIOMETRIC_SUCCESS -> "App lock is ready: fingerprint, face or your phone's screen lock"
+        BiometricManager.BIOMETRIC_ERROR_NONE_ENROLLED -> "Set up a screen lock or fingerprint in phone settings first."
         BiometricManager.BIOMETRIC_ERROR_NO_HARDWARE -> "This device has no biometric hardware"
         BiometricManager.BIOMETRIC_ERROR_HW_UNAVAILABLE -> "Biometric hardware is currently unavailable"
         else -> "Biometric authentication is not supported on this device"
@@ -59,12 +75,16 @@ object BiometricHelper {
                 override fun onAuthenticationError(errorCode: Int, errString: CharSequence) = onFailure(errString.toString())
             }
         )
-        val info = BiometricPrompt.PromptInfo.Builder()
+        val builder = BiometricPrompt.PromptInfo.Builder()
             .setTitle(title)
             .setSubtitle(subtitle)
-            .setAllowedAuthenticators(BIOMETRIC_WEAK)
-            .setNegativeButtonText("Cancel")
-            .build()
+        if (Build.VERSION.SDK_INT >= 30) {
+            builder.setAllowedAuthenticators(BIOMETRIC_WEAK or DEVICE_CREDENTIAL)
+        } else {
+            @Suppress("DEPRECATION")
+            builder.setDeviceCredentialAllowed(true)
+        }
+        val info = builder.build()
         prompt.authenticate(info)
     }
 

@@ -53,6 +53,8 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.remember
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
@@ -152,24 +154,43 @@ fun MainNavigation(settings: GymSettingsEntity) {
     }
     BackHandler(enabled = drawerState.isOpen) { scope.launch { drawerState.close() } }
 
+    val leaveGuard = remember { LeaveGuard() }
+    // Requests from the notification, the widget and dashboard tiles ("payments", "members:EXPIRING").
+    val requested by NavRequests.openRoute.collectAsStateWithLifecycle()
+    LaunchedEffect(requested) {
+        val r = requested ?: return@LaunchedEffect
+        NavRequests.openRoute.value = null
+        val target = r.substringBefore(":")
+        val filter = r.substringAfter(":", "")
+        if (filter.isNotEmpty()) NavRequests.memberFilter.value = filter
+        if (destinations.any { it.route == target }) {
+            leaveGuard.attempt {
+                if (target != nav.currentDestination?.route) nav.navigateTopLevel(target)
+            }
+        }
+    }
+
     ModalNavigationDrawer(
         drawerState = drawerState,
         gesturesEnabled = isTopLevel || drawerState.isOpen,
         drawerContent = {
             AppDrawer(gymName = settings.gymName, currentRoute = route) { target ->
                 scope.launch { drawerState.close() }
-                if (target != route) nav.navigateTopLevel(target)
+                if (target != route) leaveGuard.attempt { nav.navigateTopLevel(target) }
             }
         }
     ) {
-        CompositionLocalProvider(LocalOpenCalendar provides { id -> nav.navigate(Routes.calendar(id)) }) {
+        CompositionLocalProvider(
+            LocalOpenCalendar provides { id -> nav.navigate(Routes.calendar(id)) },
+            LocalLeaveGuard provides leaveGuard
+        ) {
         // Tapping any empty area of a screen releases the text field cursor and closes the keyboard.
         Box(Modifier.fillMaxSize().pointerInput(Unit) { detectTapGestures(onTap = { dropFocus() }) }) {
         NavHost(navController = nav, startDestination = Routes.DASHBOARD) {
             composable(Routes.DASHBOARD) {
                 DashboardScreen(
                     onOpenDrawer = openDrawer,
-                    onNavigate = { nav.navigateTopLevel(it) },
+                    onNavigate = { r -> NavRequests.openRoute.value = r },
                     onAddMember = { nav.navigate(Routes.editMember(0)) },
                     onEditMember = { nav.navigate(Routes.editMember(it)) }
                 )
@@ -237,7 +258,7 @@ private fun AppDrawer(gymName: String, currentRoute: String?, onSelect: (String)
         Column(Modifier.fillMaxHeight().verticalScroll(rememberScrollState()).navigationBarsPadding()) {
             Box(
                 Modifier.fillMaxWidth()
-                    .background(Brush.linearGradient(if (com.sushant.gymmanager.ui.theme.LocalExtraColors.current.isDark) listOf(Color(0xFFD9520B), Color(0xFF8A2E0A)) else listOf(scheme.primary, Color(0xFFC2410C))))
+                    .background(Brush.linearGradient(if (com.sushant.gymmanager.ui.theme.LocalExtraColors.current.isDark) listOf(Color(0xFFD9520B), Color(0xFF8A2E0A)) else listOf(Color(0xFFEA580C), Color(0xFFC2410C))))
                     .statusBarsPadding()
                     .padding(horizontal = 24.dp, vertical = 24.dp)
             ) {

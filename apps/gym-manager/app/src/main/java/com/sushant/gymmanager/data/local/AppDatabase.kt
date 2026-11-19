@@ -17,7 +17,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         PaymentEntity::class,
         ExpenseEntity::class
     ],
-    version = 2,
+    version = 3,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -68,9 +68,19 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        /** v2 -> v3: waived dues and a receipt counter that never goes back. Keeps all data. */
+        val MIGRATION_2_3 = object : Migration(2, 3) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE `payment_cycles` ADD COLUMN `waivedAmount` REAL NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE `payment_cycles` ADD COLUMN `waiveReason` TEXT")
+                db.execSQL("ALTER TABLE `gym_settings` ADD COLUMN `lastReceiptNo` INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("UPDATE `gym_settings` SET `lastReceiptNo` = (SELECT COALESCE(MAX(`id`), 0) FROM `payments`)")
+            }
+        }
+
         fun build(context: Context): AppDatabase =
             Room.databaseBuilder(context.applicationContext, AppDatabase::class.java, NAME)
-                .addMigrations(MIGRATION_1_2)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
                 .build()
     }
 }

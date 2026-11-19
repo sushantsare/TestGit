@@ -80,6 +80,13 @@ import com.sushant.gymmanager.ui.components.planStatus
 import com.sushant.gymmanager.ui.components.rememberGymApp
 import com.sushant.gymmanager.ui.navigation.LocalOpenCalendar
 import com.sushant.gymmanager.ui.payments.ShareActions
+import com.sushant.gymmanager.ui.payments.CollectPaymentDialog
+import com.sushant.gymmanager.ui.payments.ReceiptsDialog
+import com.sushant.gymmanager.ui.payments.WaiveDialog
+import com.sushant.gymmanager.data.local.PaymentCycleEntity
+import com.sushant.gymmanager.data.repository.ReceiptRef
+import com.sushant.gymmanager.ui.theme.OnStatus
+import androidx.compose.material.icons.filled.CurrencyRupee
 import com.sushant.gymmanager.ui.theme.LocalExtraColors
 import com.sushant.gymmanager.ui.theme.StatusGreen
 import com.sushant.gymmanager.ui.theme.StatusRed
@@ -103,6 +110,14 @@ fun MemberCardDialog(memberId: Long, onDismiss: () -> Unit, onEdit: (Long) -> Un
     var confirmDelete by remember { mutableStateOf(false) }
     var confirmFreeze by remember { mutableStateOf(false) }
     var undoTarget by remember { mutableStateOf<PaymentEntity?>(null) }
+    val dues by remember(memberId) { app.repository.unpaidFor(memberId) }.collectAsStateWithLifecycle(initialValue = emptyList())
+    var collecting by remember { mutableStateOf(false) }
+    var receipts by remember { mutableStateOf<List<ReceiptRef>>(emptyList()) }
+    var waiveTarget by remember { mutableStateOf<PaymentCycleEntity?>(null) }
+    var lastWaive by remember { mutableStateOf<Pair<Long, Double>?>(null) }
+    var confirmRenew by remember { mutableStateOf(false) }
+    // Saves run in the app scope so closing this card can't cancel them.
+    val io = app.appScope
     var showAllHistory by remember { mutableStateOf(false) }
     var loaded by remember { mutableStateOf(false) }
     LaunchedEffect(details) {
@@ -176,7 +191,7 @@ fun MemberCardDialog(memberId: Long, onDismiss: () -> Unit, onEdit: (Long) -> Un
                         LabeledValue(t("WHATSAPP"), "+" + WhatsAppHelper.normalizePhone(m.whatsappNumber), Modifier.weight(1f))
                         Button(
                             onClick = { WhatsAppHelper.open(context, m.whatsappNumber) },
-                            colors = ButtonDefaults.buttonColors(containerColor = WhatsAppGreen, contentColor = Color.White),
+                            colors = ButtonDefaults.buttonColors(containerColor = com.sushant.gymmanager.ui.theme.WhatsAppInk, contentColor = OnStatus),
                             contentPadding = ButtonDefaults.ButtonWithIconContentPadding
                         ) {
                             Icon(Icons.AutoMirrored.Filled.Chat, null, Modifier.size(18.dp)); Spacer(Modifier.width(6.dp)); Text(t("Chat"))
@@ -229,7 +244,7 @@ fun MemberCardDialog(memberId: Long, onDismiss: () -> Unit, onEdit: (Long) -> Un
                             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                 if (frozen) {
                                     Button(
-                                        onClick = { scope.launch { app.repository.unfreeze(m.id); toast(t_("Membership resumed", lang)) } },
+                                        onClick = { io.launch { app.repository.unfreeze(m.id); toast(t_("Membership resumed", lang)) } },
                                         modifier = Modifier.weight(1f).testTag("card_resume")
                                     ) { Icon(Icons.Default.PlayArrow, null, Modifier.size(18.dp)); Spacer(Modifier.width(6.dp)); Text(t("Resume")) }
                                 } else {
@@ -237,14 +252,62 @@ fun MemberCardDialog(memberId: Long, onDismiss: () -> Unit, onEdit: (Long) -> Un
                                         Icon(Icons.Default.AcUnit, null, Modifier.size(18.dp)); Spacer(Modifier.width(6.dp)); Text(t("Freeze"))
                                     }
                                     if (!plan.autoRenew) {
-                                        OutlinedButton(onClick = {
-                                            scope.launch { app.repository.renewMembership(m.id); toast(t_("Membership renewed, a new due was added", lang)) }
-                                        }, modifier = Modifier.weight(1f)) {
+                                        OutlinedButton(onClick = { confirmRenew = true }, modifier = Modifier.weight(1f).testTag("card_renew")) {
                                             Icon(Icons.Default.Autorenew, null, Modifier.size(18.dp)); Spacer(Modifier.width(6.dp)); Text(t("Renew"))
                                         }
                                     }
                                 }
                             }
+                        }
+                    }
+                }
+                Spacer(Modifier.height(10.dp))
+
+                InfoBlock {
+                    val owed = dues.sumOf { it.balance }
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(t("Pending Dues"), style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
+                        Text(
+                            if (owed > 0) Money.format(owed) else t("All paid"),
+                            style = MaterialTheme.typography.labelLarge, color = if (owed > 0) StatusRed else StatusGreen,
+                            modifier = Modifier.testTag("card_dues_total")
+                        )
+                    }
+                    dues.filter { it.balance > 0 }.forEach { c ->
+                        Row(Modifier.fillMaxWidth().padding(top = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Column(Modifier.weight(1f)) {
+                                Text(
+                                    "${DateUtils.formatShort(c.cycleStart)} – ${DateUtils.formatShort(c.cycleEnd)}",
+                                    style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis
+                                )
+                                if (c.paidAmount > 0 || c.waivedAmount > 0) {
+                                    Text(
+                                        t("%s paid, %s waived of %s", Money.format(c.paidAmount), Money.format(c.waivedAmount), Money.format(c.amount)),
+                                        style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+                            Text(Money.format(c.balance), style = MaterialTheme.typography.titleSmall)
+                            TextButton(onClick = { waiveTarget = c }) { Text(t("Waive")) }
+                        }
+                    }
+                    lastWaive?.let { (cycleId, amount) ->
+                        Row(Modifier.fillMaxWidth().padding(top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Text(t("Waived %s", Money.format(amount)), style = MaterialTheme.typography.labelMedium, modifier = Modifier.weight(1f))
+                            TextButton(onClick = {
+                                lastWaive = null
+                                io.launch { app.repository.unwaive(cycleId, amount); toast(t_("Waiver undone", lang)) }
+                            }) { Text(t("Undo")) }
+                        }
+                    }
+                    if (owed > 0) {
+                        Spacer(Modifier.height(8.dp))
+                        Button(
+                            onClick = { collecting = true },
+                            colors = ButtonDefaults.buttonColors(containerColor = StatusGreen, contentColor = OnStatus),
+                            modifier = Modifier.fillMaxWidth().testTag("card_collect")
+                        ) {
+                            Icon(Icons.Default.CurrencyRupee, null, Modifier.size(18.dp)); Spacer(Modifier.width(6.dp)); Text(t("Collect %s", Money.format(owed)))
                         }
                     }
                 }
@@ -316,7 +379,7 @@ fun MemberCardDialog(memberId: Long, onDismiss: () -> Unit, onEdit: (Long) -> Un
                             if (m.isActive) {
                                 confirmDeactivate = true
                             } else {
-                                scope.launch { app.repository.setActive(m.id, true); toast(t_("%s reactivated", lang, m.fullName)) }
+                                io.launch { app.repository.setActive(m.id, true); toast(t_("%s reactivated", lang, m.fullName)) }
                             }
                         },
                         modifier = Modifier.weight(1f)
@@ -342,7 +405,7 @@ fun MemberCardDialog(memberId: Long, onDismiss: () -> Unit, onEdit: (Long) -> Un
                     confirmText = t("Freeze"),
                     onConfirm = {
                         confirmFreeze = false
-                        scope.launch { app.repository.freeze(m.id); toast(t_("Membership frozen", lang)) }
+                        io.launch { app.repository.freeze(m.id); toast(t_("Membership frozen", lang)) }
                     },
                     onDismiss = { confirmFreeze = false }
                 )
@@ -354,7 +417,7 @@ fun MemberCardDialog(memberId: Long, onDismiss: () -> Unit, onEdit: (Long) -> Un
                     confirmText = t("Deactivate"),
                     onConfirm = {
                         confirmDeactivate = false
-                        scope.launch { app.repository.setActive(m.id, false); toast(t_("%s deactivated", lang, m.fullName)) }
+                        io.launch { app.repository.setActive(m.id, false); toast(t_("%s deactivated", lang, m.fullName)) }
                     },
                     onDismiss = { confirmDeactivate = false }
                 )
@@ -368,15 +431,50 @@ fun MemberCardDialog(memberId: Long, onDismiss: () -> Unit, onEdit: (Long) -> Un
                     onConfirm = {
                         confirmDelete = false
                         BiometricHelper.guard(context, settings, ProtectedAction.DELETE_MEMBER, t_("Delete %s", lang, m.fullName)) {
-                            scope.launch {
+                            io.launch {
                                 app.repository.deleteMember(m.id)
                                 toast(t_("Member deleted", lang))
-                                onDismiss()
                             }
                         }
                     },
                     onDismiss = { confirmDelete = false }
                 )
+            }
+            if (confirmRenew) {
+                ConfirmDialog(
+                    title = t("Renew membership?"),
+                    message = t("A new due of %s will be added for %s, starting %s.", Money.format(plan?.fee ?: 0.0), m.fullName,
+                        DateUtils.formatShort(plan?.let { p -> if (DateUtils.isExpired(p.expiryDate)) DateUtils.today() else p.expiryDate })),
+                    confirmText = t("Renew"),
+                    onConfirm = {
+                        confirmRenew = false
+                        io.launch { app.repository.renewMembership(m.id); toast(t_("Membership renewed, a new due was added", lang)) }
+                    },
+                    onDismiss = { confirmRenew = false }
+                )
+            }
+            if (collecting) {
+                CollectPaymentDialog(
+                    cycles = dues.filter { it.balance > 0 },
+                    onDismiss = { collecting = false },
+                    onConfirm = { amounts, mode, note ->
+                        collecting = false
+                        io.launch {
+                            val refs = app.repository.recordPayments(amounts, mode, note)
+                            receipts = refs
+                        }
+                    }
+                )
+            }
+            if (receipts.isNotEmpty()) {
+                ReceiptsDialog(receipts, mapOf(m.id to m.fullName), onDismiss = { receipts = emptyList() })
+            }
+            waiveTarget?.let { c ->
+                WaiveDialog(c, onDismiss = { waiveTarget = null }) { amount, reason ->
+                    waiveTarget = null
+                    lastWaive = c.id to amount
+                    io.launch { app.repository.waive(c.id, amount, reason); toast(t_("Due waived", lang)) }
+                }
             }
             undoTarget?.let { p ->
                 ConfirmDialog(
@@ -386,7 +484,7 @@ fun MemberCardDialog(memberId: Long, onDismiss: () -> Unit, onEdit: (Long) -> Un
                     destructive = true,
                     onConfirm = {
                         undoTarget = null
-                        scope.launch { app.repository.undoPayment(p.id); toast(t_("Payment reversed", lang)) }
+                        io.launch { app.repository.undoPayment(p.id); toast(t_("Payment reversed", lang)) }
                     },
                     onDismiss = { undoTarget = null }
                 )

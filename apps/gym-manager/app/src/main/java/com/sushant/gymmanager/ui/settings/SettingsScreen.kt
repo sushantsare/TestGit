@@ -83,11 +83,28 @@ import com.sushant.gymmanager.ui.components.GymTopBar
 import com.sushant.gymmanager.ui.theme.LocalExtraColors
 import com.sushant.gymmanager.util.DateUtils
 import kotlinx.coroutines.launch
+import kotlinx.serialization.json.Json
+import android.os.Build
+import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.LaunchedEffect
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.SavedStateHandle
+import androidx.lifecycle.compose.LifecycleEventEffect
+import com.sushant.gymmanager.ui.components.rememberDownloadsAccess
+import com.sushant.gymmanager.ui.components.rememberPermissionRequester
+import com.sushant.gymmanager.ui.navigation.NavRequests
+import com.sushant.gymmanager.ui.navigation.RegisterLeaveGuard
+import com.sushant.gymmanager.ui.theme.StatusGreen
+import com.sushant.gymmanager.work.Notifications
 
 data class FeeFields(val f1: String, val f3: String, val f6: String, val f12: String)
 
-class SettingsViewModel(app: Application) : AndroidViewModel(app) {
+class SettingsViewModel(app: Application, private val handle: SavedStateHandle) : AndroidViewModel(app) {
     private val repo = (app as GymApp).repository
+    private val json = Json { ignoreUnknownKeys = true }
 
     var saved by mutableStateOf<GymSettingsEntity?>(null)
         private set
@@ -97,13 +114,63 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
 
     init { reload() }
 
-    fun reload() {
+    fun reload(restore: Boolean = true) {
         viewModelScope.launch {
             val s = repo.getSettings()
             saved = s; draft = s
             fees = FeeFields(fmt(s.fee1Month), fmt(s.fee3Months), fmt(s.fee6Months), fmt(s.fee12Months))
             expiringDays = s.expiringSoonDays.toString()
+            // Unsaved edits come back if Android closed the app in the background.
+            if (restore) {
+                handle.get<String>("draft")?.let { d -> runCatching { json.decodeFromString(GymSettingsEntity.serializer(), d) }.getOrNull()?.let { draft = it } }
+                handle.get<Array<String>>("fees")?.takeIf { it.size == 4 }?.let { fees = FeeFields(it[0], it[1], it[2], it[3]) }
+                handle.get<String>("days")?.let { expiringDays = it }
+            }
         }
+    }
+
+    /** Remembers unsaved edits across the app being closed in the background. */
+    fun persistDraft() {
+        handle["draft"] = json.encodeToString(GymSettingsEntity.serializer(), draft)
+        handle["fees"] = arrayOf(fees.f1, fees.f3, fees.f6, fees.f12)
+        handle["days"] = expiringDays
+    }
+
+    fun discardDraft() {
+        val s = saved ?: return
+        draft = s
+        fees = FeeFields(fmt(s.fee1Month), fmt(s.fee3Months), fmt(s.fee6Months), fmt(s.fee12Months))
+        expiringDays = s.expiringSoonDays.toString()
+        persistDraft()
+    }
+
+    /** Simple switches (theme, reminder, auto-backup) take effect at once without touching other unsaved edits. */
+    fun applyNow(transform: (GymSettingsEntity) -> GymSettingsEntity) {
+        val s = saved ?: return
+        val next = transform(s)
+        saved = next
+        draft = transform(draft)
+        persistDraft()
+        viewModelScope.launch {
+            repo.saveSettings(next)
+            if (next.reminderHour != s.reminderHour) DailyWorker.schedule(getApplication(), next.reminderHour, replace = true)
+        }
+    }
+
+    fun shiftError(d: GymSettingsEntity = draft): String? {
+        val ms = DateUtils.parseTime(d.morningShiftStart); val me = DateUtils.parseTime(d.morningShiftEnd)
+        val es = DateUtils.parseTime(d.eveningShiftStart); val ee = DateUtils.parseTime(d.eveningShiftEnd)
+        return when {
+            ms == null || me == null || es == null || ee == null -> "Pick all four shift times"
+            !ms.isBefore(me) -> "Morning shift must end after it starts"
+            !es.isBefore(ee) -> "Evening shift must end after it starts"
+            es.isBefore(me) -> "Evening shift can't start before the morning shift ends"
+            else -> null
+        }
+    }
+
+    fun bulkFee(planType: String, fee: Double, onDone: (Int) -> Unit) {
+        viewModelScope.launch { onDone(repo.bulkChangeFee(planType, fee)) }
     }
 
     private fun fmt(v: Double) = if (v % 1.0 == 0.0) v.toLong().toString() else v.toString()
@@ -113,7 +180,7 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
         val f6 = fees.f6.toDoubleOrNull(); val f12 = fees.f12.toDoubleOrNull()
         val days = expiringDays.toIntOrNull()
         if (listOf(f1, f3, f6, f12).any { it == null || it < 0 } || days == null || days !in 1..90) return null
-        if (draft.gymName.isBlank()) return null
+        if (draft.gymName.isBlank() || shiftError() != null) return null
         return draft.copy(
             gymName = draft.gymName.trim(),
             fee1Month = f1!!, fee3Months = f3!!, fee6Months = f6!!, fee12Months = f12!!,
@@ -121,7 +188,12 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
         )
     }
 
-    val isDirty: Boolean get() = saved != null && buildResult() != saved
+    val isDirty: Boolean
+        get() {
+            val s = saved ?: return false
+            val r = buildResult() ?: return true
+            return r != s
+        }
 
     fun securityChanged(result: GymSettingsEntity): Boolean {
         val s = saved ?: return false
@@ -135,20 +207,25 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
             )
     }
 
-    fun save(result: GymSettingsEntity, onDone: () -> Unit) {
+    fun save(result: GymSettingsEntity, onDone: (moved: Int) -> Unit) {
         viewModelScope.launch {
-            val hourChanged = saved?.reminderHour != result.reminderHour
+            val before = saved
+            val hourChanged = before?.reminderHour != result.reminderHour
             repo.saveSettings(result)
             if (hourChanged) DailyWorker.schedule(getApplication(), result.reminderHour, replace = true)
+            // New shift windows: re-sort existing members into Morning/Evening.
+            val windowsChanged = before?.morningShiftStart != result.morningShiftStart || before.morningShiftEnd != result.morningShiftEnd
+            val moved = if (windowsChanged) repo.reassignShifts(result.morningShiftStart, result.morningShiftEnd) else 0
             saved = result; draft = result
-            onDone()
+            persistDraft()
+            onDone(moved)
         }
     }
 
     fun resetAll(onDone: () -> Unit) {
         viewModelScope.launch {
             repo.resetAll()
-            reload()
+            reload(restore = false)
             onDone()
         }
     }
@@ -169,7 +246,33 @@ fun SettingsScreen(onOpenDrawer: () -> Unit, onDataReset: () -> Unit, vm: Settin
     val securityTitle = t("Change security settings")
     val resetTitle = t("Reset all data")
     val savedMsg = t("Settings saved")
+    val movedMsg = t("Settings saved. %d members moved to their new shift.")
     val resetMsg = t("All data has been reset")
+    var leaveAction by remember { mutableStateOf<(() -> Unit)?>(null) }
+    var hourPicker by remember { mutableStateOf(false) }
+    var bulkFee by remember { mutableStateOf(false) }
+    var canPost by remember { mutableStateOf(Notifications.canPost(context)) }
+    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { canPost = Notifications.canPost(context) }
+    LaunchedEffect(vm.draft, vm.fees, vm.expiringDays) { if (vm.saved != null) vm.persistDraft() }
+    RegisterLeaveGuard(vm.isDirty) { proceed -> leaveAction = proceed }
+    BackHandler(enabled = vm.isDirty) { leaveAction = { NavRequests.openRoute.value = "dashboard" } }
+    val notifPermission = rememberPermissionRequester(
+        "android.permission.POST_NOTIFICATIONS",
+        title = t("Daily summary notification"),
+        reason = t("Allow notifications so the app can tell you each day which memberships are expiring and how much is pending."),
+        deniedMessage = t("Notifications are off, so the daily summary can't be shown.")
+    )
+    val enableReminder: () -> Unit = {
+        if (Build.VERSION.SDK_INT < 33) {
+            vm.applyNow { it.copy(dailyReminderEnabled = true) }
+        } else {
+            notifPermission.request(onDenied = { canPost = false }) {
+                canPost = true
+                vm.applyNow { it.copy(dailyReminderEnabled = true) }
+            }
+        }
+    }
+    val downloadsAccess = rememberDownloadsAccess()
 
     Scaffold(
         topBar = { GymTopBar(t("Settings"), t("Gym preferences & security"), onMenu = onOpenDrawer) },
@@ -181,7 +284,7 @@ fun SettingsScreen(onOpenDrawer: () -> Unit, onDataReset: () -> Unit, vm: Settin
                         onClick = {
                             val r = result ?: return@Button
                             val doSave = {
-                                vm.save(r) { context.toast(savedMsg) }
+                                vm.save(r) { moved -> context.toast(if (moved > 0) movedMsg.format(moved) else savedMsg) }
                             }
                             if (vm.securityChanged(r)) {
                                 BiometricHelper.guard(context, vm.saved ?: r, ProtectedAction.CHANGE_SECURITY, securityTitle, doSave)
@@ -272,6 +375,9 @@ fun SettingsScreen(onOpenDrawer: () -> Unit, onDataReset: () -> Unit, vm: Settin
                     TimeBox(t("Start"), d.eveningShiftStart, Modifier.weight(1f)) { timeField = TimeField.ES }
                     TimeBox(t("End"), d.eveningShiftEnd, Modifier.weight(1f)) { timeField = TimeField.EE }
                 }
+                vm.shiftError()?.let { err ->
+                    Text(t(err), color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 8.dp))
+                }
             }
 
             // Fees
@@ -285,19 +391,27 @@ fun SettingsScreen(onOpenDrawer: () -> Unit, onDataReset: () -> Unit, vm: Settin
                     FeeField(t("6 Months"), vm.fees.f6, Modifier.weight(1f)) { vm.fees = vm.fees.copy(f6 = it) }
                     FeeField(t("12 Months"), vm.fees.f12, Modifier.weight(1f)) { vm.fees = vm.fees.copy(f12 = it) }
                 }
+                Text(
+                    t("These are used for new members. To change what existing members pay, use the button below."),
+                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 8.dp)
+                )
+                OutlinedButton(onClick = { bulkFee = true }, modifier = Modifier.fillMaxWidth().padding(top = 8.dp).testTag("bulk_fee")) {
+                    Text(t("Change fee for existing members"))
+                }
             }
 
             // Biometrics
             Section(Icons.Default.Fingerprint, t("Biometric Security")) {
                 Surface(
                     shape = RoundedCornerShape(12.dp),
-                    color = if (bioAvailable) Color(0xFF16A34A).copy(alpha = 0.1f) else MaterialTheme.colorScheme.errorContainer
+                    color = if (bioAvailable) StatusGreen.copy(alpha = 0.1f) else MaterialTheme.colorScheme.errorContainer
                 ) {
                     Text(
                         t(bioMessage),
                         style = MaterialTheme.typography.bodySmall,
                         modifier = Modifier.fillMaxWidth().padding(10.dp),
-                        color = if (bioAvailable) Color(0xFF15803D) else MaterialTheme.colorScheme.onErrorContainer
+                        color = if (bioAvailable) StatusGreen else MaterialTheme.colorScheme.onErrorContainer
                     )
                 }
                 Spacer(Modifier.height(6.dp))
@@ -324,14 +438,30 @@ fun SettingsScreen(onOpenDrawer: () -> Unit, onDataReset: () -> Unit, vm: Settin
 
             // Notifications
             Section(Icons.Default.NotificationsActive, t("Daily Reminder")) {
-                ToggleRow(t("Morning summary notification"), t("Expiring memberships and pending dues, once a day"), d.dailyReminderEnabled) {
-                    vm.draft = d.copy(dailyReminderEnabled = it)
+                val saved = vm.saved ?: d
+                val blocked = saved.dailyReminderEnabled && !canPost
+                ToggleRow(t("Morning summary notification"), t("Expiring memberships and pending dues, once a day"), saved.dailyReminderEnabled && !blocked, tag = "toggle_reminder") { on ->
+                    if (on) enableReminder() else vm.applyNow { it.copy(dailyReminderEnabled = false) }
+                }
+                if (blocked) {
+                    Surface(shape = RoundedCornerShape(12.dp), color = MaterialTheme.colorScheme.errorContainer) {
+                        Row(Modifier.fillMaxWidth().padding(start = 12.dp, end = 4.dp, top = 4.dp, bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                t("Notifications are blocked for this app, so the daily summary can't appear."),
+                                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onErrorContainer,
+                                modifier = Modifier.weight(1f)
+                            )
+                            TextButton(onClick = enableReminder) { Text(t("Allow")) }
+                        }
+                    }
+                    Spacer(Modifier.height(6.dp))
                 }
                 Spacer(Modifier.height(6.dp))
-                TimeBox(t("Notification time"), DateUtils.toHHmm(d.reminderHour, 0), Modifier.fillMaxWidth()) { timeField = TimeField.REMINDER }
+                TimeBox(t("Notification time"), DateUtils.toHHmm(saved.reminderHour, 0), Modifier.fillMaxWidth()) { hourPicker = true }
                 Spacer(Modifier.height(6.dp))
-                ToggleRow(t("Automatic daily backup"), t("Saves a backup every day and keeps a copy in Downloads/GymManager"), d.autoBackupEnabled) {
-                    vm.draft = d.copy(autoBackupEnabled = it)
+                ToggleRow(t("Automatic daily backup"), t("Saves a backup every day and keeps a copy in Downloads/GymManager"), saved.autoBackupEnabled) { on ->
+                    vm.applyNow { it.copy(autoBackupEnabled = on) }
+                    if (on) downloadsAccess({}) {}
                 }
             }
 
@@ -345,7 +475,7 @@ fun SettingsScreen(onOpenDrawer: () -> Unit, onDataReset: () -> Unit, vm: Settin
                     ).forEach { (mode, label, icon) ->
                         FilterChip(
                             selected = d.themeMode == mode,
-                            onClick = { vm.draft = d.copy(themeMode = mode) },
+                            onClick = { vm.applyNow { it.copy(themeMode = mode) } },
                             label = { Text(label) },
                             leadingIcon = { Icon(if (d.themeMode == mode) Icons.Default.Check else icon, null, Modifier.size(18.dp)) },
                             modifier = Modifier.weight(1f).testTag("theme_$mode")
@@ -395,7 +525,7 @@ fun SettingsScreen(onOpenDrawer: () -> Unit, onDataReset: () -> Unit, vm: Settin
             TimeField.ME -> "Morning shift ends" to d.morningShiftEnd
             TimeField.ES -> "Evening shift starts" to d.eveningShiftStart
             TimeField.EE -> "Evening shift ends" to d.eveningShiftEnd
-            TimeField.REMINDER -> "Notification time" to DateUtils.toHHmm(d.reminderHour, 0)
+            TimeField.REMINDER -> "Notification time" to DateUtils.toHHmm(d.reminderHour, 0) // not used: hours use their own picker
         }
         AppTimePickerDialog(t(title), value, onPick = { tm ->
             vm.draft = when (field) {
@@ -408,6 +538,25 @@ fun SettingsScreen(onOpenDrawer: () -> Unit, onDataReset: () -> Unit, vm: Settin
         }, onDismiss = { timeField = null })
     }
 
+    if (hourPicker) {
+        HourPickerDialog(vm.saved?.reminderHour ?: 9, onPick = { h -> hourPicker = false; vm.applyNow { it.copy(reminderHour = h) } }, onDismiss = { hourPicker = false })
+    }
+    if (bulkFee) {
+        BulkFeeDialog(onDismiss = { bulkFee = false }) { plan, fee ->
+            bulkFee = false
+            vm.bulkFee(plan, fee) { n -> context.toast(I18n.tr(lang, "New fee set for %d members. It applies from their next due.", n), long = true) }
+        }
+    }
+    leaveAction?.let { proceed ->
+        ConfirmDialog(
+            title = t("Discard unsaved settings?"),
+            message = t("You changed some settings but haven't saved them."),
+            confirmText = t("Discard"),
+            destructive = true,
+            onConfirm = { leaveAction = null; vm.discardDraft(); proceed() },
+            onDismiss = { leaveAction = null }
+        )
+    }
     if (confirmReset) {
         ConfirmDialog(
             title = t("Reset everything?"),
@@ -475,7 +624,7 @@ private fun FeeField(label: String, value: String, modifier: Modifier, onChange:
 }
 
 @Composable
-private fun ToggleRow(title: String, subtitle: String, checked: Boolean, enabled: Boolean = true, onChange: (Boolean) -> Unit) {
+private fun ToggleRow(title: String, subtitle: String, checked: Boolean, enabled: Boolean = true, tag: String? = null, onChange: (Boolean) -> Unit) {
     Row(Modifier.fillMaxWidth().padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
         Column(Modifier.weight(1f)) {
             Text(
@@ -489,6 +638,73 @@ private fun ToggleRow(title: String, subtitle: String, checked: Boolean, enabled
                 color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = if (enabled) 1f else 0.5f)
             )
         }
-        Switch(checked = checked, onCheckedChange = onChange, enabled = enabled)
+        Switch(checked = checked, onCheckedChange = onChange, enabled = enabled, modifier = if (tag != null) Modifier.testTag(tag) else Modifier)
     }
+}
+
+/** The reminder runs on the hour, so the picker only offers whole hours. */
+@Composable
+private fun HourPickerDialog(current: Int, onPick: (Int) -> Unit, onDismiss: () -> Unit) {
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(t("Notification time")) },
+        text = {
+            androidx.compose.foundation.lazy.LazyColumn(Modifier.height(320.dp)) {
+                items(24) { h ->
+                    val label = DateUtils.formatTo12Hour(DateUtils.toHHmm(h, 0))
+                    Row(
+                        Modifier.fillMaxWidth().clickable { onPick(h) }.padding(vertical = 12.dp, horizontal = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(label, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
+                        if (h == current) Icon(Icons.Default.Check, null, tint = MaterialTheme.colorScheme.primary)
+                    }
+                }
+            }
+        },
+        confirmButton = {},
+        dismissButton = { TextButton(onClick = onDismiss) { Text(t("Cancel")) } }
+    )
+}
+
+/** Sets a new price for everyone on one plan; running and past dues keep their old price. */
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+@Composable
+private fun BulkFeeDialog(onDismiss: () -> Unit, onConfirm: (planType: String, fee: Double) -> Unit) {
+    val lang = currentLang()
+    var plan by remember { mutableStateOf(com.sushant.gymmanager.data.local.PlanType.ONE_MONTH) }
+    var feeText by remember { mutableStateOf("") }
+    val fee = feeText.toDoubleOrNull()
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(t("Change fee for existing members")) },
+        text = {
+            Column {
+                Text(
+                    t("Members on this plan pay the new fee from their next due. Dues already running or unpaid keep their old amount."),
+                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(Modifier.height(10.dp))
+                androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    com.sushant.gymmanager.data.local.PlanType.all.filter { it != com.sushant.gymmanager.data.local.PlanType.CUSTOM }.forEach { p ->
+                        FilterChip(selected = plan == p, onClick = { plan = p }, label = { Text(I18n.planLabel(lang, p)) })
+                    }
+                }
+                Spacer(Modifier.height(10.dp))
+                OutlinedTextField(
+                    value = feeText,
+                    onValueChange = { feeText = it.filter { c -> c.isDigit() || c == '.' }.take(9) },
+                    label = { Text(t("New fee")) },
+                    prefix = { Text("₹") },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    modifier = Modifier.fillMaxWidth().testTag("bulk_fee_amount")
+                )
+            }
+        },
+        confirmButton = {
+            Button(onClick = { onConfirm(plan, fee ?: 0.0) }, enabled = fee != null && fee >= 0) { Text(t("Apply")) }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(t("Cancel")) } }
+    )
 }

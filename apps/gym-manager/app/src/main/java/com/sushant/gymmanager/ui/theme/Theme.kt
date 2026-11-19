@@ -10,6 +10,7 @@ import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Immutable
+import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
@@ -27,13 +28,22 @@ val Slate400 = Color(0xFF94A3B8)
 val Teal600 = Color(0xFF0D9488)
 val Teal400 = Color(0xFF2DD4BF)
 
-val StatusGreen = Color(0xFF16A34A)
-val StatusAmber = Color(0xFFD97706)
-val StatusRed = Color(0xFFDC2626)
 val WhatsAppGreen = Color(0xFF25D366)
 
+/** Status colours: darker in light mode and lighter in dark mode so text and pills stay at least 4.5:1. */
+val StatusGreen: Color @Composable @ReadOnlyComposable get() = if (LocalExtraColors.current.isDark) Color(0xFF4ADE80) else Color(0xFF166534)
+val StatusAmber: Color @Composable @ReadOnlyComposable get() = if (LocalExtraColors.current.isDark) Color(0xFFFBBF24) else Color(0xFF92400E)
+val StatusRed: Color @Composable @ReadOnlyComposable get() = if (LocalExtraColors.current.isDark) Color(0xFFF87171) else Color(0xFFB91C1C)
+val StatusBlue: Color @Composable @ReadOnlyComposable get() = if (LocalExtraColors.current.isDark) Color(0xFF38BDF8) else Color(0xFF0369A1)
+val StatusGray: Color @Composable @ReadOnlyComposable get() = if (LocalExtraColors.current.isDark) Color(0xFFA8A8A8) else Color(0xFF475569)
+val StatusTeal: Color @Composable @ReadOnlyComposable get() = if (LocalExtraColors.current.isDark) Color(0xFF2DD4BF) else Color(0xFF0F766E)
+/** Text/icon colour on a solid status-coloured background. */
+val OnStatus: Color @Composable @ReadOnlyComposable get() = if (LocalExtraColors.current.isDark) Color(0xFF0F0F0F) else Color.White
+/** WhatsApp action text/icon colour. */
+val WhatsAppInk: Color @Composable @ReadOnlyComposable get() = if (LocalExtraColors.current.isDark) Color(0xFF4ADE80) else Color(0xFF0F7A3E)
+
 private val LightColors = lightColorScheme(
-    primary = Amber600,
+    primary = Amber700,
     onPrimary = Color.White,
     primaryContainer = Color(0xFFFFEDD5),
     onPrimaryContainer = Color(0xFF7C2D12),

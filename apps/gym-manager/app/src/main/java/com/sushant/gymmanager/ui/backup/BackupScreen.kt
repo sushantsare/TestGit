@@ -83,6 +83,14 @@ import com.sushant.gymmanager.ui.theme.StatusAmber
 import com.sushant.gymmanager.ui.theme.StatusGreen
 import com.sushant.gymmanager.util.DateUtils
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import androidx.compose.material.icons.filled.TableChart
+import com.sushant.gymmanager.ui.components.rememberDownloadsAccess
+import com.sushant.gymmanager.util.CsvImport
+import com.sushant.gymmanager.util.CsvImportResult
+import com.sushant.gymmanager.util.ShareUtil
+import com.sushant.gymmanager.util.Downloads
 import java.io.File
 
 class BackupViewModel(app: Application) : AndroidViewModel(app) {
@@ -160,6 +168,45 @@ class BackupViewModel(app: Application) : AndroidViewModel(app) {
 
     fun clearPreview() { preview = null; importError = null }
 
+    // ---------- Members from a spreadsheet (CSV) ----------
+    var csv by mutableStateOf<CsvImportResult?>(null)
+        private set
+
+    fun loadCsv(uri: Uri) {
+        busy = true
+        viewModelScope.launch {
+            val result = runCatching {
+                withContext(Dispatchers.IO) {
+                    val text = getApplication<Application>().contentResolver.openInputStream(uri)?.use { it.readBytes().decodeToString() }.orEmpty()
+                    val existing = gymApp.repository.snapshot().members.map { it.rollNumber }.toSet()
+                    CsvImport.parse(text, gymApp.repository.getSettings(), existing)
+                }
+            }.getOrElse { CsvImportResult(emptyList(), listOf("Could not read this file. Save the sheet as CSV and try again.")) }
+            csv = result
+            busy = false
+        }
+    }
+
+    fun importCsv(onDone: (Int) -> Unit) {
+        val rows = csv?.rows ?: return
+        busy = true
+        gymApp.appScope.launch {
+            val added = gymApp.repository.importMembers(rows)
+            withContext(Dispatchers.Main) {
+                csv = null
+                busy = false
+                onDone(added)
+            }
+        }
+    }
+
+    fun clearCsv() { csv = null }
+
+    fun sampleCsv(): java.io.File {
+        val dir = java.io.File(getApplication<Application>().cacheDir, "shared").apply { mkdirs() }
+        return java.io.File(dir, "GymManager_members_sample.csv").apply { writeText(CsvImport.sample()) }
+    }
+
     fun delete(info: BackupFileInfo) {
         manager.delete(info.file)
         refresh()
@@ -187,6 +234,11 @@ fun BackupScreen(onOpenDrawer: () -> Unit, onRestored: () -> Unit, vm: BackupVie
     val savedMsg = t("Saved to Downloads/GymManager")
     val needPermMsg = t("Could not save to Downloads")
 
+    val downloadsAccess = rememberDownloadsAccess()
+    val importedMsg = t("%d members added")
+    val csvPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) vm.loadCsv(uri)
+    }
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) {
             val name = context.contentResolver.query(uri, null, null, null, null)?.use { c ->
@@ -234,6 +286,14 @@ fun BackupScreen(onOpenDrawer: () -> Unit, onRestored: () -> Unit, vm: BackupVie
                                 else vm.lastAuto?.let { t("Last automatic backup: %s. A copy is kept in Downloads/GymManager.", DateUtils.formatShort(it)) }
                                     ?: t("Runs once a day and keeps a copy in Downloads/GymManager.")
                             )
+                            if (vm.settings.autoBackupEnabled && Downloads.needsPermission(context)) {
+                                Spacer(Modifier.height(8.dp))
+                                Text(
+                                    t("On this Android version, copying to Downloads needs storage access."),
+                                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error
+                                )
+                                androidx.compose.material3.TextButton(onClick = { downloadsAccess({}) { vm.refresh() } }) { Text(t("Allow storage access")) }
+                            }
                         }
                     }
                     item { Text(t("Saved on this device"), style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 4.dp)) }
@@ -244,7 +304,7 @@ fun BackupScreen(onOpenDrawer: () -> Unit, onRestored: () -> Unit, vm: BackupVie
                         else -> items(list, key = { it.file.name }) { info ->
                             BackupRow(
                                 info,
-                                onSave = { vm.saveToDownloads(info) { ok -> context.toast(if (ok) savedMsg else needPermMsg) } },
+                                onSave = { downloadsAccess({}) { vm.saveToDownloads(info) { ok -> context.toast(if (ok) savedMsg else needPermMsg) } } },
                                 onShare = { context.startActivity(vm.shareIntent(info)) },
                                 onDelete = { toDelete = info },
                                 onRestore = { vm.loadLocal(info.file); tab = 1 }
@@ -277,6 +337,52 @@ fun BackupScreen(onOpenDrawer: () -> Unit, onRestored: () -> Unit, vm: BackupVie
                     if (vm.busy && vm.preview == null) item { Box(Modifier.fillMaxWidth().padding(24.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator() } }
                     vm.preview?.let { p ->
                         item { PreviewCard(p, vm.previewName, vm.busy, onCancel = vm::clearPreview, onRestore = { confirmRestore = true }) }
+                    }
+                    item {
+                        AppCard(Modifier.fillMaxWidth().testTag("csv_card")) {
+                            HeaderRow(
+                                Icons.Default.TableChart, t("Add members from a spreadsheet"),
+                                t("Moving from a register or Excel? Save the sheet as CSV with columns: Roll, Name, WhatsApp, Joining Date, From, To, Plan (months), Fee.")
+                            )
+                            Spacer(Modifier.height(14.dp))
+                            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                                OutlinedButton(
+                                    onClick = { ShareUtil.shareFile(context, vm.sampleCsv(), "text/csv", "GymManager_members_sample.csv") },
+                                    modifier = Modifier.weight(1f).height(48.dp)
+                                ) { Text(t("Sample file"), maxLines = 1, overflow = TextOverflow.Ellipsis) }
+                                Button(
+                                    onClick = { csvPicker.launch(arrayOf("text/csv", "text/comma-separated-values", "text/plain", "application/vnd.ms-excel", "*/*")) },
+                                    enabled = !vm.busy,
+                                    modifier = Modifier.weight(1.3f).height(48.dp).testTag("pick_csv")
+                                ) { Text(t("Pick CSV file"), maxLines = 1, overflow = TextOverflow.Ellipsis) }
+                            }
+                            vm.csv?.let { r ->
+                                Spacer(Modifier.height(12.dp))
+                                Text(
+                                    t("%d members ready to add", r.rows.size),
+                                    style = MaterialTheme.typography.titleSmall, modifier = Modifier.testTag("csv_ready")
+                                )
+                                if (r.problems.isNotEmpty()) {
+                                    Text(
+                                        t("%d rows will be skipped:", r.problems.size),
+                                        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error
+                                    )
+                                    r.problems.take(6).forEach { pr ->
+                                        Text("• $pr", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    }
+                                    if (r.problems.size > 6) Text(t("…and %d more", r.problems.size - 6), style = MaterialTheme.typography.bodySmall)
+                                }
+                                Spacer(Modifier.height(10.dp))
+                                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                                    OutlinedButton(onClick = vm::clearCsv, modifier = Modifier.weight(1f)) { Text(t("Cancel")) }
+                                    Button(
+                                        onClick = { vm.importCsv { n -> context.toast(importedMsg.format(n)) } },
+                                        enabled = r.rows.isNotEmpty() && !vm.busy,
+                                        modifier = Modifier.weight(1.3f).testTag("import_csv")
+                                    ) { Text(t("Add %d members", r.rows.size), maxLines = 1, overflow = TextOverflow.Ellipsis) }
+                                }
+                            }
+                        }
                     }
                     item {
                         Row(Modifier.padding(4.dp), verticalAlignment = Alignment.Top) {

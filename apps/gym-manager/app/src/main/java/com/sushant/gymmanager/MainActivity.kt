@@ -1,15 +1,14 @@
 package com.sushant.gymmanager
 
-import android.Manifest
+import android.content.Intent
 import android.graphics.Color
-import android.os.Build
+import android.view.WindowManager
+import com.sushant.gymmanager.ui.navigation.NavRequests
 import android.os.Bundle
 import android.os.SystemClock
 import androidx.activity.SystemBarStyle
-import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -36,7 +35,6 @@ import com.sushant.gymmanager.ui.navigation.MainNavigation
 import com.sushant.gymmanager.ui.theme.GymManagerTheme
 import com.sushant.gymmanager.ui.theme.isAppInDarkTheme
 import com.sushant.gymmanager.work.GymWidget
-import com.sushant.gymmanager.work.Notifications
 import kotlinx.coroutines.launch
 
 class MainActivity : FragmentActivity() {
@@ -48,7 +46,21 @@ class MainActivity : FragmentActivity() {
         super.onCreate(savedInstanceState)
         val app = application as GymApp
         lifecycleScope.launch { app.backupManager.runAutoBackupIfDue() }
+        if (savedInstanceState == null) handleOpenIntent(intent)
         setContent { AppRoot(app) }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        handleOpenIntent(intent)
+    }
+
+    /** Notification and widget taps carry the screen to open. */
+    private fun handleOpenIntent(intent: Intent?) {
+        if (intent == null) return
+        val route = intent.getStringExtra(NavRequests.EXTRA_OPEN) ?: return
+        NavRequests.openRoute.value = route
+        intent.removeExtra(NavRequests.EXTRA_OPEN)
     }
 
     override fun onStop() {
@@ -74,11 +86,10 @@ class MainActivity : FragmentActivity() {
             }
         }
 
-        val notifPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { }
-        LaunchedEffect(s?.dailyReminderEnabled) {
-            if (s?.dailyReminderEnabled == true && Build.VERSION.SDK_INT >= 33 && !Notifications.canPost(this@MainActivity)) {
-                notifPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
-            }
+        // While the app lock is on, hide the app's content in the Recents screen and screenshots.
+        LaunchedEffect(lockEnabled) {
+            if (lockEnabled) window.setFlags(WindowManager.LayoutParams.FLAG_SECURE, WindowManager.LayoutParams.FLAG_SECURE)
+            else window.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
         }
 
         LaunchedEffect(dark) {
@@ -106,7 +117,7 @@ class MainActivity : FragmentActivity() {
                                 )
                             }
                             LaunchedEffect(Unit) { unlock() }
-                            AppLockScreen(gymName = s.gymName, onUnlock = unlock)
+                            AppLockScreen(gymName = s.gymName, onUnlock = unlock, onExit = { finish() })
                         }
                     }
                 }

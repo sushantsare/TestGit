@@ -244,6 +244,20 @@ object ShareUtil {
         context.startActivity(Intent.createChooser(send, subject).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK))
     }
 
+    /** Plain-text share sheet (e.g. today's collection summary). */
+    fun shareText(context: Context, text: String, subject: String) {
+        val send = Intent(Intent.ACTION_SEND).apply {
+            type = "text/plain"
+            putExtra(Intent.EXTRA_TEXT, text)
+            putExtra(Intent.EXTRA_SUBJECT, subject)
+        }
+        try {
+            context.startActivity(Intent.createChooser(send, subject).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        } catch (_: ActivityNotFoundException) {
+            Toast.makeText(context, "No app available to share", Toast.LENGTH_SHORT).show()
+        }
+    }
+
     @Suppress("DEPRECATION")
     private fun isInstalled(context: Context, pkg: String): Boolean = try {
         context.packageManager.getPackageInfo(pkg, 0); true
