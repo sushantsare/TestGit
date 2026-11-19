@@ -32,6 +32,7 @@ import androidx.compose.material.icons.filled.Fingerprint
 import androidx.compose.material.icons.filled.FitnessCenter
 import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material.icons.filled.Palette
+import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material.icons.filled.Payments
 import androidx.compose.material.icons.filled.Save
 import androidx.compose.material.icons.filled.Warning
@@ -71,6 +72,10 @@ import com.sushant.gymmanager.auth.ProtectedAction
 import com.sushant.gymmanager.auth.findFragmentActivity
 import com.sushant.gymmanager.data.local.GymSettingsEntity
 import com.sushant.gymmanager.data.local.ThemeMode
+import com.sushant.gymmanager.i18n.I18n
+import com.sushant.gymmanager.i18n.currentLang
+import com.sushant.gymmanager.i18n.t
+import com.sushant.gymmanager.work.DailyWorker
 import com.sushant.gymmanager.ui.components.AppCard
 import com.sushant.gymmanager.ui.components.AppTimePickerDialog
 import com.sushant.gymmanager.ui.components.ConfirmDialog
@@ -132,7 +137,9 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
 
     fun save(result: GymSettingsEntity, onDone: () -> Unit) {
         viewModelScope.launch {
+            val hourChanged = saved?.reminderHour != result.reminderHour
             repo.saveSettings(result)
+            if (hourChanged) DailyWorker.schedule(getApplication(), result.reminderHour, replace = true)
             saved = result; draft = result
             onDone()
         }
@@ -147,7 +154,7 @@ class SettingsViewModel(app: Application) : AndroidViewModel(app) {
     }
 }
 
-private enum class TimeField { MS, ME, ES, EE }
+private enum class TimeField { MS, ME, ES, EE, REMINDER }
 
 @Composable
 fun SettingsScreen(onOpenDrawer: () -> Unit, onDataReset: () -> Unit, vm: SettingsViewModel = viewModel()) {
@@ -158,9 +165,14 @@ fun SettingsScreen(onOpenDrawer: () -> Unit, onDataReset: () -> Unit, vm: Settin
     val bioAvailable = remember { BiometricHelper.isAvailable(context) }
     val bioMessage = remember { BiometricHelper.statusMessage(context) }
     val result = vm.buildResult()
+    val lang = currentLang()
+    val securityTitle = t("Change security settings")
+    val resetTitle = t("Reset all data")
+    val savedMsg = t("Settings saved")
+    val resetMsg = t("All data has been reset")
 
     Scaffold(
-        topBar = { GymTopBar("Settings", "Gym preferences & security", onMenu = onOpenDrawer) },
+        topBar = { GymTopBar(t("Settings"), t("Gym preferences & security"), onMenu = onOpenDrawer) },
         bottomBar = {
             Surface(color = MaterialTheme.colorScheme.surface, tonalElevation = 0.dp) {
                 Column {
@@ -169,10 +181,10 @@ fun SettingsScreen(onOpenDrawer: () -> Unit, onDataReset: () -> Unit, vm: Settin
                         onClick = {
                             val r = result ?: return@Button
                             val doSave = {
-                                vm.save(r) { Toast.makeText(context, "Settings saved", Toast.LENGTH_SHORT).show() }
+                                vm.save(r) { Toast.makeText(context, savedMsg, Toast.LENGTH_SHORT).show() }
                             }
                             if (vm.securityChanged(r)) {
-                                BiometricHelper.guard(context, vm.saved ?: r, ProtectedAction.CHANGE_SECURITY, "Change security settings", doSave)
+                                BiometricHelper.guard(context, vm.saved ?: r, ProtectedAction.CHANGE_SECURITY, securityTitle, doSave)
                             } else doSave()
                         },
                         enabled = result != null && vm.isDirty,
@@ -181,7 +193,7 @@ fun SettingsScreen(onOpenDrawer: () -> Unit, onDataReset: () -> Unit, vm: Settin
                     ) {
                         Icon(Icons.Default.Save, null, Modifier.size(18.dp))
                         Spacer(Modifier.width(8.dp))
-                        Text(if (vm.isDirty || result == null) "Save Settings" else "All changes saved")
+                        Text(t(if (vm.isDirty || result == null) "Save Settings" else "All changes saved"))
                     }
                 }
             }
@@ -197,11 +209,11 @@ fun SettingsScreen(onOpenDrawer: () -> Unit, onDataReset: () -> Unit, vm: Settin
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
             // Gym info
-            Section(Icons.Default.FitnessCenter, "Gym Information") {
+            Section(Icons.Default.FitnessCenter, t("Gym Information")) {
                 OutlinedTextField(
                     value = d.gymName,
                     onValueChange = { vm.draft = d.copy(gymName = it.take(40)) },
-                    label = { Text("Gym Name") },
+                    label = { Text(t("Gym Name")) },
                     singleLine = true,
                     isError = d.gymName.isBlank(),
                     shape = RoundedCornerShape(14.dp),
@@ -209,9 +221,28 @@ fun SettingsScreen(onOpenDrawer: () -> Unit, onDataReset: () -> Unit, vm: Settin
                 )
                 Spacer(Modifier.height(10.dp))
                 OutlinedTextField(
+                    value = d.gymPhone,
+                    onValueChange = { vm.draft = d.copy(gymPhone = it.filter { c -> c.isDigit() || c == '+' || c == ' ' }.take(16)) },
+                    label = { Text(t("Gym phone (shown on receipts)")) },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+                    shape = RoundedCornerShape(14.dp),
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Spacer(Modifier.height(10.dp))
+                OutlinedTextField(
+                    value = d.gymAddress,
+                    onValueChange = { vm.draft = d.copy(gymAddress = it.take(60)) },
+                    label = { Text(t("Gym address (shown on receipts)")) },
+                    singleLine = true,
+                    shape = RoundedCornerShape(14.dp),
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Spacer(Modifier.height(10.dp))
+                OutlinedTextField(
                     value = vm.expiringDays,
                     onValueChange = { vm.expiringDays = it.filter { c -> c.isDigit() }.take(2) },
-                    label = { Text("\"Expiring soon\" warning (days)") },
+                    label = { Text(t("\"Expiring soon\" warning (days)")) },
                     singleLine = true,
                     isError = (vm.expiringDays.toIntOrNull() ?: 0) !in 1..90,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
@@ -221,60 +252,60 @@ fun SettingsScreen(onOpenDrawer: () -> Unit, onDataReset: () -> Unit, vm: Settin
             }
 
             // Shift windows
-            Section(Icons.Default.AccessTime, "Shift Timing Windows") {
+            Section(Icons.Default.AccessTime, t("Shift Timing Windows")) {
                 Text(
-                    "Members whose workout starts inside the morning window are placed in the Morning shift; all others go to Evening.",
+                    t("Members whose workout starts inside the morning window are placed in the Morning shift; all others go to Evening."),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Spacer(Modifier.height(12.dp))
-                Text("Morning", style = MaterialTheme.typography.labelLarge)
+                Text(t("Morning"), style = MaterialTheme.typography.labelLarge)
                 Spacer(Modifier.height(6.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    TimeBox("Start", d.morningShiftStart, Modifier.weight(1f)) { timeField = TimeField.MS }
-                    TimeBox("End", d.morningShiftEnd, Modifier.weight(1f)) { timeField = TimeField.ME }
+                    TimeBox(t("Start"), d.morningShiftStart, Modifier.weight(1f)) { timeField = TimeField.MS }
+                    TimeBox(t("End"), d.morningShiftEnd, Modifier.weight(1f)) { timeField = TimeField.ME }
                 }
                 Spacer(Modifier.height(12.dp))
-                Text("Evening", style = MaterialTheme.typography.labelLarge)
+                Text(t("Evening"), style = MaterialTheme.typography.labelLarge)
                 Spacer(Modifier.height(6.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    TimeBox("Start", d.eveningShiftStart, Modifier.weight(1f)) { timeField = TimeField.ES }
-                    TimeBox("End", d.eveningShiftEnd, Modifier.weight(1f)) { timeField = TimeField.EE }
+                    TimeBox(t("Start"), d.eveningShiftStart, Modifier.weight(1f)) { timeField = TimeField.ES }
+                    TimeBox(t("End"), d.eveningShiftEnd, Modifier.weight(1f)) { timeField = TimeField.EE }
                 }
             }
 
             // Fees
-            Section(Icons.Default.Payments, "Default Membership Fees (₹)") {
+            Section(Icons.Default.Payments, t("Default Membership Fees (₹)")) {
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    FeeField("1 Month", vm.fees.f1, Modifier.weight(1f)) { vm.fees = vm.fees.copy(f1 = it) }
-                    FeeField("3 Months", vm.fees.f3, Modifier.weight(1f)) { vm.fees = vm.fees.copy(f3 = it) }
+                    FeeField(t("1 Month"), vm.fees.f1, Modifier.weight(1f)) { vm.fees = vm.fees.copy(f1 = it) }
+                    FeeField(t("3 Months"), vm.fees.f3, Modifier.weight(1f)) { vm.fees = vm.fees.copy(f3 = it) }
                 }
                 Spacer(Modifier.height(10.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    FeeField("6 Months", vm.fees.f6, Modifier.weight(1f)) { vm.fees = vm.fees.copy(f6 = it) }
-                    FeeField("12 Months", vm.fees.f12, Modifier.weight(1f)) { vm.fees = vm.fees.copy(f12 = it) }
+                    FeeField(t("6 Months"), vm.fees.f6, Modifier.weight(1f)) { vm.fees = vm.fees.copy(f6 = it) }
+                    FeeField(t("12 Months"), vm.fees.f12, Modifier.weight(1f)) { vm.fees = vm.fees.copy(f12 = it) }
                 }
             }
 
             // Biometrics
-            Section(Icons.Default.Fingerprint, "Biometric Security") {
+            Section(Icons.Default.Fingerprint, t("Biometric Security")) {
                 Surface(
                     shape = RoundedCornerShape(12.dp),
                     color = if (bioAvailable) Color(0xFF16A34A).copy(alpha = 0.1f) else MaterialTheme.colorScheme.errorContainer
                 ) {
                     Text(
-                        bioMessage,
+                        t(bioMessage),
                         style = MaterialTheme.typography.bodySmall,
                         modifier = Modifier.fillMaxWidth().padding(10.dp),
                         color = if (bioAvailable) Color(0xFF15803D) else MaterialTheme.colorScheme.onErrorContainer
                     )
                 }
                 Spacer(Modifier.height(6.dp))
-                ToggleRow("Enable Biometric Protection", "Master switch for all options below", d.biometricMasterEnabled, enabled = bioAvailable || d.biometricMasterEnabled) { on ->
+                ToggleRow(t("Enable Biometric Protection"), t("Master switch for all options below"), d.biometricMasterEnabled, enabled = bioAvailable || d.biometricMasterEnabled) { on ->
                     if (on) {
                         val activity = context.findFragmentActivity()
                         if (activity != null) {
-                            BiometricHelper.authenticate(activity, "Enable biometric protection", "Confirm your fingerprint or face", onSuccess = {
+                            BiometricHelper.authenticate(activity, I18n.tr(lang, "Enable biometric protection"), I18n.tr(lang, "Confirm your fingerprint or face"), onSuccess = {
                                 vm.draft = vm.draft.copy(biometricMasterEnabled = true)
                             })
                         }
@@ -284,20 +315,33 @@ fun SettingsScreen(onOpenDrawer: () -> Unit, onDataReset: () -> Unit, vm: Settin
                 }
                 val sub = d.biometricMasterEnabled
                 HorizontalDivider(Modifier.padding(vertical = 4.dp), color = MaterialTheme.colorScheme.outlineVariant)
-                ToggleRow("App Launch Authentication", "Ask every time the app opens", d.biometricAppLaunch, enabled = sub) { vm.draft = d.copy(biometricAppLaunch = it) }
-                ToggleRow("Add New Member", "Verify before saving a new member", d.biometricAddMember, enabled = sub) { vm.draft = d.copy(biometricAddMember = it) }
-                ToggleRow("Permanently Delete Member", "Verify before deleting a member", d.biometricDeleteMember, enabled = sub) { vm.draft = d.copy(biometricDeleteMember = it) }
-                ToggleRow("Restore Backup", "Verify before replacing data", d.biometricRestoreBackup, enabled = sub) { vm.draft = d.copy(biometricRestoreBackup = it) }
-                ToggleRow("Reset App Data", "Verify before wiping everything", d.biometricResetData, enabled = sub) { vm.draft = d.copy(biometricResetData = it) }
+                ToggleRow(t("App Launch Authentication"), t("Ask every time the app opens"), d.biometricAppLaunch, enabled = sub) { vm.draft = d.copy(biometricAppLaunch = it) }
+                ToggleRow(t("Add New Member"), t("Verify before saving a new member"), d.biometricAddMember, enabled = sub) { vm.draft = d.copy(biometricAddMember = it) }
+                ToggleRow(t("Permanently Delete Member"), t("Verify before deleting a member"), d.biometricDeleteMember, enabled = sub) { vm.draft = d.copy(biometricDeleteMember = it) }
+                ToggleRow(t("Restore Backup"), t("Verify before replacing data"), d.biometricRestoreBackup, enabled = sub) { vm.draft = d.copy(biometricRestoreBackup = it) }
+                ToggleRow(t("Reset App Data"), t("Verify before wiping everything"), d.biometricResetData, enabled = sub) { vm.draft = d.copy(biometricResetData = it) }
+            }
+
+            // Notifications
+            Section(Icons.Default.NotificationsActive, t("Daily Reminder")) {
+                ToggleRow(t("Morning summary notification"), t("Expiring memberships and pending dues, once a day"), d.dailyReminderEnabled) {
+                    vm.draft = d.copy(dailyReminderEnabled = it)
+                }
+                Spacer(Modifier.height(6.dp))
+                TimeBox(t("Notification time"), DateUtils.toHHmm(d.reminderHour, 0), Modifier.fillMaxWidth()) { timeField = TimeField.REMINDER }
+                Spacer(Modifier.height(6.dp))
+                ToggleRow(t("Automatic daily backup"), t("Saves a backup every day and keeps a copy in Downloads/GymManager"), d.autoBackupEnabled) {
+                    vm.draft = d.copy(autoBackupEnabled = it)
+                }
             }
 
             // Theme
-            Section(Icons.Default.Palette, "Application Theme") {
+            Section(Icons.Default.Palette, t("Application Theme")) {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     listOf(
-                        Triple(ThemeMode.SYSTEM, "System", Icons.Default.BrightnessAuto),
-                        Triple(ThemeMode.LIGHT, "Light", Icons.Default.LightMode),
-                        Triple(ThemeMode.DARK, "Dark", Icons.Default.DarkMode)
+                        Triple(ThemeMode.SYSTEM, t("System"), Icons.Default.BrightnessAuto),
+                        Triple(ThemeMode.LIGHT, t("Light"), Icons.Default.LightMode),
+                        Triple(ThemeMode.DARK, t("Dark"), Icons.Default.DarkMode)
                     ).forEach { (mode, label, icon) ->
                         FilterChip(
                             selected = d.themeMode == mode,
@@ -320,11 +364,11 @@ fun SettingsScreen(onOpenDrawer: () -> Unit, onDataReset: () -> Unit, vm: Settin
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(Icons.Default.Warning, null, tint = MaterialTheme.colorScheme.error)
                         Spacer(Modifier.width(8.dp))
-                        Text("Danger Zone", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.error)
+                        Text(t("Danger Zone"), style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.error)
                     }
                     Spacer(Modifier.height(6.dp))
                     Text(
-                        "Erase every member, payment, attendance record, photo and setting. Create a backup first if you may need this data.",
+                        t("Erase every member, payment, attendance record, photo and setting. Create a backup first if you may need this data."),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -337,7 +381,7 @@ fun SettingsScreen(onOpenDrawer: () -> Unit, onDataReset: () -> Unit, vm: Settin
                     ) {
                         Icon(Icons.Default.DeleteForever, null, Modifier.size(18.dp))
                         Spacer(Modifier.width(6.dp))
-                        Text("Reset All App Data to Defaults")
+                        Text(t("Reset All App Data to Defaults"))
                     }
                 }
             }
@@ -351,28 +395,30 @@ fun SettingsScreen(onOpenDrawer: () -> Unit, onDataReset: () -> Unit, vm: Settin
             TimeField.ME -> "Morning shift ends" to d.morningShiftEnd
             TimeField.ES -> "Evening shift starts" to d.eveningShiftStart
             TimeField.EE -> "Evening shift ends" to d.eveningShiftEnd
+            TimeField.REMINDER -> "Notification time" to DateUtils.toHHmm(d.reminderHour, 0)
         }
-        AppTimePickerDialog(title, value, onPick = { t ->
+        AppTimePickerDialog(t(title), value, onPick = { tm ->
             vm.draft = when (field) {
-                TimeField.MS -> vm.draft.copy(morningShiftStart = t)
-                TimeField.ME -> vm.draft.copy(morningShiftEnd = t)
-                TimeField.ES -> vm.draft.copy(eveningShiftStart = t)
-                TimeField.EE -> vm.draft.copy(eveningShiftEnd = t)
+                TimeField.MS -> vm.draft.copy(morningShiftStart = tm)
+                TimeField.ME -> vm.draft.copy(morningShiftEnd = tm)
+                TimeField.ES -> vm.draft.copy(eveningShiftStart = tm)
+                TimeField.EE -> vm.draft.copy(eveningShiftEnd = tm)
+                TimeField.REMINDER -> vm.draft.copy(reminderHour = DateUtils.parseTime(tm)?.hour ?: 9)
             }
         }, onDismiss = { timeField = null })
     }
 
     if (confirmReset) {
         ConfirmDialog(
-            title = "Reset everything?",
-            message = "All members, photos, payments, attendance and settings will be permanently erased. This cannot be undone.",
-            confirmText = "Erase All",
+            title = t("Reset everything?"),
+            message = t("All members, photos, payments, attendance and settings will be permanently erased. This cannot be undone."),
+            confirmText = t("Erase All"),
             destructive = true,
             onConfirm = {
                 confirmReset = false
-                BiometricHelper.guard(context, vm.saved ?: d, ProtectedAction.RESET_DATA, "Reset all data") {
+                BiometricHelper.guard(context, vm.saved ?: d, ProtectedAction.RESET_DATA, resetTitle) {
                     vm.resetAll {
-                        Toast.makeText(context, "All data has been reset", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, resetMsg, Toast.LENGTH_SHORT).show()
                         onDataReset()
                     }
                 }

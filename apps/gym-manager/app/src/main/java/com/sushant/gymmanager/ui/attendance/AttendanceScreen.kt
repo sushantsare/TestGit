@@ -2,6 +2,17 @@ package com.sushant.gymmanager.ui.attendance
 
 import android.app.Application
 import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.compose.material.icons.filled.QrCodeScanner
+import androidx.compose.material3.IconButton
+import androidx.compose.runtime.rememberCoroutineScope
+import com.journeyapps.barcodescanner.ScanContract
+import com.journeyapps.barcodescanner.ScanOptions
+import com.sushant.gymmanager.data.repository.CheckInResult
+import com.sushant.gymmanager.i18n.I18n
+import com.sushant.gymmanager.i18n.currentLang
+import com.sushant.gymmanager.i18n.t
+import com.sushant.gymmanager.ui.components.rememberGymApp
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -105,6 +116,8 @@ class AttendanceViewModel(app: Application) : AndroidViewModel(app) {
 
     init { load() }
 
+    fun reload() = load()
+
     private fun load() {
         loadJob?.cancel()
         loading = true
@@ -116,7 +129,7 @@ class AttendanceViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun groupsFor(all: List<MemberEntity>): List<SlotGroup> =
-        all.filter { it.shift == shift }
+        all.filter { it.shift == shift && it.frozenFrom == null && it.dateOfJoining <= date }
             .groupBy { it.fromTime to it.toTime }
             .map { (k, v) -> SlotGroup(k.first, k.second, v) }
             .sortedWith(compareBy({ it.from }, { it.to }))
@@ -146,7 +159,7 @@ class AttendanceViewModel(app: Application) : AndroidViewModel(app) {
 fun AttendanceScreen(onOpenDrawer: () -> Unit, onEditMember: (Long) -> Unit, vm: AttendanceViewModel = viewModel()) {
     val context = LocalContext.current
     val all by vm.activeMembers.collectAsStateWithLifecycle()
-    val groups = remember(all, vm.shift) { all?.let { vm.groupsFor(it) } }
+    val groups = remember(all, vm.shift, vm.date) { all?.let { vm.groupsFor(it) } }
     val visible = groups?.flatMap { it.members }.orEmpty()
     val dirty = vm.isDirty(visible)
     var pending by remember { mutableStateOf<(() -> Unit)?>(null) }
@@ -158,18 +171,45 @@ fun AttendanceScreen(onOpenDrawer: () -> Unit, onEditMember: (Long) -> Unit, vm:
     BackHandler(enabled = dirty) { pending = { vm.discard() } }
 
     val present = visible.count { vm.marks[it.id] == true }
+    val savedMsg = t("Attendance saved: %d present", present)
+    val scanPrompt = t("Point the camera at the member's QR code")
+    val lang = currentLang()
+    val app = rememberGymApp()
+    val scope = rememberCoroutineScope()
+    val scanner = rememberLauncherForActivityResult(ScanContract()) { result ->
+        val code = result.contents ?: return@rememberLauncherForActivityResult
+        scope.launch {
+            val r = app.repository.checkIn(code)
+            val name = r.member?.fullName.orEmpty()
+            val msg = when (r.result) {
+                CheckInResult.OK -> I18n.tr(lang, "%s checked in", name)
+                CheckInResult.ALREADY -> I18n.tr(lang, "%s is already marked present today", name)
+                CheckInResult.INACTIVE -> I18n.tr(lang, "%s is deactivated", name)
+                CheckInResult.FROZEN -> I18n.tr(lang, "%s's membership is frozen", name)
+                CheckInResult.NOT_FOUND -> I18n.tr(lang, "No member found for this QR code")
+            }
+            Toast.makeText(context, msg, Toast.LENGTH_LONG).show()
+            if (r.result == CheckInResult.OK && vm.date == DateUtils.today()) vm.reload()
+        }
+    }
     val isToday = vm.date == DateUtils.today()
 
     Scaffold(
         topBar = {
             GymTopBar(
-                title = "Attendance",
-                subtitle = if (isToday) "Today • ${DateUtils.formatShort(vm.date)}" else DateUtils.formatFull(vm.date),
+                title = t("Attendance"),
+                subtitle = if (isToday) t("Today • %s", DateUtils.formatShort(vm.date)) else DateUtils.formatFull(vm.date),
                 onMenu = onOpenDrawer,
                 actions = {
+                    IconButton(onClick = {
+                        scanner.launch(
+                            ScanOptions().setDesiredBarcodeFormats(ScanOptions.QR_CODE).setPrompt(scanPrompt)
+                                .setBeepEnabled(true).setOrientationLocked(false)
+                        )
+                    }, modifier = Modifier.testTag("scan_qr")) { Icon(Icons.Default.QrCodeScanner, t("Scan QR check-in")) }
                     AssistChip(
                         onClick = { showDate = true },
-                        label = { Text(if (isToday) "Today" else DateUtils.formatShort(vm.date)) },
+                        label = { Text(if (isToday) t("Today") else DateUtils.formatShort(vm.date)) },
                         leadingIcon = { Icon(Icons.Default.CalendarToday, null, Modifier.size(AssistChipDefaults.IconSize)) },
                         modifier = Modifier.padding(end = 8.dp).testTag("date_chip")
                     )
@@ -188,11 +228,11 @@ fun AttendanceScreen(onOpenDrawer: () -> Unit, onEditMember: (Long) -> Unit, vm:
                             onClick = { pending = { vm.discard() } },
                             enabled = dirty,
                             modifier = Modifier.weight(1f).height(50.dp)
-                        ) { Text("Cancel") }
+                        ) { Text(t("Cancel")) }
                         Button(
                             onClick = {
                                 vm.save(visible) {
-                                    Toast.makeText(context, "Attendance saved: $present present", Toast.LENGTH_SHORT).show()
+                                    Toast.makeText(context, savedMsg, Toast.LENGTH_SHORT).show()
                                 }
                             },
                             enabled = dirty,
@@ -200,7 +240,7 @@ fun AttendanceScreen(onOpenDrawer: () -> Unit, onEditMember: (Long) -> Unit, vm:
                         ) {
                             Icon(Icons.Default.Save, null, Modifier.size(18.dp))
                             Spacer(Modifier.width(6.dp))
-                            Text("Save Attendance")
+                            Text(t("Save Attendance"))
                         }
                     }
                 }
@@ -215,13 +255,13 @@ fun AttendanceScreen(onOpenDrawer: () -> Unit, onEditMember: (Long) -> Unit, vm:
                 Tab(
                     selected = vm.shift == Shift.MORNING,
                     onClick = { if (vm.shift != Shift.MORNING) guarded { vm.changeShift(Shift.MORNING) } },
-                    text = { Text("Morning Shift") },
+                    text = { Text(t("Morning Shift")) },
                     icon = { Icon(Icons.Default.WbSunny, null) }
                 )
                 Tab(
                     selected = vm.shift == Shift.EVENING,
                     onClick = { if (vm.shift != Shift.EVENING) guarded { vm.changeShift(Shift.EVENING) } },
-                    text = { Text("Evening Shift") },
+                    text = { Text(t("Evening Shift")) },
                     icon = { Icon(Icons.Default.NightsStay, null) },
                     modifier = Modifier.testTag("tab_evening")
                 )
@@ -232,10 +272,10 @@ fun AttendanceScreen(onOpenDrawer: () -> Unit, onEditMember: (Long) -> Unit, vm:
                 val pct = if (visible.isEmpty()) 0 else present * 100 / visible.size
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
-                        Text("PRESENT", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(t("PRESENT"), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         Text("$present / ${visible.size}  ($pct%)", style = MaterialTheme.typography.titleLarge, modifier = Modifier.testTag("present_summary"))
                     }
-                    if (dirty) Pill("UNSAVED", MaterialTheme.colorScheme.primary)
+                    if (dirty) Pill(t("UNSAVED"), MaterialTheme.colorScheme.primary)
                 }
                 Spacer(Modifier.height(10.dp))
                 LinearProgressIndicator(
@@ -250,10 +290,10 @@ fun AttendanceScreen(onOpenDrawer: () -> Unit, onEditMember: (Long) -> Unit, vm:
                         enabled = visible.isNotEmpty(),
                         modifier = Modifier.weight(1f).testTag("all_present")
                     ) {
-                        Icon(Icons.Default.DoneAll, null, Modifier.size(18.dp)); Spacer(Modifier.width(6.dp)); Text("All Present")
+                        Icon(Icons.Default.DoneAll, null, Modifier.size(18.dp)); Spacer(Modifier.width(6.dp)); Text(t("All Present"))
                     }
                     OutlinedButton(onClick = { vm.setAll(visible, false) }, enabled = visible.isNotEmpty(), modifier = Modifier.weight(1f)) {
-                        Icon(Icons.Default.RemoveDone, null, Modifier.size(18.dp)); Spacer(Modifier.width(6.dp)); Text("Clear All")
+                        Icon(Icons.Default.RemoveDone, null, Modifier.size(18.dp)); Spacer(Modifier.width(6.dp)); Text(t("Clear All"))
                     }
                 }
             }
@@ -262,8 +302,8 @@ fun AttendanceScreen(onOpenDrawer: () -> Unit, onEditMember: (Long) -> Unit, vm:
                 groups == null || vm.loading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
                 groups.isEmpty() -> EmptyState(
                     Icons.Default.EventBusy,
-                    "No members in this shift",
-                    "Active members whose workout slot falls in the ${if (vm.shift == Shift.MORNING) "morning" else "evening"} window will appear here."
+                    t("No members in this shift"),
+                    t(if (vm.shift == Shift.MORNING) "Active members whose workout starts in the morning window will appear here." else "Active members whose workout starts in the evening window will appear here.")
                 )
                 else -> LazyColumn(
                     contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 16.dp),
@@ -278,13 +318,13 @@ fun AttendanceScreen(onOpenDrawer: () -> Unit, onEditMember: (Long) -> Unit, vm:
     }
 
     if (showDate) {
-        AppDatePickerDialog(vm.date, onPick = { iso -> if (iso != vm.date) guarded { vm.changeDate(iso) } }, onDismiss = { showDate = false })
+        AppDatePickerDialog(vm.date, onPick = { iso -> if (iso != vm.date) guarded { vm.changeDate(iso) } }, onDismiss = { showDate = false }, pastOnly = true)
     }
     pending?.let { action ->
         ConfirmDialog(
-            title = "Discard unsaved attendance?",
-            message = "You have marked attendance that hasn't been saved yet.",
-            confirmText = "Discard",
+            title = t("Discard unsaved attendance?"),
+            message = t("You have marked attendance that hasn't been saved yet."),
+            confirmText = t("Discard"),
             destructive = true,
             onConfirm = { vm.discard(); pending = null; action() },
             onDismiss = { pending = null }

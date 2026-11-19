@@ -25,6 +25,7 @@ import androidx.compose.ui.test.swipeUp
 import androidx.test.core.app.ActivityScenario
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import androidx.test.rule.GrantPermissionRule
 import com.sushant.gymmanager.data.local.GymSettingsEntity
 import com.sushant.gymmanager.data.local.MemberEntity
 import com.sushant.gymmanager.data.local.PlanType
@@ -49,6 +50,7 @@ import java.time.LocalDate
 @RunWith(AndroidJUnit4::class)
 class WalkthroughTest {
     @get:Rule val compose = createEmptyComposeRule()
+    @get:Rule val notifications: GrantPermissionRule = GrantPermissionRule.grant(android.Manifest.permission.POST_NOTIFICATIONS)
 
     private val instrumentation = InstrumentationRegistry.getInstrumentation()
     private val ctx = instrumentation.targetContext
@@ -122,7 +124,11 @@ class WalkthroughTest {
         val unpaid = repo.unpaidCycles.first()
         // Rohit joined 65 days ago on a 1-month auto-renew plan -> 3 cycles by now.
         assertEquals(3, unpaid.count { it.memberId == rohit })
-        repo.markPaid(unpaid.filter { it.memberId == vikram || it.memberId == sunny }.map { it.id })
+        repo.markPaid(unpaid.filter { it.memberId == vikram || it.memberId == sunny }.map { it.id }, "UPI")
+        // A partial payment for Rohit's oldest cycle
+        repo.recordPayments(mapOf(unpaid.filter { it.memberId == rohit }.minByOrNull { it.cycleStart }!!.id to 400.0), "CASH")
+        repo.saveExpense(com.sushant.gymmanager.data.local.ExpenseEntity(date = today.toString(), category = "Rent", amount = 6000.0, note = "Hall rent"))
+        repo.saveExpense(com.sushant.gymmanager.data.local.ExpenseEntity(date = today.minusMonths(1).toString(), category = "Electricity", amount = 1800.0))
 
         val todayIso = today.toString()
         repo.saveAttendance(todayIso, Shift.MORNING, mapOf(aarav to true, priya to true, rohit to false, neha to true), emptyMap())
@@ -211,41 +217,88 @@ class WalkthroughTest {
         waitTag("mark_paid")
         shot("16_payments_selected")
         compose.onNodeWithTag("mark_paid").performClick()
+        waitTag("confirm_payment")
+        compose.onNodeWithTag("mode_UPI").performClick()
+        compose.onNodeWithTag("pay_amount").performTextClearance()
+        compose.onNodeWithTag("pay_amount").performTextInput("300")
+        shot("17_collect_partial")
+        compose.onNodeWithTag("confirm_payment").performClick()
+        waitTag("receipts_done")
+        shot("18_payment_recorded")
+        compose.onNodeWithTag("receipts_done").performClick()
+        compose.onNodeWithTag("remind_all").performClick()
+        waitTag("send_next")
+        shot("19_bulk_remind")
+        compose.onNodeWithText("Close").performClick()
+        compose.onNodeWithTag("tab_history").performClick()
+        waitTag("history_list")
+        shot("20_payment_history")
+
+        // Reports and expenses
+        goTo("reports")
+        waitTag("reports")
+        shot("21_reports")
+        compose.onNodeWithTag("reports").performTouchInput { swipeUp() }
+        shot("22_reports_scrolled")
+        goTo("expenses")
+        waitTag("expense_list")
+        compose.onNodeWithTag("fab_expense").performClick()
+        waitTag("expense_amount")
+        compose.onNodeWithTag("expense_amount").performTextInput("2500")
+        shot("23_add_expense")
+        compose.onNodeWithTag("save_expense").performClick()
         compose.waitForIdle()
+        shot("24_expenses")
+
+        // Member card: freeze + calendar
+        goTo("members")
+        waitTag("member_list")
+        compose.onNodeWithText("Rohit Kumar").performClick()
+        waitTag("member_card")
+        shot("25_member_card_history")
+        compose.onNodeWithTag("card_freeze").performScrollTo().performClick()
+        waitText("Freeze membership?")
+        compose.onAllNodes(hasText("Freeze"))[compose.onAllNodes(hasText("Freeze")).fetchSemanticsNodes().size - 1].performClick()
+        waitTag("card_resume")
+        compose.onNodeWithTag("card_resume").performScrollTo()
+        shot("26_member_frozen")
+        compose.onNodeWithTag("card_calendar").performScrollTo().performClick()
+        waitTag("calendar")
+        shot("27_attendance_calendar")
+        compose.onNodeWithTag("nav_back").performClick()
+        waitTag("member_list")
 
         // Backup
         goTo("backup")
         compose.onNodeWithTag("create_backup").performClick()
         waitText("GymBackup_", 20_000)
-        shot("17_backup")
-        compose.onNodeWithTag("tab_import").performClick()
-        shot("18_backup_import")
+        shot("28_backup")
 
         // Settings + dark mode
         goTo("settings")
         waitTag("settings_scroll")
-        shot("19_settings")
+        shot("29_settings")
         compose.onNodeWithTag("theme_DARK").performScrollTo().performClick()
-        shot("20_settings_bottom")
+        shot("30_settings_bottom")
         compose.onNodeWithTag("save_settings").performClick()
         compose.waitForIdle()
         Thread.sleep(800)
 
         goTo("dashboard")
         waitTag("dashboard")
-        shot("21_dashboard_dark")
+        shot("31_dashboard_dark")
         goTo("members")
         waitTag("member_list")
         compose.onNodeWithText("Priya Singh").performClick()
         waitTag("member_card")
-        shot("22_member_card_dark")
+        shot("32_member_card_dark")
         compose.onNodeWithContentDescription("Close").performClick()
         goTo("payments")
         waitTag("payments_list")
-        shot("23_payments_dark")
+        shot("33_payments_dark")
         goTo("attendance")
         waitTag("present_summary")
-        shot("24_attendance_dark")
+        shot("34_attendance_dark")
 
         // Data checks
         runBlocking {
@@ -253,6 +306,9 @@ class WalkthroughTest {
             assertTrue(members.any { it.rollNumber == "9" && it.fullName == "Karan Mehta" && it.shift == Shift.MORNING })
             val present = app.repository.attendanceFor(DateUtils.today(), Shift.MORNING)
             assertTrue(present.values.all { it })
+            assertTrue(app.repository.snapshot().payments.any { it.amount == 300.0 && it.mode == "UPI" })
+            assertTrue(app.repository.snapshot().expenses.any { it.amount == 2500.0 })
+            assertTrue(app.repository.getMember(3)?.frozenFrom != null || members.any { it.frozenFrom != null })
         }
         assertTrue(compose.onAllNodes(hasTestTag("member_card")).fetchSemanticsNodes().isEmpty())
     }

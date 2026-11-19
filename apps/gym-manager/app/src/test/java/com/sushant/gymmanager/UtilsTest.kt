@@ -92,3 +92,42 @@ class WhatsAppHelperTest {
 
     @Test fun url_withoutMessage() = assertEquals("https://wa.me/919876543210", WhatsAppHelper.generateWhatsAppUrl("9876543210"))
 }
+
+class NewFeatureUtilsTest {
+    @Test fun qrRoundTrip() {
+        val code = com.sushant.gymmanager.data.repository.GymRepository.qrContent("42")
+        assertEquals("42", com.sushant.gymmanager.data.repository.GymRepository.parseQr(code))
+        assertEquals("7", com.sushant.gymmanager.data.repository.GymRepository.parseQr("7"))
+    }
+
+    @Test fun excelColumnNames() {
+        assertEquals("A", com.sushant.gymmanager.util.XlsxWriter.colName(0))
+        assertEquals("Z", com.sushant.gymmanager.util.XlsxWriter.colName(25))
+        assertEquals("AA", com.sushant.gymmanager.util.XlsxWriter.colName(26))
+    }
+
+    @Test fun excelFileIsValidZip() {
+        val out = java.io.ByteArrayOutputStream()
+        com.sushant.gymmanager.util.XlsxWriter().sheet("Payments", listOf("Name", "Amount"), listOf(listOf("A & B <x>", 1000.0))).write(out)
+        val names = mutableListOf<String>()
+        java.util.zip.ZipInputStream(java.io.ByteArrayInputStream(out.toByteArray())).use { z ->
+            while (true) { val e = z.nextEntry ?: break; names += e.name }
+        }
+        assertTrue(names.contains("xl/workbook.xml"))
+        assertTrue(names.contains("xl/worksheets/sheet1.xml"))
+    }
+
+    @Test fun streaks() {
+        fun a(d: String, p: Boolean) = com.sushant.gymmanager.data.local.AttendanceEntity(memberId = 1, attendanceDate = d, shift = "MORNING", isPresent = p)
+        val s = com.sushant.gymmanager.ui.attendance.computeStreaks(
+            listOf(a("2026-11-01", true), a("2026-11-02", true), a("2026-11-03", true), a("2026-11-04", false), a("2026-11-05", true), a("2026-11-06", true))
+        )
+        assertEquals(2, s.current)
+        assertEquals(3, s.best)
+    }
+
+    @Test fun cycleBalance() {
+        val c = com.sushant.gymmanager.data.local.PaymentCycleEntity(memberId = 1, cycleStart = "2026-11-01", cycleEnd = "2026-12-01", amount = 1000.0, paidAmount = 400.0)
+        assertEquals(600.0, c.balance, 0.001)
+    }
+}

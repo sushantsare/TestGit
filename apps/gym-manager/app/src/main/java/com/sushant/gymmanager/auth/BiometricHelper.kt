@@ -80,7 +80,7 @@ object BiometricHelper {
             block(); return
         }
         val activity = context.findFragmentActivity() ?: run { block(); return }
-        authenticate(activity, title, "Confirm it's you to continue", onSuccess = block, onFailure = { msg ->
+        authenticate(activity, title, com.sushant.gymmanager.i18n.I18n.tr(settings.language, "Confirm it's you to continue"), onSuccess = block, onFailure = { msg ->
             Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
         })
     }

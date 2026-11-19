@@ -26,6 +26,8 @@ import androidx.compose.material.icons.filled.CloudDownload
 import androidx.compose.material.icons.filled.CloudUpload
 import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.Description
+import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.FileOpen
 import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.Inventory2
@@ -68,6 +70,9 @@ import com.sushant.gymmanager.auth.ProtectedAction
 import com.sushant.gymmanager.data.local.GymSettingsEntity
 import com.sushant.gymmanager.data.repository.BackupFileInfo
 import com.sushant.gymmanager.data.repository.GymBackup
+import com.sushant.gymmanager.i18n.I18n
+import com.sushant.gymmanager.i18n.currentLang
+import com.sushant.gymmanager.i18n.t
 import com.sushant.gymmanager.ui.components.AppCard
 import com.sushant.gymmanager.ui.components.ConfirmDialog
 import com.sushant.gymmanager.ui.components.EmptyState
@@ -110,7 +115,7 @@ class BackupViewModel(app: Application) : AndroidViewModel(app) {
         busy = true
         viewModelScope.launch {
             val msg = runCatching { manager.createBackup() }
-                .fold({ "Backup created: ${it.name}" }, { "Backup failed: ${it.message}" })
+                .fold({ "OK" }, { "FAIL" })
             busy = false
             refresh()
             onResult(msg)
@@ -148,7 +153,7 @@ class BackupViewModel(app: Application) : AndroidViewModel(app) {
             if (result.isSuccess) {
                 preview = null
                 refresh()
-                onDone(true, "Restored ${backup.members.size} members successfully")
+                onDone(true, backup.members.size.toString())
             } else onDone(false, result.exceptionOrNull()?.message ?: "Restore failed")
         }
     }
@@ -161,6 +166,12 @@ class BackupViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun shareIntent(info: BackupFileInfo) = manager.shareIntent(info.file)
+
+    fun saveToDownloads(info: BackupFileInfo, onDone: (Boolean) -> Unit) {
+        viewModelScope.launch { onDone(manager.copyToDownloads(info.file)) }
+    }
+
+    val lastAuto: String? get() = manager.lastAutoBackup()
 }
 
 @Composable
@@ -169,53 +180,71 @@ fun BackupScreen(onOpenDrawer: () -> Unit, onRestored: () -> Unit, vm: BackupVie
     var tab by remember { mutableIntStateOf(0) }
     var confirmRestore by remember { mutableStateOf(false) }
     var toDelete by remember { mutableStateOf<BackupFileInfo?>(null) }
+    val lang = currentLang()
+    val restoreTitle = t("Restore backup")
+    val createdMsg = t("Backup created")
+    val failedMsg = t("Backup failed")
+    val savedMsg = t("Saved to Downloads/GymManager")
+    val needPermMsg = t("Could not save to Downloads")
 
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) {
             val name = context.contentResolver.query(uri, null, null, null, null)?.use { c ->
                 val idx = c.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
                 if (idx >= 0 && c.moveToFirst()) c.getString(idx) else null
-            } ?: "Selected file"
+            } ?: "backup.gymbackup"
             vm.load(uri, name)
         }
     }
 
-    Scaffold(topBar = { GymTopBar("Backup & Restore", "Your data stays on this device", onMenu = onOpenDrawer) }) { padding ->
+    Scaffold(topBar = { GymTopBar(t("Backup & Restore"), t("Your data stays on this device"), onMenu = onOpenDrawer) }) { padding ->
         Column(Modifier.fillMaxSize().padding(padding)) {
             TabRow(selectedTabIndex = tab, containerColor = MaterialTheme.colorScheme.background) {
-                Tab(selected = tab == 0, onClick = { tab = 0 }, text = { Text("Export") }, icon = { Icon(Icons.Default.CloudUpload, null) })
-                Tab(selected = tab == 1, onClick = { tab = 1 }, text = { Text("Import") }, icon = { Icon(Icons.Default.CloudDownload, null) }, modifier = Modifier.testTag("tab_import"))
+                Tab(selected = tab == 0, onClick = { tab = 0 }, text = { Text(t("Export")) }, icon = { Icon(Icons.Default.CloudUpload, null) })
+                Tab(selected = tab == 1, onClick = { tab = 1 }, text = { Text(t("Import")) }, icon = { Icon(Icons.Default.CloudDownload, null) }, modifier = Modifier.testTag("tab_import"))
             }
             if (tab == 0) {
                 LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     item {
                         AppCard(Modifier.fillMaxWidth()) {
-                            HeaderRow(Icons.Default.Inventory2, "Create a full backup", "Members, photos, plans, payments, attendance and settings in one .gymbackup file.")
+                            HeaderRow(Icons.Default.Inventory2, t("Create a full backup"), t("Members, photos, plans, payments, attendance and settings in one .gymbackup file."))
                             Spacer(Modifier.height(14.dp))
                             Button(
-                                onClick = { vm.create { Toast.makeText(context, it, Toast.LENGTH_SHORT).show() } },
+                                onClick = { vm.create { Toast.makeText(context, if (it == "OK") createdMsg else failedMsg, Toast.LENGTH_SHORT).show() } },
                                 enabled = !vm.busy,
                                 modifier = Modifier.fillMaxWidth().height(50.dp).testTag("create_backup")
                             ) {
                                 if (vm.busy) CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
-                                else { Icon(Icons.Default.CloudUpload, null); Spacer(Modifier.width(8.dp)); Text("Create Backup (.gymbackup)") }
+                                else { Icon(Icons.Default.CloudUpload, null); Spacer(Modifier.width(8.dp)); Text(t("Create Backup (.gymbackup)")) }
                             }
                             Spacer(Modifier.height(8.dp))
                             Text(
-                                "The latest 10 backups are kept automatically. Share a backup to Drive, WhatsApp or email to keep it safe off this phone.",
+                                t("The latest 10 backups are kept here. Tap the download icon to also save a copy in Downloads, or share it to Drive or WhatsApp."),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
                     }
-                    item { Text("Saved on this device", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 4.dp)) }
+                    item {
+                        AppCard(Modifier.fillMaxWidth()) {
+                            HeaderRow(
+                                Icons.Default.Schedule,
+                                t("Automatic daily backup"),
+                                if (!vm.settings.autoBackupEnabled) t("Turned off in Settings")
+                                else vm.lastAuto?.let { t("Last automatic backup: %s. A copy is kept in Downloads/GymManager.", DateUtils.formatShort(it)) }
+                                    ?: t("Runs once a day and keeps a copy in Downloads/GymManager.")
+                            )
+                        }
+                    }
+                    item { Text(t("Saved on this device"), style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 4.dp)) }
                     val list = vm.backups
                     when {
                         list == null -> item { Box(Modifier.fillMaxWidth().padding(24.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator() } }
-                        list.isEmpty() -> item { EmptyState(Icons.Default.FolderOpen, "No backups yet", "Create your first backup to protect your gym's data.") }
+                        list.isEmpty() -> item { EmptyState(Icons.Default.FolderOpen, t("No backups yet"), t("Create your first backup to protect your gym's data.")) }
                         else -> items(list, key = { it.file.name }) { info ->
                             BackupRow(
                                 info,
+                                onSave = { vm.saveToDownloads(info) { ok -> Toast.makeText(context, if (ok) savedMsg else needPermMsg, Toast.LENGTH_SHORT).show() } },
                                 onShare = { context.startActivity(vm.shareIntent(info)) },
                                 onDelete = { toDelete = info },
                                 onRestore = { vm.loadLocal(info.file); tab = 1 }
@@ -227,21 +256,21 @@ fun BackupScreen(onOpenDrawer: () -> Unit, onRestored: () -> Unit, vm: BackupVie
                 LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     item {
                         AppCard(Modifier.fillMaxWidth()) {
-                            HeaderRow(Icons.Default.RestorePage, "Restore from a backup", "Pick a .gymbackup file. You'll see a preview before anything changes.")
+                            HeaderRow(Icons.Default.RestorePage, t("Restore from a backup"), t("Pick a .gymbackup file. You'll see a preview before anything changes."))
                             Spacer(Modifier.height(14.dp))
                             OutlinedButton(
                                 onClick = { picker.launch(arrayOf("*/*")) },
                                 enabled = !vm.busy,
                                 modifier = Modifier.fillMaxWidth().height(50.dp)
                             ) {
-                                Icon(Icons.Default.FileOpen, null); Spacer(Modifier.width(8.dp)); Text("Select .gymbackup File")
+                                Icon(Icons.Default.FileOpen, null); Spacer(Modifier.width(8.dp)); Text(t("Select .gymbackup File"))
                             }
                         }
                     }
                     vm.importError?.let { err ->
                         item {
                             Surface(color = MaterialTheme.colorScheme.errorContainer, shape = RoundedCornerShape(16.dp)) {
-                                Text(err, Modifier.fillMaxWidth().padding(16.dp), color = MaterialTheme.colorScheme.onErrorContainer)
+                                Text(t(err), Modifier.fillMaxWidth().padding(16.dp), color = MaterialTheme.colorScheme.onErrorContainer)
                             }
                         }
                     }
@@ -254,7 +283,7 @@ fun BackupScreen(onOpenDrawer: () -> Unit, onRestored: () -> Unit, vm: BackupVie
                             Icon(Icons.Default.Security, null, Modifier.size(18.dp), tint = StatusGreen)
                             Spacer(Modifier.width(8.dp))
                             Text(
-                                "Safe restore: a safety snapshot of your current data is saved automatically before restoring, and the restore is all-or-nothing.",
+                                t("Safe restore: a safety snapshot of your current data is saved automatically before restoring, and the restore is all-or-nothing."),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -267,15 +296,15 @@ fun BackupScreen(onOpenDrawer: () -> Unit, onRestored: () -> Unit, vm: BackupVie
 
     if (confirmRestore) {
         ConfirmDialog(
-            title = "Replace all current data?",
-            message = "Everything in the app will be replaced with this backup. A safety snapshot of your current data is created first.",
-            confirmText = "Restore",
+            title = t("Replace all current data?"),
+            message = t("Everything in the app will be replaced with this backup. A safety snapshot of your current data is created first."),
+            confirmText = t("Restore"),
             destructive = true,
             onConfirm = {
                 confirmRestore = false
-                BiometricHelper.guard(context, vm.settings, ProtectedAction.RESTORE_BACKUP, "Restore backup") {
+                BiometricHelper.guard(context, vm.settings, ProtectedAction.RESTORE_BACKUP, restoreTitle) {
                     vm.restore { ok, msg ->
-                        Toast.makeText(context, msg, Toast.LENGTH_LONG).show()
+                        Toast.makeText(context, if (ok) I18n.tr(lang, "Restored %d members successfully", msg.toIntOrNull() ?: 0) else I18n.tr(lang, msg), Toast.LENGTH_LONG).show()
                         if (ok) onRestored()
                     }
                 }
@@ -285,9 +314,9 @@ fun BackupScreen(onOpenDrawer: () -> Unit, onRestored: () -> Unit, vm: BackupVie
     }
     toDelete?.let { info ->
         ConfirmDialog(
-            title = "Delete backup?",
-            message = "${info.file.name} will be removed from this device.",
-            confirmText = "Delete",
+            title = t("Delete backup?"),
+            message = t("%s will be removed from this device.", info.file.name),
+            confirmText = t("Delete"),
             destructive = true,
             onConfirm = { vm.delete(info); toDelete = null },
             onDismiss = { toDelete = null }
@@ -312,7 +341,7 @@ private fun HeaderRow(icon: ImageVector, title: String, subtitle: String) {
 }
 
 @Composable
-private fun BackupRow(info: BackupFileInfo, onShare: () -> Unit, onDelete: () -> Unit, onRestore: () -> Unit) {
+private fun BackupRow(info: BackupFileInfo, onSave: () -> Unit, onShare: () -> Unit, onDelete: () -> Unit, onRestore: () -> Unit) {
     AppCard(Modifier.fillMaxWidth(), contentPadding = PaddingValues(start = 14.dp, top = 12.dp, bottom = 8.dp, end = 4.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Icon(Icons.Default.Description, null, tint = if (info.isSafety) StatusAmber else MaterialTheme.colorScheme.primary)
@@ -325,14 +354,15 @@ private fun BackupRow(info: BackupFileInfo, onShare: () -> Unit, onDelete: () ->
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
-            IconButton(onClick = onShare) { Icon(Icons.Default.Share, "Share backup") }
-            IconButton(onClick = onDelete) { Icon(Icons.Default.DeleteOutline, "Delete backup") }
+            IconButton(onClick = onSave) { Icon(Icons.Default.Download, t("Save to Downloads")) }
+            IconButton(onClick = onShare) { Icon(Icons.Default.Share, t("Share backup")) }
+            IconButton(onClick = onDelete) { Icon(Icons.Default.DeleteOutline, t("Delete backup")) }
         }
         Row(Modifier.padding(top = 6.dp, end = 10.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            if (info.isSafety) Pill("SAFETY SNAPSHOT", StatusAmber)
+            if (info.isSafety) Pill(t("SAFETY SNAPSHOT"), StatusAmber)
             info.counts?.let { c ->
                 Text(
-                    "${c.members} members • ${c.paymentCycles} cycles • ${c.attendance} attendance",
+                    t("%d members • %d cycles • %d attendance", c.members, c.paymentCycles, c.attendance),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.weight(1f),
@@ -340,7 +370,7 @@ private fun BackupRow(info: BackupFileInfo, onShare: () -> Unit, onDelete: () ->
                     overflow = TextOverflow.Ellipsis
                 )
             } ?: Spacer(Modifier.weight(1f))
-            androidx.compose.material3.TextButton(onClick = onRestore) { Text("Restore") }
+            androidx.compose.material3.TextButton(onClick = onRestore) { Text(t("Restore")) }
         }
     }
 }
@@ -350,8 +380,8 @@ private fun PreviewCard(p: GymBackup, name: String, busy: Boolean, onCancel: () 
     val c = p.counts
     AppCard(Modifier.fillMaxWidth().testTag("backup_preview")) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text("Backup Preview", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
-            Pill("VALID", StatusGreen)
+            Text(t("Backup Preview"), style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+            Pill(t("VALID"), StatusGreen)
         }
         Text(name, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
         Spacer(Modifier.height(14.dp))
@@ -372,7 +402,7 @@ private fun PreviewCard(p: GymBackup, name: String, busy: Boolean, onCancel: () 
         }
         Spacer(Modifier.height(16.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            OutlinedButton(onClick = onCancel, modifier = Modifier.weight(1f).height(48.dp)) { Text("Cancel") }
+            OutlinedButton(onClick = onCancel, modifier = Modifier.weight(1f).height(48.dp)) { Text(t("Cancel")) }
             Button(
                 onClick = onRestore,
                 enabled = !busy,
@@ -380,7 +410,7 @@ private fun PreviewCard(p: GymBackup, name: String, busy: Boolean, onCancel: () 
                 colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error, contentColor = MaterialTheme.colorScheme.onError)
             ) {
                 if (busy) CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp, color = MaterialTheme.colorScheme.onError)
-                else Text("Restore Now")
+                else Text(t("Restore Now"))
             }
         }
     }

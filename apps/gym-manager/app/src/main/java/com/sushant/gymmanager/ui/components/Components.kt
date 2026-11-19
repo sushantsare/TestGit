@@ -26,6 +26,8 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
+import androidx.compose.material3.DatePickerDefaults
+import androidx.compose.material3.SelectableDates
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
@@ -53,6 +55,7 @@ import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.sushant.gymmanager.data.local.MembershipEntity
+import com.sushant.gymmanager.i18n.t
 import com.sushant.gymmanager.data.local.Shift
 import com.sushant.gymmanager.ui.theme.LocalExtraColors
 import com.sushant.gymmanager.ui.theme.StatusAmber
@@ -120,7 +123,7 @@ fun RollBadge(roll: String, modifier: Modifier = Modifier) {
 fun ShiftPill(shift: String, modifier: Modifier = Modifier) {
     val morning = shift == Shift.MORNING
     Pill(
-        text = if (morning) "MORNING" else "EVENING",
+        text = t(if (morning) "MORNING" else "EVENING"),
         color = if (morning) StatusAmber else MaterialTheme.colorScheme.tertiary,
         modifier = modifier
     )
@@ -227,23 +230,33 @@ fun ConfirmDialog(
                 ) else ButtonDefaults.buttonColors()
             ) { Text(confirmText) }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } }
+        dismissButton = { TextButton(onClick = onDismiss) { Text(t("Cancel")) } }
     )
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
+private object PastOrToday : SelectableDates {
+    override fun isSelectableDate(utcTimeMillis: Long): Boolean =
+        utcTimeMillis <= (DateUtils.isoToUtcMillis(DateUtils.today()) ?: Long.MAX_VALUE)
+    override fun isSelectableYear(year: Int): Boolean = year <= java.time.LocalDate.now().year
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AppDatePickerDialog(initialIso: String?, onPick: (String) -> Unit, onDismiss: () -> Unit) {
-    val state = rememberDatePickerState(initialSelectedDateMillis = DateUtils.isoToUtcMillis(initialIso))
+fun AppDatePickerDialog(initialIso: String?, onPick: (String) -> Unit, onDismiss: () -> Unit, pastOnly: Boolean = false) {
+    val state = rememberDatePickerState(
+        initialSelectedDateMillis = DateUtils.isoToUtcMillis(initialIso),
+        selectableDates = if (pastOnly) PastOrToday else DatePickerDefaults.AllDates
+    )
     DatePickerDialog(
         onDismissRequest = onDismiss,
         confirmButton = {
             TextButton(onClick = {
                 state.selectedDateMillis?.let { onPick(DateUtils.utcMillisToIso(it)) }
                 onDismiss()
-            }) { Text("OK") }
+            }) { Text(t("OK")) }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } }
+        dismissButton = { TextButton(onClick = onDismiss) { Text(t("Cancel")) } }
     ) {
         DatePicker(state = state)
     }
@@ -259,15 +272,19 @@ fun AppTimePickerDialog(title: String, initial: String, onPick: (String) -> Unit
         title = { Text(title) },
         text = { Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) { TimePicker(state = state) } },
         confirmButton = {
-            TextButton(onClick = { onPick(DateUtils.toHHmm(state.hour, state.minute)); onDismiss() }) { Text("OK") }
+            TextButton(onClick = { onPick(DateUtils.toHHmm(state.hour, state.minute)); onDismiss() }) { Text(t("OK")) }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } }
+        dismissButton = { TextButton(onClick = onDismiss) { Text(t("Cancel")) } }
     )
 }
 
 data class PlanStatus(val label: String, val color: Color)
 
-fun planStatus(membership: MembershipEntity?, thresholdDays: Int): PlanStatus = when {
+val FrozenBlue = Color(0xFF0284C7)
+
+/** Labels are English keys; translate with t(status.label). */
+fun planStatus(membership: MembershipEntity?, thresholdDays: Int, frozen: Boolean = false): PlanStatus = when {
+    frozen -> PlanStatus("Frozen", FrozenBlue)
     membership == null -> PlanStatus("No Plan", Color(0xFF64748B))
     DateUtils.isExpired(membership.expiryDate) -> PlanStatus("Expired", StatusRed)
     DateUtils.isExpiringSoon(membership.expiryDate, thresholdDays) -> PlanStatus("Expiring Soon", StatusAmber)

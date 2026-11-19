@@ -14,9 +14,22 @@ import java.time.temporal.ChronoUnit
 import java.util.Locale
 
 object DateUtils {
-    private val fullFormat = DateTimeFormatter.ofPattern("d MMMM yyyy", Locale.ENGLISH)
-    private val shortFormat = DateTimeFormatter.ofPattern("d MMM yyyy", Locale.ENGLISH)
-    private val dayFormat = DateTimeFormatter.ofPattern("EEEE, d MMMM yyyy", Locale.ENGLISH)
+    /** Month/day names follow the app language (English or Hindi). */
+    @Volatile
+    var locale: Locale = Locale.ENGLISH
+        set(value) {
+            field = value
+            fullFormat = DateTimeFormatter.ofPattern("d MMMM yyyy", value)
+            shortFormat = DateTimeFormatter.ofPattern("d MMM yyyy", value)
+            dayFormat = DateTimeFormatter.ofPattern("EEEE, d MMMM yyyy", value)
+            monthFormat = DateTimeFormatter.ofPattern("MMMM yyyy", value)
+            monthShortFormat = DateTimeFormatter.ofPattern("MMM", value)
+        }
+    private var fullFormat = DateTimeFormatter.ofPattern("d MMMM yyyy", Locale.ENGLISH)
+    private var shortFormat = DateTimeFormatter.ofPattern("d MMM yyyy", Locale.ENGLISH)
+    private var dayFormat = DateTimeFormatter.ofPattern("EEEE, d MMMM yyyy", Locale.ENGLISH)
+    private var monthFormat = DateTimeFormatter.ofPattern("MMMM yyyy", Locale.ENGLISH)
+    private var monthShortFormat = DateTimeFormatter.ofPattern("MMM", Locale.ENGLISH)
     private val timeFormat = DateTimeFormatter.ofPattern("HH:mm")
     private val time12Format = DateTimeFormatter.ofPattern("h:mm a", Locale.ENGLISH)
     private val timestampFormat = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
@@ -34,10 +47,12 @@ object DateUtils {
     fun formatFull(iso: String?): String = parseDate(iso)?.format(fullFormat) ?: ""
     fun formatShort(iso: String?): String = parseDate(iso)?.format(shortFormat) ?: ""
     fun formatDayFull(date: LocalDate = LocalDate.now()): String = date.format(dayFormat)
+    fun formatMonth(date: LocalDate): String = date.format(monthFormat)
+    fun formatMonthShort(date: LocalDate): String = date.format(monthShortFormat)
 
     fun formatTimestamp(millis: Long): String =
         Instant.ofEpochMilli(millis).atZone(ZoneId.systemDefault()).toLocalDateTime()
-            .format(DateTimeFormatter.ofPattern("d MMM yyyy, h:mm a", Locale.ENGLISH))
+            .let { it.toLocalDate().format(shortFormat) + ", " + it.format(DateTimeFormatter.ofPattern("h:mm a", Locale.ENGLISH)) }
 
     /** "06:00" -> "6:00 AM" */
     fun formatTo12Hour(hhmm: String?): String =

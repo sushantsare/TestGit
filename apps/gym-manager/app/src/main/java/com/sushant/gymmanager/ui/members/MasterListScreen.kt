@@ -49,6 +49,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.sushant.gymmanager.data.local.GymSettingsEntity
 import com.sushant.gymmanager.data.repository.MemberWithPlan
+import com.sushant.gymmanager.i18n.t
 import com.sushant.gymmanager.ui.components.AppCard
 import com.sushant.gymmanager.ui.components.EmptyState
 import com.sushant.gymmanager.ui.components.GymTopBar
@@ -80,14 +81,14 @@ fun MasterListScreen(
     Scaffold(
         topBar = {
             GymTopBar(
-                title = "Master List (${all?.size ?: 0})",
-                subtitle = "Active members",
+                title = t("Master List (%d)", all?.size ?: 0),
+                subtitle = t("Active members"),
                 onMenu = onOpenDrawer,
                 actions = {
-                    IconButton(onClick = { menu = true }) { Icon(Icons.Default.MoreVert, "More options") }
+                    IconButton(onClick = { menu = true }) { Icon(Icons.Default.MoreVert, t("More options")) }
                     DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
                         DropdownMenuItem(
-                            text = { Text("Deactivated Members (${inactive?.size ?: 0})") },
+                            text = { Text(t("Deactivated Members (%d)", inactive?.size ?: 0)) },
                             leadingIcon = { Icon(Icons.Default.PersonOff, null) },
                             onClick = { menu = false; onOpenDeactivated() }
                         )
@@ -99,7 +100,7 @@ fun MasterListScreen(
             ExtendedFloatingActionButton(
                 onClick = onAddMember,
                 icon = { Icon(Icons.Default.GroupAdd, null) },
-                text = { Text("Add Member") },
+                text = { Text(t("Add Member")) },
                 modifier = Modifier.testTag("fab_add")
             )
         }
@@ -109,10 +110,10 @@ fun MasterListScreen(
                 value = query,
                 onValueChange = { vm.query.value = it },
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp).testTag("search"),
-                placeholder = { Text("Search name, roll no. or WhatsApp") },
+                placeholder = { Text(t("Search name, roll no. or WhatsApp")) },
                 leadingIcon = { Icon(Icons.Default.Search, null) },
                 trailingIcon = {
-                    if (query.isNotEmpty()) IconButton(onClick = { vm.query.value = "" }) { Icon(Icons.Default.Clear, "Clear search") }
+                    if (query.isNotEmpty()) IconButton(onClick = { vm.query.value = "" }) { Icon(Icons.Default.Clear, t("Clear search")) }
                 },
                 singleLine = true,
                 shape = RoundedCornerShape(16.dp),
@@ -125,8 +126,8 @@ fun MasterListScreen(
             val items = list
             when {
                 items == null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
-                items.isEmpty() && query.isNotBlank() -> EmptyState(Icons.Default.PersonSearch, "No matches", "No active member matches \"$query\".")
-                items.isEmpty() -> EmptyState(Icons.Default.GroupAdd, "No members yet", "Tap Add Member to register your first gym member.")
+                items.isEmpty() && query.isNotBlank() -> EmptyState(Icons.Default.PersonSearch, t("No matches"), t("No active member matches \"%s\".", query))
+                items.isEmpty() -> EmptyState(Icons.Default.GroupAdd, t("No members yet"), t("Tap Add Member to register your first gym member."))
                 else -> MemberList(items, settings, onOpen = { openId = it })
             }
         }
@@ -150,7 +151,7 @@ fun MemberList(items: List<MemberWithPlan>, settings: GymSettingsEntity, onOpen:
 fun MemberRowCard(item: MemberWithPlan, settings: GymSettingsEntity, onClick: () -> Unit) {
     val context = LocalContext.current
     val m = item.member
-    val status = planStatus(item.membership, settings.expiringSoonDays)
+    val status = planStatus(item.membership, settings.expiringSoonDays, m.frozenFrom != null)
     AppCard(onClick = onClick, contentPadding = PaddingValues(12.dp), modifier = Modifier.fillMaxWidth().testTag("member_${m.rollNumber}")) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             MemberAvatar(m.photoUri, m.fullName, size = 52.dp)
@@ -180,11 +181,11 @@ fun MemberRowCard(item: MemberWithPlan, settings: GymSettingsEntity, onClick: ()
                 Spacer(Modifier.height(6.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     ShiftPill(m.shift)
-                    if (m.isActive) Pill(status.label.uppercase(), status.color)
+                    Pill(t(status.label).uppercase(), status.color)
                 }
             }
             Spacer(Modifier.width(8.dp))
-            WhatsAppButton(onClick = { WhatsAppHelper.open(context, m.whatsappNumber) }, contentDescription = "Chat with ${m.fullName}")
+            WhatsAppButton(onClick = { WhatsAppHelper.open(context, m.whatsappNumber) }, contentDescription = t("Chat with %s", m.fullName))
         }
     }
 }

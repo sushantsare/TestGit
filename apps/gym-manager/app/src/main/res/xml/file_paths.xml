@@ -2,4 +2,5 @@
 <paths>
     <external-files-path name="backups" path="Backups/" />
     <files-path name="internal_backups" path="Backups/" />
+    <cache-path name="shared" path="shared/" />
 </paths>

@@ -16,6 +16,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.sushant.gymmanager.i18n.t
 import com.sushant.gymmanager.ui.components.EmptyState
 import com.sushant.gymmanager.ui.components.GymTopBar
 
@@ -32,8 +33,8 @@ fun DeactivatedMembersScreen(
     Scaffold(
         topBar = {
             GymTopBar(
-                title = "Deactivated (${list?.size ?: 0})",
-                subtitle = "Tap a member to reactivate, edit or delete",
+                title = t("Deactivated (%d)", list?.size ?: 0),
+                subtitle = t("Tap a member to reactivate, edit or delete"),
                 onBack = onBack
             )
         }
@@ -42,7 +43,7 @@ fun DeactivatedMembersScreen(
             val items = list
             when {
                 items == null -> CircularProgressIndicator(Modifier.align(Alignment.Center))
-                items.isEmpty() -> EmptyState(Icons.Default.HowToReg, "No deactivated members", "Members you deactivate will appear here with their history intact.")
+                items.isEmpty() -> EmptyState(Icons.Default.HowToReg, t("No deactivated members"), t("Members you deactivate will appear here with their history intact."))
                 else -> MemberList(items, settings, onOpen = { openId = it })
             }
         }

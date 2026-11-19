@@ -73,6 +73,9 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.sushant.gymmanager.auth.BiometricHelper
 import com.sushant.gymmanager.auth.ProtectedAction
 import com.sushant.gymmanager.data.local.PlanType
+import com.sushant.gymmanager.i18n.I18n
+import com.sushant.gymmanager.i18n.currentLang
+import com.sushant.gymmanager.i18n.t
 import com.sushant.gymmanager.ui.components.AppCard
 import com.sushant.gymmanager.ui.components.AppDatePickerDialog
 import com.sushant.gymmanager.ui.components.AppTimePickerDialog
@@ -101,6 +104,8 @@ fun AddEditMemberScreen(memberId: Long, onDone: () -> Unit, vm: AddEditMemberVie
         if (uri != null) vm.importPhoto(uri)
     }
 
+    val addTitle = t("Add new member")
+    val savedMsg = t(if (isNew) "Member added" else "Changes saved")
     val tryExit: () -> Unit = { if (vm.isDirty) { confirmDiscard = true } else { onDone() } }
     BackHandler(enabled = vm.isDirty) { confirmDiscard = true }
 
@@ -110,8 +115,8 @@ fun AddEditMemberScreen(memberId: Long, onDone: () -> Unit, vm: AddEditMemberVie
     Scaffold(
         topBar = {
             GymTopBar(
-                title = if (isNew) "Add Member" else "Edit Member",
-                subtitle = if (isNew) "Register a new gym member" else f.fullName,
+                title = t(if (isNew) "Add Member" else "Edit Member"),
+                subtitle = if (isNew) t("Register a new gym member") else f.fullName,
                 onBack = tryExit
             )
         },
@@ -123,16 +128,16 @@ fun AddEditMemberScreen(memberId: Long, onDone: () -> Unit, vm: AddEditMemberVie
                         Modifier.fillMaxWidth().navigationBarsPadding().padding(horizontal = 16.dp, vertical = 12.dp),
                         horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        OutlinedButton(onClick = tryExit, modifier = Modifier.weight(1f).height(50.dp)) { Text("Cancel") }
+                        OutlinedButton(onClick = tryExit, modifier = Modifier.weight(1f).height(50.dp)) { Text(t("Cancel")) }
                         Button(
                             onClick = {
                                 val doSave = {
                                     vm.save {
-                                        Toast.makeText(context, if (isNew) "Member added" else "Changes saved", Toast.LENGTH_SHORT).show()
+                                        Toast.makeText(context, savedMsg, Toast.LENGTH_SHORT).show()
                                         onDone()
                                     }
                                 }
-                                if (isNew) BiometricHelper.guard(context, vm.settings, ProtectedAction.ADD_MEMBER, "Add new member", doSave)
+                                if (isNew) BiometricHelper.guard(context, vm.settings, ProtectedAction.ADD_MEMBER, addTitle, doSave)
                                 else doSave()
                             },
                             enabled = vm.canSave,
@@ -142,7 +147,7 @@ fun AddEditMemberScreen(memberId: Long, onDone: () -> Unit, vm: AddEditMemberVie
                             else {
                                 Icon(Icons.Default.Check, null, Modifier.size(18.dp))
                                 Spacer(Modifier.width(6.dp))
-                                Text(if (isNew) "Save Member" else "Save Changes")
+                                Text(t(if (isNew) "Save Member" else "Save Changes"))
                             }
                         }
                     }
@@ -184,28 +189,28 @@ fun AddEditMemberScreen(memberId: Long, onDone: () -> Unit, vm: AddEditMemberVie
                     }
                     Spacer(Modifier.width(16.dp))
                     Column(Modifier.weight(1f)) {
-                        Text("Profile Photo", style = MaterialTheme.typography.titleSmall)
+                        Text(t("Profile Photo"), style = MaterialTheme.typography.titleSmall)
                         Text(
-                            "Tap the circle to pick a photo. No storage permission needed.",
+                            t("Tap the circle to pick a photo. No storage permission needed."),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         if (f.photoPath != null) {
                             TextButton(onClick = vm::removePhoto, contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp)) {
-                                Text("Remove photo")
+                                Text(t("Remove photo"))
                             }
                         }
                     }
                 }
                 Spacer(Modifier.height(16.dp))
                 FormField(
-                    value = f.rollNumber, label = "Roll Number *", icon = Icons.Default.Badge, tag = "field_roll",
+                    value = f.rollNumber, label = t("Roll Number *"), icon = Icons.Default.Badge, tag = "field_roll",
                     error = if (showError("roll") || vm.rollTaken) errors["roll"] else null,
                     onChange = { v -> vm.update { it.copy(rollNumber = v.take(12)) }; touched = touched + "roll" }
                 )
                 Spacer(Modifier.height(10.dp))
                 FormField(
-                    value = f.fullName, label = "Full Name *", icon = Icons.Default.Person, tag = "field_name",
+                    value = f.fullName, label = t("Full Name *"), icon = Icons.Default.Person, tag = "field_name",
                     error = if (showError("name")) errors["name"] else null,
                     capitalization = KeyboardCapitalization.Words,
                     onChange = { v -> vm.update { it.copy(fullName = v) }; touched = touched + "name" }
@@ -214,9 +219,9 @@ fun AddEditMemberScreen(memberId: Long, onDone: () -> Unit, vm: AddEditMemberVie
 
             // ---------- Contact & personal ----------
             AppCard(Modifier.fillMaxWidth()) {
-                CardHeader("Contact & Personal")
+                CardHeader(t("Contact & Personal"))
                 FormField(
-                    value = f.whatsapp, label = "WhatsApp Number *", icon = Icons.Default.Phone, tag = "field_whatsapp",
+                    value = f.whatsapp, label = t("WhatsApp Number *"), icon = Icons.Default.Phone, tag = "field_whatsapp",
                     keyboardType = KeyboardType.Phone,
                     error = if (showError("whatsapp")) errors["whatsapp"] else null,
                     onChange = { v -> vm.update { it.copy(whatsapp = v.filter { c -> c.isDigit() || c == '+' || c == ' ' }.take(16)) }; touched = touched + "whatsapp" }
@@ -224,22 +229,22 @@ fun AddEditMemberScreen(memberId: Long, onDone: () -> Unit, vm: AddEditMemberVie
                 Spacer(Modifier.height(10.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     PickerField(
-                        "Date of Birth", DateUtils.formatShort(f.dateOfBirth).ifEmpty { "Optional" }, Icons.Default.Cake,
+                        t("Date of Birth"), DateUtils.formatShort(f.dateOfBirth).ifEmpty { t("Optional") }, Icons.Default.Cake,
                         Modifier.weight(1f), placeholder = f.dateOfBirth.isBlank()
                     ) { picker = Picker.DOB }
                     PickerField(
-                        "Date of Joining", DateUtils.formatShort(f.dateOfJoining), Icons.Default.Event, Modifier.weight(1f)
+                        t("Date of Joining"), DateUtils.formatShort(f.dateOfJoining), Icons.Default.Event, Modifier.weight(1f)
                     ) { picker = Picker.DOJ }
                 }
                 Spacer(Modifier.height(10.dp))
                 FormField(
-                    value = f.fatherName, label = "Father's Name (optional)", icon = Icons.Default.Person,
+                    value = f.fatherName, label = t("Father's Name (optional)"), icon = Icons.Default.Person,
                     capitalization = KeyboardCapitalization.Words,
                     onChange = { v -> vm.update { it.copy(fatherName = v) } }
                 )
                 Spacer(Modifier.height(10.dp))
                 FormField(
-                    value = f.motherName, label = "Mother's Name (optional)", icon = Icons.Default.Person,
+                    value = f.motherName, label = t("Mother's Name (optional)"), icon = Icons.Default.Person,
                     capitalization = KeyboardCapitalization.Words,
                     onChange = { v -> vm.update { it.copy(motherName = v) } }
                 )
@@ -253,17 +258,17 @@ fun AddEditMemberScreen(memberId: Long, onDone: () -> Unit, vm: AddEditMemberVie
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     PickerField(
-                        "From", if (f.fromTime.isBlank()) "Select" else DateUtils.formatTo12Hour(f.fromTime), Icons.Default.AccessTime,
+                        t("From"), if (f.fromTime.isBlank()) t("Select") else DateUtils.formatTo12Hour(f.fromTime), Icons.Default.AccessTime,
                         Modifier.weight(1f).testTag("field_from"), placeholder = f.fromTime.isBlank()
                     ) { picker = Picker.FROM }
                     PickerField(
-                        "To", if (f.toTime.isBlank()) "Select" else DateUtils.formatTo12Hour(f.toTime), Icons.Default.AccessTime,
+                        t("To"), if (f.toTime.isBlank()) t("Select") else DateUtils.formatTo12Hour(f.toTime), Icons.Default.AccessTime,
                         Modifier.weight(1f).testTag("field_to"), placeholder = f.toTime.isBlank()
                     ) { picker = Picker.TO }
                 }
                 val slotError = if ("slot" in touched) errors["slot"] else null
                 Text(
-                    slotError ?: "Shift is detected automatically from the start time using your shift windows in Settings.",
+                    slotError?.let { t(it) } ?: t("Shift is detected automatically from the start time using your shift windows in Settings."),
                     style = MaterialTheme.typography.bodySmall,
                     color = if (slotError != null) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(top = 8.dp)
@@ -272,13 +277,13 @@ fun AddEditMemberScreen(memberId: Long, onDone: () -> Unit, vm: AddEditMemberVie
 
             // ---------- Membership ----------
             AppCard(Modifier.fillMaxWidth()) {
-                CardHeader("Membership Plan")
+                CardHeader(t("Membership Plan"))
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     PlanType.all.forEach { p ->
                         FilterChip(
                             selected = f.planType == p,
                             onClick = { vm.selectPlan(p) },
-                            label = { Text(DateUtils.planLabel(p).takeIf { p != PlanType.CUSTOM } ?: "Custom") },
+                            label = { Text(I18n.planLabel(currentLang(), p)) },
                             leadingIcon = if (f.planType == p) {
                                 { Icon(Icons.Default.Check, null, Modifier.size(16.dp)) }
                             } else null,
@@ -295,23 +300,23 @@ fun AddEditMemberScreen(memberId: Long, onDone: () -> Unit, vm: AddEditMemberVie
                     Spacer(Modifier.height(10.dp))
                     Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                         FormField(
-                            value = f.customMonths, label = "Months", keyboardType = KeyboardType.Number,
+                            value = f.customMonths, label = t("Months"), keyboardType = KeyboardType.Number,
                             modifier = Modifier.weight(1f),
                             onChange = { v -> vm.update { it.copy(customMonths = v.filter { c -> c.isDigit() }.take(3)) } }
                         )
                         FormField(
-                            value = f.customDays, label = "Days", keyboardType = KeyboardType.Number,
+                            value = f.customDays, label = t("Days"), keyboardType = KeyboardType.Number,
                             modifier = Modifier.weight(1f),
                             onChange = { v -> vm.update { it.copy(customDays = v.filter { c -> c.isDigit() }.take(3)) } }
                         )
                     }
                     errors["custom"]?.let {
-                        Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 4.dp))
+                        Text(t(it), color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 4.dp))
                     }
                 }
                 Spacer(Modifier.height(12.dp))
                 FormField(
-                    value = f.fee, label = "Membership Fee (₹) *", icon = Icons.Default.CurrencyRupee, tag = "field_fee",
+                    value = f.fee, label = t("Membership Fee (₹) *"), icon = Icons.Default.CurrencyRupee, tag = "field_fee",
                     keyboardType = KeyboardType.Decimal,
                     error = errors["fee"],
                     onChange = { v -> vm.update { it.copy(fee = v.filter { c -> c.isDigit() || c == '.' }.take(9)) } }
@@ -322,7 +327,7 @@ fun AddEditMemberScreen(memberId: Long, onDone: () -> Unit, vm: AddEditMemberVie
                         Icon(Icons.Default.CalendarMonth, null, tint = MaterialTheme.colorScheme.primary)
                         Spacer(Modifier.width(12.dp))
                         Column(Modifier.weight(1f)) {
-                            Text("Valid till", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onPrimaryContainer)
+                            Text(t("Valid till"), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onPrimaryContainer)
                             Text(DateUtils.formatFull(vm.expiryPreview), style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onPrimaryContainer)
                         }
                     }
@@ -330,9 +335,9 @@ fun AddEditMemberScreen(memberId: Long, onDone: () -> Unit, vm: AddEditMemberVie
                 Spacer(Modifier.height(8.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
-                        Text("Auto-Renew", style = MaterialTheme.typography.titleSmall)
+                        Text(t("Auto-Renew"), style = MaterialTheme.typography.titleSmall)
                         Text(
-                            "Create the next unpaid billing cycle automatically when this one ends",
+                            t("Create the next unpaid billing cycle automatically when this one ends"),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -345,23 +350,23 @@ fun AddEditMemberScreen(memberId: Long, onDone: () -> Unit, vm: AddEditMemberVie
     }
 
     when (picker) {
-        Picker.DOB -> AppDatePickerDialog(f.dateOfBirth.ifBlank { "2000-01-01" }, { iso -> vm.update { it.copy(dateOfBirth = iso) } }) { picker = null }
+        Picker.DOB -> AppDatePickerDialog(f.dateOfBirth.ifBlank { "2000-01-01" }, { iso -> vm.update { it.copy(dateOfBirth = iso) } }, { picker = null }, pastOnly = true)
         Picker.DOJ -> AppDatePickerDialog(f.dateOfJoining, { iso -> vm.update { it.copy(dateOfJoining = iso) } }) { picker = null }
-        Picker.FROM -> AppTimePickerDialog("Workout starts at", f.fromTime.ifBlank { "06:00" }, { t ->
-            vm.update { it.copy(fromTime = t, toTime = it.toTime.ifBlank { DateUtils.parseTime(t)?.plusHours(1)?.let { x -> DateUtils.toHHmm(x.hour, x.minute) } ?: "" }) }
+        Picker.FROM -> AppTimePickerDialog(t("Workout starts at"), f.fromTime.ifBlank { "06:00" }, { tm ->
+            vm.update { it.copy(fromTime = tm, toTime = it.toTime.ifBlank { DateUtils.parseTime(tm)?.plusHours(1)?.let { x -> DateUtils.toHHmm(x.hour, x.minute) } ?: "" }) }
             touched = touched + "slot"
         }) { picker = null }
-        Picker.TO -> AppTimePickerDialog("Workout ends at", f.toTime.ifBlank { "07:00" }, { t ->
-            vm.update { it.copy(toTime = t) }; touched = touched + "slot"
+        Picker.TO -> AppTimePickerDialog(t("Workout ends at"), f.toTime.ifBlank { "07:00" }, { tm ->
+            vm.update { it.copy(toTime = tm) }; touched = touched + "slot"
         }) { picker = null }
         null -> {}
     }
 
     if (confirmDiscard) {
         ConfirmDialog(
-            title = "Discard changes?",
-            message = "You have unsaved changes. If you leave now, they will be lost.",
-            confirmText = "Discard",
+            title = t("Discard changes?"),
+            message = t("You have unsaved changes. If you leave now, they will be lost."),
+            confirmText = t("Discard"),
             destructive = true,
             onConfirm = { confirmDiscard = false; onDone() },
             onDismiss = { confirmDiscard = false }
@@ -392,7 +397,7 @@ private fun FormField(
         label = { Text(label) },
         leadingIcon = icon?.let { { Icon(it, null) } },
         isError = error != null,
-        supportingText = error?.let { { Text(it) } },
+        supportingText = error?.let { { Text(t(it)) } },
         singleLine = true,
         shape = RoundedCornerShape(14.dp),
         keyboardOptions = KeyboardOptions(keyboardType = keyboardType, capitalization = capitalization),

@@ -19,6 +19,18 @@ object PlanType {
     val all = listOf(ONE_MONTH, THREE_MONTHS, SIX_MONTHS, TWELVE_MONTHS, CUSTOM)
 }
 
+object PayMode {
+    const val CASH = "CASH"
+    const val UPI = "UPI"
+    const val CARD = "CARD"
+    const val BANK = "BANK"
+    val all = listOf(CASH, UPI, CARD, BANK)
+}
+
+object ExpenseCategory {
+    val all = listOf("Rent", "Electricity", "Salary", "Equipment", "Maintenance", "Other")
+}
+
 object ThemeMode {
     const val SYSTEM = "SYSTEM"
     const val LIGHT = "LIGHT"
@@ -44,7 +56,9 @@ data class MemberEntity(
     val fromTime: String,
     val toTime: String,
     val isActive: Boolean = true,
-    val createdAt: Long = System.currentTimeMillis()
+    val createdAt: Long = System.currentTimeMillis(),
+    /** Set while the membership is paused (yyyy-MM-dd the freeze started). */
+    val frozenFrom: String? = null
 )
 
 @Serializable
@@ -81,6 +95,40 @@ data class PaymentCycleEntity(
     val isPaid: Boolean = false,
     val paidDate: String? = null,
     val notes: String? = null,
+    val createdAt: Long = System.currentTimeMillis(),
+    val paidAmount: Double = 0.0,
+    val paymentMode: String? = null
+) {
+    val balance: Double get() = (amount - paidAmount).coerceAtLeast(0.0)
+}
+
+/** One money transaction against a billing cycle (supports partial payments). */
+@Serializable
+@Entity(
+    tableName = "payments",
+    indices = [Index(value = ["memberId"]), Index(value = ["cycleId"]), Index(value = ["paidAt"])]
+)
+data class PaymentEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val cycleId: Long,
+    val memberId: Long,
+    val amount: Double,
+    val mode: String = PayMode.CASH,
+    /** yyyy-MM-dd HH:mm:ss */
+    val paidAt: String,
+    val receiptNo: String = "",
+    val note: String? = null,
+    val createdAt: Long = System.currentTimeMillis()
+)
+
+@Serializable
+@Entity(tableName = "expenses", indices = [Index(value = ["date"])])
+data class ExpenseEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val date: String,
+    val category: String,
+    val amount: Double,
+    val note: String? = null,
     val createdAt: Long = System.currentTimeMillis()
 )
 
@@ -122,7 +170,13 @@ data class GymSettingsEntity(
     val biometricAddMember: Boolean = false,
     val biometricDeleteMember: Boolean = false,
     val biometricRestoreBackup: Boolean = false,
-    val biometricResetData: Boolean = false
+    val biometricResetData: Boolean = false,
+    val language: String = "en",
+    val autoBackupEnabled: Boolean = true,
+    val dailyReminderEnabled: Boolean = true,
+    val reminderHour: Int = 9,
+    val gymPhone: String = "",
+    val gymAddress: String = ""
 ) {
     fun defaultFeeFor(planType: String): Double? = when (planType) {
         PlanType.ONE_MONTH -> fee1Month

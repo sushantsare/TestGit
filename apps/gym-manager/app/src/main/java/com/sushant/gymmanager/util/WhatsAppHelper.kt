@@ -5,6 +5,8 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.widget.Toast
+import com.sushant.gymmanager.i18n.I18n
+import com.sushant.gymmanager.i18n.Lang
 import java.net.URLEncoder
 
 data class DuePeriod(val start: String, val end: String, val amount: Double)
@@ -21,22 +23,30 @@ object WhatsAppHelper {
         }
     }
 
-    fun buildReminderMessage(memberName: String, gymName: String, periods: List<DuePeriod>): String {
+    fun buildReminderMessage(memberName: String, gymName: String, periods: List<DuePeriod>, lang: String = Lang.EN): String {
+        fun tr(t: String, vararg a: Any) = I18n.tr(lang, t, *a)
         val total = periods.sumOf { it.amount }
         val lines = periods.joinToString("\n") {
             "• ${DateUtils.formatShort(it.start)} – ${DateUtils.formatShort(it.end)}: ${Money.format(it.amount)}"
         }
         return buildString {
-            append("Hello $memberName,\n\n")
-            append("This is a friendly reminder from $gymName regarding your pending membership fee.\n\n")
+            append(tr("Hello %s,", memberName)).append("\n\n")
+            append(tr("This is a friendly reminder from %s regarding your pending membership fee.", gymName)).append("\n\n")
             if (periods.isNotEmpty()) {
-                append("Outstanding billing period(s):\n")
+                append(tr("Outstanding billing period(s):")).append("\n")
                 append(lines)
                 append("\n\n")
             }
-            append("Total due: ${Money.format(total)}\n\n")
-            append("Please clear the dues at your earliest convenience. Thank you and keep training hard! 💪")
+            append(tr("Total due: %s", Money.format(total))).append("\n\n")
+            append(tr("Please clear the dues at your earliest convenience. Thank you and keep training hard!")).append(" 💪")
         }
+    }
+
+    fun buildExpiryMessage(memberName: String, gymName: String, expiryDate: String, lang: String = Lang.EN): String {
+        fun tr(t: String, vararg a: Any) = I18n.tr(lang, t, *a)
+        return tr("Hello %s,", memberName) + "\n\n" +
+            tr("Your membership at %s ends on %s.", gymName, DateUtils.formatFull(expiryDate)) + "\n\n" +
+            tr("Please renew to keep training without a break.") + " 💪"
     }
 
     fun generateWhatsAppUrl(phone: String, message: String? = null): String {

@@ -1,6 +1,11 @@
 package com.sushant.gymmanager.ui.lock
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.runtime.remember
+import com.sushant.gymmanager.i18n.t
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -33,9 +38,12 @@ import androidx.compose.ui.unit.dp
 @Composable
 fun AppLockScreen(gymName: String, onUnlock: () -> Unit) {
     val scheme = MaterialTheme.colorScheme
+    BackHandler {} // the app stays locked
     Box(
         Modifier
             .fillMaxSize()
+            .background(scheme.background)
+            .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) {}
             .background(Brush.verticalGradient(listOf(scheme.primaryContainer.copy(alpha = 0.55f), scheme.background, scheme.background)))
             .systemBarsPadding()
             .testTag("app_lock"),
@@ -63,14 +71,14 @@ fun AppLockScreen(gymName: String, onUnlock: () -> Unit) {
                 ) {
                     Icon(Icons.Default.Lock, null, modifier = Modifier.size(14.dp), tint = scheme.onSecondaryContainer)
                     Spacer(Modifier.size(6.dp))
-                    Text("Biometric Protection Enabled", style = MaterialTheme.typography.labelMedium, color = scheme.onSecondaryContainer)
+                    Text(t("Biometric Protection Enabled"), style = MaterialTheme.typography.labelMedium, color = scheme.onSecondaryContainer)
                 }
             }
             Spacer(Modifier.height(48.dp))
             Icon(Icons.Default.Fingerprint, null, tint = scheme.primary, modifier = Modifier.size(64.dp))
             Spacer(Modifier.height(24.dp))
             Button(onClick = onUnlock, modifier = Modifier.fillMaxWidth().height(52.dp)) {
-                Text("Unlock Application")
+                Text(t("Unlock Application"))
             }
         }
     }

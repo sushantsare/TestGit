@@ -22,6 +22,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.Backup
+import androidx.compose.material.icons.filled.BarChart
 import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.CurrencyRupee
 import androidx.compose.material.icons.filled.EventAvailable
@@ -66,6 +67,9 @@ import com.sushant.gymmanager.GymApp
 import com.sushant.gymmanager.data.local.MemberEntity
 import com.sushant.gymmanager.data.local.MembershipEntity
 import com.sushant.gymmanager.data.local.Shift
+import com.sushant.gymmanager.i18n.I18n
+import com.sushant.gymmanager.i18n.currentLang
+import com.sushant.gymmanager.i18n.t
 import com.sushant.gymmanager.ui.components.AppCard
 import com.sushant.gymmanager.ui.components.GymTopBar
 import com.sushant.gymmanager.ui.components.MemberAvatar
@@ -94,6 +98,7 @@ data class DashboardState(
     val gymName: String,
     val activeCount: Int,
     val inactiveCount: Int,
+    val frozenCount: Int,
     val morningPresent: Int,
     val morningExpected: Int,
     val eveningPresent: Int,
@@ -103,6 +108,7 @@ data class DashboardState(
     val membersWithDues: Int,
     val expiringCount: Int,
     val expiringDays: Int,
+    val collectedThisMonth: Double,
     val expiring: List<ExpiringItem>
 )
 
@@ -113,41 +119,56 @@ class DashboardViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch { repo.checkAndGenerateAutoRenewalCycles() }
     }
 
-    val state: StateFlow<DashboardState?> = combine(
+    private val base = combine(
         repo.settings,
         repo.activeMembersWithPlans,
-        repo.inactiveMembers,
+        repo.allMembers,
         repo.unpaidCycles,
         repo.attendanceForDate(DateUtils.today())
-    ) { settings, active, inactive, unpaid, attendance ->
+    ) { settings, active, all, unpaid, attendance -> Base(settings, active, all, unpaid, attendance) }
+
+    private data class Base(
+        val settings: com.sushant.gymmanager.data.local.GymSettingsEntity,
+        val active: List<com.sushant.gymmanager.data.repository.MemberWithPlan>,
+        val all: List<MemberEntity>,
+        val unpaid: List<com.sushant.gymmanager.data.local.PaymentCycleEntity>,
+        val attendance: List<com.sushant.gymmanager.data.local.AttendanceEntity>
+    )
+
+    val state: StateFlow<DashboardState?> = combine(base, repo.allPayments) { b, payments ->
+        val settings = b.settings
         val today = LocalDate.now()
-        val activeIds = active.map { it.member.id }.toSet()
-        val activeUnpaid = unpaid.filter { it.memberId in activeIds }
-        val presentIds = attendance.filter { it.isPresent }
-        val morningIds = active.filter { it.member.shift == Shift.MORNING }.map { it.member.id }.toSet()
-        val eveningIds = active.filter { it.member.shift == Shift.EVENING }.map { it.member.id }.toSet()
-        val duesByMember = activeUnpaid.groupBy { it.memberId }
-        val expiring = active.mapNotNull { mp ->
+        val running = b.active.filter { it.member.frozenFrom == null }
+        val known = b.all.map { it.id }.toSet()
+        val unpaid = b.unpaid.filter { it.memberId in known }
+        val presentIds = b.attendance.filter { it.isPresent }
+        val morningIds = running.filter { it.member.shift == Shift.MORNING }.map { it.member.id }.toSet()
+        val eveningIds = running.filter { it.member.shift == Shift.EVENING }.map { it.member.id }.toSet()
+        val duesByMember = unpaid.groupBy { it.memberId }
+        val expiring = running.mapNotNull { mp ->
             val plan = mp.membership ?: return@mapNotNull null
             if (!DateUtils.isExpiringSoon(plan.expiryDate, settings.expiringSoonDays, today)) return@mapNotNull null
             ExpiringItem(
                 mp.member, plan, DateUtils.daysUntil(plan.expiryDate, today),
-                duesByMember[mp.member.id].orEmpty().map { DuePeriod(it.cycleStart, it.cycleEnd, it.amount) }
+                duesByMember[mp.member.id].orEmpty().map { DuePeriod(it.cycleStart, it.cycleEnd, it.balance) }
             )
         }.sortedBy { it.daysLeft }
+        val monthPrefix = today.toString().take(7)
         DashboardState(
             gymName = settings.gymName,
-            activeCount = active.size,
-            inactiveCount = inactive.size,
+            activeCount = b.active.size,
+            inactiveCount = b.all.size - b.active.size,
+            frozenCount = b.active.size - running.size,
             morningPresent = presentIds.count { it.shift == Shift.MORNING && it.memberId in morningIds },
             morningExpected = morningIds.size,
             eveningPresent = presentIds.count { it.shift == Shift.EVENING && it.memberId in eveningIds },
             eveningExpected = eveningIds.size,
-            pendingTotal = activeUnpaid.sumOf { it.amount },
-            overdueCycles = activeUnpaid.count { (DateUtils.parseDate(it.cycleStart) ?: today) <= today },
+            pendingTotal = unpaid.sumOf { it.balance },
+            overdueCycles = unpaid.count { (DateUtils.parseDate(it.cycleStart) ?: today) <= today },
             membersWithDues = duesByMember.size,
             expiringCount = expiring.size,
             expiringDays = settings.expiringSoonDays,
+            collectedThisMonth = payments.filter { it.paidAt.startsWith(monthPrefix) }.sumOf { it.amount },
             expiring = expiring.take(5)
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
@@ -165,23 +186,24 @@ fun DashboardScreen(
     var menu by remember { mutableStateOf(false) }
     var openId by remember { mutableStateOf<Long?>(null) }
     val context = LocalContext.current
+    val lang = currentLang()
 
     Scaffold(
         topBar = {
             GymTopBar(
                 title = state?.gymName ?: "",
-                subtitle = "Dashboard",
+                subtitle = t("Dashboard"),
                 onMenu = onOpenDrawer,
                 actions = {
-                    IconButton(onClick = { menu = true }) { Icon(Icons.Default.MoreVert, "More options") }
+                    IconButton(onClick = { menu = true }) { Icon(Icons.Default.MoreVert, t("More options")) }
                     DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
                         DropdownMenuItem(
-                            text = { Text("Backup & Restore") },
+                            text = { Text(t("Backup & Restore")) },
                             leadingIcon = { Icon(Icons.Default.Backup, null) },
                             onClick = { menu = false; onNavigate(Routes.BACKUP) }
                         )
                         DropdownMenuItem(
-                            text = { Text("Settings") },
+                            text = { Text(t("Settings")) },
                             leadingIcon = { Icon(Icons.Default.Settings, null) },
                             onClick = { menu = false; onNavigate(Routes.SETTINGS) }
                         )
@@ -201,47 +223,48 @@ fun DashboardScreen(
                 .testTag("dashboard"),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            HeroBanner()
+            HeroBanner(s.collectedThisMonth)
 
             // 2 x 2 overview
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     MetricCard(
                         Modifier.weight(1f), Icons.Default.Groups, MaterialTheme.colorScheme.primary,
-                        s.activeCount.toString(), "Active Members", "${s.inactiveCount} inactive"
+                        s.activeCount.toString(), t("Active Members"),
+                        if (s.frozenCount > 0) t("%d inactive • %d frozen", s.inactiveCount, s.frozenCount) else t("%d inactive", s.inactiveCount)
                     ) { onNavigate(Routes.MEMBERS) }
                     MetricCard(
                         Modifier.weight(1f), Icons.Default.EventAvailable, StatusGreen,
                         "${s.morningPresent + s.eveningPresent}/${s.morningExpected + s.eveningExpected}",
-                        "Today's Attendance", "M: ${s.morningPresent}/${s.morningExpected} • E: ${s.eveningPresent}/${s.eveningExpected}"
+                        t("Today's Attendance"), t("M: %d/%d • E: %d/%d", s.morningPresent, s.morningExpected, s.eveningPresent, s.eveningExpected)
                     ) { onNavigate(Routes.ATTENDANCE) }
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     MetricCard(
                         Modifier.weight(1f), Icons.Default.CurrencyRupee, StatusRed,
-                        Money.format(s.pendingTotal), "Pending Dues",
-                        if (s.overdueCycles == 0) "All clear" else "${s.overdueCycles} overdue ${if (s.overdueCycles == 1) "cycle" else "cycles"}"
+                        Money.format(s.pendingTotal), t("Pending Dues"),
+                        if (s.overdueCycles == 0) t("All clear") else t(if (s.overdueCycles == 1) "%d overdue cycle" else "%d overdue cycles", s.overdueCycles)
                     ) { onNavigate(Routes.PAYMENTS) }
                     MetricCard(
                         Modifier.weight(1f), Icons.Default.HourglassBottom, StatusAmber,
-                        s.expiringCount.toString(), "Expiring Soon", "Within ${s.expiringDays} days"
+                        s.expiringCount.toString(), t("Expiring Soon"), t("Within %d days", s.expiringDays)
                     ) { onNavigate(Routes.MEMBERS) }
                 }
             }
 
             // Quick actions
-            SectionTitle("Quick Actions")
+            SectionTitle(t("Quick Actions"))
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                QuickAction(Modifier.weight(1f), Icons.Default.PersonAdd, "Add Member", onAddMember)
-                QuickAction(Modifier.weight(1f), Icons.Default.EventAvailable, "Attendance") { onNavigate(Routes.ATTENDANCE) }
-                QuickAction(Modifier.weight(1f), Icons.Default.Payments, "Payments") { onNavigate(Routes.PAYMENTS) }
-                QuickAction(Modifier.weight(1f), Icons.Default.Backup, "Backup") { onNavigate(Routes.BACKUP) }
+                QuickAction(Modifier.weight(1f), Icons.Default.PersonAdd, t("Add Member"), onAddMember)
+                QuickAction(Modifier.weight(1f), Icons.Default.EventAvailable, t("Attendance")) { onNavigate(Routes.ATTENDANCE) }
+                QuickAction(Modifier.weight(1f), Icons.Default.Payments, t("Payments")) { onNavigate(Routes.PAYMENTS) }
+                QuickAction(Modifier.weight(1f), Icons.Default.BarChart, t("Reports")) { onNavigate(Routes.REPORTS) }
             }
 
             // Expiring list
-            SectionTitle("Memberships Expiring Soon") {
+            SectionTitle(t("Memberships Expiring Soon")) {
                 if (s.expiringCount > 5) Text(
-                    "+${s.expiringCount - 5} more",
+                    t("+%d more", s.expiringCount - 5),
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.primary
                 )
@@ -255,9 +278,9 @@ fun DashboardScreen(
                         ) { Icon(Icons.Default.ThumbUp, null, tint = StatusGreen) }
                         Spacer(Modifier.width(12.dp))
                         Column {
-                            Text("No memberships expiring", style = MaterialTheme.typography.titleSmall)
+                            Text(t("No memberships expiring"), style = MaterialTheme.typography.titleSmall)
                             Text(
-                                "Every active plan is valid for more than ${s.expiringDays} days.",
+                                t("Every active plan is valid for more than %d days.", s.expiringDays),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -269,11 +292,9 @@ fun DashboardScreen(
                     s.expiring.forEachIndexed { i, item ->
                         ExpiringRow(item, onClick = { openId = item.member.id }) {
                             val msg = if (item.dues.isNotEmpty()) {
-                                WhatsAppHelper.buildReminderMessage(item.member.fullName, s.gymName, item.dues)
+                                WhatsAppHelper.buildReminderMessage(item.member.fullName, s.gymName, item.dues, lang)
                             } else {
-                                "Hello ${item.member.fullName},\n\nYour membership at ${s.gymName} " +
-                                    "${DateUtils.expiryText(item.membership.expiryDate).replaceFirstChar { it.lowercase() }} " +
-                                    "(${DateUtils.formatFull(item.membership.expiryDate)}).\n\nPlease renew to keep training without a break. 💪"
+                                WhatsAppHelper.buildExpiryMessage(item.member.fullName, s.gymName, item.membership.expiryDate, lang)
                             }
                             WhatsAppHelper.open(context, item.member.whatsappNumber, msg)
                         }
@@ -292,7 +313,7 @@ fun DashboardScreen(
 }
 
 @Composable
-private fun HeroBanner() {
+private fun HeroBanner(collected: Double) {
     Box(
         Modifier.fillMaxWidth().clip(RoundedCornerShape(24.dp))
             .background(Brush.linearGradient(listOf(Color(0xFFF97316), Color(0xFFC2410C))))
@@ -307,13 +328,18 @@ private fun HeroBanner() {
                 Row(Modifier.padding(horizontal = 10.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Default.CloudOff, null, tint = Color.White, modifier = Modifier.size(14.dp))
                     Spacer(Modifier.width(6.dp))
-                    Text("Local Offline", style = MaterialTheme.typography.labelSmall, color = Color.White)
+                    Text(t("Local Offline"), style = MaterialTheme.typography.labelSmall, color = Color.White)
                 }
             }
             Spacer(Modifier.height(14.dp))
-            Text("Welcome back, Coach", style = MaterialTheme.typography.headlineSmall, color = Color.White)
+            Text(t("Welcome back, Coach"), style = MaterialTheme.typography.headlineSmall, color = Color.White)
             Spacer(Modifier.height(2.dp))
             Text(DateUtils.formatDayFull(), style = MaterialTheme.typography.bodyMedium, color = Color.White.copy(alpha = 0.9f))
+            Spacer(Modifier.height(10.dp))
+            Text(
+                t("Collected this month: %s", Money.format(collected)),
+                style = MaterialTheme.typography.labelLarge, color = Color.White
+            )
         }
     }
 }
@@ -374,10 +400,10 @@ private fun ExpiringRow(item: ExpiringItem, onClick: () -> Unit, onRemind: () ->
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Default.EventBusy, null, Modifier.size(14.dp), tint = StatusAmber)
                     Spacer(Modifier.width(4.dp))
-                    Text(DateUtils.expiryText(item.membership.expiryDate), style = MaterialTheme.typography.labelMedium, color = StatusAmber)
+                    Text(I18n.expiryText(currentLang(), item.membership.expiryDate), style = MaterialTheme.typography.labelMedium, color = StatusAmber)
                 }
             }
-            WhatsAppButton(onClick = onRemind, contentDescription = "Send reminder to ${item.member.fullName}")
+            WhatsAppButton(onClick = onRemind, contentDescription = t("Send reminder to %s", item.member.fullName))
         }
     }
 }

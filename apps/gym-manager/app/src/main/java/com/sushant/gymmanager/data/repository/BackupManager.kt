@@ -10,6 +10,10 @@ import com.sushant.gymmanager.data.local.GymSettingsEntity
 import com.sushant.gymmanager.data.local.MemberEntity
 import com.sushant.gymmanager.data.local.MembershipEntity
 import com.sushant.gymmanager.data.local.PaymentCycleEntity
+import com.sushant.gymmanager.data.local.PaymentEntity
+import com.sushant.gymmanager.data.local.ExpenseEntity
+import com.sushant.gymmanager.data.local.PayMode
+import com.sushant.gymmanager.util.Downloads
 import com.sushant.gymmanager.util.PhotoStore
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -23,7 +27,7 @@ import java.util.Locale
 @Serializable
 data class GymBackup(
     val format: String = BackupManager.FORMAT,
-    val version: Int = 1,
+    val version: Int = 2,
     val createdAt: Long,
     val gymName: String,
     val members: List<MemberEntity>,
@@ -31,7 +35,9 @@ data class GymBackup(
     val memberships: List<MembershipEntity>,
     val paymentCycles: List<PaymentCycleEntity>,
     val attendance: List<AttendanceEntity>,
-    val settings: GymSettingsEntity
+    val settings: GymSettingsEntity,
+    val payments: List<PaymentEntity> = emptyList(),
+    val expenses: List<ExpenseEntity> = emptyList()
 ) {
     val counts: BackupCounts
         get() = BackupCounts(members.size, memberships.size, attendance.size, paymentCycles.size, memberPhotosBase64.size)
@@ -85,7 +91,9 @@ class BackupManager(private val context: Context, private val repository: GymRep
             memberships = data.memberships,
             paymentCycles = data.paymentCycles,
             attendance = data.attendance,
-            settings = data.settings
+            settings = data.settings,
+            payments = data.payments,
+            expenses = data.expenses
         )
     }
 
@@ -133,7 +141,22 @@ class BackupManager(private val context: Context, private val repository: GymRep
             throw BackupException("This file is not a valid Gym Manager backup")
         }
         if (backup.format != FORMAT) throw BackupException("Unsupported backup format: ${backup.format}")
-        return backup
+        return upgrade(backup)
+    }
+
+    /** Version-1 backups have no payment ledger: rebuild it from cycles that were marked paid. */
+    private fun upgrade(b: GymBackup): GymBackup {
+        if (b.version >= 2) return b
+        val fixedCycles = b.paymentCycles.map { c ->
+            if (c.isPaid && c.paidAmount <= 0) c.copy(paidAmount = c.amount, paymentMode = PayMode.CASH) else c
+        }
+        val ledger = fixedCycles.filter { it.isPaid }.map { c ->
+            PaymentEntity(
+                cycleId = c.id, memberId = c.memberId, amount = c.amount, mode = PayMode.CASH,
+                paidAt = c.paidDate ?: (c.cycleEnd + " 00:00:00"), receiptNo = "R${c.id}", createdAt = c.createdAt
+            )
+        }
+        return b.copy(paymentCycles = fixedCycles, payments = ledger)
     }
 
     suspend fun readFromUri(uri: Uri): GymBackup = withContext(Dispatchers.IO) {
@@ -159,7 +182,10 @@ class BackupManager(private val context: Context, private val repository: GymRep
         }
         try {
             repository.replaceAll(
-                BackupData(backup.settings, members, backup.memberships, backup.paymentCycles, backup.attendance)
+                BackupData(
+                    backup.settings, members, backup.memberships, backup.paymentCycles, backup.attendance,
+                    backup.payments, backup.expenses
+                )
             )
         } catch (e: Exception) {
             written.forEach { PhotoStore.delete(it) }
@@ -167,6 +193,30 @@ class BackupManager(private val context: Context, private val repository: GymRep
         }
         (previous - written.toSet()).forEach { PhotoStore.delete(it) }
     }
+
+    /** Copies a backup into the phone's Downloads/GymManager folder, which survives uninstalling the app. */
+    suspend fun copyToDownloads(file: File): Boolean = withContext(Dispatchers.IO) {
+        Downloads.save(context, file.name, "application/octet-stream") { out -> file.inputStream().use { it.copyTo(out) } } != null
+    }
+
+    /** Daily automatic backup (once per day) also copied to Downloads. Returns true when a backup was made. */
+    suspend fun runAutoBackupIfDue(): Boolean = withContext(Dispatchers.IO) {
+        val prefs = context.getSharedPreferences("auto_backup", Context.MODE_PRIVATE)
+        val today = java.time.LocalDate.now().toString()
+        val settings = repository.getSettings()
+        if (!settings.autoBackupEnabled || prefs.getString("last", null) == today) return@withContext false
+        val data = repository.snapshot()
+        if (data.members.isEmpty()) return@withContext false
+        val file = runCatching { createBackup() }.getOrNull() ?: return@withContext false
+        val autoName = "AutoBackup_" + file.name.removePrefix("GymBackup_")
+        Downloads.save(context, autoName, "application/octet-stream") { out -> file.inputStream().use { it.copyTo(out) } }
+        Downloads.prune(context, "AutoBackup_", keep = 7)
+        prefs.edit().putString("last", today).apply()
+        true
+    }
+
+    fun lastAutoBackup(): String? =
+        context.getSharedPreferences("auto_backup", Context.MODE_PRIVATE).getString("last", null)
 
     fun delete(file: File) {
         file.delete()

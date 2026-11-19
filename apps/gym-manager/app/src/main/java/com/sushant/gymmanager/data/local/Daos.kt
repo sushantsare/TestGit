@@ -18,11 +18,17 @@ interface MemberDao {
     @Query("SELECT * FROM members WHERE isActive = 0 $ROLL_ORDER")
     fun observeInactive(): Flow<List<MemberEntity>>
 
+    @Query("SELECT * FROM members $ROLL_ORDER")
+    fun observeAll(): Flow<List<MemberEntity>>
+
     @Query("SELECT * FROM members WHERE id = :id")
     fun observeById(id: Long): Flow<MemberEntity?>
 
     @Query("SELECT * FROM members WHERE id = :id")
     suspend fun getById(id: Long): MemberEntity?
+
+    @Query("SELECT * FROM members WHERE rollNumber = :roll COLLATE NOCASE LIMIT 1")
+    suspend fun getByRoll(roll: String): MemberEntity?
 
     @Query("SELECT * FROM members WHERE isActive = 1")
     suspend fun getActive(): List<MemberEntity>
@@ -44,6 +50,9 @@ interface MemberDao {
 
     @Query("UPDATE members SET isActive = :active WHERE id = :id")
     suspend fun setActive(id: Long, active: Boolean)
+
+    @Query("UPDATE members SET frozenFrom = :from WHERE id = :id")
+    suspend fun setFrozen(id: Long, from: String?)
 
     @Query("DELETE FROM members WHERE id = :id")
     suspend fun delete(id: Long)
@@ -75,9 +84,6 @@ interface MembershipDao {
     @Update
     suspend fun update(membership: MembershipEntity)
 
-    @Query("UPDATE memberships SET isActive = 0 WHERE memberId = :memberId")
-    suspend fun deactivateAllFor(memberId: Long)
-
     @Query("DELETE FROM memberships WHERE memberId = :memberId")
     suspend fun deleteFor(memberId: Long)
 
@@ -86,18 +92,27 @@ interface MembershipDao {
 }
 
 @Dao
-interface PaymentDao {
+interface CycleDao {
     @Query("SELECT * FROM payment_cycles WHERE isPaid = 0 ORDER BY cycleStart")
     fun observeUnpaid(): Flow<List<PaymentCycleEntity>>
 
-    @Query("SELECT * FROM payment_cycles WHERE memberId = :memberId ORDER BY cycleStart DESC")
-    fun observeForMember(memberId: Long): Flow<List<PaymentCycleEntity>>
+    @Query("SELECT * FROM payment_cycles ORDER BY cycleStart")
+    fun observeAll(): Flow<List<PaymentCycleEntity>>
+
+    @Query("SELECT * FROM payment_cycles WHERE isPaid = 0")
+    suspend fun getUnpaid(): List<PaymentCycleEntity>
+
+    @Query("SELECT * FROM payment_cycles WHERE id = :id")
+    suspend fun getById(id: Long): PaymentCycleEntity?
+
+    @Query("SELECT * FROM payment_cycles WHERE id IN (:ids)")
+    suspend fun getByIds(ids: List<Long>): List<PaymentCycleEntity>
+
+    @Query("SELECT * FROM payment_cycles WHERE memberId = :memberId ORDER BY cycleStart")
+    suspend fun getFor(memberId: Long): List<PaymentCycleEntity>
 
     @Query("SELECT * FROM payment_cycles WHERE memberId = :memberId ORDER BY cycleEnd DESC LIMIT 1")
     suspend fun getLatestFor(memberId: Long): PaymentCycleEntity?
-
-    @Query("SELECT * FROM payment_cycles WHERE memberId = :memberId AND membershipId = :membershipId ORDER BY cycleStart LIMIT 1")
-    suspend fun getFirstFor(memberId: Long, membershipId: Long): PaymentCycleEntity?
 
     @Query("SELECT COUNT(*) FROM payment_cycles WHERE memberId = :memberId AND cycleStart = :start")
     suspend fun countStartingOn(memberId: Long, start: String): Int
@@ -114,13 +129,70 @@ interface PaymentDao {
     @Update
     suspend fun update(cycle: PaymentCycleEntity)
 
-    @Query("UPDATE payment_cycles SET isPaid = 1, paidDate = :paidDate WHERE id IN (:ids)")
-    suspend fun markPaid(ids: List<Long>, paidDate: String)
+    @Query("DELETE FROM payment_cycles WHERE memberId = :memberId AND paidAmount <= 0")
+    suspend fun deleteUntouchedFor(memberId: Long)
 
     @Query("DELETE FROM payment_cycles WHERE memberId = :memberId")
     suspend fun deleteFor(memberId: Long)
 
     @Query("DELETE FROM payment_cycles")
+    suspend fun deleteAll()
+}
+
+@Dao
+interface PaymentDao {
+    @Query("SELECT * FROM payments ORDER BY paidAt DESC, id DESC")
+    fun observeAll(): Flow<List<PaymentEntity>>
+
+    @Query("SELECT * FROM payments WHERE memberId = :memberId ORDER BY paidAt DESC, id DESC")
+    fun observeFor(memberId: Long): Flow<List<PaymentEntity>>
+
+    @Query("SELECT * FROM payments WHERE id = :id")
+    suspend fun getById(id: Long): PaymentEntity?
+
+    @Query("SELECT * FROM payments WHERE receiptNo = :receiptNo")
+    suspend fun getByReceipt(receiptNo: String): List<PaymentEntity>
+
+    @Query("SELECT * FROM payments")
+    suspend fun getAll(): List<PaymentEntity>
+
+    @Query("SELECT COALESCE(MAX(id), 0) FROM payments")
+    suspend fun maxId(): Long
+
+    @Insert
+    suspend fun insert(p: PaymentEntity): Long
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertAll(items: List<PaymentEntity>)
+
+    @Query("DELETE FROM payments WHERE id = :id")
+    suspend fun delete(id: Long)
+
+    @Query("DELETE FROM payments WHERE memberId = :memberId")
+    suspend fun deleteFor(memberId: Long)
+
+    @Query("DELETE FROM payments")
+    suspend fun deleteAll()
+}
+
+@Dao
+interface ExpenseDao {
+    @Query("SELECT * FROM expenses ORDER BY date DESC, id DESC")
+    fun observeAll(): Flow<List<ExpenseEntity>>
+
+    @Query("SELECT * FROM expenses")
+    suspend fun getAll(): List<ExpenseEntity>
+
+    @Upsert
+    suspend fun upsert(e: ExpenseEntity)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertAll(items: List<ExpenseEntity>)
+
+    @Query("DELETE FROM expenses WHERE id = :id")
+    suspend fun delete(id: Long)
+
+    @Query("DELETE FROM expenses")
     suspend fun deleteAll()
 }
 
@@ -131,6 +203,12 @@ interface AttendanceDao {
 
     @Query("SELECT * FROM attendance WHERE attendanceDate = :date AND shift = :shift")
     suspend fun getFor(date: String, shift: String): List<AttendanceEntity>
+
+    @Query("SELECT * FROM attendance WHERE attendanceDate = :date")
+    suspend fun getForDate(date: String): List<AttendanceEntity>
+
+    @Query("SELECT * FROM attendance WHERE memberId = :memberId ORDER BY attendanceDate")
+    fun observeForMember(memberId: Long): Flow<List<AttendanceEntity>>
 
     @Query("SELECT COUNT(*) FROM attendance WHERE memberId = :memberId AND isPresent = 1")
     fun observePresentCount(memberId: Long): Flow<Int>

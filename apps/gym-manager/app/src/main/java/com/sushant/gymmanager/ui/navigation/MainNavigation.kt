@@ -17,6 +17,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Backup
+import androidx.compose.material.icons.filled.BarChart
+import androidx.compose.material.icons.automirrored.filled.ReceiptLong
 import androidx.compose.material.icons.filled.Dashboard
 import androidx.compose.material.icons.filled.EventAvailable
 import androidx.compose.material.icons.filled.FitnessCenter
@@ -35,6 +37,8 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
@@ -54,7 +58,11 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.sushant.gymmanager.BuildConfig
 import com.sushant.gymmanager.data.local.GymSettingsEntity
+import com.sushant.gymmanager.ui.attendance.AttendanceCalendarScreen
 import com.sushant.gymmanager.ui.attendance.AttendanceScreen
+import com.sushant.gymmanager.ui.reports.ExpensesScreen
+import com.sushant.gymmanager.ui.reports.ReportsScreen
+import com.sushant.gymmanager.i18n.t
 import com.sushant.gymmanager.ui.backup.BackupScreen
 import com.sushant.gymmanager.ui.dashboard.DashboardScreen
 import com.sushant.gymmanager.ui.members.AddEditMemberScreen
@@ -73,7 +81,11 @@ object Routes {
     const val PAYMENTS = "payments"
     const val BACKUP = "backup"
     const val SETTINGS = "settings"
+    const val REPORTS = "reports"
+    const val EXPENSES = "expenses"
+    const val CALENDAR = "member/calendar/{memberId}"
     fun editMember(id: Long) = "member/edit/$id"
+    fun calendar(id: Long) = "member/calendar/$id"
 }
 
 private data class DrawerDestination(val route: String, val label: String, val icon: ImageVector)
@@ -83,6 +95,8 @@ private val destinations = listOf(
     DrawerDestination(Routes.MEMBERS, "Master List", Icons.Default.Groups),
     DrawerDestination(Routes.ATTENDANCE, "Attendance", Icons.Default.EventAvailable),
     DrawerDestination(Routes.PAYMENTS, "Payments", Icons.Default.Payments),
+    DrawerDestination(Routes.REPORTS, "Reports", Icons.Default.BarChart),
+    DrawerDestination(Routes.EXPENSES, "Expenses", Icons.AutoMirrored.Filled.ReceiptLong),
     DrawerDestination(Routes.BACKUP, "Backup", Icons.Default.Backup),
     DrawerDestination(Routes.SETTINGS, "Settings", Icons.Default.Settings)
 )
@@ -116,6 +130,7 @@ fun MainNavigation(settings: GymSettingsEntity) {
             }
         }
     ) {
+        CompositionLocalProvider(LocalOpenCalendar provides { id -> nav.navigate(Routes.calendar(id)) }) {
         NavHost(navController = nav, startDestination = Routes.DASHBOARD) {
             composable(Routes.DASHBOARD) {
                 DashboardScreen(
@@ -152,6 +167,14 @@ fun MainNavigation(settings: GymSettingsEntity) {
                 AttendanceScreen(onOpenDrawer = openDrawer, onEditMember = { nav.navigate(Routes.editMember(it)) })
             }
             composable(Routes.PAYMENTS) { PaymentsScreen(onOpenDrawer = openDrawer) }
+            composable(Routes.REPORTS) { ReportsScreen(onOpenDrawer = openDrawer) }
+            composable(Routes.EXPENSES) { ExpensesScreen(onOpenDrawer = openDrawer) }
+            composable(
+                Routes.CALENDAR,
+                arguments = listOf(navArgument("memberId") { type = NavType.LongType })
+            ) { entry ->
+                AttendanceCalendarScreen(memberId = entry.arguments?.getLong("memberId") ?: 0L, onBack = { nav.popBackStack() })
+            }
             composable(Routes.BACKUP) {
                 BackupScreen(onOpenDrawer = openDrawer, onRestored = { nav.navigateTopLevel(Routes.DASHBOARD) })
             }
@@ -159,8 +182,12 @@ fun MainNavigation(settings: GymSettingsEntity) {
                 SettingsScreen(onOpenDrawer = openDrawer, onDataReset = { nav.navigateTopLevel(Routes.DASHBOARD) })
             }
         }
+        }
     }
 }
+
+/** Lets the member card open the attendance calendar from any screen. */
+val LocalOpenCalendar = staticCompositionLocalOf<(Long) -> Unit> { {} }
 
 @Composable
 private fun AppDrawer(gymName: String, currentRoute: String?, onSelect: (String) -> Unit) {
@@ -192,14 +219,14 @@ private fun AppDrawer(gymName: String, currentRoute: String?, onSelect: (String)
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis
                     )
-                    Text("Admin Portal", style = MaterialTheme.typography.bodyMedium, color = Color.White.copy(alpha = 0.85f))
+                    Text(t("Admin Portal"), style = MaterialTheme.typography.bodyMedium, color = Color.White.copy(alpha = 0.85f))
                 }
             }
             Spacer(Modifier.height(12.dp))
             destinations.forEach { d ->
                 NavigationDrawerItem(
                     icon = { Icon(d.icon, null) },
-                    label = { Text(d.label, style = MaterialTheme.typography.labelLarge) },
+                    label = { Text(t(d.label), style = MaterialTheme.typography.labelLarge) },
                     selected = currentRoute == d.route,
                     onClick = { onSelect(d.route) },
                     modifier = Modifier.padding(horizontal = 12.dp, vertical = 2.dp).testTag("drawer_${d.route}"),
@@ -213,7 +240,7 @@ private fun AppDrawer(gymName: String, currentRoute: String?, onSelect: (String)
             Spacer(Modifier.weight(1f))
             HorizontalDivider(Modifier.padding(horizontal = 24.dp), color = scheme.outlineVariant)
             Text(
-                "Gym Manager v${BuildConfig.VERSION_NAME} • 100% offline",
+                "Gym Manager v${BuildConfig.VERSION_NAME} • " + t("100% offline"),
                 style = MaterialTheme.typography.labelSmall,
                 color = scheme.onSurfaceVariant,
                 modifier = Modifier.navigationBarsPadding().padding(24.dp)
