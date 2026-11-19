@@ -10,7 +10,8 @@ import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
-import androidx.test.espresso.Espresso
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextClearance
@@ -192,7 +193,11 @@ class GrabbitE2ETest {
         compose.onNodeWithTag("searchField").performTextInput("mov")
         shot("92_search")
         compose.onNodeWithContentDescription("Clear search").performClick()
-        Espresso.closeSoftKeyboard()
+        compose.activity.runOnUiThread {
+            val a = compose.activity
+            a.currentFocus?.clearFocus()
+            WindowCompat.getInsetsController(a.window, a.window.decorView).hide(WindowInsetsCompat.Type.ime())
+        }
 
         // A library entry whose file is gone must be detected as missing
         val ghost = SavedItem(
