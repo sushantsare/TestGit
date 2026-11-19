@@ -19,9 +19,14 @@ adb shell pm grant $PKG android.permission.ACCESS_COARSE_LOCATION
 adb shell settings put secure location_mode 3
 adb shell settings put global hide_error_dialogs 1
 adb root > /dev/null 2>&1; sleep 3; adb wait-for-device
-adb shell settings put secure sysui_qs_tiles "custom\($TILE\),wifi,bt,flashlight,dnd,airplane,rotation,location"
-adb shell 'kill $(pidof com.android.systemui)' >> $LOG 2>&1; sleep 8
-adb shell settings get secure sysui_qs_tiles | grep -q speedtile || adb shell cmd statusbar add-tile $TILE >> $LOG 2>&1
+for attempt in 1 2 3 4; do
+  adb shell settings put secure sysui_qs_tiles "custom\($TILE\),wifi,bt,flashlight,dnd,airplane,rotation,location"
+  adb shell 'kill $(pidof com.android.systemui)' >> $LOG 2>&1; sleep 12
+  adb shell settings get secure sysui_qs_tiles | grep -q speedtile && break
+  adb shell cmd statusbar add-tile $TILE >> $LOG 2>&1; sleep 4
+  adb shell settings get secure sysui_qs_tiles | grep -q speedtile && break
+  echo "tile placement attempt $attempt failed" >> $LOG
+done
 echo "tile placed: $(adb shell settings get secure sysui_qs_tiles | grep -c speedtile)" >> $LOG
 adb emu geo fix 85.1000 25.6000 50 9
 
@@ -52,6 +57,7 @@ scenario tap_handoff tile
 scenario handoff_direct direct
 echo "-- granting Allow all the time" >> $LOG
 adb shell pm grant $PKG android.permission.ACCESS_BACKGROUND_LOCATION >> $LOG 2>&1
+adb shell dumpsys package $PKG | grep -i "BACKGROUND_LOCATION" | head -2 >> $LOG
 scenario tap_allow_all_time tile
 adb shell pm revoke $PKG android.permission.ACCESS_BACKGROUND_LOCATION >> $LOG 2>&1
 cat $RES.tmp >> $LOG
