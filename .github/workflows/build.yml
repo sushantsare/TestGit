@@ -77,8 +77,9 @@ jobs:
             ./gradlew :app:connectedDebugAndroidTest --stacktrace > /tmp/out/ui-tests.log 2>&1 && echo PASSED > /tmp/out/UI_TESTS || echo FAILED > /tmp/out/UI_TESTS
             adb pull /sdcard/Pictures/GymShots/. /tmp/out/screens/ || true
             adb pull /sdcard/Pictures/AppShots/. /tmp/out/screens/ || true
+            if [ -f e2e.sh ]; then bash e2e.sh || true; fi
             adb logcat -d -t 3000 > /tmp/out/logcat.txt || true
-            adb logcat -d -s GrabbitE2E:I > /tmp/out/e2e-results.txt || true
+            if [ ! -f e2e.sh ]; then adb logcat -d -s GrabbitE2E:I > /tmp/out/e2e-results.txt || true; fi
 
       - name: Collect reports
         if: always()

@@ -129,7 +129,7 @@ class WalkthroughTest {
                 ProviderProperties.POWER_USAGE_HIGH, ProviderProperties.ACCURACY_FINE)
         }
         lm.setTestProviderEnabled(LocationManager.GPS_PROVIDER, true)
-        instrumentation.runOnMainSync { app.engine.showForTest(SpeedState()); app.prefs.directStartBlocked = false }
+        instrumentation.runOnMainSync { app.engine.showForTest(SpeedState()) }
         val tile = "${ctx.packageName}/.SpeedTileService"
         shell("settings put secure sysui_qs_tiles custom($tile),wifi,bt,flashlight,dnd,airplane,rotation,location")
         shell("input keyevent KEYCODE_HOME")
@@ -138,7 +138,6 @@ class WalkthroughTest {
         Thread.sleep(2000)
         shell("cmd statusbar click-tile $tile")
         compose.waitUntil(15_000) { app.engine.state.value.running }
-        Log.i("Walkthrough", "Tile start path: direct=${!app.prefs.directStartBlocked}")
         shell("cmd statusbar expand-settings")
         var lat = 25.6
         repeat(8) {

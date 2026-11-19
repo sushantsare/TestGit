@@ -21,8 +21,6 @@ import kotlinx.coroutines.flow.onEach
 class SpeedTileService : TileService() {
 
     private var job: Job? = null
-    /** True right after a direct start, so a refusal can fall back to StartActivity. */
-    private var directPending = false
 
     override fun onTileAdded() { app.prefs.setTileAdded(true) }
     override fun onTileRemoved() { app.prefs.setTileAdded(false) }
@@ -32,14 +30,7 @@ class SpeedTileService : TileService() {
         app.prefs.setTileAdded(true)
         job?.cancel()
         job = combine(app.engine.state, app.prefs.decimals) { s, d -> s to d }
-            .onEach { (s, d) ->
-                render(s, d)
-                if (s.running) directPending = false
-                if (directPending && !s.running && s.stopReason == StopReason.BLOCKED) {
-                    directPending = false
-                    openStarter()
-                }
-            }
+            .onEach { (s, d) -> render(s, d) }
             .launchIn(app.appScope)
     }
 
@@ -58,22 +49,12 @@ class SpeedTileService : TileService() {
         if (isLocked) unlockAndRun { begin() } else begin()
     }
 
-    /** Switch on in place when possible; the tile then lights up and shows km/h without closing the shade. */
-    private fun begin() {
-        val p = app.prefs
-        if (!hasLocationPermission(this) || !isGpsOn(this) || p.directStartBlocked) {
-            openStarter()
-            return
-        }
-        try {
-            directPending = true
-            SpeedService.startFromTile(this)
-        } catch (e: Exception) {
-            directPending = false
-            p.directStartBlocked = true
-            openStarter()
-        }
-    }
+    /**
+     * Android gives an app GPS only if it starts using it while one of its screens is visible.
+     * So the tile always opens the invisible StartActivity for a moment; starting the service
+     * straight from the tile looks fine but on many phones GPS data never arrives.
+     */
+    private fun begin() = openStarter()
 
     @SuppressLint("StartActivityAndCollapseDeprecated")
     private fun openStarter() {
@@ -138,7 +119,7 @@ data class TileView(val active: Boolean, val label: String, val subtitle: String
                 }
                 Status.WEAK -> TileView(true, "-- km/h", "Weak GPS signal", null)
                 Status.GPS_OFF -> TileView(true, "Speed", "Location is off", null)
-                else -> TileView(true, "-- km/h", "Finding GPS…", null)
+                else -> TileView(true, "-- km/h", if (s.satsSeen > 0) "Finding GPS · ${s.satsSeen} sats" else "Finding GPS…", null)
             }
         }
     }

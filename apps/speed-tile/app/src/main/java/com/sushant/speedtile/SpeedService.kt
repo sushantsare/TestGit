@@ -20,6 +20,7 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
+import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.app.ServiceCompat
 import androidx.core.content.ContextCompat
@@ -40,10 +41,12 @@ class SpeedService : Service() {
     private var lastNotifText: String? = null
 
     private val listener = object : LocationListener {
+        private var count = 0
         override fun onLocationChanged(loc: Location) {
+            if (count++ % 10 == 0) Log.i(TAG, "GPS fix #$count speed=${if (loc.hasSpeed()) loc.speed * 3.6f else -1f} acc=${loc.accuracy}")
             app.engine.onFix(loc.toFix())
         }
-        override fun onProviderDisabled(provider: String) { app.engine.onGpsDisabled() }
+        override fun onProviderDisabled(provider: String) { Log.i(TAG, "GPS turned off"); app.engine.onGpsDisabled() }
         override fun onProviderEnabled(provider: String) { app.engine.onGpsEnabled() }
         @Deprecated("Deprecated in Java")
         override fun onStatusChanged(provider: String?, status: Int, extras: Bundle?) {}
@@ -67,15 +70,6 @@ class SpeedService : Service() {
             }
             handler.postDelayed(this, 2_000L)
         }
-    }
-
-    /**
-     * Some Android versions start the service from the tile but silently withhold GPS.
-     * If nothing at all arrived, use the visible hand-off from the next tap on.
-     */
-    private val directCheck = Runnable {
-        val st = app.engine.state.value
-        if (listening && app.engine.lastFixAt == 0L && st.satsSeen == 0) app.prefs.directStartBlocked = true
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
@@ -102,16 +96,12 @@ class SpeedService : Service() {
                 if (Build.VERSION.SDK_INT >= 29) ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION else 0,
             )
         } catch (e: Exception) {
-            // Android refused to start GPS without a visible screen; the tile retries via StartActivity.
-            app.prefs.directStartBlocked = true
+            Log.w(TAG, "startForeground refused", e)
             app.engine.onStopped(StopReason.BLOCKED)
             stopSelf()
             return START_NOT_STICKY
         }
-        if (!listening) {
-            startListening()
-            if (intent?.getBooleanExtra(EXTRA_FROM_TILE, false) == true) handler.postDelayed(directCheck, 15_000L)
-        }
+        if (!listening) startListening()
         return START_NOT_STICKY
     }
 
@@ -122,6 +112,7 @@ class SpeedService : Service() {
         if (!lm.isProviderEnabled(LocationManager.GPS_PROVIDER)) app.engine.onGpsDisabled()
         try {
             lm.requestLocationUpdates(LocationManager.GPS_PROVIDER, 1_000L, 0f, listener, Looper.getMainLooper())
+            Log.i(TAG, "GPS updates requested")
             lm.registerGnssStatusCallback(gnss, handler)
         } catch (e: SecurityException) {
             stopNow(StopReason.NO_PERMISSION)
@@ -149,7 +140,6 @@ class SpeedService : Service() {
         }
         listening = false
         handler.removeCallbacks(ticker)
-        handler.removeCallbacks(directCheck)
         stateJob?.cancel()
         stateJob = null
     }
@@ -210,15 +200,10 @@ class SpeedService : Service() {
         const val CHANNEL_ID = "live_speed"
         const val NOTIF_ID = 7
         const val ACTION_STOP = "com.sushant.speedtile.STOP"
-        const val EXTRA_FROM_TILE = "from_tile"
+        const val TAG = "SpeedTile"
 
         fun start(context: Context) {
             ContextCompat.startForegroundService(context, Intent(context, SpeedService::class.java))
-        }
-
-        /** Start straight from the tile, without leaving the shade. Throws if Android forbids it. */
-        fun startFromTile(context: Context) {
-            context.startForegroundService(Intent(context, SpeedService::class.java).putExtra(EXTRA_FROM_TILE, true))
         }
 
         fun stop(context: Context) {

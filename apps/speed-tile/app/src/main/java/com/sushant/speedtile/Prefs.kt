@@ -38,11 +38,6 @@ class Prefs(context: Context) {
         get() = sp.getBoolean(K_ASKED_NOTIF, false)
         set(v) { sp.edit().putBoolean(K_ASKED_NOTIF, v).apply() }
 
-    /** Set when this phone refused to start GPS straight from the tile; then the tile uses StartActivity. */
-    var directStartBlocked: Boolean
-        get() = sp.getBoolean(K_DIRECT_BLOCKED, false)
-        set(v) { sp.edit().putBoolean(K_DIRECT_BLOCKED, v).apply() }
-
     var askedLocation: Boolean
         get() = sp.getBoolean(K_ASKED_LOC, false)
         set(v) { sp.edit().putBoolean(K_ASKED_LOC, v).apply() }
@@ -67,7 +62,6 @@ class Prefs(context: Context) {
         const val K_TILE_ADDED = "tile_added"
         const val K_ASKED_NOTIF = "asked_notifications"
         const val K_ASKED_LOC = "asked_location"
-        const val K_DIRECT_BLOCKED = "direct_start_blocked"
         const val K_MAX = "trip_max"
         const val K_DIST = "trip_distance"
         const val K_MOVING = "trip_moving"
