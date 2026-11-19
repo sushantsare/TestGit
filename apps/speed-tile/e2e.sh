@@ -15,6 +15,14 @@ adb install -r -g $OUT/speed-tile.apk >> $LOG 2>&1
 adb shell settings put secure location_mode 3
 adb shell settings put global hide_error_dialogs 1
 adb shell settings put secure sysui_qs_tiles "custom\($TILE\),wifi,bt,flashlight,dnd,airplane,rotation,location"
+# Newer SystemUI reads the tile list only at start: restart it (emulator allows root), then make sure the tile is added.
+adb root > /dev/null 2>&1; sleep 3; adb wait-for-device
+adb shell settings put secure sysui_qs_tiles "custom\($TILE\),wifi,bt,flashlight,dnd,airplane,rotation,location"
+adb shell 'kill $(pidof com.android.systemui)' >> $LOG 2>&1
+sleep 8
+adb shell cmd statusbar add-tile $TILE >> $LOG 2>&1
+sleep 2
+echo "tiles: $(adb shell settings get secure sysui_qs_tiles)" >> $LOG
 adb shell am force-stop $PKG
 adb shell input keyevent KEYCODE_HOME
 sleep 3
@@ -43,6 +51,8 @@ done
 adb exec-out screencap -p > $OUT/screens/${TAG}_b_panel_reopened_live.png
 adb shell dumpsys activity services $PKG | grep -iE "ServiceRecord|isForeground|foregroundServiceType|allowWhileInUse|mAllowWhileInUsePermissionInFgs" | head -10 >> $LOG
 adb shell dumpsys location | grep -iE "speedtile" | head -8 >> $LOG
+STARTED=$(adb logcat -d -s SpeedTile:I | grep -c "GPS updates requested")
+echo "SERVICE_STARTED_LOG=$STARTED" >> $LOG
 FIXES=$(adb logcat -d -s SpeedTile:I | grep -c "GPS fix")
 SATS=$(adb logcat -d -s SpeedTile:I | grep -c "GNSS status")
 echo "FIX_LOG_LINES=$FIXES GNSS_LOG_LINES=$SATS" >> $LOG
