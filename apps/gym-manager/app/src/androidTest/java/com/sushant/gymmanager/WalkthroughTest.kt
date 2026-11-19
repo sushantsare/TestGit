@@ -83,7 +83,7 @@ class WalkthroughTest {
     private fun goTo(route: String) {
         compose.onNodeWithTag("nav_menu").performClick()
         waitTag("drawer_$route")
-        compose.onNodeWithTag("drawer_$route").performClick()
+        compose.onNodeWithTag("drawer_$route").performScrollTo().performClick()
         compose.waitForIdle()
         Thread.sleep(500)
     }
@@ -244,6 +244,9 @@ class WalkthroughTest {
         shot("21_reports")
         compose.onNodeWithTag("reports").performTouchInput { swipeUp() }
         shot("22_reports_scrolled")
+        goTo("about")
+        waitTag("about")
+        shot("22b_about")
         goTo("expenses")
         waitTag("expense_list")
         compose.onNodeWithTag("fab_expense").performClick()
@@ -322,6 +325,27 @@ class WalkthroughTest {
             val receiptNo = repo.snapshot().payments.maxByOrNull { it.id }!!.receiptNo
             saveBitmap("35_receipt", com.sushant.gymmanager.util.ReceiptRenderer.render(repo.receipt(receiptNo)!!, "en"))
             val m = repo.activeMembers.first().first()
+            // PDF report: render every page to an image for review
+            val pdf = java.io.File(ctx.cacheDir, "test_report.pdf")
+            val snap = repo.snapshot()
+            pdf.outputStream().use {
+                com.sushant.gymmanager.util.ReportPdf.write(
+                    com.sushant.gymmanager.util.ReportInput(
+                        repo.getSettings().copy(gymPhone = "98765 43210", gymAddress = "Station Road, Biharsharif"),
+                        java.time.YearMonth.now(), snap.payments, snap.expenses, snap.paymentCycles, snap.members
+                    ), it
+                )
+            }
+            android.graphics.pdf.PdfRenderer(android.os.ParcelFileDescriptor.open(pdf, android.os.ParcelFileDescriptor.MODE_READ_ONLY)).use { r ->
+                for (i in 0 until r.pageCount) {
+                    r.openPage(i).use { page ->
+                        val bmp = Bitmap.createBitmap(page.width * 2, page.height * 2, Bitmap.Config.ARGB_8888)
+                        bmp.eraseColor(android.graphics.Color.WHITE)
+                        page.render(bmp, null, null, android.graphics.pdf.PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
+                        saveBitmap("37_pdf_page${i + 1}", bmp)
+                    }
+                }
+            }
             saveBitmap("36_id_card", com.sushant.gymmanager.util.IdCardRenderer.render(m, repo.getActiveMembership(m.id), repo.getSettings().copy(gymPhone = "98765 43210", gymAddress = "Station Road, Biharsharif"), "en"))
         }
     }

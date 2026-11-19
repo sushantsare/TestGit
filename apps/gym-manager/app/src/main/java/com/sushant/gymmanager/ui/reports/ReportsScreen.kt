@@ -25,7 +25,7 @@ import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.filled.TrendingDown
 import androidx.compose.material.icons.filled.AccountBalanceWallet
-import androidx.compose.material.icons.filled.FileDownload
+import androidx.compose.material.icons.filled.PictureAsPdf
 import androidx.compose.material.icons.filled.HourglassBottom
 import androidx.compose.material.icons.filled.PersonAdd
 import androidx.compose.material.icons.filled.Savings
@@ -81,7 +81,8 @@ import com.sushant.gymmanager.util.DateUtils
 import com.sushant.gymmanager.util.Downloads
 import com.sushant.gymmanager.util.Money
 import com.sushant.gymmanager.util.ShareUtil
-import com.sushant.gymmanager.util.XlsxWriter
+import com.sushant.gymmanager.util.ReportInput
+import com.sushant.gymmanager.util.ReportPdf
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -111,78 +112,20 @@ class ReportsViewModel(app: Application) : AndroidViewModel(app) {
     var exporting by mutableStateOf(false)
         private set
 
-    /** Builds the Excel workbook, saves a copy in Downloads/GymManager and returns the shareable file. */
-    fun export(lang: String, onDone: (File?, Boolean) -> Unit) {
+    /** Builds the PDF report for the selected month, saves a copy in Downloads/GymManager and returns the shareable file. */
+    fun export(onDone: (File?, Boolean) -> Unit) {
         val d = data.value ?: return
         exporting = true
+        val selected = month
         viewModelScope.launch {
             val result = withContext(Dispatchers.IO) {
                 runCatching {
-                    fun tr(s: String) = I18n.tr(lang, s)
                     val settings = repo.getSettings()
-                    val names = d.members.associateBy { it.id }
-                    val cycles = repo.snapshot().paymentCycles.associateBy { it.id }
-                    val months = (11 downTo 0).map { YearMonth.now().minusMonths(it.toLong()) }
-                    val wb = XlsxWriter()
-                        .sheet(
-                            tr("Summary"),
-                            listOf(tr("Month"), tr("Collected"), tr("Expenses"), tr("Profit"), tr("Payments")),
-                            months.map { ym ->
-                                val key = ym.toString()
-                                val col = d.payments.filter { it.paidAt.startsWith(key) }
-                                val exp = d.expenses.filter { it.date.startsWith(key) }.sumOf { it.amount }
-                                listOf(DateUtils.formatMonth(ym.atDay(1)), col.sumOf { it.amount }, exp, col.sumOf { it.amount } - exp, col.size)
-                            },
-                            listOf(18, 14, 14, 14, 12)
-                        )
-                        .sheet(
-                            tr("Payments"),
-                            listOf(tr("Date"), tr("Receipt No."), tr("Roll"), tr("Member"), tr("Period"), tr("Mode"), tr("Amount"), tr("Note")),
-                            d.payments.map { p ->
-                                val m = names[p.memberId]
-                                val c = cycles[p.cycleId]
-                                listOf(
-                                    p.paidAt, p.receiptNo, m?.rollNumber, m?.fullName,
-                                    c?.let { "${it.cycleStart} → ${it.cycleEnd}" }, I18n.payModeLabel(lang, p.mode), p.amount, p.note
-                                )
-                            },
-                            listOf(20, 12, 8, 22, 26, 14, 12, 24)
-                        )
-                        .sheet(
-                            tr("Pending Dues"),
-                            listOf(tr("Roll"), tr("Member"), tr("WhatsApp"), tr("Period"), tr("Fee"), tr("Paid"), tr("Balance")),
-                            d.unpaid.filter { it.balance > 0 }.sortedBy { it.cycleStart }.map { c ->
-                                val m = names[c.memberId]
-                                listOf(m?.rollNumber, m?.fullName, m?.whatsappNumber, "${c.cycleStart} → ${c.cycleEnd}", c.amount, c.paidAmount, c.balance)
-                            },
-                            listOf(8, 22, 16, 26, 12, 12, 12)
-                        )
-                        .sheet(
-                            tr("Members"),
-                            listOf(tr("Roll"), tr("Name"), tr("WhatsApp"), tr("Joined"), tr("Shift"), tr("Time slot"), tr("Status")),
-                            d.members.map { m ->
-                                listOf(
-                                    m.rollNumber, m.fullName, m.whatsappNumber, m.dateOfJoining, I18n.shiftLabel(lang, m.shift),
-                                    DateUtils.formatTimeSlot(m.fromTime, m.toTime),
-                                    tr(if (!m.isActive) "Deactivated" else if (m.frozenFrom != null) "Frozen" else "Active")
-                                )
-                            },
-                            listOf(8, 22, 16, 12, 12, 22, 12)
-                        )
-                        .sheet(
-                            tr("Expenses"),
-                            listOf(tr("Date"), tr("Category"), tr("Amount"), tr("Note")),
-                            d.expenses.map { listOf(it.date, I18n.categoryLabel(lang, it.category), it.amount, it.note) },
-                            listOf(12, 16, 12, 30)
-                        )
-                    val name = "GymReport_" + settings.gymName.filter { it.isLetterOrDigit() }.take(20) + "_" +
-                        java.time.LocalDate.now() + ".xlsx"
+                    val input = ReportInput(settings, selected, d.payments, d.expenses, repo.snapshot().paymentCycles, d.members)
+                    val name = "GymReport_" + settings.gymName.filter { it.isLetterOrDigit() }.take(20) + "_" + selected + ".pdf"
                     val file = File(File(getApplication<Application>().cacheDir, "shared").apply { mkdirs() }, name)
-                    file.outputStream().use { wb.write(it) }
-                    val saved = Downloads.save(
-                        getApplication(), name,
-                        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                    ) { out -> file.inputStream().use { it.copyTo(out) } } != null
+                    file.outputStream().use { ReportPdf.write(input, it) }
+                    val saved = Downloads.save(getApplication(), name, "application/pdf") { out -> file.inputStream().use { it.copyTo(out) } } != null
                     file to saved
                 }.getOrNull()
             }
@@ -197,22 +140,22 @@ fun ReportsScreen(onOpenDrawer: () -> Unit, vm: ReportsViewModel = viewModel()) 
     val context = LocalContext.current
     val lang = currentLang()
     val data by vm.data.collectAsStateWithLifecycle()
-    val exportedMsg = t("Excel report saved to Downloads/GymManager")
+    val exportedMsg = t("PDF report saved to Downloads/GymManager")
     val failedMsg = t("Could not create the report")
     val doExport = {
-        vm.export(lang) { file, saved ->
+        vm.export { file, saved ->
             if (file == null) {
                 context.toast(failedMsg)
             } else {
                 if (saved) context.toast(exportedMsg)
-                ShareUtil.shareFile(context, file, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", file.name)
+                ShareUtil.shareFile(context, file, "application/pdf", file.name)
             }
         }
     }
 
     Scaffold(topBar = {
         GymTopBar(t("Reports"), t("Revenue, expenses and profit"), onMenu = onOpenDrawer, actions = {
-            IconButton(onClick = doExport, enabled = data != null && !vm.exporting) { Icon(Icons.Default.FileDownload, t("Export to Excel")) }
+            IconButton(onClick = doExport, enabled = data != null && !vm.exporting) { Icon(Icons.Default.PictureAsPdf, t("Export PDF report")) }
         })
     }) { padding ->
         val d = data
@@ -302,15 +245,15 @@ fun ReportsScreen(onOpenDrawer: () -> Unit, vm: ReportsViewModel = viewModel()) 
             Button(
                 onClick = doExport,
                 enabled = !vm.exporting,
-                modifier = Modifier.fillMaxWidth().height(52.dp).testTag("export_excel")
+                modifier = Modifier.fillMaxWidth().height(52.dp).testTag("export_pdf")
             ) {
                 if (vm.exporting) CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
                 else {
-                    Icon(Icons.Default.FileDownload, null); Spacer(Modifier.width(8.dp)); Text(t("Export to Excel"))
+                    Icon(Icons.Default.PictureAsPdf, null); Spacer(Modifier.width(8.dp)); Text(t("Export PDF Report"))
                 }
             }
             Text(
-                t("Includes summary, all payments, pending dues, members and expenses."),
+                t("A neatly formatted PDF of the selected month: summary, 6-month trend, payment modes, payments, expenses and pending dues."),
                 style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             Spacer(Modifier.height(8.dp))

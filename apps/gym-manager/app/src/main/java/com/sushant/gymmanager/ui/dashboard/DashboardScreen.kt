@@ -183,7 +183,6 @@ fun DashboardScreen(
     vm: DashboardViewModel = viewModel()
 ) {
     val state by vm.state.collectAsStateWithLifecycle()
-    var menu by remember { mutableStateOf(false) }
     var openId by remember { mutableStateOf<Long?>(null) }
     val context = LocalContext.current
     val lang = currentLang()
@@ -193,22 +192,7 @@ fun DashboardScreen(
             GymTopBar(
                 title = state?.gymName ?: "",
                 subtitle = t("Dashboard"),
-                onMenu = onOpenDrawer,
-                actions = {
-                    IconButton(onClick = { menu = true }) { Icon(Icons.Default.MoreVert, t("More options")) }
-                    DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
-                        DropdownMenuItem(
-                            text = { Text(t("Backup & Restore")) },
-                            leadingIcon = { Icon(Icons.Default.Backup, null) },
-                            onClick = { menu = false; onNavigate(Routes.BACKUP) }
-                        )
-                        DropdownMenuItem(
-                            text = { Text(t("Settings")) },
-                            leadingIcon = { Icon(Icons.Default.Settings, null) },
-                            onClick = { menu = false; onNavigate(Routes.SETTINGS) }
-                        )
-                    }
-                }
+                onMenu = onOpenDrawer
             )
         }
     ) { padding ->
@@ -321,17 +305,9 @@ private fun HeroBanner(collected: Double) {
         Icon(
             Icons.Default.FitnessCenter, null,
             tint = Color.White.copy(alpha = 0.14f),
-            modifier = Modifier.size(150.dp).align(Alignment.CenterEnd).offset(x = 28.dp)
+            modifier = Modifier.size(120.dp).align(Alignment.CenterEnd).offset(x = 24.dp)
         )
         Column(Modifier.padding(20.dp)) {
-            Surface(shape = RoundedCornerShape(50), color = Color.White.copy(alpha = 0.2f)) {
-                Row(Modifier.padding(horizontal = 10.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.CloudOff, null, tint = Color.White, modifier = Modifier.size(14.dp))
-                    Spacer(Modifier.width(6.dp))
-                    Text(t("Local Offline"), style = MaterialTheme.typography.labelSmall, color = Color.White)
-                }
-            }
-            Spacer(Modifier.height(14.dp))
             Text(t("Welcome back, Coach"), style = MaterialTheme.typography.headlineSmall, color = Color.White)
             Spacer(Modifier.height(2.dp))
             Text(DateUtils.formatDayFull(), style = MaterialTheme.typography.bodyMedium, color = Color.White.copy(alpha = 0.9f))

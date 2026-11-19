@@ -4,7 +4,7 @@ import com.sushant.gymmanager.util.toast
 import android.app.Application
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.compose.material.icons.filled.QrCodeScanner
-import androidx.compose.material3.IconButton
+import androidx.compose.material3.FloatingActionButton
 import androidx.compose.runtime.rememberCoroutineScope
 import com.journeyapps.barcodescanner.ScanContract
 import com.journeyapps.barcodescanner.ScanOptions
@@ -201,12 +201,6 @@ fun AttendanceScreen(onOpenDrawer: () -> Unit, onEditMember: (Long) -> Unit, vm:
                 subtitle = if (isToday) t("Today • %s", DateUtils.formatShort(vm.date)) else DateUtils.formatFull(vm.date),
                 onMenu = onOpenDrawer,
                 actions = {
-                    IconButton(onClick = {
-                        scanner.launch(
-                            ScanOptions().setDesiredBarcodeFormats(ScanOptions.QR_CODE).setPrompt(scanPrompt)
-                                .setBeepEnabled(true).setOrientationLocked(false)
-                        )
-                    }, modifier = Modifier.testTag("scan_qr")) { Icon(Icons.Default.QrCodeScanner, t("Scan QR check-in")) }
                     AssistChip(
                         onClick = { showDate = true },
                         label = { Text(if (isToday) t("Today") else DateUtils.formatShort(vm.date)) },
@@ -215,6 +209,19 @@ fun AttendanceScreen(onOpenDrawer: () -> Unit, onEditMember: (Long) -> Unit, vm:
                     )
                 }
             )
+        },
+        floatingActionButton = {
+            FloatingActionButton(
+                onClick = {
+                    scanner.launch(
+                        ScanOptions().setDesiredBarcodeFormats(ScanOptions.QR_CODE).setPrompt(scanPrompt)
+                            .setBeepEnabled(true).setOrientationLocked(false)
+                    )
+                },
+                containerColor = MaterialTheme.colorScheme.primary,
+                contentColor = MaterialTheme.colorScheme.onPrimary,
+                modifier = Modifier.testTag("scan_qr")
+            ) { Icon(Icons.Default.QrCodeScanner, t("Scan QR check-in")) }
         },
         bottomBar = {
             Surface(color = MaterialTheme.colorScheme.surface, tonalElevation = 0.dp) {
@@ -306,7 +313,7 @@ fun AttendanceScreen(onOpenDrawer: () -> Unit, onEditMember: (Long) -> Unit, vm:
                     t(if (vm.shift == Shift.MORNING) "Active members whose workout starts in the morning window will appear here." else "Active members whose workout starts in the evening window will appear here.")
                 )
                 else -> LazyColumn(
-                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 16.dp),
+                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 88.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     items(groups, key = { "${it.from}-${it.to}" }) { g ->

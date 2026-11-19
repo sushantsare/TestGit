@@ -3,6 +3,8 @@ package com.sushant.gymmanager.ui.navigation
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.Column
@@ -23,6 +25,7 @@ import androidx.compose.material.icons.filled.Dashboard
 import androidx.compose.material.icons.filled.EventAvailable
 import androidx.compose.material.icons.filled.FitnessCenter
 import androidx.compose.material.icons.filled.Groups
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Payments
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.DrawerValue
@@ -58,6 +61,7 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.sushant.gymmanager.BuildConfig
 import com.sushant.gymmanager.data.local.GymSettingsEntity
+import com.sushant.gymmanager.ui.about.AboutScreen
 import com.sushant.gymmanager.ui.attendance.AttendanceCalendarScreen
 import com.sushant.gymmanager.ui.attendance.AttendanceScreen
 import com.sushant.gymmanager.ui.reports.ExpensesScreen
@@ -82,6 +86,7 @@ object Routes {
     const val BACKUP = "backup"
     const val SETTINGS = "settings"
     const val REPORTS = "reports"
+    const val ABOUT = "about"
     const val EXPENSES = "expenses"
     const val CALENDAR = "member/calendar/{memberId}"
     fun editMember(id: Long) = "member/edit/$id"
@@ -98,7 +103,8 @@ private val destinations = listOf(
     DrawerDestination(Routes.REPORTS, "Reports", Icons.Default.BarChart),
     DrawerDestination(Routes.EXPENSES, "Expenses", Icons.AutoMirrored.Filled.ReceiptLong),
     DrawerDestination(Routes.BACKUP, "Backup", Icons.Default.Backup),
-    DrawerDestination(Routes.SETTINGS, "Settings", Icons.Default.Settings)
+    DrawerDestination(Routes.SETTINGS, "Settings", Icons.Default.Settings),
+    DrawerDestination(Routes.ABOUT, "About", Icons.Default.Info)
 )
 
 fun NavHostController.navigateTopLevel(route: String) {
@@ -168,6 +174,7 @@ fun MainNavigation(settings: GymSettingsEntity) {
             }
             composable(Routes.PAYMENTS) { PaymentsScreen(onOpenDrawer = openDrawer) }
             composable(Routes.REPORTS) { ReportsScreen(onOpenDrawer = openDrawer) }
+            composable(Routes.ABOUT) { AboutScreen(onOpenDrawer = openDrawer) }
             composable(Routes.EXPENSES) { ExpensesScreen(onOpenDrawer = openDrawer) }
             composable(
                 Routes.CALENDAR,
@@ -198,7 +205,7 @@ private fun AppDrawer(gymName: String, currentRoute: String?, onSelect: (String)
         drawerShape = RoundedCornerShape(topEnd = 24.dp, bottomEnd = 24.dp),
         windowInsets = WindowInsets(0, 0, 0, 0)
     ) {
-        Column(Modifier.fillMaxHeight()) {
+        Column(Modifier.fillMaxHeight().verticalScroll(rememberScrollState()).navigationBarsPadding()) {
             Box(
                 Modifier.fillMaxWidth()
                     .background(Brush.linearGradient(listOf(scheme.primary, Color(0xFFC2410C))))
@@ -237,14 +244,6 @@ private fun AppDrawer(gymName: String, currentRoute: String?, onSelect: (String)
                     )
                 )
             }
-            Spacer(Modifier.weight(1f))
-            HorizontalDivider(Modifier.padding(horizontal = 24.dp), color = scheme.outlineVariant)
-            Text(
-                "Gym Manager v${BuildConfig.VERSION_NAME} • " + t("100% offline"),
-                style = MaterialTheme.typography.labelSmall,
-                color = scheme.onSurfaceVariant,
-                modifier = Modifier.navigationBarsPadding().padding(24.dp)
-            )
         }
     }
 }
