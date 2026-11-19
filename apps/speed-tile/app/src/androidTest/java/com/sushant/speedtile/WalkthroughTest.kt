@@ -51,9 +51,8 @@ class WalkthroughTest {
         shell("settings put global hide_error_dialogs 1")
         instrumentation.runOnMainSync {
             app.prefs.setTheme(1)
-            app.prefs.setTileAdded(false)
             app.prefs.setDecimals(false)
-            app.prefs.askedNotifications = true
+            app.prefs.setOffOnPanelClose(true)
         }
     }
 
@@ -108,13 +107,11 @@ class WalkthroughTest {
             shell("cmd statusbar expand-settings")
             Thread.sleep(3000)
             shot("02_real_gps_live_quick_settings")
-            shell("cmd statusbar collapse")
             pusher.join()
-
-            Thread.sleep(800)
-            compose.onNodeWithTag("btn_stop").performClick()
-            compose.waitUntil(10_000) { !app.engine.state.value.running }
-            assertFalse(app.engine.state.value.running)
+            // Closing Quick Settings switches speed off (after the short debounce).
+            shell("cmd statusbar collapse")
+            compose.waitUntil(8_000) { !app.engine.state.value.running }
+            assertEquals(StopReason.PANEL_CLOSED, app.engine.state.value.stopReason)
         }
         runCatching { lm.removeTestProvider(LocationManager.GPS_PROVIDER) }
     }

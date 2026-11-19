@@ -47,6 +47,10 @@ fun SpeedGauge(speedText: String, speedKmh: Float, maxKmh: Int, active: Boolean,
     val primary = MaterialTheme.colorScheme.primary
     val muted = MaterialTheme.colorScheme.onSurfaceVariant
     val measurer = rememberTextMeasurer()
+    // The big number sits inside a fixed-size dial: let it grow with system font size only up to 1.15x.
+    val fontScale = androidx.compose.ui.platform.LocalDensity.current.fontScale
+    val bigSize = (76f * minOf(fontScale, 1.15f) / fontScale).sp
+    val unitSize = (16f * minOf(fontScale, 1.3f) / fontScale).sp
     val labelStyle = TextStyle(fontSize = 11.sp, color = muted, fontWeight = FontWeight.Medium)
     val step = when {
         maxKmh <= 120 -> 20
@@ -99,13 +103,13 @@ fun SpeedGauge(speedText: String, speedKmh: Float, maxKmh: Int, active: Boolean,
         Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.offset(y = (-6).dp)) {
             Text(
                 speedText,
-                fontSize = 76.sp,
+                fontSize = bigSize,
                 fontWeight = FontWeight.Black,
                 color = if (active) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.testTag("speed_value"),
                 maxLines = 1,
             )
-            Text("km/h", style = MaterialTheme.typography.titleMedium, color = muted, fontWeight = FontWeight.SemiBold)
+            Text("km/h", fontSize = unitSize, color = muted, fontWeight = FontWeight.SemiBold)
         }
     }
 }

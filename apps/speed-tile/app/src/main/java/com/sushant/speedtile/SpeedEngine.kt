@@ -6,7 +6,7 @@ import kotlinx.coroutines.flow.update
 
 enum class Status { OFF, WAITING, LIVE, WEAK, GPS_OFF }
 
-enum class StopReason { NONE, USER, IDLE, GPS_OFF, NO_PERMISSION, BLOCKED }
+enum class StopReason { NONE, USER, IDLE, GPS_OFF, NO_PERMISSION, BLOCKED, PANEL_CLOSED }
 
 data class SpeedState(
     val running: Boolean = false,

@@ -14,6 +14,8 @@ data class Fix(
     val timeMs: Long,
     val speedMps: Float? = null,
     val accuracyM: Float? = null,
+    /** Receiver's own estimate of how wrong the speed may be (m/s), when it gives one. */
+    val speedAccMps: Float? = null,
 )
 
 data class TripStats(
@@ -34,6 +36,15 @@ object SpeedMath {
     const val GOOD_ACCURACY_M = 30f
     /** Speed is computed from positions only when both are at least this good. */
     const val FALLBACK_ACCURACY_M = 50f
+    /** Speed readings less certain than this (m/s, about 9 km/h) are not trusted. */
+    const val MAX_SPEED_ACC_MPS = 2.5f
+    /** No road vehicle changes speed faster than ~1 g = 35 km/h every second (+5 km/h slack). */
+    const val MAX_CHANGE_KMH_PER_S = 35f
+    const val CHANGE_SLACK_KMH = 5f
+
+    /** True when going from [prevKmh] to [kmh] in [dtMs] is physically impossible (a GPS glitch). */
+    fun isImpossibleJump(prevKmh: Float, kmh: Float, dtMs: Long): Boolean =
+        kotlin.math.abs(kmh - prevKmh) > MAX_CHANGE_KMH_PER_S * (dtMs / 1000f) + CHANGE_SLACK_KMH
 
     fun mpsToKmh(mps: Float): Float = mps * 3.6f
 
@@ -80,11 +91,16 @@ object SpeedMath {
 /**
  * Turns GPS fixes into a live speed and running trip totals.
  * Uses the receiver Doppler speed when the phone gives one, otherwise distance / time.
+ * Glitches (uncertain speed, impossible jumps) are dropped; a new top speed needs two steady readings.
  */
 class TripTracker(initial: TripStats = TripStats()) {
     var stats: TripStats = initial
         private set
     private var last: Fix? = null
+    private var lastKmh: Float? = null
+    private var lastKmhAt = 0L
+    /** Last reading that was good enough for records (used for the two-reading top-speed rule). */
+    private var lastGoodKmh: Float? = null
 
     /** Returns the cleaned speed in km/h, or null when it cannot be worked out yet. */
     fun add(fix: Fix): Float? {
@@ -104,23 +120,43 @@ class TripTracker(initial: TripStats = TripStats()) {
         last = fix
         val kmh = raw?.let { SpeedMath.clean(it) } ?: return null
 
+        // Glitch filter: keep showing the previous speed and leave the records alone.
+        val uncertain = (fix.speedAccMps ?: 0f) > SpeedMath.MAX_SPEED_ACC_MPS
+        val pk = lastKmh
+        val jump = pk != null && fix.timeMs - lastKmhAt in 1L..3_000L &&
+            SpeedMath.isImpossibleJump(pk, kmh, fix.timeMs - lastKmhAt)
+        if (uncertain || jump) {
+            lastGoodKmh = null
+            return pk
+        }
+        lastKmh = kmh
+        lastKmhAt = fix.timeMs
+
         val good = (fix.accuracyM ?: 0f) <= SpeedMath.GOOD_ACCURACY_M
         if (good) {
             var s = stats
-            if (kmh > s.maxKmh) s = s.copy(maxKmh = kmh)
+            val steady = lastGoodKmh?.let { minOf(it, kmh) }
+            if (steady != null && steady > s.maxKmh) s = s.copy(maxKmh = steady)
             if (prev != null && kmh >= SpeedMath.MOVING_KMH && dt <= 10_000L) {
                 s = s.copy(distanceM = s.distanceM + gap, movingMs = s.movingMs + dt)
             }
             stats = s
+            lastGoodKmh = kmh
+        } else {
+            lastGoodKmh = null
         }
         return kmh
     }
 
     /** Forget the previous fix (after a signal loss) so a long gap is not counted as a jump. */
-    fun breakChain() { last = null }
+    fun breakChain() {
+        last = null
+        lastKmh = null
+        lastGoodKmh = null
+    }
 
     fun reset() {
         stats = TripStats()
-        last = null
+        breakChain()
     }
 }

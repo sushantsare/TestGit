@@ -15,6 +15,17 @@ class SpeedTileApp : Application() {
     val appScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     val prefs by lazy { Prefs(this) }
     val engine by lazy { SpeedEngine(prefs) }
+    val panelWatch by lazy {
+        PanelWatch(
+            handler = android.os.Handler(android.os.Looper.getMainLooper()),
+            enabled = { prefs.offOnPanelClose.value },
+            isRunning = { engine.state.value.running },
+            stop = {
+                android.util.Log.i(SpeedService.TAG, "Quick Settings closed: speed off")
+                SpeedService.stop(this, StopReason.PANEL_CLOSED)
+            },
+        )
+    }
 
     override fun onCreate() {
         super.onCreate()
@@ -27,6 +38,10 @@ class SpeedTileApp : Application() {
                     TileService.requestListeningState(this, ComponentName(this, SpeedTileService::class.java))
                 }
             }
+            .launchIn(appScope)
+        // Speed went off for any reason: forget panel tracking.
+        engine.state.map { it.running }.distinctUntilChanged()
+            .onEach { running -> if (!running) panelWatch.reset() }
             .launchIn(appScope)
     }
 }

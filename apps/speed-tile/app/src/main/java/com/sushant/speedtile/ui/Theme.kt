@@ -74,8 +74,8 @@ data class ExtraColors(
 
 private val LightExtra = ExtraColors(
     cardBorder = Color(0xFFE2E8F0),
-    green = Color(0xFF15803D),
-    amber = Color(0xFFB45309),
+    green = Color(0xFF166534),
+    amber = Color(0xFF92400E),
     red = Color(0xFFB91C1C),
     blue = Color(0xFF1D4ED8),
     gaugeTrack = Color(0xFFE2E8F0),

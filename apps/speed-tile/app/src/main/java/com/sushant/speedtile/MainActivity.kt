@@ -79,6 +79,7 @@ class MainActivity : ComponentActivity() {
         val gaugeMax by prefs.gaugeMax.collectAsStateWithLifecycle()
         val autoStop by prefs.autoStopMin.collectAsStateWithLifecycle()
         val keepOn by prefs.keepScreenOn.collectAsStateWithLifecycle()
+        val offOnClose by prefs.offOnPanelClose.collectAsStateWithLifecycle()
         val themeMode by prefs.theme.collectAsStateWithLifecycle()
 
         // Re-check permissions and GPS every time the app comes back to the front.
@@ -101,6 +102,7 @@ class MainActivity : ComponentActivity() {
                 return
             }
             SpeedService.start(this)
+            app.panelWatch.startedFromApp()
         }
 
         val locLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { res ->
@@ -158,6 +160,7 @@ class MainActivity : ComponentActivity() {
                     gaugeMax = gaugeMax, onGaugeMax = prefs::setGaugeMax,
                     autoStop = autoStop, onAutoStop = prefs::setAutoStop,
                     keepOn = keepOn, onKeepOn = prefs::setKeepScreenOn,
+                    offOnClose = offOnClose, onOffOnClose = prefs::setOffOnPanelClose,
                     onBack = { nav.popBackStack() },
                 )
             }

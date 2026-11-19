@@ -22,12 +22,9 @@ class SpeedTileService : TileService() {
 
     private var job: Job? = null
 
-    override fun onTileAdded() { app.prefs.setTileAdded(true) }
-    override fun onTileRemoved() { app.prefs.setTileAdded(false) }
-
     override fun onStartListening() {
         super.onStartListening()
-        app.prefs.setTileAdded(true)
+        app.panelWatch.panelOpened()
         job?.cancel()
         job = combine(app.engine.state, app.prefs.decimals) { s, d -> s to d }
             .onEach { (s, d) -> render(s, d) }
@@ -37,6 +34,7 @@ class SpeedTileService : TileService() {
     override fun onStopListening() {
         job?.cancel()
         job = null
+        app.panelWatch.panelClosed()
         super.onStopListening()
     }
 
@@ -54,7 +52,10 @@ class SpeedTileService : TileService() {
      * So the tile always opens the invisible StartActivity for a moment; starting the service
      * straight from the tile looks fine but on many phones GPS data never arrives.
      */
-    private fun begin() = openStarter()
+    private fun begin() {
+        app.panelWatch.startingFromTile() // the collapse that follows is ours, not the user closing the panel
+        openStarter()
+    }
 
     @SuppressLint("StartActivityAndCollapseDeprecated")
     private fun openStarter() {
@@ -106,7 +107,7 @@ data class TileView(val active: Boolean, val label: String, val subtitle: String
                 val sub = when (s.stopReason) {
                     StopReason.IDLE -> "Stopped · not moving"
                     StopReason.NO_PERMISSION -> "Tap to allow location"
-                    StopReason.BLOCKED -> "Tap to start"
+                    StopReason.BLOCKED, StopReason.PANEL_CLOSED -> "Tap to start"
                     StopReason.GPS_OFF -> "No GPS on this phone"
                     else -> "Tap to start"
                 }

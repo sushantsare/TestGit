@@ -91,10 +91,11 @@ fun AboutScreen(version: String, onEmail: () -> Unit, onBack: () -> Unit) {
                 SectionTitle("How it works")
                 Spacer(Modifier.size(8.dp))
                 Bullet("Add the Speed tile once: pull down Quick Settings, tap the pencil (Edit) and drag Speed into your tiles.")
-                Bullet("Tap the tile to switch GPS on. The tile shows your km/h live. Tap again to switch it off.")
+                Bullet("Tap the tile: Quick Settings closes for a moment while GPS starts. Pull it down again and the tile shows your km/h live.")
+                Bullet("Close Quick Settings (or tap the tile again) and speed switches off. You can change this in Settings.")
                 Bullet("Speed comes straight from your phone GPS receiver, updated every second.")
                 Bullet("Long-press the tile to open this screen: speedometer, trip and settings.")
-                Bullet("If you stop moving for a while, GPS turns itself off to save battery.")
+                Bullet("If you do not pull down within 30 seconds, or stop moving for a while, GPS turns itself off to save battery.")
             }
 
             AppCard {

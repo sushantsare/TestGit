@@ -42,6 +42,7 @@ fun SettingsScreen(
     gaugeMax: Int, onGaugeMax: (Int) -> Unit,
     autoStop: Int, onAutoStop: (Int) -> Unit,
     keepOn: Boolean, onKeepOn: (Boolean) -> Unit,
+    offOnClose: Boolean, onOffOnClose: (Boolean) -> Unit,
     onBack: () -> Unit,
 ) {
     Scaffold(
@@ -77,6 +78,15 @@ fun SettingsScreen(
                 SwitchRow("Show one decimal", "For example 42.6 km/h instead of 43", decimals, "sw_decimals", onDecimals)
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                 SwitchRow("Keep screen on", "While the speed screen is open and speed is on", keepOn, "sw_keep_on", onKeepOn)
+            }
+
+            AppCard {
+                SectionTitle("Quick Settings tile")
+                SwitchRow(
+                    "Turn off when the panel closes",
+                    "Speed stops as soon as you close Quick Settings. After tapping the tile, pull down within 30 seconds to see your speed.",
+                    offOnClose, "sw_off_on_close", onOffOnClose,
+                )
             }
 
             AppCard {

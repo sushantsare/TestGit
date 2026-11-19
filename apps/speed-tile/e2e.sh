@@ -20,7 +20,7 @@ echo "-- tap tile (start)" >> $LOG
 adb shell cmd statusbar click-tile $TILE
 sleep 4
 lon=85.1000
-for i in $(seq 1 15); do
+for i in $(seq 1 10); do
   lon=$(python3 -c "print(f'{$lon + 0.00015:.5f}')")   # ~15 m per second = ~54 km/h
   r=$(adb emu geo fix $lon 25.6000 50 9 29 2>&1)
   echo "$r" | grep -q KO && adb emu geo fix $lon 25.6000 50 9 > /dev/null 2>&1
@@ -30,13 +30,18 @@ adb shell cmd statusbar expand-settings
 sleep 3
 adb exec-out screencap -p > $OUT/screens/20_real_tile_tap_live.png
 adb shell dumpsys location | grep -i -A2 "speedtile" | head -20 >> $LOG
-adb logcat -d -s SpeedTile:* >> $LOG
 FIXES=$(adb logcat -d -s SpeedTile:I | grep -c "GPS fix")
 echo "FIX_LOG_LINES=$FIXES" >> $LOG
-echo "-- tap tile (stop)" >> $LOG
-adb shell cmd statusbar click-tile $TILE
-sleep 3
-adb exec-out screencap -p > $OUT/screens/21_real_tile_tap_off.png
+echo "-- close Quick Settings (speed must switch off)" >> $LOG
 adb shell cmd statusbar collapse
-if [ "$FIXES" -gt 0 ]; then echo PASSED > $OUT/E2E; else echo FAILED > $OUT/E2E; fi
+sleep 4
+CLOSED=$(adb logcat -d -s SpeedTile:I | grep -c "Quick Settings closed: speed off")
+STILL=$(adb shell dumpsys location | grep -c "listeners:.*speedtile\|$PKG.*HIGH_ACCURACY")
+echo "PANEL_CLOSED_LOG=$CLOSED GPS_REQUESTS_AFTER_CLOSE=$STILL" >> $LOG
+adb shell cmd statusbar expand-settings
+sleep 3
+adb exec-out screencap -p > $OUT/screens/21_real_panel_closed_then_reopened_off.png
+adb shell cmd statusbar collapse
+adb logcat -d -s SpeedTile:* >> $LOG
+if [ "$FIXES" -gt 0 ] && [ "$CLOSED" -gt 0 ]; then echo PASSED > $OUT/E2E; else echo FAILED > $OUT/E2E; fi
 cat $OUT/E2E >> $LOG

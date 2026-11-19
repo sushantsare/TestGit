@@ -70,7 +70,14 @@ class StartActivity : ComponentActivity() {
             return
         }
         SpeedService.start(this)
-        toast("Speed on · pull down to see it")
+        app.panelWatch.startingFromTile()
+        val p = app.prefs
+        if (!p.shownLongPressHint) {
+            p.shownLongPressHint = true
+            toast("Speed on · pull down to see it. Long-press the tile for trip and settings.")
+        } else {
+            toast("Speed on · pull down to see it")
+        }
     }
 
     private fun openAppSettings() {

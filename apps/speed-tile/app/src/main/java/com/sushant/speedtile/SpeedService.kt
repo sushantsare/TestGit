@@ -108,6 +108,7 @@ class SpeedService : Service() {
     @SuppressLint("MissingPermission")
     private fun startListening() {
         listening = true
+        pendingReason = StopReason.USER
         app.engine.onStarted()
         if (!lm.isProviderEnabled(LocationManager.GPS_PROVIDER)) app.engine.onGpsDisabled()
         try {
@@ -147,7 +148,8 @@ class SpeedService : Service() {
     override fun onDestroy() {
         val wasListening = listening
         cleanup()
-        if (wasListening) app.engine.onStopped(StopReason.USER)
+        if (wasListening) app.engine.onStopped(pendingReason)
+        pendingReason = StopReason.USER
         super.onDestroy()
     }
 
@@ -206,7 +208,11 @@ class SpeedService : Service() {
             ContextCompat.startForegroundService(context, Intent(context, SpeedService::class.java))
         }
 
-        fun stop(context: Context) {
+        /** Why the next stop happens (read in onDestroy). */
+        @Volatile var pendingReason: StopReason = StopReason.USER
+
+        fun stop(context: Context, reason: StopReason = StopReason.USER) {
+            pendingReason = reason
             context.stopService(Intent(context, SpeedService::class.java))
         }
 
@@ -233,4 +239,5 @@ fun Location.toFix(): Fix = Fix(
     timeMs = time,
     speedMps = if (hasSpeed()) speed else null,
     accuracyM = if (hasAccuracy()) accuracy else null,
+    speedAccMps = if (hasSpeedAccuracy()) speedAccuracyMetersPerSecond else null,
 )

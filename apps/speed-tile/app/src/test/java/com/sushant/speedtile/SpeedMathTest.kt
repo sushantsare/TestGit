@@ -109,6 +109,44 @@ class TripTrackerTest {
         assertNull(t.add(Fix(25.0, 85.0, 1_000, speedMps = 10f, accuracyM = 5f)))
     }
 
+    @Test fun one_gps_spike_does_not_become_top_speed() {
+        val t = TripTracker()
+        var lat = 25.0
+        val speeds = listOf(40f, 41f, 190f, 42f, 43f) // km/h, one glitch
+        speeds.forEachIndexed { i, kmh ->
+            t.add(Fix(lat, 85.0, i * 1_000L, speedMps = kmh / 3.6f, accuracyM = 5f))
+            lat += 0.0001
+        }
+        assertEquals(42f, t.stats.maxKmh, 0.1f) // two steady readings: min(42, 43)
+    }
+
+    @Test fun spike_keeps_showing_previous_speed() {
+        val t = TripTracker()
+        t.add(Fix(25.0, 85.0, 0, speedMps = 40f / 3.6f, accuracyM = 5f))
+        val shown = t.add(Fix(25.0001, 85.0, 1_000, speedMps = 190f / 3.6f, accuracyM = 5f))
+        assertEquals(40f, shown!!, 0.1f)
+    }
+
+    @Test fun uncertain_speed_is_ignored_for_records() {
+        val t = TripTracker()
+        t.add(Fix(25.0, 85.0, 0, speedMps = 20f, accuracyM = 5f, speedAccMps = 6f))
+        t.add(Fix(25.0001, 85.0, 1_000, speedMps = 20f, accuracyM = 5f, speedAccMps = 6f))
+        assertEquals(0f, t.stats.maxKmh, 0f)
+    }
+
+    @Test fun top_speed_needs_two_steady_readings() {
+        val t = TripTracker()
+        t.add(Fix(25.0, 85.0, 0, speedMps = 10f, accuracyM = 5f))
+        assertEquals(0f, t.stats.maxKmh, 0f)
+        t.add(Fix(25.0001, 85.0, 1_000, speedMps = 11f, accuracyM = 5f))
+        assertEquals(36f, t.stats.maxKmh, 0.1f) // min of the two readings
+    }
+
+    @Test fun real_hard_braking_is_not_a_glitch() {
+        assertFalse(SpeedMath.isImpossibleJump(60f, 30f, 1_000)) // 30 km/h drop in 1 s
+        assertTrue(SpeedMath.isImpossibleJump(40f, 190f, 1_000))
+    }
+
     @Test fun reset_clears_everything() {
         val t = TripTracker(TripStats(80f, 5000.0, 600_000))
         t.reset()

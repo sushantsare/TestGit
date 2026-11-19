@@ -6,7 +6,18 @@ import kotlinx.coroutines.flow.StateFlow
 
 /** Small settings store. Simple switches apply instantly. */
 class Prefs(context: Context) {
+    /** Backed up (see res/xml backup rules): settings and trip totals. */
     private val sp = context.getSharedPreferences("settings", Context.MODE_PRIVATE)
+    /** Not backed up: per-phone flags such as "location already asked" (would mislead a new phone). */
+    private val local = context.getSharedPreferences("device_state", Context.MODE_PRIVATE)
+
+    init {
+        // v1.0/1.1 kept the asked flag in the backed-up file: move it.
+        if (sp.contains(K_ASKED_LOC)) {
+            local.edit().putBoolean(K_ASKED_LOC, sp.getBoolean(K_ASKED_LOC, false)).apply()
+            sp.edit().remove(K_ASKED_LOC).remove("asked_notifications").remove("tile_added").apply()
+        }
+    }
 
     private val _theme = MutableStateFlow(sp.getInt(K_THEME, 0))
     /** 0 = system, 1 = light, 2 = dark */
@@ -30,17 +41,18 @@ class Prefs(context: Context) {
     val keepScreenOn: StateFlow<Boolean> = _keepOn
     fun setKeepScreenOn(v: Boolean) { sp.edit().putBoolean(K_KEEP_ON, v).apply(); _keepOn.value = v }
 
-    private val _tileAdded = MutableStateFlow(sp.getBoolean(K_TILE_ADDED, false))
-    val tileAdded: StateFlow<Boolean> = _tileAdded
-    fun setTileAdded(v: Boolean) { sp.edit().putBoolean(K_TILE_ADDED, v).apply(); _tileAdded.value = v }
-
-    var askedNotifications: Boolean
-        get() = sp.getBoolean(K_ASKED_NOTIF, false)
-        set(v) { sp.edit().putBoolean(K_ASKED_NOTIF, v).apply() }
-
     var askedLocation: Boolean
-        get() = sp.getBoolean(K_ASKED_LOC, false)
-        set(v) { sp.edit().putBoolean(K_ASKED_LOC, v).apply() }
+        get() = local.getBoolean(K_ASKED_LOC, false)
+        set(v) { local.edit().putBoolean(K_ASKED_LOC, v).apply() }
+
+    var shownLongPressHint: Boolean
+        get() = local.getBoolean(K_HINT, false)
+        set(v) { local.edit().putBoolean(K_HINT, v).apply() }
+
+    private val _offOnClose = MutableStateFlow(sp.getBoolean(K_OFF_ON_CLOSE, true))
+    /** Turn speed off when the Quick Settings panel closes. */
+    val offOnPanelClose: StateFlow<Boolean> = _offOnClose
+    fun setOffOnPanelClose(v: Boolean) { sp.edit().putBoolean(K_OFF_ON_CLOSE, v).apply(); _offOnClose.value = v }
 
     fun loadTrip(): TripStats = TripStats(
         maxKmh = sp.getFloat(K_MAX, 0f),
@@ -59,8 +71,8 @@ class Prefs(context: Context) {
         const val K_AUTOSTOP = "auto_stop_min"
         const val K_DECIMALS = "decimals"
         const val K_KEEP_ON = "keep_screen_on"
-        const val K_TILE_ADDED = "tile_added"
-        const val K_ASKED_NOTIF = "asked_notifications"
+        const val K_HINT = "shown_long_press_hint"
+        const val K_OFF_ON_CLOSE = "off_on_panel_close"
         const val K_ASKED_LOC = "asked_location"
         const val K_MAX = "trip_max"
         const val K_DIST = "trip_distance"
