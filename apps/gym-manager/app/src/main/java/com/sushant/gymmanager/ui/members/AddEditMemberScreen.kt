@@ -351,7 +351,7 @@ fun AddEditMemberScreen(memberId: Long, onDone: () -> Unit, vm: AddEditMemberVie
 
     when (picker) {
         Picker.DOB -> AppDatePickerDialog(f.dateOfBirth.ifBlank { "2000-01-01" }, { iso -> vm.update { it.copy(dateOfBirth = iso) } }, { picker = null }, pastOnly = true)
-        Picker.DOJ -> AppDatePickerDialog(f.dateOfJoining, { iso -> vm.update { it.copy(dateOfJoining = iso) } }) { picker = null }
+        Picker.DOJ -> AppDatePickerDialog(f.dateOfJoining, { iso -> vm.update { it.copy(dateOfJoining = iso) } }, { picker = null })
         Picker.FROM -> AppTimePickerDialog(t("Workout starts at"), f.fromTime.ifBlank { "06:00" }, { tm ->
             vm.update { it.copy(fromTime = tm, toTime = it.toTime.ifBlank { DateUtils.parseTime(tm)?.plusHours(1)?.let { x -> DateUtils.toHHmm(x.hour, x.minute) } ?: "" }) }
             touched = touched + "slot"
