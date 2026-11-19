@@ -12,6 +12,10 @@ object Errors {
                 "No internet connection (or it is too slow). Check your network and try again."
             "unsupported url" in l ->
                 "This link isn't supported. Make sure it's a direct link to a video or post."
+            "not a bot" in l ->
+                "YouTube wants to check you're not a bot. Log in to YouTube in Settings → Accounts, or switch between Wi-Fi and mobile data and try again."
+            "impersonat" in l && "web client only works when logged-in" in l || "web client only works when logged-in" in l ->
+                "This site only allows downloads when you're logged in. Open Settings → Accounts, log in, then try again."
             "sign in to confirm your age" in l || "age-restricted" in l || "confirm your age" in l ->
                 "This video is age-restricted. Log in to the site in Settings → Accounts, then try again."
             "sign in to confirm" in l || "use --cookies" in l || "login required" in l ||

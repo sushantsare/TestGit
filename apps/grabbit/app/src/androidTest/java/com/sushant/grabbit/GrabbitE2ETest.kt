@@ -164,17 +164,18 @@ class GrabbitE2ETest {
         shot("01_home_ready")
 
         val direct = grab("direct", "https://www.w3schools.com/html/mov_bbb.mp4")
+        val x = grab("x", "https://x.com/SpaceX/status/1732824684683784516")
+        val dm = grab("dailymotion", "https://www.dailymotion.com/video/x7tgad0")
+        val fb = grab("facebook", "https://www.facebook.com/watch/?v=10153231379946729")
         val youtube = grab("youtube", "https://www.youtube.com/watch?v=jNQXAC9IVRw")
-        val vimeo = grab("vimeo", "https://vimeo.com/76979871")
 
         compose.onNodeWithTag("nav_downloads").performClick()
         shot("90_downloads")
         compose.onNodeWithTag("nav_settings").performClick()
         shot("91_settings")
 
-        diagnose()
-        log("SUMMARY direct=$direct youtube=$youtube vimeo=$vimeo")
+        log("SUMMARY direct=$direct x=$x dailymotion=$dm facebook=$fb youtube=$youtube")
         results.forEach { Log.i("GrabbitE2E", "RESULT $it") }
-        assertTrue("No download succeeded", direct || youtube || vimeo)
+        assertTrue("Downloads failed", direct && x)
     }
 }
