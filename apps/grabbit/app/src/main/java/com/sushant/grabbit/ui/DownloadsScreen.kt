@@ -1,5 +1,8 @@
 package com.sushant.grabbit.ui
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.IntentSenderRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -19,7 +22,11 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.ErrorOutline
+import androidx.compose.material.icons.rounded.Search
+import androidx.compose.material.icons.rounded.SwapVert
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.DownloadDone
 import androidx.compose.material.icons.rounded.MoreVert
@@ -40,9 +47,11 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -54,10 +63,13 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.work.WorkInfo
 import coil.compose.AsyncImage
 import com.sushant.grabbit.data.SavedItem
@@ -69,6 +81,11 @@ fun DownloadsScreen(vm: MainViewModel, modifier: Modifier) {
     val works by vm.works.collectAsState()
     val library by vm.library.collectAsState()
     var filter by remember { mutableStateOf("All") }
+    var query by remember { mutableStateOf("") }
+    var sort by remember { mutableStateOf(0) }
+
+    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { vm.checkMissing() }
+    LaunchedEffect(library.size) { vm.checkMissing() }
 
     val active = works
         .filter { it.state != WorkInfo.State.SUCCEEDED && it.state != WorkInfo.State.CANCELLED }
@@ -76,10 +93,20 @@ fun DownloadsScreen(vm: MainViewModel, modifier: Modifier) {
         .sortedByDescending { Downloads.created(it) }
     val sites = listOf("All") + library.map { it.site }.filter { it.isNotBlank() }.distinct().sorted() +
         (if (library.any { it.isAudio }) listOf("Audio") else emptyList())
-    val shown = when (filter) {
+    val byChip = when (filter) {
         "All" -> library
         "Audio" -> library.filter { it.isAudio }
         else -> library.filter { it.site == filter }
+    }
+    val q = query.trim()
+    val matched = if (q.isEmpty()) byChip else byChip.filter {
+        it.title.contains(q, true) || it.site.contains(q, true) || it.fileName.contains(q, true)
+    }
+    val shown = when (sort) {
+        1 -> matched.sortedBy { it.time }
+        2 -> matched.sortedBy { it.title.lowercase() }
+        3 -> matched.sortedByDescending { it.size }
+        else -> matched.sortedByDescending { it.time }
     }
 
     LazyColumn(
@@ -104,12 +131,20 @@ fun DownloadsScreen(vm: MainViewModel, modifier: Modifier) {
         if (library.isEmpty()) {
             item { EmptyState() }
         } else {
+            item { SearchSortRow(query, { query = it }, sort, { sort = it }) }
             item {
                 LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     items(sites) { s -> FilterChip(selected = filter == s, onClick = { filter = s }, label = { Text(s) }) }
                 }
             }
-            items(shown, key = { it.id }) { item -> SavedRow(item, vm) }
+            if (shown.isEmpty()) item {
+                Text(
+                    if (q.isNotEmpty()) "No downloads match \"$q\"" else "Nothing in this filter",
+                    Modifier.fillMaxWidth().padding(vertical = 24.dp), textAlign = TextAlign.Center,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            items(shown, key = { it.id }) { item -> SavedRow(item, item.id in vm.missing, vm) }
         }
     }
 }
@@ -186,15 +221,23 @@ private fun ActiveRow(w: WorkInfo, vm: MainViewModel) {
                     ?: if (w.state == WorkInfo.State.RUNNING) "Starting…" else "Waiting…"
                 val speed = p.getString(DownloadWorker.P_SPEED).orEmpty()
                 val eta = fmtEta(p.getLong(DownloadWorker.P_ETA, 0))
+                val size = p.getString(DownloadWorker.P_SIZE).orEmpty()
                 if (pct > 0f) {
                     LinearProgressIndicator(progress = { pct / 100f }, modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(4.dp)))
                 } else {
                     LinearProgressIndicator(Modifier.fillMaxWidth().clip(RoundedCornerShape(4.dp)))
                 }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(status, Modifier.weight(1f), style = MaterialTheme.typography.bodySmall,
+                        fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    if (pct > 0f) Text("${pct.toInt()}%", style = MaterialTheme.typography.bodySmall,
+                        fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                }
+                val detail = listOf(size, speed, eta).filter { it.isNotBlank() }.joinToString("  ·  ")
                 Text(
-                    listOf(status, if (pct > 0f) "${pct.toInt()}%" else "", speed, eta)
-                        .filter { it.isNotBlank() }.joinToString("  ·  "),
+                    detail.ifEmpty { "Connecting to the site…" },
                     style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1, overflow = TextOverflow.Ellipsis,
                 )
             }
         }
@@ -209,36 +252,52 @@ private fun qualityText(q: String) = when {
 }
 
 @Composable
-private fun SavedRow(item: SavedItem, vm: MainViewModel) {
+private fun SavedRow(item: SavedItem, missing: Boolean, vm: MainViewModel) {
     val ctx = LocalContext.current
     var menu by remember { mutableStateOf(false) }
     var confirm by remember { mutableStateOf(false) }
+    var confirmRemove by remember { mutableStateOf(false) }
+    val deleteLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) {
+        vm.afterDeleteConfirm(item)
+    }
     Card(
         shape = RoundedCornerShape(18.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
-        modifier = Modifier.fillMaxWidth().clickable { ctx.openUri(item.uri, item.mime) },
+        modifier = Modifier.fillMaxWidth().clickable {
+            if (missing) confirmRemove = true else ctx.openUri(item.uri, item.mime)
+        },
     ) {
         Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
             Thumb(item.thumb, item.isAudio)
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
                 Text(item.title, maxLines = 2, overflow = TextOverflow.Ellipsis, fontWeight = FontWeight.SemiBold)
-                Text(
+                if (missing) Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Rounded.ErrorOutline, null, Modifier.size(14.dp), tint = MaterialTheme.colorScheme.error)
+                    Spacer(Modifier.width(4.dp))
+                    Text("File missing · tap to remove", style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error, maxLines = 1)
+                } else Text(
                     listOf(item.site, fmtSize(item.size), fmtDate(item.time)).filter { it.isNotBlank() }.joinToString(" · "),
                     style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1, overflow = TextOverflow.Ellipsis,
                 )
             }
             Box {
-                IconButton(onClick = { menu = true }) { Icon(Icons.Rounded.MoreVert, "More") }
+                IconButton(onClick = { menu = true }) { Icon(Icons.Rounded.MoreVert, "More options") }
                 DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
-                    DropdownMenuItem(text = { Text("Play") }, leadingIcon = { Icon(Icons.Rounded.PlayArrow, null) },
-                        onClick = { menu = false; ctx.openUri(item.uri, item.mime) })
-                    DropdownMenuItem(text = { Text("Share") }, leadingIcon = { Icon(Icons.Rounded.Share, null) },
-                        onClick = { menu = false; ctx.shareUri(item.uri, item.mime) })
+                    if (!missing) {
+                        DropdownMenuItem(text = { Text("Play") }, leadingIcon = { Icon(Icons.Rounded.PlayArrow, null) },
+                            onClick = { menu = false; ctx.openUri(item.uri, item.mime) })
+                        DropdownMenuItem(text = { Text("Share") }, leadingIcon = { Icon(Icons.Rounded.Share, null) },
+                            onClick = { menu = false; ctx.shareUri(item.uri, item.mime) })
+                    }
                     if (item.sourceUrl.isNotBlank()) DropdownMenuItem(text = { Text("Open original post") },
                         leadingIcon = { Icon(Icons.Rounded.OpenInBrowser, null) },
                         onClick = { menu = false; ctx.openLink(item.sourceUrl) })
-                    DropdownMenuItem(text = { Text("Delete") }, leadingIcon = { Icon(Icons.Rounded.Delete, null) },
+                    if (missing) DropdownMenuItem(text = { Text("Remove from list") }, leadingIcon = { Icon(Icons.Rounded.Close, null) },
+                        onClick = { menu = false; vm.removeFromList(item) })
+                    else DropdownMenuItem(text = { Text("Delete") }, leadingIcon = { Icon(Icons.Rounded.Delete, null) },
                         onClick = { menu = false; confirm = true })
                 }
             }
@@ -247,10 +306,58 @@ private fun SavedRow(item: SavedItem, vm: MainViewModel) {
     if (confirm) AlertDialog(
         onDismissRequest = { confirm = false },
         title = { Text("Delete this file?") },
-        text = { Text(item.title) },
-        confirmButton = { TextButton(onClick = { confirm = false; vm.delete(item) }) { Text("Delete") } },
+        text = { Text("\"${item.title}\" will be deleted from your phone.") },
+        confirmButton = {
+            TextButton(onClick = {
+                confirm = false
+                vm.delete(item) { sender -> deleteLauncher.launch(IntentSenderRequest.Builder(sender).build()) }
+            }) { Text("Delete") }
+        },
         dismissButton = { TextButton(onClick = { confirm = false }) { Text("Cancel") } },
     )
+    if (confirmRemove) AlertDialog(
+        onDismissRequest = { confirmRemove = false },
+        title = { Text("File not found") },
+        text = { Text("This file was deleted or moved outside Grabbit. Remove it from the list?") },
+        confirmButton = { TextButton(onClick = { confirmRemove = false; vm.removeFromList(item) }) { Text("Remove") } },
+        dismissButton = { TextButton(onClick = { confirmRemove = false }) { Text("Keep") } },
+    )
+}
+
+private val SORTS = listOf("Newest first", "Oldest first", "Name (A–Z)", "Largest first")
+
+@Composable
+private fun SearchSortRow(query: String, onQuery: (String) -> Unit, sort: Int, onSort: (Int) -> Unit) {
+    var open by remember { mutableStateOf(false) }
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        OutlinedTextField(
+            value = query,
+            onValueChange = onQuery,
+            modifier = Modifier.weight(1f).testTag("searchField"),
+            placeholder = { Text("Search downloads") },
+            leadingIcon = { Icon(Icons.Rounded.Search, null) },
+            trailingIcon = {
+                if (query.isNotEmpty()) IconButton(onClick = { onQuery("") }) { Icon(Icons.Rounded.Close, "Clear search") }
+            },
+            singleLine = true,
+            shape = RoundedCornerShape(16.dp),
+        )
+        Spacer(Modifier.width(8.dp))
+        Box {
+            IconButton(onClick = { open = true }, modifier = Modifier.testTag("sortBtn")) {
+                Icon(Icons.Rounded.SwapVert, "Sort: ${SORTS[sort]}")
+            }
+            DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+                SORTS.forEachIndexed { i, label ->
+                    DropdownMenuItem(
+                        text = { Text(label) },
+                        leadingIcon = { if (i == sort) Icon(Icons.Rounded.Check, null) else Spacer(Modifier.size(24.dp)) },
+                        onClick = { open = false; onSort(i) },
+                    )
+                }
+            }
+        }
+    }
 }
 
 @Composable

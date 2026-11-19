@@ -1,3 +1,5 @@
+import com.android.build.api.variant.FilterConfiguration
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
@@ -11,9 +13,9 @@ android {
     defaultConfig {
         applicationId = "com.sushant.grabbit"
         minSdk = 26
-        targetSdk = 34
-        versionCode = 1
-        versionName = "1.0"
+        targetSdk = 35
+        versionCode = 2
+        versionName = "1.1"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
@@ -30,13 +32,24 @@ android {
         release {
             isMinifyEnabled = false
             signingConfig = signingConfigs.getByName("release")
-            // Phones only (keeps the APK smaller); debug keeps x86_64 for the emulator test
-            ndk { abiFilters += listOf("arm64-v8a", "armeabi-v7a") }
         }
         debug {
             signingConfig = signingConfigs.getByName("release")
         }
     }
+
+    // One APK per CPU type: the 64-bit phone APK is about half the size of a combined one.
+    // x86_64 is only for the emulator test run.
+    splits {
+        abi {
+            isEnable = true
+            reset()
+            include("arm64-v8a", "armeabi-v7a", "x86_64")
+            isUniversalApk = false
+        }
+    }
+
+    testOptions.unitTests.isReturnDefaultValues = true
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
@@ -62,6 +75,17 @@ android {
     }
 }
 
+// Each CPU-type APK gets its own versionCode (base * 10 + n) so updates install cleanly
+androidComponents {
+    onVariants { variant ->
+        variant.outputs.forEach { output ->
+            val abi = output.filters.find { it.filterType == FilterConfiguration.FilterType.ABI }?.identifier
+            val n = mapOf("armeabi-v7a" to 1, "arm64-v8a" to 2, "x86_64" to 3)[abi]
+            if (n != null) output.versionCode.set((output.versionCode.orNull ?: 0) * 10 + n)
+        }
+    }
+}
+
 dependencies {
     val ytdl = "0.17.4"
     implementation("io.github.junkfood02.youtubedl-android:library:$ytdl")
@@ -83,6 +107,7 @@ dependencies {
 
     implementation("io.coil-kt:coil-compose:2.7.0")
 
+    testImplementation("junit:junit:4.13.2")
     debugImplementation("androidx.compose.ui:ui-test-manifest")
     androidTestImplementation(platform("androidx.compose:compose-bom:2024.12.01"))
     androidTestImplementation("androidx.test.ext:junit:1.2.1")

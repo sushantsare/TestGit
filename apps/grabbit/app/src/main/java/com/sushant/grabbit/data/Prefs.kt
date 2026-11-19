@@ -45,4 +45,9 @@ object Prefs {
     var hidden: Set<String>
         get() = p.getStringSet("hidden", emptySet()) ?: emptySet()
         set(v) = p.edit().putStringSet("hidden", v).apply()
+
+    /** Notification permission is asked once, at the first download */
+    var notifAsked: Boolean
+        get() = p.getBoolean("notif_asked", false)
+        set(v) = p.edit().putBoolean("notif_asked", v).apply()
 }

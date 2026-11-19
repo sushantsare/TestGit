@@ -17,7 +17,10 @@ import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.rule.GrantPermissionRule
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
+import androidx.lifecycle.ViewModelProvider
 import com.sushant.grabbit.data.Library
+import com.sushant.grabbit.data.SavedItem
+import com.sushant.grabbit.ui.MainViewModel
 import com.sushant.grabbit.data.Prefs
 import com.sushant.grabbit.download.DownloadWorker
 import com.sushant.grabbit.download.Downloads
@@ -173,6 +176,48 @@ class GrabbitE2ETest {
         shot("90_downloads")
         compose.onNodeWithTag("nav_settings").performClick()
         shot("91_settings")
+
+        val vm = ViewModelProvider(compose.activity)[MainViewModel::class.java]
+
+        // Search in Saved
+        compose.onNodeWithTag("nav_downloads").performClick()
+        compose.onNodeWithTag("searchField").performTextInput("mov")
+        shot("92_search")
+        compose.onNodeWithTag("searchField").performTextClearance()
+
+        // A library entry whose file is gone must be detected as missing
+        val ghost = SavedItem(
+            id = "ghost", title = "Deleted from gallery", site = "Test", thumb = "",
+            uri = "content://media/external/video/media/987654321", fileName = "ghost.mp4", mime = "video/mp4",
+            size = 1, time = System.currentTimeMillis(), sourceUrl = "", path = null,
+        )
+        Library.add(listOf(ghost))
+        val missingOk = "ghost" in vm.findMissing(Library.items.value)
+        log("MISSING-CHECK ghost detected=$missingOk")
+        compose.activity.runOnUiThread { vm.checkMissing() }
+        Thread.sleep(1500)
+        shot("93_missing_file")
+        Library.remove("ghost")
+        assertTrue("Missing file not detected", missingOk)
+
+        // Delete must really remove the file, not just the list entry
+        val target = Library.items.value.firstOrNull { it.fileName.startsWith("mov_bbb") }
+        if (target != null) {
+            val r = vm.deleteNow(target)
+            val gone = !vm.fileExists(target)
+            log("DELETE result=$r fileGone=$gone")
+            assertTrue("Delete did not remove the file: $r", r == MainViewModel.DeleteResult.Done && gone)
+        }
+
+        // Dark mode screenshots of every main screen
+        Prefs.theme = 2
+        compose.onNodeWithTag("nav_home").performClick()
+        shot("95_dark_home")
+        compose.onNodeWithTag("nav_downloads").performClick()
+        shot("96_dark_downloads")
+        compose.onNodeWithTag("nav_settings").performClick()
+        shot("97_dark_settings")
+        Prefs.theme = 0
 
         log("SUMMARY direct=$direct x=$x dailymotion=$dm facebook=$fb youtube=$youtube")
         results.forEach { Log.i("GrabbitE2E", "RESULT $it") }

@@ -1,5 +1,14 @@
 package com.sushant.grabbit.ui
 
+import android.Manifest
+import android.app.Activity
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.net.Uri
+import android.os.Build
+import android.provider.Settings
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -18,6 +27,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
@@ -31,7 +41,9 @@ import androidx.compose.material.icons.rounded.MusicNote
 import androidx.compose.material.icons.rounded.PlaylistPlay
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Search
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -44,6 +56,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -54,6 +67,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
@@ -68,15 +82,57 @@ import com.sushant.grabbit.R
 import com.sushant.grabbit.data.Prefs
 import com.sushant.grabbit.engine.Engine
 import com.sushant.grabbit.engine.MediaInfo
+import androidx.core.app.ActivityCompat
 
 @Composable
 fun HomeScreen(vm: MainViewModel, modifier: Modifier) {
     val engine by vm.engine.collectAsState()
     val focus = LocalFocusManager.current
     val go = { focus.clearFocus(); vm.fetch() }
+    val ctx = LocalContext.current
+    val list = rememberLazyListState()
+
+    // Permissions are asked here, the first time the user downloads, never at app start.
+    var pending by remember { mutableStateOf<Pair<MediaInfo, String>?>(null) }
+    var explain by remember { mutableStateOf<List<String>>(emptyList()) }
+    var storageBlocked by remember { mutableStateOf(false) }
+    val permLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { res ->
+        val p = pending
+        pending = null
+        val storageDenied = Build.VERSION.SDK_INT <= 28 && res[Manifest.permission.WRITE_EXTERNAL_STORAGE] == false
+        if (storageDenied) storageBlocked = true
+        else if (p != null) vm.download(p.first, p.second)
+    }
+    val startDownload: (MediaInfo, String) -> Unit = { info, q ->
+        val need = neededPermissions(ctx)
+        if (need.isEmpty()) vm.download(info, q) else { pending = info to q; explain = need }
+    }
+
+    // When video details arrive, bring the card (and its Download button) into view
+    LaunchedEffect(vm.fetchState) {
+        if (vm.fetchState is FetchState.Loaded) list.animateScrollToItem(if (engine !is Engine.State.Ready) 3 else 2)
+    }
+
+    if (explain.isNotEmpty()) PermissionExplainDialog(
+        need = explain,
+        onContinue = {
+            if (Manifest.permission.POST_NOTIFICATIONS in explain) Prefs.notifAsked = true
+            permLauncher.launch(explain.toTypedArray()); explain = emptyList()
+        },
+        onSkip = {
+            Prefs.notifAsked = true
+            val p = pending
+            pending = null
+            val storageNeeded = explain.contains(Manifest.permission.WRITE_EXTERNAL_STORAGE)
+            explain = emptyList()
+            if (storageNeeded) storageBlocked = true else if (p != null) vm.download(p.first, p.second)
+        },
+    )
+    if (storageBlocked) StorageBlockedDialog(ctx) { storageBlocked = false }
 
     LazyColumn(
         modifier.fillMaxSize(),
+        state = list,
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
@@ -116,26 +172,26 @@ fun HomeScreen(vm: MainViewModel, modifier: Modifier) {
             FetchState.Idle -> item { HowToCard() }
             FetchState.Loading -> item { LoadingCard() }
             is FetchState.Failed -> item { FetchErrorCard(f.message, f.raw) { vm.fetch() } }
-            is FetchState.Loaded -> item { InfoCard(f.info) { q -> vm.download(f.info, q) } }
+            is FetchState.Loaded -> item { InfoCard(f.info) { q -> startDownload(f.info, q) } }
         }
     }
 }
 
 @Composable
 private fun Header() {
-    Box(
-        Modifier.fillMaxWidth().clip(RoundedCornerShape(24.dp)).background(BrandGradient).padding(20.dp)
+    Row(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(20.dp)).background(BrandGradient)
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Image(
-                painterResource(R.drawable.ic_launcher_foreground), null,
-                Modifier.size(64.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.15f)),
-            )
-            Spacer(Modifier.width(14.dp))
-            Column {
-                Text("Grabbit", color = Color.White, fontSize = 30.sp, fontWeight = FontWeight.ExtraBold)
-                Text("Grab videos from anywhere", color = Color.White.copy(alpha = 0.9f), fontSize = 14.sp)
-            }
+        Image(
+            painterResource(R.drawable.ic_launcher_foreground), null,
+            Modifier.size(44.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.15f)),
+        )
+        Spacer(Modifier.width(12.dp))
+        Column {
+            Text("Grabbit", color = Color.White, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.ExtraBold)
+            Text("Grab videos from anywhere", color = Color.White.copy(alpha = 0.9f), style = MaterialTheme.typography.bodySmall)
         }
     }
 }
@@ -156,9 +212,12 @@ private fun EngineBanner(state: Engine.State, onRetry: () -> Unit) {
                 Text("Engine couldn't start: ${state.message}", Modifier.weight(1f), style = MaterialTheme.typography.bodySmall)
                 TextButton(onClick = onRetry) { Text("Retry") }
             } else {
-                CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
-                Spacer(Modifier.width(12.dp))
-                Text("Setting up the download engine… (first launch takes a few seconds)", style = MaterialTheme.typography.bodySmall)
+                Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Setting up the download engine…", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                    LinearProgressIndicator(Modifier.fillMaxWidth().clip(RoundedCornerShape(4.dp)))
+                    Text("First launch only. Takes a few seconds.", style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
             }
         }
     }
@@ -324,4 +383,61 @@ fun Pill(text: String, modifier: Modifier = Modifier) {
         modifier.clip(RoundedCornerShape(8.dp)).background(Color.Black.copy(alpha = 0.65f))
             .padding(horizontal = 8.dp, vertical = 3.dp)
     ) { Text(text, color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.SemiBold) }
+}
+
+/** Permissions still needed before a download: notifications (asked once, optional) and storage on Android 9 and older. */
+private fun neededPermissions(ctx: android.content.Context): List<String> = buildList {
+    fun granted(p: String) = ctx.checkSelfPermission(p) == PackageManager.PERMISSION_GRANTED
+    if (Build.VERSION.SDK_INT >= 33 && !Prefs.notifAsked && !granted(Manifest.permission.POST_NOTIFICATIONS))
+        add(Manifest.permission.POST_NOTIFICATIONS)
+    if (Build.VERSION.SDK_INT <= 28 && !granted(Manifest.permission.WRITE_EXTERNAL_STORAGE))
+        add(Manifest.permission.WRITE_EXTERNAL_STORAGE)
+}
+
+@Composable
+private fun PermissionExplainDialog(need: List<String>, onContinue: () -> Unit, onSkip: () -> Unit) {
+    val storage = Manifest.permission.WRITE_EXTERNAL_STORAGE in need
+    AlertDialog(
+        onDismissRequest = onSkip,
+        title = { Text("Before your first download") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (Build.VERSION.SDK_INT >= 33 && Manifest.permission.POST_NOTIFICATIONS in need)
+                    Text("Notifications: see download progress and know when a video is ready. Optional — downloads work without it.")
+                if (storage)
+                    Text("Storage: on this Android version, Grabbit needs it to save videos to Movies/Grabbit and Music/Grabbit.")
+            }
+        },
+        confirmButton = { TextButton(onClick = onContinue) { Text("Continue") } },
+        dismissButton = { TextButton(onClick = onSkip) { Text(if (storage) "Cancel" else "Not now") } },
+    )
+}
+
+@Composable
+private fun StorageBlockedDialog(ctx: android.content.Context, onClose: () -> Unit) {
+    val permanently = (ctx as? Activity)?.let {
+        !ActivityCompat.shouldShowRequestPermissionRationale(it, Manifest.permission.WRITE_EXTERNAL_STORAGE)
+    } ?: false
+    AlertDialog(
+        onDismissRequest = onClose,
+        title = { Text("Storage access needed") },
+        text = {
+            Text(
+                "Grabbit can't save videos on this Android version without storage access." +
+                    if (permanently) " Turn it on in Settings → Permissions → Storage." else " Tap Download again to allow it."
+            )
+        },
+        confirmButton = {
+            if (permanently) TextButton(onClick = {
+                onClose()
+                runCatching {
+                    ctx.startActivity(
+                        Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:${ctx.packageName}"))
+                            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    )
+                }
+            }) { Text("Open Settings") } else TextButton(onClick = onClose) { Text("OK") }
+        },
+        dismissButton = { if (permanently) TextButton(onClick = onClose) { Text("Cancel") } },
+    )
 }

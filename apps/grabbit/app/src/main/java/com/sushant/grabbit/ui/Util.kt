@@ -6,6 +6,7 @@ import android.content.Intent
 import android.net.Uri
 import android.widget.Toast
 import java.text.SimpleDateFormat
+import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 
@@ -26,7 +27,18 @@ fun fmtDuration(sec: Long): String {
 
 fun fmtEta(sec: Long): String = if (sec <= 0) "" else fmtDuration(sec) + " left"
 
-fun fmtDate(ms: Long): String = SimpleDateFormat("d MMM, h:mm a", Locale.getDefault()).format(Date(ms))
+/** Compact one-line date: "4:42 AM" today, "19 Nov" this year, "19 Nov 2025" otherwise. */
+fun fmtDate(ms: Long, now: Long = System.currentTimeMillis(), locale: Locale = Locale.getDefault()): String {
+    val a = Calendar.getInstance().apply { timeInMillis = ms }
+    val b = Calendar.getInstance().apply { timeInMillis = now }
+    val sameYear = a.get(Calendar.YEAR) == b.get(Calendar.YEAR)
+    val pattern = when {
+        sameYear && a.get(Calendar.DAY_OF_YEAR) == b.get(Calendar.DAY_OF_YEAR) -> "h:mm a"
+        sameYear -> "d MMM"
+        else -> "d MMM yyyy"
+    }
+    return SimpleDateFormat(pattern, locale).format(Date(ms))
+}
 
 fun qualityLabel(res: Int): String = when {
     res >= 4320 -> "8K"

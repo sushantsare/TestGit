@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.Chat
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.Email
 import androidx.compose.material.icons.rounded.Phone
@@ -172,12 +173,19 @@ fun SettingsScreen(vm: MainViewModel, modifier: Modifier) {
                 }
                 Row(
                     Modifier.fillMaxWidth().clickable {
-                        runCatching { ctx.startActivity(Intent(Intent.ACTION_DIAL, Uri.parse("tel:8877612216"))) }
+                        runCatching { ctx.startActivity(Intent(Intent.ACTION_DIAL, Uri.parse("tel:+918877612216"))) }
                     }.padding(vertical = 4.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Icon(Icons.Rounded.Phone, null, Modifier.size(18.dp)); Spacer(Modifier.width(8.dp))
-                    Text("8877612216")
+                    Text("+91 88776 12216")
+                }
+                Row(
+                    Modifier.fillMaxWidth().clickable { ctx.openLink("https://wa.me/918877612216") }.padding(vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(Icons.AutoMirrored.Rounded.Chat, null, Modifier.size(18.dp)); Spacer(Modifier.width(8.dp))
+                    Text("Message on WhatsApp")
                 }
                 Text(
                     "Download only content you have the right to save. Powered by yt-dlp and FFmpeg.",

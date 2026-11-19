@@ -35,6 +35,7 @@ class DownloadWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(c
         const val P_STATUS = "status"
         const val P_SPEED = "speed"
         const val P_ETA = "eta"
+        const val P_SIZE = "size"
         private val SPEED = Regex("""at\s+~?\s*([\d.]+\s*[KMG]i?B/s)""")
         private val ITEM = Regex("""Downloading item (\d+) of (\d+)""")
 
@@ -108,6 +109,7 @@ class DownloadWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(c
         val req = buildRequest(ctx, url, quality, playlist, tmp)
         val nm = ctx.getSystemService(NotificationManager::class.java)
         var last = 0L
+        var total = 0L
         var status = if (quality == "audio") "Downloading audio…" else "Downloading…"
 
         try {
@@ -119,15 +121,18 @@ class DownloadWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(c
                         line.contains("[EmbedThumbnail]") || line.contains("[Metadata]") -> status = "Finishing…"
                         else -> ITEM.find(line)?.let { status = "Downloading ${it.groupValues[1]} of ${it.groupValues[2]}…" }
                     }
+                    Progress.totalBytes(line)?.let { total = it }
                     val now = SystemClock.elapsedRealtime()
                     if (now - last >= 600) {
                         last = now
                         val pct = p.coerceIn(0f, 100f)
-                        val speed = SPEED.find(line)?.groupValues?.get(1) ?: ""
-                        setProgressAsync(workDataOf(P_PCT to pct, P_STATUS to status, P_SPEED to speed, P_ETA to eta))
+                        val speed = (SPEED.find(line)?.groupValues?.get(1) ?: "").replace("iB", "B")
+                        val size = Progress.sizeText(pct, total)
+                        setProgressAsync(workDataOf(P_PCT to pct, P_STATUS to status, P_SPEED to speed, P_ETA to eta, P_SIZE to size))
                         val text = buildString {
                             append(status)
                             if (pct > 0) append("  ${pct.toInt()}%")
+                            if (size.isNotEmpty()) append("  ·  $size")
                             if (speed.isNotEmpty()) append("  ·  $speed")
                         }
                         nm.notify(nid, Notifs.progress(ctx, title, text, pct.toInt(), p <= 0f, id))
