@@ -1,0 +1,20 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp" android:height="108dp"
+    android:viewportWidth="108" android:viewportHeight="108">
+    <!-- violet glow -->
+    <path android:fillColor="#557C5CBF"
+        android:pathData="M54,54m-27,0a27,27 0,1 1,54 0a27,27 0,1 1,-54 0" />
+    <!-- quill feather -->
+    <path android:fillColor="#7C5CBF"
+        android:pathData="M72,28C60,30 49,39 44,52L40,64L46,62L50,58C58,55 66,47 70,37C68,39 64,41 61,42C66,38 70,33 72,28Z" />
+    <path android:fillColor="#FFFFFF"
+        android:pathData="M70,30C61,33 52,41 47,52L44,60L48,57C55,53 62,46 66,38C63,40 60,41 57,41C62,38 67,34 70,30Z" />
+    <!-- nib -->
+    <path android:fillColor="#E1D8F5"
+        android:pathData="M44,58L39,68L41,69L47,61Z" />
+    <path android:strokeColor="#7C5CBF" android:strokeWidth="1.2" android:strokeLineCap="round"
+        android:pathData="M62,40L45,60" />
+    <!-- ink stroke -->
+    <path android:strokeColor="#FFFFFF" android:strokeWidth="2.6" android:strokeLineCap="round"
+        android:pathData="M37,74C44,70 50,77 57,73C62,70 66,72 71,74" />
+</vector>

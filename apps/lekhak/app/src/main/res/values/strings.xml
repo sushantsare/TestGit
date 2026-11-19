@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">Lekhak</string>
+    <string name="accessibility_label">Lekhak AI Assistant</string>
+    <string name="accessibility_description">Lekhak reads the open WhatsApp chat and your typed draft only when you tap the violet pen bubble, so it can suggest replies and rewrite your message. It works only inside WhatsApp and WhatsApp Business. Nothing is stored.</string>
+</resources>
