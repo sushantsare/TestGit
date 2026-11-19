@@ -64,36 +64,42 @@ private val LightColors = lightColorScheme(
     onErrorContainer = Color(0xFF7F1D1D)
 )
 
+// Dark theme: neutral charcoal (no blue tint) with a warm orange accent.
+// Layers get slightly lighter as they rise: background < surface < containers.
 private val DarkColors = darkColorScheme(
-    primary = Amber400,
-    onPrimary = Color(0xFF431407),
-    primaryContainer = Color(0xFF7C2D12),
-    onPrimaryContainer = Color(0xFFFFEDD5),
-    secondary = Slate400,
-    onSecondary = Color(0xFF0F172A),
-    secondaryContainer = Color(0xFF1E293B),
-    onSecondaryContainer = Color(0xFFE2E8F0),
-    tertiary = Teal400,
-    onTertiary = Color(0xFF042F2E),
-    tertiaryContainer = Color(0xFF134E4A),
-    onTertiaryContainer = Color(0xFFCCFBF1),
-    background = Color(0xFF0B0F19),
-    onBackground = Color(0xFFE2E8F0),
-    surface = Color(0xFF131C2E),
-    onSurface = Color(0xFFE2E8F0),
-    surfaceVariant = Color(0xFF1C2638),
-    onSurfaceVariant = Color(0xFF94A3B8),
-    surfaceContainerLowest = Color(0xFF0B0F19),
-    surfaceContainerLow = Color(0xFF131C2E),
-    surfaceContainer = Color(0xFF131C2E),
-    surfaceContainerHigh = Color(0xFF1C2638),
-    surfaceContainerHighest = Color(0xFF243044),
-    outline = Color(0xFF334155),
-    outlineVariant = Color(0xFF1E293B),
-    error = Color(0xFFF87171),
-    onError = Color(0xFF450A0A),
-    errorContainer = Color(0xFF7F1D1D),
-    onErrorContainer = Color(0xFFFEE2E2)
+    primary = Color(0xFFFF8A3D),
+    onPrimary = Color(0xFF2A1200),
+    primaryContainer = Color(0xFF3A2416),
+    onPrimaryContainer = Color(0xFFFFD9C2),
+    secondary = Color(0xFFD6D3D1),
+    onSecondary = Color(0xFF1C1917),
+    secondaryContainer = Color(0xFF2B2826),
+    onSecondaryContainer = Color(0xFFE7E5E4),
+    tertiary = Color(0xFF4FD1C5),
+    onTertiary = Color(0xFF00201D),
+    tertiaryContainer = Color(0xFF12302D),
+    onTertiaryContainer = Color(0xFFB4F1EA),
+    background = Color(0xFF0F0F0F),
+    onBackground = Color(0xFFEDEDED),
+    surface = Color(0xFF1A1A1A),
+    onSurface = Color(0xFFF2F2F2),
+    surfaceVariant = Color(0xFF242424),
+    onSurfaceVariant = Color(0xFFA8A8A8),
+    surfaceContainerLowest = Color(0xFF0B0B0B),
+    surfaceContainerLow = Color(0xFF161616),
+    surfaceContainer = Color(0xFF1A1A1A),
+    surfaceContainerHigh = Color(0xFF242424),
+    surfaceContainerHighest = Color(0xFF2E2E2E),
+    surfaceTint = Color.Transparent,
+    inverseSurface = Color(0xFFEDEDED),
+    inverseOnSurface = Color(0xFF1A1A1A),
+    outline = Color(0xFF4A4A4A),
+    outlineVariant = Color(0xFF2C2C2C),
+    scrim = Color(0xFF000000),
+    error = Color(0xFFFF6B6B),
+    onError = Color(0xFF3A0000),
+    errorContainer = Color(0xFF3B1717),
+    onErrorContainer = Color(0xFFFFDAD6)
 )
 
 @Immutable
@@ -134,7 +140,7 @@ fun GymManagerTheme(themeMode: String = ThemeMode.SYSTEM, content: @Composable (
     val dark = isAppInDarkTheme(themeMode)
     val colors = if (dark) DarkColors else LightColors
     CompositionLocalProvider(
-        LocalExtraColors provides ExtraColors(dark, if (dark) Color(0xFF1E293B) else Color(0xFFE2E8F0))
+        LocalExtraColors provides ExtraColors(dark, if (dark) Color(0xFF2A2A2A) else Color(0xFFE2E8F0))
     ) {
         MaterialTheme(colorScheme = colors, typography = AppTypography, shapes = AppShapes, content = content)
     }

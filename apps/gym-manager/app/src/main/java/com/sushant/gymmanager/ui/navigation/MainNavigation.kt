@@ -208,7 +208,7 @@ private fun AppDrawer(gymName: String, currentRoute: String?, onSelect: (String)
         Column(Modifier.fillMaxHeight().verticalScroll(rememberScrollState()).navigationBarsPadding()) {
             Box(
                 Modifier.fillMaxWidth()
-                    .background(Brush.linearGradient(listOf(scheme.primary, Color(0xFFC2410C))))
+                    .background(Brush.linearGradient(if (com.sushant.gymmanager.ui.theme.LocalExtraColors.current.isDark) listOf(Color(0xFFD9520B), Color(0xFF8A2E0A)) else listOf(scheme.primary, Color(0xFFC2410C))))
                     .statusBarsPadding()
                     .padding(horizontal = 24.dp, vertical = 24.dp)
             ) {

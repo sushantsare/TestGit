@@ -300,7 +300,7 @@ fun DashboardScreen(
 private fun HeroBanner(collected: Double) {
     Box(
         Modifier.fillMaxWidth().clip(RoundedCornerShape(24.dp))
-            .background(Brush.linearGradient(listOf(Color(0xFFF97316), Color(0xFFC2410C))))
+            .background(Brush.linearGradient(heroColors()))
     ) {
         Icon(
             Icons.Default.FitnessCenter, null,
@@ -383,3 +383,8 @@ private fun ExpiringRow(item: ExpiringItem, onClick: () -> Unit, onRemind: () ->
         }
     }
 }
+
+@Composable
+private fun heroColors(): List<Color> =
+    if (com.sushant.gymmanager.ui.theme.LocalExtraColors.current.isDark) listOf(Color(0xFFD9520B), Color(0xFF8A2E0A))
+    else listOf(Color(0xFFF97316), Color(0xFFC2410C))
