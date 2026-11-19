@@ -3,6 +3,15 @@ package com.sushant.gymmanager.ui.navigation
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.snapshotFlow
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.drop
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.WindowInsets
@@ -123,7 +132,24 @@ fun MainNavigation(settings: GymSettingsEntity) {
     val route = backStack?.destination?.route
     val isTopLevel = destinations.any { it.route == route }
 
-    val openDrawer: () -> Unit = { scope.launch { drawerState.open() } }
+    val focusManager = LocalFocusManager.current
+    val keyboard = LocalSoftwareKeyboardController.current
+    val dropFocus: () -> Unit = {
+        focusManager.clearFocus(force = true)
+        keyboard?.hide()
+    }
+    // The moment the menu starts to move (swipe or button), release any text field so its
+    // cursor and selection handle don't float on top of the menu.
+    LaunchedEffect(drawerState) {
+        snapshotFlow { drawerState.currentOffset }
+            .distinctUntilChanged()
+            .drop(1)
+            .collect { dropFocus() }
+    }
+    val openDrawer: () -> Unit = {
+        dropFocus()
+        scope.launch { drawerState.open() }
+    }
     BackHandler(enabled = drawerState.isOpen) { scope.launch { drawerState.close() } }
 
     ModalNavigationDrawer(
@@ -137,6 +163,8 @@ fun MainNavigation(settings: GymSettingsEntity) {
         }
     ) {
         CompositionLocalProvider(LocalOpenCalendar provides { id -> nav.navigate(Routes.calendar(id)) }) {
+        // Tapping any empty area of a screen releases the text field cursor and closes the keyboard.
+        Box(Modifier.fillMaxSize().pointerInput(Unit) { detectTapGestures(onTap = { dropFocus() }) }) {
         NavHost(navController = nav, startDestination = Routes.DASHBOARD) {
             composable(Routes.DASHBOARD) {
                 DashboardScreen(
@@ -188,6 +216,7 @@ fun MainNavigation(settings: GymSettingsEntity) {
             composable(Routes.SETTINGS) {
                 SettingsScreen(onOpenDrawer = openDrawer, onDataReset = { nav.navigateTopLevel(Routes.DASHBOARD) })
             }
+        }
         }
         }
     }

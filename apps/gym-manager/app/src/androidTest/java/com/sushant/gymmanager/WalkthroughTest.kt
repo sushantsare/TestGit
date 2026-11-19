@@ -8,6 +8,8 @@ import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assertIsFocused
+import androidx.compose.ui.test.assertIsNotFocused
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createEmptyComposeRule
@@ -285,6 +287,16 @@ class WalkthroughTest {
         goTo("settings")
         waitTag("settings_scroll")
         shot("29_settings")
+        // Opening the menu while typing must release the text cursor
+        compose.onNodeWithTag("field_gym_name").performClick()
+        compose.onNodeWithTag("field_gym_name").assertIsFocused()
+        compose.onNodeWithTag("nav_menu").performClick()
+        waitTag("drawer_settings")
+        compose.waitForIdle()
+        compose.onNodeWithTag("field_gym_name").assertIsNotFocused()
+        shot("29b_drawer_over_form")
+        compose.onNodeWithTag("drawer_settings").performScrollTo().performClick()
+        compose.waitForIdle()
         compose.onNodeWithTag("theme_DARK").performScrollTo().performClick()
         shot("30_settings_bottom")
         compose.onNodeWithTag("save_settings").performClick()
