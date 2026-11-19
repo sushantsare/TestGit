@@ -36,7 +36,8 @@ private val Dark = darkColorScheme(
     outline = Color(0xFF948DA3),
     outlineVariant = Color(0xFF3D3849),
     error = Color(0xFFFFB4AB),
-    errorContainer = Color(0xFF93000A),
+    errorContainer = Color(0xFF5A1C1C),
+    onErrorContainer = Color(0xFFFFDAD6),
 )
 
 private val Light = lightColorScheme(

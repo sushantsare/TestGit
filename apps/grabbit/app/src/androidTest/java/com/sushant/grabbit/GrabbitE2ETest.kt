@@ -7,7 +7,10 @@ import android.provider.MediaStore
 import android.util.Log
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
+import androidx.test.espresso.Espresso
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextClearance
@@ -97,7 +100,12 @@ class GrabbitE2ETest {
         while (System.currentTimeMillis() - start < 300_000) {
             if (Library.items.value.size > before) break
             if (failedCount() > failedBefore) break
-            if (!shotProgress && System.currentTimeMillis() - start > 4000) { shot("${name}_2_progress"); shotProgress = true }
+            if (!shotProgress) {
+                val sized = WorkManager.getInstance(ctx).getWorkInfosByTag(Downloads.TAG).get().any {
+                    it.state == WorkInfo.State.RUNNING && !it.progress.getString(DownloadWorker.P_SIZE).isNullOrEmpty()
+                }
+                if (sized || System.currentTimeMillis() - start > 15_000) { shot("${name}_2_progress"); shotProgress = true }
+            }
             Thread.sleep(1000)
         }
         val ok = Library.items.value.size > before
@@ -183,7 +191,8 @@ class GrabbitE2ETest {
         compose.onNodeWithTag("nav_downloads").performClick()
         compose.onNodeWithTag("searchField").performTextInput("mov")
         shot("92_search")
-        compose.onNodeWithTag("searchField").performTextClearance()
+        compose.onNodeWithContentDescription("Clear search").performClick()
+        Espresso.closeSoftKeyboard()
 
         // A library entry whose file is gone must be detected as missing
         val ghost = SavedItem(
@@ -196,6 +205,9 @@ class GrabbitE2ETest {
         log("MISSING-CHECK ghost detected=$missingOk")
         compose.activity.runOnUiThread { vm.checkMissing() }
         Thread.sleep(1500)
+        compose.onNodeWithTag("sortBtn").performClick()
+        shot("93a_sort_menu")
+        compose.onNodeWithText("Newest first").performClick()
         shot("93_missing_file")
         Library.remove("ghost")
         assertTrue("Missing file not detected", missingOk)

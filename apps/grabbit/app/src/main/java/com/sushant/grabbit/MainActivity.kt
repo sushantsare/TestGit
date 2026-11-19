@@ -1,7 +1,11 @@
 package com.sushant.grabbit
 
 import android.content.Intent
+import android.graphics.Color
 import android.os.Bundle
+import androidx.activity.SystemBarStyle
+import androidx.compose.runtime.LaunchedEffect
+import com.sushant.grabbit.ui.isDarkTheme
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -22,6 +26,13 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         if (savedInstanceState == null) handleIntent(intent)
         setContent {
+            // Status/navigation bar icons follow the app's own theme choice, not just the phone's
+            val dark = isDarkTheme()
+            LaunchedEffect(dark) {
+                val style = if (dark) SystemBarStyle.dark(Color.TRANSPARENT)
+                else SystemBarStyle.light(Color.TRANSPARENT, Color.TRANSPARENT)
+                enableEdgeToEdge(statusBarStyle = style, navigationBarStyle = style)
+            }
             GrabbitTheme { GrabbitRoot(vm) }
         }
     }
