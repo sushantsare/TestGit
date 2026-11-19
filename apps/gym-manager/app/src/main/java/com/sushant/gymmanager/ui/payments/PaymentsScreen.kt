@@ -490,14 +490,15 @@ private fun HistoryList(rows: List<HistoryRow>?, onReceipt: (String) -> Unit, on
                             Column(Modifier.weight(1f)) {
                                 Text(row.member?.fullName ?: t("Deleted member"), style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
                                 Text(
-                                    listOfNotNull(
-                                        row.payment.receiptNo,
-                                        I18n.payModeLabel(lang, row.payment.mode),
-                                        row.cycle?.let { "${DateUtils.formatShort(it.cycleStart)} – ${DateUtils.formatShort(it.cycleEnd)}" }
-                                    ).joinToString(" • "),
-                                    style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    maxLines = 2
+                                    "${row.payment.receiptNo} • ${I18n.payModeLabel(lang, row.payment.mode)}",
+                                    style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1
                                 )
+                                row.cycle?.let {
+                                    Text(
+                                        "${DateUtils.formatShort(it.cycleStart)} – ${DateUtils.formatShort(it.cycleEnd)}",
+                                        style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1
+                                    )
+                                }
                             }
                             Text(Money.format(row.payment.amount), style = MaterialTheme.typography.titleSmall, color = StatusGreen)
                             IconButton(onClick = { onReceipt(row.payment.receiptNo) }) { Icon(Icons.Default.Receipt, t("Send receipt"), tint = MaterialTheme.colorScheme.primary) }

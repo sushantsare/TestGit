@@ -60,6 +60,10 @@ class WalkthroughTest {
         compose.waitForIdle()
         Thread.sleep(900)
         val bmp: Bitmap = instrumentation.uiAutomation.takeScreenshot() ?: return
+        saveBitmap(name, bmp)
+    }
+
+    private fun saveBitmap(name: String, bmp: Bitmap) {
         val values = ContentValues().apply {
             put(MediaStore.Images.Media.DISPLAY_NAME, "$name.png")
             put(MediaStore.Images.Media.MIME_TYPE, "image/png")
@@ -311,5 +315,14 @@ class WalkthroughTest {
             assertTrue(app.repository.getMember(3)?.frozenFrom != null || members.any { it.frozenFrom != null })
         }
         assertTrue(compose.onAllNodes(hasTestTag("member_card")).fetchSemanticsNodes().isEmpty())
+
+        // Render a receipt and an ID card for visual review
+        runBlocking {
+            val repo = app.repository
+            val receiptNo = repo.snapshot().payments.maxByOrNull { it.id }!!.receiptNo
+            saveBitmap("35_receipt", com.sushant.gymmanager.util.ReceiptRenderer.render(repo.receipt(receiptNo)!!, "en"))
+            val m = repo.activeMembers.first().first()
+            saveBitmap("36_id_card", com.sushant.gymmanager.util.IdCardRenderer.render(m, repo.getActiveMembership(m.id), repo.getSettings().copy(gymPhone = "98765 43210", gymAddress = "Station Road, Biharsharif"), "en"))
+        }
     }
 }
