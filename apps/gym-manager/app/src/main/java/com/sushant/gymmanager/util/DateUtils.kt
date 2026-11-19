@@ -141,5 +141,5 @@ object Money {
         minimumFractionDigits = 0
     }
 
-    fun format(amount: Double): String = "₹" + format.format(amount)
+    fun format(amount: Double): String = (if (amount < 0) "-₹" else "₹") + format.format(kotlin.math.abs(amount))
 }

@@ -109,6 +109,8 @@ class NewFeatureUtilsTest {
         assertEquals(3, s.best)
     }
 
+    @Test fun negativeMoney() = assertEquals("-₹1,800", com.sushant.gymmanager.util.Money.format(-1800.0))
+
     @Test fun cycleBalance() {
         val c = com.sushant.gymmanager.data.local.PaymentCycleEntity(memberId = 1, cycleStart = "2026-11-01", cycleEnd = "2026-12-01", amount = 1000.0, paidAmount = 400.0)
         assertEquals(600.0, c.balance, 0.001)
