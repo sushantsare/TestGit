@@ -112,9 +112,11 @@ object ReceiptRenderer {
         if (d.balanceDue > 0.005) c.drawText(Money.format(d.balanceDue), 1020f, y, paint(30f, RED, true, Paint.Align.RIGHT))
         else c.drawText(tr("No dues"), 1020f, y, paint(30f, GREEN, true, Paint.Align.RIGHT))
 
-        // PAID stamp
-        val stamp = paint(64f, 0x3316A34A, true, Paint.Align.CENTER)
-        c.save(); c.rotate(-18f, 820f, y - 240f); c.drawText(tr("PAID"), 820f, y - 220f, stamp); c.restore()
+        // PAID stamp only when nothing is left to pay
+        if (d.balanceDue <= 0.005) {
+            val stamp = paint(60f, 0x4016A34A, true, Paint.Align.CENTER)
+            c.save(); c.rotate(-14f, 560f, y - 140f); c.drawText(tr("PAID"), 560f, y - 120f, stamp); c.restore()
+        }
 
         y += 110f
         c.drawText(tr("Thank you! Keep training hard."), 540f, y, paint(34f, INK, true, Paint.Align.CENTER))
