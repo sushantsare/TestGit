@@ -46,6 +46,7 @@ object LekhakServiceManager {
     var geminiModel = DEFAULT_GEMINI_MODEL
     var themeMode = THEME_SYSTEM
     var serviceEnabled = true
+        private set
 
     @Volatile var activeInputNode: AccessibilityNodeInfo? = null
     @Volatile var lastCapturedInputText = ""
@@ -122,7 +123,7 @@ object LekhakServiceManager {
         prefs?.edit()?.putString("theme", mode)?.apply()
     }
 
-    fun setServiceEnabled(enabled: Boolean) {
+    fun updateServiceEnabled(enabled: Boolean) {
         serviceEnabled = enabled
         prefs?.edit()?.putBoolean("service_enabled", enabled)?.apply()
     }

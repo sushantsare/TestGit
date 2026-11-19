@@ -191,7 +191,7 @@ private fun SettingsScreen(activity: SettingsActivity, theme: String, onTheme: (
         if (firstLaunch && overlay && access && aiReady) {
             prefs.edit().putBoolean("is_first_launch", false).apply()
             firstLaunch = false
-            M.setServiceEnabled(true)
+            M.updateServiceEnabled(true)
             FloatingBubbleService.start(activity)
             activity.toast("Lekhak is ready")
             activity.moveTaskToBack(true)
@@ -399,12 +399,12 @@ private fun SettingsScreen(activity: SettingsActivity, theme: String, onTheme: (
                                 activity.toast("Please approve Display Over Other Apps first!")
                                 activity.openOverlaySettings()
                             } else {
-                                M.setServiceEnabled(true)
+                                M.updateServiceEnabled(true)
                                 FloatingBubbleService.start(activity)
                                 bubbleOn = true
                             }
                         } else {
-                            M.setServiceEnabled(false)
+                            M.updateServiceEnabled(false)
                             FloatingBubbleService.stop(activity)
                             bubbleOn = false
                         }
