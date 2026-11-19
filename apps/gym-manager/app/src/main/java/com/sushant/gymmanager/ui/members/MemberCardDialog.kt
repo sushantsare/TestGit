@@ -92,7 +92,7 @@ fun MemberCardDialog(memberId: Long, onDismiss: () -> Unit, onEdit: (Long) -> Un
             modifier = Modifier.fillMaxWidth(0.92f).heightIn(max = 720.dp).testTag("member_card"),
             shape = RoundedCornerShape(28.dp),
             color = MaterialTheme.colorScheme.surface,
-            tonalElevation = 2.dp
+            tonalElevation = 0.dp
         ) {
             val d = details
             if (d == null) {

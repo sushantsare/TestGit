@@ -116,7 +116,7 @@ fun AddEditMemberScreen(memberId: Long, onDone: () -> Unit, vm: AddEditMemberVie
             )
         },
         bottomBar = {
-            Surface(tonalElevation = 3.dp, color = MaterialTheme.colorScheme.surface) {
+            Surface(tonalElevation = 0.dp, color = MaterialTheme.colorScheme.surface) {
                 Column {
                     HorizontalDivider(color = LocalExtraColors.current.cardBorder)
                     Row(

@@ -3,6 +3,8 @@ package com.sushant.gymmanager.ui.navigation
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -166,7 +168,8 @@ private fun AppDrawer(gymName: String, currentRoute: String?, onSelect: (String)
     ModalDrawerSheet(
         modifier = Modifier.width(300.dp).testTag("drawer"),
         drawerContainerColor = scheme.surface,
-        drawerShape = RoundedCornerShape(topEnd = 24.dp, bottomEnd = 24.dp)
+        drawerShape = RoundedCornerShape(topEnd = 24.dp, bottomEnd = 24.dp),
+        windowInsets = WindowInsets(0, 0, 0, 0)
     ) {
         Column(Modifier.fillMaxHeight()) {
             Box(
@@ -213,7 +216,7 @@ private fun AppDrawer(gymName: String, currentRoute: String?, onSelect: (String)
                 "Gym Manager v${BuildConfig.VERSION_NAME} • 100% offline",
                 style = MaterialTheme.typography.labelSmall,
                 color = scheme.onSurfaceVariant,
-                modifier = Modifier.padding(24.dp)
+                modifier = Modifier.navigationBarsPadding().padding(24.dp)
             )
         }
     }

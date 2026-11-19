@@ -17,6 +17,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performTextClearance
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTouchInput
@@ -166,7 +167,9 @@ class WalkthroughTest {
         compose.waitForIdle()
         shot("08_add_member_filled")
         compose.onNodeWithTag("save_member").performClick()
-        waitTag("member_9")
+        waitTag("member_list")
+        compose.waitUntil(15_000) { runBlocking { app.repository.activeMembers.first().any { it.rollNumber == "9" } } }
+        compose.onNodeWithTag("member_list").performScrollToNode(hasTestTag("member_9"))
         shot("09_master_list_after_add")
 
         // Duplicate roll number is rejected

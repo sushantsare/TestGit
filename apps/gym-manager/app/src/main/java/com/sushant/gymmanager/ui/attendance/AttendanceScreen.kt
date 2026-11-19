@@ -177,7 +177,7 @@ fun AttendanceScreen(onOpenDrawer: () -> Unit, onEditMember: (Long) -> Unit, vm:
             )
         },
         bottomBar = {
-            Surface(color = MaterialTheme.colorScheme.surface, tonalElevation = 3.dp) {
+            Surface(color = MaterialTheme.colorScheme.surface, tonalElevation = 0.dp) {
                 Column {
                     HorizontalDivider(color = LocalExtraColors.current.cardBorder)
                     Row(

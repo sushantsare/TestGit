@@ -162,7 +162,7 @@ fun SettingsScreen(onOpenDrawer: () -> Unit, onDataReset: () -> Unit, vm: Settin
     Scaffold(
         topBar = { GymTopBar("Settings", "Gym preferences & security", onMenu = onOpenDrawer) },
         bottomBar = {
-            Surface(color = MaterialTheme.colorScheme.surface, tonalElevation = 3.dp) {
+            Surface(color = MaterialTheme.colorScheme.surface, tonalElevation = 0.dp) {
                 Column {
                     HorizontalDivider(color = LocalExtraColors.current.cardBorder)
                     Button(
