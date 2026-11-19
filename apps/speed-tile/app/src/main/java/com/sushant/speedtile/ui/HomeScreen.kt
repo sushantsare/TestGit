@@ -253,7 +253,7 @@ private fun TripCard(state: SpeedState, decimals: Boolean, onReset: () -> Unit) 
 private fun Stat(label: String, value: String, modifier: Modifier) {
     Column(
         modifier
-            .background(MaterialTheme.colorScheme.surfaceContainer, RoundedCornerShape(14.dp))
+            .background(MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = if (LocalExtra.current.cardBorder == androidx.compose.ui.graphics.Color(0xFF2A2A2A)) 1f else 0.6f), RoundedCornerShape(14.dp))
             .heightIn(min = 64.dp)
             .padding(horizontal = 14.dp, vertical = 10.dp),
     ) {

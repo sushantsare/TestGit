@@ -193,11 +193,13 @@ class WalkthroughTest {
 
             compose.onNodeWithTag("nav_settings").performClick()
             waitTag("sw_decimals")
+            Thread.sleep(1200)
             shot("07_settings_light")
             compose.onNodeWithTag("nav_back").performClick()
 
             compose.onNodeWithTag("nav_about").performClick()
             waitTag("about_email")
+            Thread.sleep(1200)
             shot("08_about_light")
             compose.onNodeWithTag("nav_back").performClick()
 
@@ -212,10 +214,12 @@ class WalkthroughTest {
             show(liveState())
             compose.onNodeWithTag("nav_settings").performClick()
             waitTag("sw_decimals")
+            Thread.sleep(1200)
             shot("11_settings_dark")
             compose.onNodeWithTag("nav_back").performClick()
             compose.onNodeWithTag("nav_about").performClick()
             waitTag("about_email")
+            Thread.sleep(1200)
             shot("12_about_dark")
             compose.onNodeWithTag("nav_back").performClick()
 
