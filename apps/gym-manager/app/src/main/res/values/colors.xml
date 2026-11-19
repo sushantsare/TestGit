@@ -1,0 +1,5 @@
+<resources>
+    <color name="window_bg">#F8FAFC</color>
+    <color name="ic_bg_start">#F97316</color>
+    <color name="ic_bg_end">#C2410C</color>
+</resources>
