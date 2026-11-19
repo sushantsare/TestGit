@@ -70,7 +70,9 @@ jobs:
             adb shell settings put secure anr_show_background 0 || true
             ./gradlew :app:connectedDebugAndroidTest --stacktrace > /tmp/out/ui-tests.log 2>&1 && echo PASSED > /tmp/out/UI_TESTS || echo FAILED > /tmp/out/UI_TESTS
             adb pull /sdcard/Pictures/GymShots/. /tmp/out/screens/ || true
+            adb pull /sdcard/Pictures/AppShots/. /tmp/out/screens/ || true
             adb logcat -d -t 3000 > /tmp/out/logcat.txt || true
+            adb logcat -d -s GrabbitE2E:I > /tmp/out/e2e-results.txt || true
 
       - name: Collect reports
         if: always()

@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Grabbit: rabbit whose right ear is a download arrow -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp" android:height="108dp"
+    android:viewportWidth="108" android:viewportHeight="108">
+    <!-- left ear -->
+    <path android:fillColor="#FFFFFF"
+        android:pathData="M42,58 C37,44 37,31 43,27 C50,24 52,40 50,58 Z" />
+    <!-- right ear = download arrow -->
+    <path android:fillColor="#FFFFFF"
+        android:pathData="M56.5,27 Q56.5,25 58.5,25 L62.5,25 Q64.5,25 64.5,27 L64.5,41 L70.5,41 L60.5,53 L50.5,41 L56.5,41 Z" />
+    <!-- head -->
+    <path android:fillColor="#FFFFFF"
+        android:pathData="M38,69 a16,14.5 0 1,0 32,0 a16,14.5 0 1,0 -32,0 Z" />
+    <!-- eyes -->
+    <path android:fillColor="#5B2BD9"
+        android:pathData="M45.6,67 a2.4,2.4 0 1,0 4.8,0 a2.4,2.4 0 1,0 -4.8,0 Z" />
+    <path android:fillColor="#5B2BD9"
+        android:pathData="M57.6,67 a2.4,2.4 0 1,0 4.8,0 a2.4,2.4 0 1,0 -4.8,0 Z" />
+    <!-- nose -->
+    <path android:fillColor="#FF4D8D"
+        android:pathData="M51.8,73 L56.2,73 L54,75.6 Z" />
+</vector>
