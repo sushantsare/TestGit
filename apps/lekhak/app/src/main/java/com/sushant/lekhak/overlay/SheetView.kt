@@ -21,6 +21,7 @@ import android.widget.LinearLayout
 import android.widget.ProgressBar
 import android.widget.ScrollView
 import android.widget.TextView
+import androidx.core.view.WindowInsetsCompat
 import com.sushant.lekhak.ai.Suggestion
 import com.sushant.lekhak.core.LekhakServiceManager
 import com.sushant.lekhak.core.Palette
@@ -71,8 +72,17 @@ class SheetView(
             setStroke(context.dp(1), p.divider)
         }
         card.isClickable = true // touches on the card must not reach the backdrop
-        val h = min((screenHeight * 0.75f).toInt(), max((screenHeight * 0.40f).toInt(), context.dp(380)))
+        val h = min((screenHeight * 0.75f).toInt(), max((screenHeight * 0.40f).toInt(), context.dp(440)))
         addView(card, LayoutParams(LayoutParams.MATCH_PARENT, h, Gravity.BOTTOM))
+        // Keep the last card above the navigation bar.
+        setOnApplyWindowInsetsListener { _, insets ->
+            val bottom = WindowInsetsCompat.toWindowInsetsCompat(insets)
+                .getInsets(WindowInsetsCompat.Type.navigationBars()).bottom
+            card.setPadding(pad, context.dp(8), pad, pad + bottom)
+            (card.layoutParams as LayoutParams).height = h + bottom
+            card.requestLayout()
+            insets
+        }
 
         buildHandleAndHeader()
         card.addView(chipScroller(toneRow), LinearLayout.LayoutParams(-1, -2).apply { topMargin = context.dp(10) })
@@ -181,6 +191,7 @@ class SheetView(
             }, LinearLayout.LayoutParams(context.dp(36), context.dp(36)))
             addView(TextView(context).apply {
                 text = "Generating..."
+                gravity = Gravity.CENTER
                 setTextColor(p.textSecondary)
                 textSize = 13f
                 setPadding(0, context.dp(8), 0, 0)
