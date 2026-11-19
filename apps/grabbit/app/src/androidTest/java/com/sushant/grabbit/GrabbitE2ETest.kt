@@ -7,6 +7,8 @@ import android.provider.MediaStore
 import android.util.Log
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
+import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -185,6 +187,8 @@ class GrabbitE2ETest {
         shot("90_downloads")
         compose.onNodeWithTag("nav_settings").performClick()
         shot("91_settings")
+        compose.onNodeWithTag("settingsList").performScrollToNode(hasText("Developed by Sushant Kumar"))
+        shot("91b_about")
 
         val vm = ViewModelProvider(compose.activity)[MainViewModel::class.java]
 

@@ -17,10 +17,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.Chat
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.Email
-import androidx.compose.material.icons.rounded.Phone
 import androidx.compose.material.icons.rounded.SystemUpdate
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -48,6 +46,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.sushant.grabbit.BuildConfig
@@ -67,7 +66,7 @@ fun SettingsScreen(vm: MainViewModel, modifier: Modifier) {
     var auto by remember { mutableStateOf(Prefs.autoUpdate) }
 
     LazyColumn(
-        modifier.fillMaxSize(),
+        modifier.fillMaxSize().testTag("settingsList"),
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
@@ -170,22 +169,6 @@ fun SettingsScreen(vm: MainViewModel, modifier: Modifier) {
                 ) {
                     Icon(Icons.Rounded.Email, null, Modifier.size(18.dp)); Spacer(Modifier.width(8.dp))
                     Text("sushant.sare@gmail.com")
-                }
-                Row(
-                    Modifier.fillMaxWidth().clickable {
-                        runCatching { ctx.startActivity(Intent(Intent.ACTION_DIAL, Uri.parse("tel:+918877612216"))) }
-                    }.padding(vertical = 4.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Icon(Icons.Rounded.Phone, null, Modifier.size(18.dp)); Spacer(Modifier.width(8.dp))
-                    Text("+91 88776 12216")
-                }
-                Row(
-                    Modifier.fillMaxWidth().clickable { ctx.openLink("https://wa.me/918877612216") }.padding(vertical = 4.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Icon(Icons.AutoMirrored.Rounded.Chat, null, Modifier.size(18.dp)); Spacer(Modifier.width(8.dp))
-                    Text("Message on WhatsApp")
                 }
                 Text(
                     "Download only content you have the right to save. Powered by yt-dlp and FFmpeg.",
