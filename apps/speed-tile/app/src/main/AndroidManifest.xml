@@ -5,6 +5,9 @@
     <!-- GPS speed (precise location is required for GPS; approximate is declared because Android 12+ requires both) -->
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <!-- Optional "Allow all the time": only so the tile can start GPS without closing Quick Settings.
+         Asked only from Settings when the user switches that option on. -->
+    <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
     <!-- Keeps measuring while the shade or another app is open -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />

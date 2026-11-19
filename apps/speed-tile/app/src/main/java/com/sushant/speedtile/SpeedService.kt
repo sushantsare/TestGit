@@ -87,6 +87,7 @@ class SpeedService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        Log.i(TAG, "Service start command")
         if (intent?.action == ACTION_STOP) {
             stopNow(StopReason.USER)
             return START_NOT_STICKY
@@ -233,6 +234,11 @@ class SpeedService : Service() {
 
 fun hasLocationPermission(context: Context): Boolean =
     ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
+
+/** "Allow all the time": lets the tile start GPS without the hand-off screen. Not separate before Android 10. */
+fun hasBackgroundLocation(context: Context): Boolean =
+    hasLocationPermission(context) && (Build.VERSION.SDK_INT < 29 ||
+        ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_BACKGROUND_LOCATION) == PackageManager.PERMISSION_GRANTED)
 
 fun isGpsOn(context: Context): Boolean {
     val lm = context.getSystemService(Context.LOCATION_SERVICE) as LocationManager

@@ -43,6 +43,7 @@ fun SettingsScreen(
     autoStop: Int, onAutoStop: (Int) -> Unit,
     keepOn: Boolean, onKeepOn: (Boolean) -> Unit,
     offOnClose: Boolean, onOffOnClose: (Boolean) -> Unit,
+    inPlace: Boolean, onEnableInPlace: () -> Unit,
     onBack: () -> Unit,
 ) {
     Scaffold(
@@ -87,6 +88,22 @@ fun SettingsScreen(
                     "Speed stops as soon as you close Quick Settings. After tapping the tile, pull down within 30 seconds to see your speed.",
                     offOnClose, "sw_off_on_close", onOffOnClose,
                 )
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                Row(Modifier.fillMaxWidth().padding(vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text("Start without closing the panel", style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
+                        Text(
+                            if (inPlace) "On · the tile switches on right where it is."
+                            else "Set location to \"Allow all the time\" so the tile can start GPS by itself, without Quick Settings closing.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = if (inPlace) LocalExtra.current.green else MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    if (!inPlace) {
+                        Spacer(Modifier.width(12.dp))
+                        androidx.compose.material3.FilledTonalButton(onClick = onEnableInPlace, modifier = Modifier.testTag("btn_in_place")) { Text("Turn on") }
+                    }
+                }
             }
 
             AppCard {

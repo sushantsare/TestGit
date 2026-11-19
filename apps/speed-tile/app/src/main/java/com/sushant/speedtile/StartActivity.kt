@@ -35,6 +35,7 @@ class StartActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        android.util.Log.i(SpeedService.TAG, "Hand-off screen opened")
         overridePendingTransition(0, 0)
         handled = savedInstanceState?.getBoolean("handled") ?: false
     }

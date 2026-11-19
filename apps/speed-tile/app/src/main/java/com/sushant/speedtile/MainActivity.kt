@@ -95,6 +95,13 @@ class MainActivity : ComponentActivity() {
 
         var showLocRationale by rememberSaveable { mutableStateOf(false) }
         var showResetConfirm by rememberSaveable { mutableStateOf(false) }
+        var showBgExplain by rememberSaveable { mutableStateOf(false) }
+        val inPlace = remember(resumeTick) { hasBackgroundLocation(this) }
+        val bgLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+            resumeTick++
+            // Android 11+ shows no dialog once refused: send the user to the app's location setting instead.
+            if (!granted && !shouldShowRequestPermissionRationale(Manifest.permission.ACCESS_BACKGROUND_LOCATION)) openAppSettings()
+        }
 
         fun startNow() {
             if (!isGpsOn(this)) {
@@ -161,6 +168,7 @@ class MainActivity : ComponentActivity() {
                     autoStop = autoStop, onAutoStop = prefs::setAutoStop,
                     keepOn = keepOn, onKeepOn = prefs::setKeepScreenOn,
                     offOnClose = offOnClose, onOffOnClose = prefs::setOffOnPanelClose,
+                    inPlace = inPlace, onEnableInPlace = { showBgExplain = true },
                     onBack = { nav.popBackStack() },
                 )
             }
@@ -196,6 +204,31 @@ class MainActivity : ComponentActivity() {
                     }) { Text("Continue") }
                 },
                 dismissButton = { TextButton(onClick = { showLocRationale = false }) { Text("Not now") } },
+            )
+        }
+
+        if (showBgExplain) {
+            AlertDialog(
+                onDismissRequest = { showBgExplain = false },
+                title = { Text("Start without closing the panel") },
+                text = {
+                    Text(
+                        "Android lets the tile start GPS by itself only if location is set to \"Allow all the time\". " +
+                            "Speed Tile still uses location only while speed is on, never saves it and has no internet. " +
+                            "On the next screen choose Allow all the time."
+                    )
+                },
+                confirmButton = {
+                    TextButton(onClick = {
+                        showBgExplain = false
+                        when {
+                            !hasLocationPermission(this) -> showLocRationale = true
+                            Build.VERSION.SDK_INT >= 29 -> bgLauncher.launch(Manifest.permission.ACCESS_BACKGROUND_LOCATION)
+                            else -> resumeTick++
+                        }
+                    }) { Text("Continue") }
+                },
+                dismissButton = { TextButton(onClick = { showBgExplain = false }) { Text("Not now") } },
             )
         }
 

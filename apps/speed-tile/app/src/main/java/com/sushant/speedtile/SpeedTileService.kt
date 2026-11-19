@@ -40,6 +40,7 @@ class SpeedTileService : TileService() {
 
     override fun onClick() {
         super.onClick()
+        android.util.Log.i(SpeedService.TAG, "Tile tapped (running=${app.engine.state.value.running}, locked=$isLocked)")
         if (app.engine.state.value.running) {
             SpeedService.stop(this)
             return
@@ -53,6 +54,16 @@ class SpeedTileService : TileService() {
      * straight from the tile looks fine but on many phones GPS data never arrives.
      */
     private fun begin() {
+        // With "Allow all the time", Android lets the tile start GPS itself: no hand-off, the panel stays open.
+        if (hasBackgroundLocation(this) && isGpsOn(this)) {
+            try {
+                SpeedService.start(this)
+                android.util.Log.i(SpeedService.TAG, "Started in place from the tile")
+                return
+            } catch (e: Exception) {
+                android.util.Log.w(SpeedService.TAG, "In-place start refused, using hand-off", e)
+            }
+        }
         app.panelWatch.startingFromTile() // the collapse that follows is ours, not the user closing the panel
         openStarter()
     }
@@ -61,7 +72,14 @@ class SpeedTileService : TileService() {
     private fun openStarter() {
         val intent = Intent(this, StartActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         if (Build.VERSION.SDK_INT >= 34) {
-            val pi = PendingIntent.getActivity(this, 0, intent, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
+            // Android 15+: a PendingIntent only launches from the background if its creator opts in.
+            val opts = if (Build.VERSION.SDK_INT >= 35) {
+                android.app.ActivityOptions.makeBasic()
+                    .setPendingIntentCreatorBackgroundActivityStartMode(android.app.ActivityOptions.MODE_BACKGROUND_ACTIVITY_START_ALLOWED)
+                    .toBundle()
+            } else null
+            val pi = PendingIntent.getActivity(this, 0, intent, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT, opts)
+            android.util.Log.i(SpeedService.TAG, "Opening hand-off screen")
             startActivityAndCollapse(pi)
         } else {
             @Suppress("DEPRECATION")
