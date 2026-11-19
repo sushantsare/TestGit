@@ -23,14 +23,14 @@ class StartActivity : ComponentActivity() {
         val coarse = res[Manifest.permission.ACCESS_COARSE_LOCATION] == true ||
             ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
         when {
-            hasLocationPermission(this) -> startSpeed()
+            hasLocationPermission(this) -> { if (startSpeed()) closeWhenRunning() else close() }
             coarse -> {
                 toast("Speed needs Precise location. Turn on Use precise location.")
                 openAppSettings()
             }
-            else -> toast("Speed needs location to measure km/h")
+            else -> { toast("Speed needs location to measure km/h"); close() }
         }
-        close()
+        if (!hasLocationPermission(this)) close()
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -49,7 +49,7 @@ class StartActivity : ComponentActivity() {
         if (handled) return
         handled = true
         when {
-            hasLocationPermission(this) -> { startSpeed(); close() }
+            hasLocationPermission(this) -> { if (startSpeed()) closeWhenRunning() else close() }
             // Asked before and the user chose "Don't allow" twice: only Settings can fix it now.
             app.prefs.askedLocation && !shouldShowRequestPermissionRationale(Manifest.permission.ACCESS_FINE_LOCATION) &&
                 ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED -> {
@@ -61,13 +61,14 @@ class StartActivity : ComponentActivity() {
         }
     }
 
-    private fun startSpeed() {
+    /** Returns true when the GPS service was started. */
+    private fun startSpeed(): Boolean {
         if (!isGpsOn(this)) {
             toast("Turn on Location, then tap the tile again")
             runCatching {
                 startActivity(Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
             }
-            return
+            return false
         }
         SpeedService.start(this)
         app.panelWatch.startingFromTile()
@@ -78,6 +79,25 @@ class StartActivity : ComponentActivity() {
         } else {
             toast("Speed on · pull down to see it")
         }
+        return true
+    }
+
+    /**
+     * Android 14+ checks that the app is on screen when the GPS service actually goes foreground,
+     * not only when it is asked to start. Stay (invisibly) until the service reports it is running.
+     */
+    private fun closeWhenRunning() {
+        val started = System.currentTimeMillis()
+        val check = object : Runnable {
+            override fun run() {
+                if (app.engine.state.value.running || System.currentTimeMillis() - started > 2_000L) {
+                    window.decorView.postDelayed({ finish(); overridePendingTransition(0, 0) }, 250)
+                } else {
+                    window.decorView.postDelayed(this, 50)
+                }
+            }
+        }
+        window.decorView.post(check)
     }
 
     private fun openAppSettings() {

@@ -30,8 +30,15 @@ adb emu geo fix 85.1000 25.6000 50 9
 adb logcat -c
 adb shell cmd statusbar expand-settings
 sleep 3
-echo "-- tap tile (start)" >> $LOG
-adb shell cmd statusbar click-tile $TILE
+if adb shell settings get secure sysui_qs_tiles | grep -q speedtile; then
+  echo "-- tap tile (start)" >> $LOG
+  adb shell cmd statusbar click-tile $TILE
+else
+  # Tile list locked by this SystemUI: open the tile's hand-off screen directly (same code path as a tap).
+  echo "-- tile not placeable here: starting the tile hand-off screen as root" >> $LOG
+  adb shell cmd statusbar collapse
+  adb shell am start -n $PKG/.StartActivity >> $LOG 2>&1
+fi
 sleep 3
 adb exec-out screencap -p > $OUT/screens/${TAG}_a_after_tap.png
 lon=85.1000
@@ -49,7 +56,9 @@ for i in $(seq 1 4); do
   sleep 1
 done
 adb exec-out screencap -p > $OUT/screens/${TAG}_b_panel_reopened_live.png
-adb shell dumpsys activity services $PKG | grep -iE "ServiceRecord|isForeground|foregroundServiceType|allowWhileInUse|mAllowWhileInUsePermissionInFgs" | head -10 >> $LOG
+adb shell dumpsys activity services $PKG | grep -iE "ServiceRecord|isForeground|foregroundServiceType|allowWhileInUse|WhileInUse|fgsType" | head -12 >> $LOG
+adb shell appops get $PKG | grep -iE "LOCATION" >> $LOG
+adb shell dumpsys activity processes $PKG | grep -iE "curCapability|setCapability|procState|curProcState" | head -6 >> $LOG
 adb shell dumpsys location | grep -iE "speedtile" | head -8 >> $LOG
 STARTED=$(adb logcat -d -s SpeedTile:I | grep -c "GPS updates requested")
 echo "SERVICE_STARTED_LOG=$STARTED" >> $LOG
