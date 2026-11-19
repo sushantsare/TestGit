@@ -157,7 +157,7 @@ private fun SectionTitle(t: String) =
 private fun Thumb(url: String, audio: Boolean) {
     Box(
         Modifier.width(112.dp).height(64.dp).clip(RoundedCornerShape(12.dp))
-            .background(BrandGradient),
+            .background(brandGradient()),
         contentAlignment = Alignment.Center,
     ) {
         if (url.isNotBlank()) {
@@ -175,7 +175,7 @@ private fun ActiveRow(w: WorkInfo, vm: MainViewModel) {
     val job = Downloads.jobOf(w)
     val failed = w.state == WorkInfo.State.FAILED
     var showRaw by remember { mutableStateOf(false) }
-    Card(
+    Card(border = cardBorder(), 
         shape = RoundedCornerShape(18.dp),
         colors = CardDefaults.cardColors(
             containerColor = if (failed) MaterialTheme.colorScheme.errorContainer else MaterialTheme.colorScheme.surfaceContainer
@@ -260,7 +260,7 @@ private fun SavedRow(item: SavedItem, missing: Boolean, vm: MainViewModel) {
     val deleteLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) {
         vm.afterDeleteConfirm(item)
     }
-    Card(
+    Card(border = cardBorder(), 
         shape = RoundedCornerShape(18.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
         modifier = Modifier.fillMaxWidth().clickable {

@@ -47,7 +47,6 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -180,7 +179,7 @@ fun HomeScreen(vm: MainViewModel, modifier: Modifier) {
 @Composable
 private fun Header() {
     Row(
-        Modifier.fillMaxWidth().clip(RoundedCornerShape(20.dp)).background(BrandGradient)
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(20.dp)).background(brandGradient())
             .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -198,7 +197,7 @@ private fun Header() {
 
 @Composable
 private fun EngineBanner(state: Engine.State, onRetry: () -> Unit) {
-    Card(
+    Card(border = cardBorder(), 
         colors = CardDefaults.cardColors(
             containerColor = if (state is Engine.State.Failed) MaterialTheme.colorScheme.errorContainer
             else MaterialTheme.colorScheme.surfaceContainerHigh
@@ -225,7 +224,7 @@ private fun EngineBanner(state: Engine.State, onRetry: () -> Unit) {
 
 @Composable
 private fun HowToCard() {
-    Card(shape = RoundedCornerShape(20.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)) {
+    Card(border = cardBorder(), shape = RoundedCornerShape(20.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)) {
         Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Text("How to use", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
             Step("1", "In YouTube, Instagram, Facebook or any app, tap Share → Grabbit.")
@@ -244,7 +243,7 @@ private fun HowToCard() {
 private fun Step(n: String, text: String) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         Box(
-            Modifier.size(26.dp).clip(CircleShape).background(BrandGradient),
+            Modifier.size(26.dp).clip(CircleShape).background(brandGradient()),
             contentAlignment = Alignment.Center,
         ) { Text(n, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp) }
         Spacer(Modifier.width(12.dp))
@@ -254,7 +253,7 @@ private fun Step(n: String, text: String) {
 
 @Composable
 private fun LoadingCard() {
-    Card(shape = RoundedCornerShape(20.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)) {
+    Card(border = cardBorder(), shape = RoundedCornerShape(20.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)) {
         Row(Modifier.fillMaxWidth().padding(24.dp), verticalAlignment = Alignment.CenterVertically) {
             CircularProgressIndicator(Modifier.size(28.dp))
             Spacer(Modifier.width(16.dp))
@@ -270,7 +269,7 @@ private fun LoadingCard() {
 @Composable
 fun FetchErrorCard(message: String, raw: String, onRetry: () -> Unit) {
     var showRaw by remember { mutableStateOf(false) }
-    Card(
+    Card(border = cardBorder(), 
         shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer),
         modifier = Modifier.testTag("fetchError"),
@@ -327,7 +326,7 @@ private fun InfoCard(info: MediaInfo, onDownload: (String) -> Unit) {
     var selected by remember(info) { mutableStateOf(defaultChoice(opts)) }
     val audioIcon: @Composable () -> Unit = { Icon(Icons.Rounded.MusicNote, null, Modifier.size(18.dp)) }
 
-    ElevatedCard(shape = RoundedCornerShape(22.dp)) {
+    Card(border = cardBorder(), shape = RoundedCornerShape(22.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)) {
         Box {
             AsyncImage(
                 model = info.thumbnail.ifBlank { null },
