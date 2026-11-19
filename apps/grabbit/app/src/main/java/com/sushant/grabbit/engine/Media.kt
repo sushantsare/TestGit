@@ -76,26 +76,32 @@ object Media {
         val heights = sortedSetOf<Int>(reverseOrder())
         val sizes = HashMap<Int, Long>()
         var bestAudio = 0L
+        var anyVideo = false
         val formats = j.optJSONArray("formats")
         if (formats != null) {
             for (i in 0 until formats.length()) {
                 val f = formats.optJSONObject(i) ?: continue
-                val v = f.str("vcodec").ifBlank { "none" }
-                val a = f.str("acodec").ifBlank { "none" }
+                val v = f.str("vcodec")
+                val a = f.str("acodec")
                 val w = f.optInt("width", 0)
                 val h = f.optInt("height", 0)
                 val res = if (w > 0 && h > 0) minOf(w, h) else h
                 val size = f.optLong("filesize", 0).takeIf { it > 0 } ?: f.optLong("filesize_approx", 0)
-                if (v != "none" && res > 0) {
-                    heights += res
-                    sizes[res] = maxOf(sizes[res] ?: 0L, size)
-                } else if (v == "none" && a != "none") {
+                val audioOnly = v == "none" || (v.isBlank() && res == 0 && a.isNotBlank() && a != "none") ||
+                    f.str("ext") in setOf("m4a", "mp3", "opus", "ogg", "wav", "flac", "aac")
+                if (!audioOnly) {
+                    anyVideo = true
+                    if (res > 0) {
+                        heights += res
+                        sizes[res] = maxOf(sizes[res] ?: 0L, size)
+                    }
+                } else if (a != "none") {
                     bestAudio = maxOf(bestAudio, size)
                 }
             }
         }
         val top = j.optInt("height", 0)
-        val hasVideo = heights.isNotEmpty() || top > 0 || formats == null || j.str("vcodec").let { it.isNotBlank() && it != "none" }
+        val hasVideo = anyVideo || heights.isNotEmpty() || top > 0 || formats == null || j.str("vcodec").let { it.isNotBlank() && it != "none" }
         val finalSizes = sizes.mapValues { (_, s) -> if (s > 0) s + bestAudio else 0L }
         return MediaInfo(
             url = url,

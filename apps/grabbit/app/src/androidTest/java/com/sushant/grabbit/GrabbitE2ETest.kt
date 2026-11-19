@@ -22,6 +22,8 @@ import com.sushant.grabbit.data.Prefs
 import com.sushant.grabbit.download.DownloadWorker
 import com.sushant.grabbit.download.Downloads
 import com.sushant.grabbit.engine.Engine
+import com.yausername.youtubedl_android.YoutubeDL
+import com.yausername.youtubedl_android.YoutubeDLRequest
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import org.junit.Assert.assertTrue
@@ -110,6 +112,43 @@ class GrabbitE2ETest {
         return ok
     }
 
+    /** Runs yt-dlp directly against several sites/options and logs exactly what happens. */
+    private fun diagnose() {
+        val yt = "https://www.youtube.com/watch?v=jNQXAC9IVRw"
+        val cases = listOf(
+            Triple("yt-default", yt, emptyList<String>()),
+            Triple("yt-android_vr", yt, listOf("--extractor-args", "youtube:player_client=android_vr")),
+            Triple("yt-tv_simply", yt, listOf("--extractor-args", "youtube:player_client=tv_simply")),
+            Triple("yt-mweb", yt, listOf("--extractor-args", "youtube:player_client=mweb")),
+            Triple("yt-ios", yt, listOf("--extractor-args", "youtube:player_client=ios")),
+            Triple("vimeo", "https://vimeo.com/76979871", emptyList()),
+            Triple("dailymotion", "https://www.dailymotion.com/video/x7tgad0", emptyList()),
+            Triple("reddit", "https://www.reddit.com/r/aww/comments/90bu6w/heat_index_was_110_degrees_so_we_offered_him_a/", emptyList()),
+            Triple("x", "https://x.com/SpaceX/status/1732824684683784516", emptyList()),
+            Triple("facebook", "https://www.facebook.com/watch/?v=10153231379946729", emptyList()),
+            Triple("instagram", "https://www.instagram.com/reel/C6vRMSTJ0fG/", emptyList()),
+            Triple("archive", "https://archive.org/details/BigBuckBunny_124", emptyList()),
+        )
+        for ((name, url, extra) in cases) {
+            val req = YoutubeDLRequest(url).apply {
+                addOption("-J"); addOption("--no-playlist")
+                var i = 0
+                while (i < extra.size) { addOption(extra[i], extra[i + 1]); i += 2 }
+            }
+            val t = System.currentTimeMillis()
+            try {
+                val r = YoutubeDL.getInstance().execute(req, processId = "diag-$name", callback = null)
+                val j = org.json.JSONObject(r.out.lineSequence().last { it.startsWith("{") })
+                val f = j.optJSONArray("formats")
+                var maxH = 0
+                if (f != null) for (k in 0 until f.length()) maxH = maxOf(maxH, f.getJSONObject(k).optInt("height", 0))
+                log("DIAG $name OK formats=${f?.length()} maxH=$maxH ${(System.currentTimeMillis() - t) / 1000}s warn=${r.err.takeLast(300).replace('\n', ' ')}")
+            } catch (e: Throwable) {
+                log("DIAG $name FAIL ${(e.message ?: e.toString()).takeLast(500).replace('\n', ' ')}")
+            }
+        }
+    }
+
     @Test
     fun endToEnd() {
         shot("00_home_start")
@@ -133,6 +172,7 @@ class GrabbitE2ETest {
         compose.onNodeWithTag("nav_settings").performClick()
         shot("91_settings")
 
+        diagnose()
         log("SUMMARY direct=$direct youtube=$youtube vimeo=$vimeo")
         results.forEach { Log.i("GrabbitE2E", "RESULT $it") }
         assertTrue("No download succeeded", direct || youtube || vimeo)
