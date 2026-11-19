@@ -17,7 +17,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.DashboardCustomize
 import androidx.compose.material.icons.outlined.GpsOff
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.LocationOff
@@ -60,13 +59,10 @@ fun HomeScreen(
     decimals: Boolean,
     gaugeMax: Int,
     notice: Notice,
-    tileAdded: Boolean,
-    canRequestTile: Boolean,
     onStart: () -> Unit,
     onStop: () -> Unit,
     onFixNotice: () -> Unit,
     onResetTrip: () -> Unit,
-    onAddTile: () -> Unit,
     onSettings: () -> Unit,
     onAbout: () -> Unit,
 ) {
@@ -144,8 +140,6 @@ fun HomeScreen(
             }
 
             TripCard(state, decimals, onResetTrip)
-
-            TileCard(tileAdded, canRequestTile, onAddTile)
         }
     }
 }
@@ -266,38 +260,5 @@ private fun Stat(label: String, value: String, modifier: Modifier) {
         Text(label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
         Spacer(Modifier.size(2.dp))
         Text(value, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-    }
-}
-
-@Composable
-private fun TileCard(tileAdded: Boolean, canRequest: Boolean, onAdd: () -> Unit) {
-    AppCard(Modifier.testTag("tile_card")) {
-        Row(verticalAlignment = Alignment.Top) {
-            Box(
-                Modifier.size(40.dp).background(MaterialTheme.colorScheme.primaryContainer, RoundedCornerShape(12.dp)),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(Icons.Outlined.DashboardCustomize, null, tint = MaterialTheme.colorScheme.onPrimaryContainer)
-            }
-            Spacer(Modifier.width(12.dp))
-            Column(Modifier.weight(1f)) {
-                Text(
-                    if (tileAdded) "Speed tile is in Quick Settings" else "Add the Speed tile",
-                    style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold,
-                )
-                Spacer(Modifier.size(4.dp))
-                Text(
-                    if (tileAdded) "Pull down the notification shade twice and tap Speed to switch it on or off. The tile shows your speed live."
-                    else if (canRequest) "Put a Speed tile in Quick Settings to see your km/h with one swipe, without opening the app."
-                    else "Pull down Quick Settings, tap the pencil (Edit), and drag the Speed tile into your tiles.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                if (!tileAdded && canRequest) {
-                    Spacer(Modifier.size(10.dp))
-                    FilledTonalButton(onClick = onAdd, modifier = Modifier.testTag("btn_add_tile")) { Text("Add tile") }
-                }
-            }
-        }
     }
 }

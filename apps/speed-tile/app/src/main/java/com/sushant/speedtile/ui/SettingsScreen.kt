@@ -14,7 +14,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -43,8 +42,6 @@ fun SettingsScreen(
     gaugeMax: Int, onGaugeMax: (Int) -> Unit,
     autoStop: Int, onAutoStop: (Int) -> Unit,
     keepOn: Boolean, onKeepOn: (Boolean) -> Unit,
-    notifBlocked: Boolean, onOpenNotifSettings: () -> Unit,
-    tileAdded: Boolean, canRequestTile: Boolean, onAddTile: () -> Unit,
     onBack: () -> Unit,
 ) {
     Scaffold(
@@ -93,37 +90,6 @@ fun SettingsScreen(
                 Spacer(Modifier.size(10.dp))
                 val opts = listOf(0, 5, 15, 30)
                 Segments(listOf("Never", "5 min", "15 min", "30 min"), opts.indexOf(autoStop).coerceAtLeast(0), "autostop") { onAutoStop(opts[it]) }
-            }
-
-            AppCard {
-                SectionTitle("Notification")
-                Spacer(Modifier.size(4.dp))
-                Text(
-                    if (notifBlocked) "Notifications blocked · your speed will not show in the notification bar."
-                    else "While speed is on, a quiet notification shows your km/h and has a Stop button.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = if (notifBlocked) LocalExtra.current.amber else MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.testTag("notif_status"),
-                )
-                if (notifBlocked) {
-                    Spacer(Modifier.size(10.dp))
-                    FilledTonalButton(onClick = onOpenNotifSettings) { Text("Open Settings") }
-                }
-            }
-
-            AppCard {
-                SectionTitle("Quick Settings tile")
-                Spacer(Modifier.size(4.dp))
-                Text(
-                    if (tileAdded) "Added. Tap it to switch speed on or off; long-press it to open this app."
-                    else "Not added yet.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                if (!tileAdded && canRequestTile) {
-                    Spacer(Modifier.size(10.dp))
-                    FilledTonalButton(onClick = onAddTile) { Text("Add tile") }
-                }
             }
         }
     }

@@ -21,6 +21,8 @@ import kotlinx.coroutines.flow.onEach
 class SpeedTileService : TileService() {
 
     private var job: Job? = null
+    /** True right after a direct start, so a refusal can fall back to StartActivity. */
+    private var directPending = false
 
     override fun onTileAdded() { app.prefs.setTileAdded(true) }
     override fun onTileRemoved() { app.prefs.setTileAdded(false) }
@@ -30,7 +32,14 @@ class SpeedTileService : TileService() {
         app.prefs.setTileAdded(true)
         job?.cancel()
         job = combine(app.engine.state, app.prefs.decimals) { s, d -> s to d }
-            .onEach { (s, d) -> render(s, d) }
+            .onEach { (s, d) ->
+                render(s, d)
+                if (s.running) directPending = false
+                if (directPending && !s.running && s.stopReason == StopReason.BLOCKED) {
+                    directPending = false
+                    openStarter()
+                }
+            }
             .launchIn(app.appScope)
     }
 
@@ -46,7 +55,24 @@ class SpeedTileService : TileService() {
             SpeedService.stop(this)
             return
         }
-        if (isLocked) unlockAndRun { openStarter() } else openStarter()
+        if (isLocked) unlockAndRun { begin() } else begin()
+    }
+
+    /** Switch on in place when possible; the tile then lights up and shows km/h without closing the shade. */
+    private fun begin() {
+        val p = app.prefs
+        if (!hasLocationPermission(this) || !isGpsOn(this) || p.directStartBlocked) {
+            openStarter()
+            return
+        }
+        try {
+            directPending = true
+            SpeedService.startFromTile(this)
+        } catch (e: Exception) {
+            directPending = false
+            p.directStartBlocked = true
+            openStarter()
+        }
     }
 
     @SuppressLint("StartActivityAndCollapseDeprecated")
@@ -99,6 +125,7 @@ data class TileView(val active: Boolean, val label: String, val subtitle: String
                 val sub = when (s.stopReason) {
                     StopReason.IDLE -> "Stopped · not moving"
                     StopReason.NO_PERMISSION -> "Tap to allow location"
+                    StopReason.BLOCKED -> "Tap to start"
                     StopReason.GPS_OFF -> "No GPS on this phone"
                     else -> "Tap to start"
                 }

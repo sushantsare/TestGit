@@ -1,11 +1,8 @@
 package com.sushant.speedtile
 
 import android.Manifest
-import android.app.StatusBarManager
-import android.content.ComponentName
 import android.content.Intent
 import android.content.pm.PackageManager
-import android.graphics.drawable.Icon
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -83,7 +80,6 @@ class MainActivity : ComponentActivity() {
         val autoStop by prefs.autoStopMin.collectAsStateWithLifecycle()
         val keepOn by prefs.keepScreenOn.collectAsStateWithLifecycle()
         val themeMode by prefs.theme.collectAsStateWithLifecycle()
-        val tileAdded by prefs.tileAdded.collectAsStateWithLifecycle()
 
         // Re-check permissions and GPS every time the app comes back to the front.
         var resumeTick by remember { mutableIntStateOf(0) }
@@ -95,15 +91,9 @@ class MainActivity : ComponentActivity() {
         }
         var locDeniedOnce by rememberSaveable { mutableStateOf(false) }
         val notice = remember(resumeTick, locDeniedOnce, state.running, state.status) { computeNotice(locDeniedOnce) }
-        val notifBlocked = remember(resumeTick) { notificationsBlocked() }
 
         var showLocRationale by rememberSaveable { mutableStateOf(false) }
-        var showNotifAsk by rememberSaveable { mutableStateOf(false) }
         var showResetConfirm by rememberSaveable { mutableStateOf(false) }
-
-        val notifLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
-            resumeTick++
-        }
 
         fun startNow() {
             if (!isGpsOn(this)) {
@@ -111,9 +101,6 @@ class MainActivity : ComponentActivity() {
                 return
             }
             SpeedService.start(this)
-            if (Build.VERSION.SDK_INT >= 33 && !prefs.askedNotifications &&
-                ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
-            ) showNotifAsk = true
         }
 
         val locLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { res ->
@@ -149,8 +136,6 @@ class MainActivity : ComponentActivity() {
                     decimals = decimals,
                     gaugeMax = gaugeMax,
                     notice = notice,
-                    tileAdded = tileAdded,
-                    canRequestTile = Build.VERSION.SDK_INT >= 33,
                     onStart = { onStart() },
                     onStop = { SpeedService.stop(this@MainActivity) },
                     onFixNotice = {
@@ -162,7 +147,6 @@ class MainActivity : ComponentActivity() {
                         }
                     },
                     onResetTrip = { showResetConfirm = true },
-                    onAddTile = { requestAddTile() },
                     onSettings = { nav.navigate("settings") { launchSingleTop = true } },
                     onAbout = { nav.navigate("about") { launchSingleTop = true } },
                 )
@@ -174,8 +158,6 @@ class MainActivity : ComponentActivity() {
                     gaugeMax = gaugeMax, onGaugeMax = prefs::setGaugeMax,
                     autoStop = autoStop, onAutoStop = prefs::setAutoStop,
                     keepOn = keepOn, onKeepOn = prefs::setKeepScreenOn,
-                    notifBlocked = notifBlocked, onOpenNotifSettings = { openNotificationSettings() },
-                    tileAdded = tileAdded, canRequestTile = Build.VERSION.SDK_INT >= 33, onAddTile = { requestAddTile() },
                     onBack = { nav.popBackStack() },
                 )
             }
@@ -214,24 +196,6 @@ class MainActivity : ComponentActivity() {
             )
         }
 
-        if (showNotifAsk) {
-            AlertDialog(
-                onDismissRequest = { showNotifAsk = false; prefs.askedNotifications = true },
-                title = { Text("Show speed in notifications?") },
-                text = { Text("A quiet notification shows your km/h and a Stop button while speed is on. Speed works either way.") },
-                confirmButton = {
-                    TextButton(onClick = {
-                        showNotifAsk = false
-                        prefs.askedNotifications = true
-                        if (Build.VERSION.SDK_INT >= 33) notifLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-                    }) { Text("Allow") }
-                },
-                dismissButton = {
-                    TextButton(onClick = { showNotifAsk = false; prefs.askedNotifications = true }) { Text("Not now") }
-                },
-            )
-        }
-
         if (showResetConfirm) {
             AlertDialog(
                 onDismissRequest = { showResetConfirm = false },
@@ -262,28 +226,6 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private fun notificationsBlocked(): Boolean =
-        Build.VERSION.SDK_INT >= 33 && app.prefs.askedNotifications &&
-            ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
-
-    private fun requestAddTile() {
-        if (Build.VERSION.SDK_INT < 33) return
-        val sbm = getSystemService(StatusBarManager::class.java) ?: return
-        sbm.requestAddTileService(
-            ComponentName(this, SpeedTileService::class.java),
-            getString(R.string.tile_label),
-            Icon.createWithResource(this, R.drawable.ic_speed),
-            ContextCompat.getMainExecutor(this),
-        ) { result ->
-            when (result) {
-                StatusBarManager.TILE_ADD_REQUEST_RESULT_TILE_ADDED -> { app.prefs.setTileAdded(true); toast("Speed tile added") }
-                StatusBarManager.TILE_ADD_REQUEST_RESULT_TILE_ALREADY_ADDED -> { app.prefs.setTileAdded(true); toast("Speed tile is already added") }
-                StatusBarManager.TILE_ADD_REQUEST_RESULT_TILE_NOT_ADDED -> Unit
-                else -> toast("Could not add the tile here. Add it from Quick Settings edit.")
-            }
-        }
-    }
-
     private fun openAppSettings() {
         startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.fromParts("package", packageName, null)))
     }
@@ -291,11 +233,6 @@ class MainActivity : ComponentActivity() {
     private fun openLocationSettings() {
         runCatching { startActivity(Intent(Settings.ACTION_LOCATION_SOURCE_SETTINGS)) }
             .onFailure { toast("Open Settings and turn on Location") }
-    }
-
-    private fun openNotificationSettings() {
-        val i = Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(Settings.EXTRA_APP_PACKAGE, packageName)
-        runCatching { startActivity(i) }.onFailure { openAppSettings() }
     }
 
     private fun openEmail() {

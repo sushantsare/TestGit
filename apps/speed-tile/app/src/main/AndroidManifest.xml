@@ -5,10 +5,9 @@
     <!-- GPS speed (precise location is required for GPS; approximate is declared because Android 12+ requires both) -->
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
-    <!-- Keeps measuring while the shade or another app is open; shows a live-speed notification -->
+    <!-- Keeps measuring while the shade or another app is open -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
-    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <uses-feature android:name="android.hardware.location.gps" android:required="false" />
 
@@ -28,17 +27,13 @@
             android:exported="true"
             android:launchMode="singleTop"
             android:windowSoftInputMode="adjustResize">
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-                <category android:name="android.intent.category.LAUNCHER" />
-            </intent-filter>
-            <!-- Long-press on the tile opens the app -->
+            <!-- No launcher icon: this screen opens only by long-pressing the tile -->
             <intent-filter>
                 <action android:name="android.service.quicksettings.action.QS_TILE_PREFERENCES" />
             </intent-filter>
         </activity>
 
-        <!-- Invisible helper opened by the tile so Android allows GPS to start -->
+        <!-- Invisible helper opened by the tile: asks for location once, then starts GPS -->
         <activity
             android:name=".StartActivity"
             android:exported="false"

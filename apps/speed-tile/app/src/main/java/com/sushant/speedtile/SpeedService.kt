@@ -69,6 +69,15 @@ class SpeedService : Service() {
         }
     }
 
+    /**
+     * Some Android versions start the service from the tile but silently withhold GPS.
+     * If nothing at all arrived, use the visible hand-off from the next tap on.
+     */
+    private val directCheck = Runnable {
+        val st = app.engine.state.value
+        if (listening && app.engine.lastFixAt == 0L && st.satsSeen == 0) app.prefs.directStartBlocked = true
+    }
+
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onCreate() {
@@ -93,12 +102,16 @@ class SpeedService : Service() {
                 if (Build.VERSION.SDK_INT >= 29) ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION else 0,
             )
         } catch (e: Exception) {
-            // Android refused to start GPS from the background; the user can start it from the app.
-            app.engine.onStopped(StopReason.NO_PERMISSION)
+            // Android refused to start GPS without a visible screen; the tile retries via StartActivity.
+            app.prefs.directStartBlocked = true
+            app.engine.onStopped(StopReason.BLOCKED)
             stopSelf()
             return START_NOT_STICKY
         }
-        if (!listening) startListening()
+        if (!listening) {
+            startListening()
+            if (intent?.getBooleanExtra(EXTRA_FROM_TILE, false) == true) handler.postDelayed(directCheck, 15_000L)
+        }
         return START_NOT_STICKY
     }
 
@@ -136,6 +149,7 @@ class SpeedService : Service() {
         }
         listening = false
         handler.removeCallbacks(ticker)
+        handler.removeCallbacks(directCheck)
         stateJob?.cancel()
         stateJob = null
     }
@@ -147,6 +161,7 @@ class SpeedService : Service() {
         super.onDestroy()
     }
 
+    @SuppressLint("MissingPermission")
     private fun updateNotification(s: SpeedState) {
         if (!s.running) return
         val n = buildNotification(s)
@@ -154,11 +169,8 @@ class SpeedService : Service() {
             n.extras.getCharSequence(Notification.EXTRA_TEXT)
         if (key == lastNotifText) return
         lastNotifText = key
-        if (Build.VERSION.SDK_INT < 33 ||
-            ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
-        ) {
-            getSystemService(NotificationManager::class.java).notify(NOTIF_ID, n)
-        }
+        // Shown where the system allows it (Android 13+ hides it unless notifications are allowed in Settings).
+        runCatching { getSystemService(NotificationManager::class.java).notify(NOTIF_ID, n) }
     }
 
     private fun buildNotification(s: SpeedState): Notification {
@@ -198,9 +210,15 @@ class SpeedService : Service() {
         const val CHANNEL_ID = "live_speed"
         const val NOTIF_ID = 7
         const val ACTION_STOP = "com.sushant.speedtile.STOP"
+        const val EXTRA_FROM_TILE = "from_tile"
 
         fun start(context: Context) {
             ContextCompat.startForegroundService(context, Intent(context, SpeedService::class.java))
+        }
+
+        /** Start straight from the tile, without leaving the shade. Throws if Android forbids it. */
+        fun startFromTile(context: Context) {
+            context.startForegroundService(Intent(context, SpeedService::class.java).putExtra(EXTRA_FROM_TILE, true))
         }
 
         fun stop(context: Context) {
