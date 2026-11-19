@@ -74,6 +74,7 @@ adb shell cmd statusbar expand-settings
 sleep 3
 adb exec-out screencap -p > $OUT/screens/${TAG}_c_after_close_reopened.png
 adb shell cmd statusbar collapse
-adb logcat -d -s SpeedTile:* ActivityManager:W | grep -iE "speedtile|SpeedTile" | tail -30 >> $LOG
+echo "---- system log (filtered) ----" >> $LOG
+adb logcat -d | grep -iE "speedtile|SpeedTile|Background activity|BackgroundActivityStart|balAllowed|Abort background|ForegroundService|AndroidRuntime|while-in-use|WhileInUse|startActivityAndCollapse|PendingIntent" | grep -v "^--------" | tail -120 >> $LOG
 if [ "$FIXES" -gt 0 ] && [ "$CLOSED" -gt 0 ]; then echo PASSED > $RES; fi
 cat $RES >> $LOG
