@@ -33,7 +33,9 @@ adb emu geo fix 85.1000 25.6000 50 9
 scenario() { # name, how
   NAME=$1
   reset_app
-  adb shell cmd statusbar expand-settings; sleep 3
+  # warm-up: let SystemUI bind the tile again after the force-stop
+  adb shell cmd statusbar expand-settings; sleep 4; adb shell cmd statusbar collapse; sleep 2
+  adb shell cmd statusbar expand-settings; sleep 5
   case $2 in
     tile) adb shell cmd statusbar click-tile $TILE ;;
     direct) adb shell cmd statusbar collapse; adb shell am start -n $PKG/.StartActivity >> $LOG 2>&1 ;;
