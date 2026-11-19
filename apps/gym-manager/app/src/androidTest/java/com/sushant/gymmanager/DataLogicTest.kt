@@ -28,7 +28,7 @@ class DataLogicTest {
 
     /** A database created by app version 1.0 must open in 2.0 with all data kept. */
     @Test
-    fun migrationFromVersion1KeepsData() = runBlocking {
+    fun migrationFromVersion1KeepsData(): Unit = runBlocking {
         val name = "migration_test.db"
         ctx.deleteDatabase(name)
         val file = ctx.getDatabasePath(name).apply { parentFile?.mkdirs() }
@@ -80,7 +80,7 @@ class DataLogicTest {
     )
 
     @Test
-    fun partialPaymentsAndUndo() = runBlocking {
+    fun partialPaymentsAndUndo(): Unit = runBlocking {
         val (db, repo) = memoryRepo()
         val id = repo.addMember(member("1", LocalDate.now().minusDays(5)), PlanInput(PlanType.ONE_MONTH, 0, 0, 1000.0, true))
         val cycle = repo.cyclesOf(id).single()
@@ -103,7 +103,7 @@ class DataLogicTest {
     }
 
     @Test
-    fun feeChangeRebuildsOnlyUnpaidCycles() = runBlocking {
+    fun feeChangeRebuildsOnlyUnpaidCycles(): Unit = runBlocking {
         val (db, repo) = memoryRepo()
         val joined = LocalDate.now().minusDays(40)
         val id = repo.addMember(member("2", joined), PlanInput(PlanType.ONE_MONTH, 0, 0, 1000.0, true))
@@ -126,7 +126,7 @@ class DataLogicTest {
     }
 
     @Test
-    fun freezeSkipsRenewalAndResumeExtendsPlan() = runBlocking {
+    fun freezeSkipsRenewalAndResumeExtendsPlan(): Unit = runBlocking {
         val (db, repo) = memoryRepo()
         val id = repo.addMember(member("4", LocalDate.now().minusDays(10)), PlanInput(PlanType.ONE_MONTH, 0, 0, 1000.0, true))
         val before = repo.getActiveMembership(id)!!.expiryDate
@@ -139,7 +139,7 @@ class DataLogicTest {
     }
 
     @Test
-    fun qrCheckIn() = runBlocking {
+    fun qrCheckIn(): Unit = runBlocking {
         val (db, repo) = memoryRepo()
         val id = repo.addMember(member("5", LocalDate.now()), PlanInput(PlanType.ONE_MONTH, 0, 0, 1000.0, true))
         assertEquals(CheckInResult.OK, repo.checkIn(GymRepository.qrContent("5")).result)

@@ -1,7 +1,7 @@
 package com.sushant.gymmanager.ui.reports
 
+import com.sushant.gymmanager.util.toast
 import android.app.Application
-import android.widget.Toast
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -202,9 +202,9 @@ fun ReportsScreen(onOpenDrawer: () -> Unit, vm: ReportsViewModel = viewModel()) 
     val doExport = {
         vm.export(lang) { file, saved ->
             if (file == null) {
-                Toast.makeText(context, failedMsg, Toast.LENGTH_SHORT).show()
+                context.toast(failedMsg)
             } else {
-                if (saved) Toast.makeText(context, exportedMsg, Toast.LENGTH_SHORT).show()
+                if (saved) context.toast(exportedMsg)
                 ShareUtil.shareFile(context, file, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", file.name)
             }
         }

@@ -1,7 +1,7 @@
 package com.sushant.gymmanager.ui.payments
 
+import com.sushant.gymmanager.util.toast
 import android.app.Application
-import android.widget.Toast
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
@@ -295,7 +295,7 @@ fun PaymentsScreen(onOpenDrawer: () -> Unit, vm: PaymentsViewModel = viewModel()
                 vm.record(amounts, mode, note) { refs ->
                     receiptNames = names
                     receipts = refs
-                    Toast.makeText(context, I18n.tr(lang, "Payment recorded"), Toast.LENGTH_SHORT).show()
+                    context.toast(I18n.tr(lang, "Payment recorded"))
                 }
             }
         )

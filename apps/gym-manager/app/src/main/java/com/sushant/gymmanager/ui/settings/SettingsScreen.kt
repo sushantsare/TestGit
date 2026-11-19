@@ -1,7 +1,7 @@
 package com.sushant.gymmanager.ui.settings
 
+import com.sushant.gymmanager.util.toast
 import android.app.Application
-import android.widget.Toast
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -181,7 +181,7 @@ fun SettingsScreen(onOpenDrawer: () -> Unit, onDataReset: () -> Unit, vm: Settin
                         onClick = {
                             val r = result ?: return@Button
                             val doSave = {
-                                vm.save(r) { Toast.makeText(context, savedMsg, Toast.LENGTH_SHORT).show() }
+                                vm.save(r) { context.toast(savedMsg) }
                             }
                             if (vm.securityChanged(r)) {
                                 BiometricHelper.guard(context, vm.saved ?: r, ProtectedAction.CHANGE_SECURITY, securityTitle, doSave)
@@ -418,7 +418,7 @@ fun SettingsScreen(onOpenDrawer: () -> Unit, onDataReset: () -> Unit, vm: Settin
                 confirmReset = false
                 BiometricHelper.guard(context, vm.saved ?: d, ProtectedAction.RESET_DATA, resetTitle) {
                     vm.resetAll {
-                        Toast.makeText(context, resetMsg, Toast.LENGTH_SHORT).show()
+                        context.toast(resetMsg)
                         onDataReset()
                     }
                 }

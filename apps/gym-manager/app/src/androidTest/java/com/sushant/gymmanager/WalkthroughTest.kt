@@ -89,7 +89,7 @@ class WalkthroughTest {
     }
 
     @Before
-    fun seed() = runBlocking {
+    fun seed(): Unit = runBlocking {
         val repo = app.repository
         repo.resetAll()
         repo.saveSettings(GymSettingsEntity(gymName = "PowerFit Gym", themeMode = "LIGHT"))

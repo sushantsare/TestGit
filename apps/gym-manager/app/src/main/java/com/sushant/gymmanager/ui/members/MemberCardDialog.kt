@@ -1,6 +1,6 @@
 package com.sushant.gymmanager.ui.members
 
-import android.widget.Toast
+import com.sushant.gymmanager.util.toast
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -108,7 +108,7 @@ fun MemberCardDialog(memberId: Long, onDismiss: () -> Unit, onEdit: (Long) -> Un
     LaunchedEffect(details) {
         if (details != null) loaded = true else if (loaded) onDismiss()
     }
-    fun toast(msg: String) = Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
+    fun toast(msg: String) = context.toast(msg)
 
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         Surface(

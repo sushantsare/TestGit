@@ -1,7 +1,7 @@
 package com.sushant.gymmanager.ui.attendance
 
+import com.sushant.gymmanager.util.toast
 import android.app.Application
-import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material3.IconButton
@@ -188,7 +188,7 @@ fun AttendanceScreen(onOpenDrawer: () -> Unit, onEditMember: (Long) -> Unit, vm:
                 CheckInResult.FROZEN -> I18n.tr(lang, "%s's membership is frozen", name)
                 CheckInResult.NOT_FOUND -> I18n.tr(lang, "No member found for this QR code")
             }
-            Toast.makeText(context, msg, Toast.LENGTH_LONG).show()
+            context.toast(msg, long = true)
             if (r.result == CheckInResult.OK && vm.date == DateUtils.today()) vm.reload()
         }
     }
@@ -232,7 +232,7 @@ fun AttendanceScreen(onOpenDrawer: () -> Unit, onEditMember: (Long) -> Unit, vm:
                         Button(
                             onClick = {
                                 vm.save(visible) {
-                                    Toast.makeText(context, savedMsg, Toast.LENGTH_SHORT).show()
+                                    context.toast(savedMsg)
                                 }
                             },
                             enabled = dirty,

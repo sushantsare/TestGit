@@ -1,6 +1,6 @@
 package com.sushant.gymmanager.ui.members
 
-import android.widget.Toast
+import com.sushant.gymmanager.util.toast
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
@@ -133,7 +133,7 @@ fun AddEditMemberScreen(memberId: Long, onDone: () -> Unit, vm: AddEditMemberVie
                             onClick = {
                                 val doSave = {
                                     vm.save {
-                                        Toast.makeText(context, savedMsg, Toast.LENGTH_SHORT).show()
+                                        context.toast(savedMsg)
                                         onDone()
                                     }
                                 }

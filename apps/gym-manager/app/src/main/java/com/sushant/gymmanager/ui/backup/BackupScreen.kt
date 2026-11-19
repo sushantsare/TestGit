@@ -1,8 +1,8 @@
 package com.sushant.gymmanager.ui.backup
 
+import com.sushant.gymmanager.util.toast
 import android.app.Application
 import android.net.Uri
-import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -210,7 +210,7 @@ fun BackupScreen(onOpenDrawer: () -> Unit, onRestored: () -> Unit, vm: BackupVie
                             HeaderRow(Icons.Default.Inventory2, t("Create a full backup"), t("Members, photos, plans, payments, attendance and settings in one .gymbackup file."))
                             Spacer(Modifier.height(14.dp))
                             Button(
-                                onClick = { vm.create { Toast.makeText(context, if (it == "OK") createdMsg else failedMsg, Toast.LENGTH_SHORT).show() } },
+                                onClick = { vm.create { context.toast(if (it == "OK") createdMsg else failedMsg) } },
                                 enabled = !vm.busy,
                                 modifier = Modifier.fillMaxWidth().height(50.dp).testTag("create_backup")
                             ) {
@@ -244,7 +244,7 @@ fun BackupScreen(onOpenDrawer: () -> Unit, onRestored: () -> Unit, vm: BackupVie
                         else -> items(list, key = { it.file.name }) { info ->
                             BackupRow(
                                 info,
-                                onSave = { vm.saveToDownloads(info) { ok -> Toast.makeText(context, if (ok) savedMsg else needPermMsg, Toast.LENGTH_SHORT).show() } },
+                                onSave = { vm.saveToDownloads(info) { ok -> context.toast(if (ok) savedMsg else needPermMsg) } },
                                 onShare = { context.startActivity(vm.shareIntent(info)) },
                                 onDelete = { toDelete = info },
                                 onRestore = { vm.loadLocal(info.file); tab = 1 }
@@ -304,7 +304,7 @@ fun BackupScreen(onOpenDrawer: () -> Unit, onRestored: () -> Unit, vm: BackupVie
                 confirmRestore = false
                 BiometricHelper.guard(context, vm.settings, ProtectedAction.RESTORE_BACKUP, restoreTitle) {
                     vm.restore { ok, msg ->
-                        Toast.makeText(context, if (ok) I18n.tr(lang, "Restored %d members successfully", msg.toIntOrNull() ?: 0) else I18n.tr(lang, msg), Toast.LENGTH_LONG).show()
+                        context.toast(if (ok) I18n.tr(lang, "Restored %d members successfully", msg.toIntOrNull() ?: 0) else I18n.tr(lang, msg), long = true)
                         if (ok) onRestored()
                     }
                 }
