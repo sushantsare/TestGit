@@ -38,6 +38,8 @@ data class SavedItem(
     val deletedAt: Long? = null,
     /** Private copy kept while in the bin (so it can be restored). */
     val binPath: String? = null,
+    /** true = in the phone Gallery (mediaUri is a MediaStore URI); false = hidden in Saveo's private vault (file:// URI). */
+    val visible: Boolean = true,
 ) {
     val mediaKind: MediaKind get() = if (kind == MediaKind.VIDEO.name) MediaKind.VIDEO else MediaKind.IMAGE
     val sourceEnum: Source get() = Source.entries.firstOrNull { it.name == source } ?: Source.WHATSAPP
@@ -75,6 +77,9 @@ interface SavedDao {
     @Query("DELETE FROM saved_items WHERE id = :id")
     suspend fun delete(id: Long)
 
+    @Query("SELECT id FROM saved_items WHERE deletedAt IS NULL AND visible = 0")
+    suspend fun hiddenIds(): List<Long>
+
     @Query("SELECT COUNT(*) FROM saved_items WHERE deletedAt IS NULL")
     suspend fun savedCount(): Int
 
@@ -88,13 +93,20 @@ interface SavedDao {
     suspend fun seenCount(): Int
 }
 
-@Database(entities = [SavedItem::class, Seen::class], version = 1, exportSchema = false)
+@Database(entities = [SavedItem::class, Seen::class], version = 2, exportSchema = false)
 abstract class SaveoDb : RoomDatabase() {
     abstract fun dao(): SavedDao
 
     companion object {
         fun create(ctx: Context, inMemory: Boolean = false): SaveoDb =
             if (inMemory) Room.inMemoryDatabaseBuilder(ctx, SaveoDb::class.java).build()
-            else Room.databaseBuilder(ctx, SaveoDb::class.java, "saveo.db").build()
+            else Room.databaseBuilder(ctx, SaveoDb::class.java, "saveo.db").addMigrations(MIGRATION_1_2).build()
+
+        /** v1.1.0: hidden saves. Everything saved with 1.0.0 is already in the Gallery, so it stays visible. */
+        val MIGRATION_1_2 = object : androidx.room.migration.Migration(1, 2) {
+            override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE saved_items ADD COLUMN visible INTEGER NOT NULL DEFAULT 1")
+            }
+        }
     }
 }

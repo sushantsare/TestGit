@@ -44,6 +44,43 @@
     <string name="src_wa_short">WhatsApp</string>
     <string name="src_b_short">Business</string>
     <string name="src_dual_short">Dual</string>
+    <string name="snack_photo_private">Photo saved · only in Saveo</string>
+    <string name="snack_video_private">Video saved · only in Saveo</string>
+    <string name="show_in_gallery">Show in gallery</string>
+    <string name="hide">Hide</string>
+    <string name="filter_in_gallery">In gallery</string>
+    <string name="cd_eye_show">Hidden from Gallery. Tap to show in Gallery</string>
+    <string name="cd_eye_hide">Visible in Gallery. Tap to hide</string>
+    <string name="snack_visible">Now visible in Gallery</string>
+    <string name="snack_hidden">Hidden from Gallery</string>
+    <string name="viewer_visible_hint">Visible in Gallery · tap the eye to hide</string>
+    <string name="viewer_hidden_hint">Only in Saveo · tap the eye to show in Gallery</string>
+    <string name="set_new_saves">New saves go to</string>
+    <string name="new_saves_hidden">Hidden (only in Saveo)</string>
+    <string name="new_saves_gallery">Gallery</string>
+    <string name="set_show_all">Show all in gallery</string>
+    <string name="set_show_all_d">Makes every saved item visible in Gallery</string>
+    <string name="show_all_body">They will appear in your Gallery app in the album Saveo. You can hide any of them again with the eye button.</string>
+    <string name="nothing_hidden">Everything is already in your Gallery</string>
+    <string name="gallery_filter_note">Only these are in your phone Gallery. Everything else stays private inside Saveo.</string>
+    <string name="gallery_empty_title">Nothing in Gallery</string>
+    <string name="gallery_empty_body">Saved items stay private inside Saveo. Tap the eye on any item to show it in your Gallery.</string>
+    <string name="private_title">Saved items are private now</string>
+    <string name="private_body">New saves stay inside Saveo and do not show in your Gallery. Tap the eye on any item to show it in Gallery.</string>
+    <string name="private_warn">Before uninstalling Saveo or changing phones, use Settings › Show all in gallery, or Android will delete the hidden items with the app.</string>
+    <string name="got_it">Got it</string>
+    <plurals name="snack_n_visible">
+        <item quantity="one">%d now visible in Gallery</item>
+        <item quantity="other">%d now visible in Gallery</item>
+    </plurals>
+    <plurals name="snack_n_hidden">
+        <item quantity="one">%d hidden from Gallery</item>
+        <item quantity="other">%d hidden from Gallery</item>
+    </plurals>
+    <plurals name="show_all_q">
+        <item quantity="one">Show %d hidden item in Gallery?</item>
+        <item quantity="other">Show %d hidden items in Gallery?</item>
+    </plurals>
     <string name="pane_hint">Tap a status to see it here</string>
     <string name="clear_dates">Clear dates</string>
     <string name="saved_on">Saved %1$s</string>
@@ -221,8 +258,8 @@
         <item quantity="other">%d selected</item>
     </plurals>
     <plurals name="snack_n_saved">
-        <item quantity="one">%d saved to gallery</item>
-        <item quantity="other">%d saved to gallery</item>
+        <item quantity="one">%d saved</item>
+        <item quantity="other">%d saved</item>
     </plurals>
     <plurals name="snack_moved_bin">
         <item quantity="one">%d item moved to Recycle bin</item>

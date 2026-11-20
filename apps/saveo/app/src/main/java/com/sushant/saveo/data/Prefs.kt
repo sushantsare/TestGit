@@ -17,6 +17,8 @@ data class Settings(
     val sortNewest: Boolean = true,
     /** null = all connected sources */
     val sourceFilter: Source? = null,
+    /** false (default) = new saves stay hidden inside Saveo; true = they go straight to the Gallery. */
+    val newSavesVisible: Boolean = false,
 )
 
 /**
@@ -43,6 +45,7 @@ class Prefs(ctx: Context) {
         appLock = sp.getBoolean("appLock", false),
         sortNewest = sp.getBoolean("sortNewest", true),
         sourceFilter = sp.getString("source", null)?.let { s -> Source.entries.firstOrNull { it.name == s } },
+        newSavesVisible = sp.getBoolean("newSavesVisible", false),
     )
 
     fun update(block: (Settings) -> Settings) {
@@ -56,6 +59,7 @@ class Prefs(ctx: Context) {
             .putBoolean("appLock", n.appLock)
             .putBoolean("sortNewest", n.sortNewest)
             .putString("source", n.sourceFilter?.name)
+            .putBoolean("newSavesVisible", n.newSavesVisible)
             .apply()
         _settings.value = n
     }
@@ -87,6 +91,10 @@ class Prefs(ctx: Context) {
     var storageAsked: Boolean
         get() = dev.getBoolean("storageAsked", false)
         set(v) { dev.edit().putBoolean("storageAsked", v).apply() }
+
+    var privateInfoShown: Boolean
+        get() = dev.getBoolean("privateInfo", false)
+        set(v) { dev.edit().putBoolean("privateInfo", v).apply() }
 
     var hintSelectShown: Boolean
         get() = dev.getBoolean("hintSelect", false)

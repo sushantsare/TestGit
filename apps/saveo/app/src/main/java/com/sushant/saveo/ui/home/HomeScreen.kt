@@ -54,6 +54,8 @@ import androidx.compose.material.icons.rounded.Repeat
 import androidx.compose.material.icons.rounded.Share
 import androidx.compose.material.icons.rounded.SwapVert
 import androidx.compose.material.icons.rounded.WarningAmber
+import androidx.compose.material.icons.rounded.Visibility
+import androidx.compose.material.icons.rounded.VisibilityOff
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.DateRangePicker
 import androidx.compose.material3.DropdownMenu
@@ -220,6 +222,8 @@ fun HomeScreen(vm: MainViewModel, showTabs: Boolean, modifier: Modifier = Modifi
                 onShare = { vm.share(items) },
                 onRepost = { vm.share(items, repostTo = items.firstOrNull()?.source?.pkg ?: "com.whatsapp") },
                 onDelete = { vm.delete(items.mapNotNull { it.saved?.id }) },
+                onShow = { vm.setVisible(items.mapNotNull { it.saved?.id }, true) },
+                onHide = { vm.setVisible(items.mapNotNull { it.saved?.id }, false) },
             )
         }
     }
@@ -321,24 +325,26 @@ private fun SelectionBar(count: Int, onClose: () -> Unit, onSelectAll: () -> Uni
 }
 
 @Composable
-private fun FilterRow(vm: MainViewModel, trailing: @Composable () -> Unit = {}) {
-    val f by vm.filter.collectAsStateWithLifecycle()
+private fun FilterRow(vm: MainViewModel, savedTab: Boolean = false, trailing: @Composable () -> Unit = {}) {
+    val raw by vm.filter.collectAsStateWithLifecycle()
+    val f = if (!savedTab && raw == MediaFilter.IN_GALLERY) MediaFilter.ALL else raw
     Row(Modifier.fillMaxWidth().padding(start = 2.dp, top = 10.dp, bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
         Row(Modifier.weight(1f).horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            listOf(MediaFilter.ALL to R.string.filter_all, MediaFilter.PHOTOS to R.string.filter_photos, MediaFilter.VIDEOS to R.string.filter_videos).forEach { (k, s) ->
-                GlossChip(stringResource(s), f == k) { vm.setFilter(k) }
-            }
+            val chips = listOf(MediaFilter.ALL to R.string.filter_all, MediaFilter.PHOTOS to R.string.filter_photos, MediaFilter.VIDEOS to R.string.filter_videos) +
+                (if (savedTab) listOf(MediaFilter.IN_GALLERY to R.string.filter_in_gallery) else emptyList())
+            chips.forEach { (k, s) -> GlossChip(stringResource(s), f == k, if (k == MediaFilter.IN_GALLERY) Icons.Rounded.Visibility else null) { vm.setFilter(k) } }
         }
         trailing()
     }
 }
 
 @Composable
-private fun GlossChip(text: String, selected: Boolean, onClick: () -> Unit) {
+private fun GlossChip(text: String, selected: Boolean, icon: ImageVector? = null, onClick: () -> Unit) {
     val ex = LocalSaveo.current
     FilterChip(
         selected = selected, onClick = onClick,
         label = { Text(text, style = MaterialTheme.typography.labelLarge) },
+        leadingIcon = icon?.let { ic -> { Icon(ic, null, Modifier.size(18.dp)) } },
         shape = CircleShape, border = null,
         colors = FilterChipDefaults.filterChipColors(
             containerColor = MaterialTheme.colorScheme.surfaceContainer,
@@ -445,6 +451,7 @@ private fun SavedPage(vm: MainViewModel, onSort: () -> Unit, onDates: () -> Unit
     val all by vm.savedAll.collectAsStateWithLifecycle()
     val selection by vm.selection.collectAsStateWithLifecycle()
     val dk by vm.dateKind.collectAsStateWithLifecycle()
+    val filter by vm.filter.collectAsStateWithLifecycle()
     val grid = rememberLazyGridState()
     val px = dpToPx(190.dp)
     LazyVerticalGrid(
@@ -454,7 +461,7 @@ private fun SavedPage(vm: MainViewModel, onSort: () -> Unit, onDates: () -> Unit
         modifier = Modifier.fillMaxSize().testTag("saved_grid"),
     ) {
         item(key = "filters", span = { GridItemSpan(maxLineSpan) }) {
-            FilterRow(vm) {
+            FilterRow(vm, savedTab = true) {
                 RoundAction(Icons.Rounded.SwapVert, stringResource(R.string.sort), onSort)
                 RoundAction(Icons.Rounded.CalendarMonth, stringResource(R.string.dates), onDates, active = dk != DateRangeKind.ANY)
             }
@@ -468,6 +475,9 @@ private fun SavedPage(vm: MainViewModel, onSort: () -> Unit, onDates: () -> Unit
         when {
             all.isEmpty() -> item(key = "empty", span = { GridItemSpan(maxLineSpan) }) {
                 EmptyState(stringResource(R.string.saved_empty_title), stringResource(R.string.saved_empty_body))
+            }
+            list.isEmpty() && filter == MediaFilter.IN_GALLERY -> item(key = "ge", span = { GridItemSpan(maxLineSpan) }) {
+                EmptyState(stringResource(R.string.gallery_empty_title), stringResource(R.string.gallery_empty_body), illustration = false)
             }
             list.isEmpty() -> item(key = "fe", span = { GridItemSpan(maxLineSpan) }) {
                 EmptyState(stringResource(R.string.filter_empty_title), stringResource(R.string.filter_empty_body), illustration = false)
@@ -485,6 +495,8 @@ private fun SavedPage(vm: MainViewModel, onSort: () -> Unit, onDates: () -> Unit
                     onSave = {},
                     modifier = Modifier.animateItem().testTag("saved_tile"),
                     sizePx = px,
+                    galleryVisible = m.saved?.visible,
+                    onEye = { m.saved?.let { s -> vm.setVisible(listOf(s.id), !s.visible) } },
                 )
             }
         }
@@ -545,13 +557,19 @@ private fun LostCard(onFix: () -> Unit) {
 }
 
 @Composable
-private fun SelectionActions(fromSaved: Boolean, count: Int, onSave: () -> Unit, onShare: () -> Unit, onRepost: () -> Unit, onDelete: () -> Unit) {
+private fun SelectionActions(fromSaved: Boolean, count: Int, onSave: () -> Unit, onShare: () -> Unit, onRepost: () -> Unit, onDelete: () -> Unit, onShow: () -> Unit, onHide: () -> Unit) {
     Surface(shape = RoundedCornerShape(24.dp), color = MaterialTheme.colorScheme.surfaceContainerLow, shadowElevation = 8.dp, modifier = Modifier.widthIn(max = 520.dp).fillMaxWidth()) {
         Row(Modifier.padding(8.dp), horizontalArrangement = Arrangement.SpaceAround) {
-            if (!fromSaved) BarAction(Icons.Rounded.Download, stringResource(R.string.save_n, count), true, count > 0, onSave)
-            BarAction(Icons.Rounded.Share, stringResource(R.string.share), fromSaved, count > 0, onShare)
-            BarAction(Icons.Rounded.Repeat, stringResource(R.string.repost), false, count > 0, onRepost)
-            if (fromSaved) BarAction(Icons.Rounded.Delete, stringResource(R.string.delete), false, count > 0, onDelete)
+            if (!fromSaved) {
+                BarAction(Icons.Rounded.Download, stringResource(R.string.save_n, count), true, count > 0, onSave)
+                BarAction(Icons.Rounded.Share, stringResource(R.string.share), false, count > 0, onShare)
+                BarAction(Icons.Rounded.Repeat, stringResource(R.string.repost), false, count > 0, onRepost)
+            } else {
+                BarAction(Icons.Rounded.Visibility, stringResource(R.string.show_in_gallery), true, count > 0, onShow)
+                BarAction(Icons.Rounded.VisibilityOff, stringResource(R.string.hide), false, count > 0, onHide)
+                BarAction(Icons.Rounded.Share, stringResource(R.string.share), false, count > 0, onShare)
+                BarAction(Icons.Rounded.Delete, stringResource(R.string.delete), false, count > 0, onDelete)
+            }
         }
     }
 }

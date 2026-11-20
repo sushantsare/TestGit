@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
@@ -42,6 +43,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -85,9 +87,11 @@ fun AppRoot(
 
     val deleteLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) { r ->
         val ids = vm.pendingDeleteIds
+        val hide = vm.pendingIsHide
         vm.pendingDeleteIds = emptyList()
-        if (r.resultCode == android.app.Activity.RESULT_OK) vm.deleteConfirmed(ids)
+        if (r.resultCode == android.app.Activity.RESULT_OK) { if (hide) vm.hideConfirmed(ids) else vm.deleteConfirmed(ids) }
     }
+    var privateInfo by androidx.compose.runtime.saveable.rememberSaveable { androidx.compose.runtime.mutableStateOf(false) }
 
     LaunchedEffect(vm) {
         vm.events.collect { e ->
@@ -99,7 +103,9 @@ fun AppRoot(
                 }
                 is UiEvent.Launch -> runCatching { ctx.startActivity(e.intent) }.onFailure { vm.showSnack(ctx.getString(R.string.snack_no_whatsapp)) }
                 UiEvent.DismissSnack -> snackHost.currentSnackbarData?.dismiss()
-                is UiEvent.ConfirmDelete -> { vm.pendingDeleteIds = e.ids; deleteLauncher.launch(IntentSenderRequest.Builder(e.sender).build()) }
+                is UiEvent.ConfirmDelete -> { vm.pendingDeleteIds = e.ids; vm.pendingIsHide = false; deleteLauncher.launch(IntentSenderRequest.Builder(e.sender).build()) }
+                is UiEvent.ConfirmHide -> { vm.pendingDeleteIds = e.ids; vm.pendingIsHide = true; deleteLauncher.launch(IntentSenderRequest.Builder(e.sender).build()) }
+                UiEvent.PrivateInfo -> privateInfo = true
             }
         }
     }
@@ -160,8 +166,25 @@ fun AppRoot(
             val ex = LocalSaveo.current
             Snackbar(d, containerColor = ex.snackBg, contentColor = androidx.compose.ui.graphics.Color.White, actionColor = ex.snackAction, shape = MaterialTheme.shapes.medium, modifier = Modifier.padding(horizontal = 16.dp))
         }
+        if (privateInfo) PrivateInfoSheet { privateInfo = false }
         if (locked && settings.appLock) LockScreen(onUnlock = onUnlockRequest)
     }
+    }
+}
+
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+@Composable
+private fun PrivateInfoSheet(onDismiss: () -> Unit) {
+    androidx.compose.material3.ModalBottomSheet(onDismissRequest = onDismiss, sheetState = androidx.compose.material3.rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
+        Column(Modifier.padding(horizontal = 24.dp).padding(bottom = 28.dp)) {
+            Text(stringResource(R.string.private_title), style = MaterialTheme.typography.titleLarge)
+            Spacer(Modifier.height(10.dp))
+            Text(stringResource(R.string.private_body), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Spacer(Modifier.height(12.dp))
+            Text(stringResource(R.string.private_warn), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
+            Spacer(Modifier.height(20.dp))
+            com.sushant.saveo.ui.components.GlossyButton(stringResource(R.string.got_it), onDismiss, Modifier.fillMaxWidth().testTag("got_it"))
+        }
     }
 }
 

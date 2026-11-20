@@ -35,7 +35,7 @@ import kotlinx.coroutines.launch
 import java.io.File
 
 enum class Screen { ONBOARD, SETUP, HOME, SETTINGS, BIN, DIAG, ABOUT }
-enum class MediaFilter { ALL, PHOTOS, VIDEOS }
+enum class MediaFilter { ALL, PHOTOS, VIDEOS, IN_GALLERY }
 enum class DateRangeKind { ANY, TODAY, WEEK, MONTH, CUSTOM }
 
 /** One thing shown in a grid tile or the viewer — either a live status or a saved copy. */
@@ -58,6 +58,8 @@ sealed interface UiEvent {
     data class Launch(val intent: Intent) : UiEvent
     data class ConfirmDelete(val sender: IntentSender, val ids: List<Long>) : UiEvent
     data object DismissSnack : UiEvent
+    data object PrivateInfo : UiEvent
+    data class ConfirmHide(val sender: IntentSender, val ids: List<Long>) : UiEvent
 }
 
 /** Viewer session: the list is frozen when opened so saving/deleting never jumps pages. */
@@ -95,14 +97,21 @@ class MainViewModel(app: Application, private val handle: SavedStateHandle) : An
     val statuses: StateFlow<List<Media>> = combine(status, settings, filter) { st, s, f ->
         st.items.asSequence()
             .filter { s.sourceFilter == null || it.source == s.sourceFilter }
-            .filter { f == MediaFilter.ALL || (f == MediaFilter.PHOTOS) == (it.kind == MediaKind.IMAGE) }
+            .filter { f == MediaFilter.ALL || f == MediaFilter.IN_GALLERY || (f == MediaFilter.PHOTOS) == (it.kind == MediaKind.IMAGE) }
             .map { it.toMedia() }.toList()
     }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
     val saved: StateFlow<List<Media>> = combine(savedAll, settings, filter, dateKind, customRange) { list, s, f, dk, range ->
         val (from, to) = rangeFor(dk, range)
         val l = list.asSequence()
-            .filter { f == MediaFilter.ALL || (f == MediaFilter.PHOTOS) == (it.mediaKind == MediaKind.IMAGE) }
+            .filter {
+                when (f) {
+                    MediaFilter.ALL -> true
+                    MediaFilter.IN_GALLERY -> it.visible
+                    MediaFilter.PHOTOS -> it.mediaKind == MediaKind.IMAGE
+                    MediaFilter.VIDEOS -> it.mediaKind == MediaKind.VIDEO
+                }
+            }
             .filter { it.savedAt in from..to }
             .map { it.toMedia() }.toList()
         if (s.sortNewest) l else l.reversed()
@@ -179,7 +188,7 @@ class MainViewModel(app: Application, private val handle: SavedStateHandle) : An
         val st = m.status ?: return
         viewModelScope.launch {
             when (val r = repo.save(st)) {
-                is SaveResult.Saved -> snack(str(if (st.kind == MediaKind.VIDEO) R.string.snack_video_saved else R.string.snack_photo_saved))
+                is SaveResult.Saved -> afterSaved(listOf(r.item), st.kind)
                 is SaveResult.AlreadySaved -> snack(str(R.string.snack_already))
                 is SaveResult.Failed -> snack(str(R.string.snack_failed, r.reason))
             }
@@ -192,10 +201,46 @@ class MainViewModel(app: Application, private val handle: SavedStateHandle) : An
         viewModelScope.launch {
             val (ok, dup, fail) = repo.saveAll(list)
             when {
-                ok > 0 -> snack(plural(R.plurals.snack_n_saved, ok))
+                ok > 0 -> { snack(plural(R.plurals.snack_n_saved, ok)); maybePrivateInfo() }
                 fail > 0 -> snack(str(R.string.snack_failed, "$fail"))
                 dup > 0 -> snack(str(R.string.snack_all_already))
             }
+        }
+    }
+
+    private fun afterSaved(items: List<SavedItem>, kind: MediaKind) {
+        val it = items.firstOrNull() ?: return
+        if (it.visible) snack(str(if (kind == MediaKind.VIDEO) R.string.snack_video_saved else R.string.snack_photo_saved))
+        else snack(str(if (kind == MediaKind.VIDEO) R.string.snack_video_private else R.string.snack_photo_private), str(R.string.show_in_gallery)) { setVisible(listOf(it.id), true) }
+        maybePrivateInfo()
+    }
+
+    private fun maybePrivateInfo() {
+        if (!settings.value.newSavesVisible && !prefs.privateInfoShown) { prefs.privateInfoShown = true; _events.tryEmit(UiEvent.PrivateInfo) }
+    }
+
+    /** Eye button: move saved items into the Gallery or back into Saveo (with Undo). */
+    fun setVisible(ids: List<Long>, visible: Boolean, withUndo: Boolean = true) {
+        if (ids.isEmpty()) return
+        clearSelection()
+        viewModelScope.launch {
+            when (val r = repo.setVisible(ids, visible)) {
+                is DeleteResult.Done -> if (r.ids.isNotEmpty()) {
+                    val text = if (r.ids.size == 1) str(if (visible) R.string.snack_visible else R.string.snack_hidden)
+                    else plural(if (visible) R.plurals.snack_n_visible else R.plurals.snack_n_hidden, r.ids.size)
+                    if (withUndo) snack(text, str(R.string.snack_undo)) { setVisible(r.ids, !visible, withUndo = false) } else snack(text)
+                }
+                is DeleteResult.NeedsConfirm -> _events.tryEmit(UiEvent.ConfirmHide(r.sender, r.ids))
+            }
+        }
+    }
+
+    fun hideConfirmed(ids: List<Long>) { viewModelScope.launch { repo.confirmHidden(ids); snack(str(R.string.snack_hidden)) } }
+
+    fun showAllInGallery() {
+        viewModelScope.launch {
+            val ids = repo.hiddenIds()
+            if (ids.isEmpty()) snack(str(R.string.nothing_hidden)) else setVisible(ids, true, withUndo = false)
         }
     }
 
@@ -272,8 +317,11 @@ class MainViewModel(app: Application, private val handle: SavedStateHandle) : An
     }
 
     // ---- share / repost / open --------------------------------------------
-    private fun contentUriFor(m: Media, f: File?): Uri =
-        if (f != null) FileProvider.getUriForFile(getApplication(), "${getApplication<Application>().packageName}.files", f) else m.uri
+    private fun contentUriFor(m: Media, f: File?): Uri = when {
+        f != null -> FileProvider.getUriForFile(getApplication(), "${getApplication<Application>().packageName}.files", f)
+        m.uri.scheme == "file" -> FileProvider.getUriForFile(getApplication(), "${getApplication<Application>().packageName}.files", File(m.uri.path!!))
+        else -> m.uri
+    }
 
     fun share(items: List<Media>, repostTo: String? = null) {
         if (items.isEmpty()) return
@@ -349,6 +397,7 @@ class MainViewModel(app: Application, private val handle: SavedStateHandle) : An
 
     /** Ids waiting for Android's delete confirmation. */
     var pendingDeleteIds: List<Long> = emptyList()
+    var pendingIsHide: Boolean = false
 
     fun emit(e: UiEvent) { _events.tryEmit(e) }
     fun showSnack(text: String) = snack(text)

@@ -127,4 +127,49 @@ class RepositoryTest {
         assertTrue("scan took $ms ms", ms < 5000)
         many.deleteRecursively()
     }
+
+    @Test fun newSavesAreHiddenAndEyeMovesThem(): Unit = runBlocking {
+        val photo = repo.refresh().items.first { it.kind == MediaKind.IMAGE }
+        val saved = (repo.save(photo) as SaveResult.Saved).item
+        // hidden by default: private vault file, not in MediaStore
+        assertFalse(saved.visible)
+        assertEquals("file", Uri.parse(saved.mediaUri).scheme)
+        assertTrue(File(Uri.parse(saved.mediaUri).path!!).path.contains("/vault/"))
+        // show in gallery: moved (vault file gone, MediaStore item exists)
+        assertTrue(repo.setVisible(listOf(saved.id), true) is DeleteResult.Done)
+        val shown = repo.saved.first().single()
+        assertTrue(shown.visible)
+        assertEquals("content", Uri.parse(shown.mediaUri).scheme)
+        assertTrue(repo.saver.exists(Uri.parse(shown.mediaUri)))
+        assertFalse(File(Uri.parse(saved.mediaUri).path!!).exists())
+        // hide again: back into the vault, gallery copy removed
+        assertTrue(repo.setVisible(listOf(saved.id), false) is DeleteResult.Done)
+        val hidden = repo.saved.first().single()
+        assertFalse(hidden.visible)
+        assertFalse(repo.saver.exists(Uri.parse(shown.mediaUri)))
+        assertTrue(repo.saver.exists(Uri.parse(hidden.mediaUri)))
+        // the content is still the same file (hash)
+        assertEquals(saved.hash, repo.saver.sha256(Uri.parse(hidden.mediaUri)))
+    }
+
+    @Test fun gallerySettingSavesVisible(): Unit = runBlocking {
+        app.prefs.update { it.copy(newSavesVisible = true) }
+        val photo = repo.refresh().items.first { it.kind == MediaKind.IMAGE }
+        val saved = (repo.save(photo) as SaveResult.Saved).item
+        assertTrue(saved.visible)
+        assertEquals("content", Uri.parse(saved.mediaUri).scheme)
+        assertTrue(repo.hiddenIds().isEmpty())
+    }
+
+    @Test fun binRestoreKeepsHiddenState(): Unit = runBlocking {
+        val photo = repo.refresh().items.first { it.kind == MediaKind.IMAGE }
+        val saved = (repo.save(photo) as SaveResult.Saved).item
+        repo.moveToBin(listOf(saved.id))
+        assertFalse(File(Uri.parse(saved.mediaUri).path!!).exists())
+        repo.restore(listOf(saved.id))
+        val back = repo.saved.first().single()
+        assertFalse(back.visible)
+        assertTrue(repo.saver.exists(Uri.parse(back.mediaUri)))
+        assertEquals(listOf(saved.id), repo.hiddenIds())
+    }
 }

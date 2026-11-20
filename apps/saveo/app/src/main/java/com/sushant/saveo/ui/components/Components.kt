@@ -36,6 +36,9 @@ import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Download
 import androidx.compose.material.icons.rounded.PlayArrow
+import androidx.compose.material.icons.rounded.Visibility
+import androidx.compose.material.icons.rounded.VisibilityOff
+import androidx.compose.ui.platform.testTag
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -136,6 +139,26 @@ fun SaveButton(state: SaveState, onClick: () -> Unit, modifier: Modifier = Modif
     }
 }
 
+/** Saved tile eye: crossed grey eye = only in Saveo; green open eye = visible in Gallery. */
+@Composable
+fun EyeButton(visible: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier, size: Dp = 40.dp) {
+    val desc = stringResource(if (visible) R.string.cd_eye_hide else R.string.cd_eye_show)
+    val stateText = stringResource(if (visible) R.string.saveo_on else R.string.saveo_off)
+    val brush = if (visible) Brush.verticalGradient(listOf(Color(0xFF3CCB89), Color(0xFF148654)))
+    else Brush.verticalGradient(listOf(Color.White, Color(0xFFE9EFEB)))
+    Box(
+        modifier.size(48.dp).semantics { contentDescription = desc; role = Role.Switch; stateDescription = stateText }
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Box(Modifier.size(size).shadow(5.dp, CircleShape).clip(CircleShape).background(brush), contentAlignment = Alignment.Center) {
+            AnimatedContent(visible, transitionSpec = { (fadeIn() + scaleIn(initialScale = 0.6f)) togetherWith fadeOut() }, label = "eye") { v ->
+                Icon(if (v) Icons.Rounded.Visibility else Icons.Rounded.VisibilityOff, null, tint = if (v) Color.White else Color(0xFF5B6B61), modifier = Modifier.size(size * 0.5f))
+            }
+        }
+    }
+}
+
 @Composable
 fun DurationBadge(text: String, modifier: Modifier = Modifier) {
     Row(
@@ -170,6 +193,8 @@ fun MediaTile(
     onSave: () -> Unit,
     modifier: Modifier = Modifier,
     sizePx: Int = 360,
+    galleryVisible: Boolean? = null,
+    onEye: () -> Unit = {},
 ) {
     val known = media.saved?.durationMs?.takeIf { it > 0 }
     var duration by remember(media.uri) { mutableLongStateOf(known ?: -1L) }
@@ -207,6 +232,7 @@ fun MediaTile(
         }
         if (media.saved == null) SourceBadge(media.source, Modifier.align(Alignment.TopEnd).padding(9.dp))
         if (saveState != null && !selecting) SaveButton(saveState, onSave, Modifier.align(Alignment.BottomEnd).padding(2.dp))
+        if (galleryVisible != null && !selecting) EyeButton(galleryVisible, onEye, Modifier.align(Alignment.BottomEnd).padding(2.dp).testTag("eye"))
     }
 }
 

@@ -50,6 +50,9 @@ import androidx.compose.material.icons.rounded.Palette
 import androidx.compose.material.icons.rounded.Restore
 import androidx.compose.material.icons.rounded.Share
 import androidx.compose.material.icons.rounded.Description
+import androidx.compose.material.icons.rounded.Visibility
+import androidx.compose.material.icons.rounded.VisibilityOff
+import kotlinx.coroutines.launch
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -126,6 +129,10 @@ fun SettingsScreen(vm: MainViewModel, authenticate: (onOk: () -> Unit) -> Unit, 
     val bin by vm.bin.collectAsStateWithLifecycle()
     var themeSheet by rememberSaveable { mutableStateOf(false) }
     var notifAsk by rememberSaveable { mutableStateOf(false) }
+    var newSavesSheet by rememberSaveable { mutableStateOf(false) }
+    var showAllAsk by rememberSaveable { mutableStateOf(false) }
+    var hiddenCount by rememberSaveable { mutableIntStateOf(0) }
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
     var resumeTick by remember { mutableIntStateOf(0) }
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { resumeTick++ }
     val canNotify = remember(resumeTick, s.alerts) { Notifier.canNotify(ctx) }
@@ -166,6 +173,17 @@ fun SettingsScreen(vm: MainViewModel, authenticate: (onOk: () -> Unit) -> Unit, 
                 SettingRow(Icons.Rounded.Folder, Color(0xFF3D6FC9), stringResource(R.string.set_folders), connected) { vm.openSetup(true) }
             }
             SectionLabel(stringResource(R.string.sec_privacy))
+            ListCard {
+                SettingRow(
+                    if (s.newSavesVisible) Icons.Rounded.Visibility else Icons.Rounded.VisibilityOff, Color(0xFF33443A), stringResource(R.string.set_new_saves),
+                    stringResource(if (s.newSavesVisible) R.string.new_saves_gallery else R.string.new_saves_hidden),
+                ) { newSavesSheet = true }
+                ListDivider()
+                SettingRow(Icons.Rounded.Visibility, Color(0xFF187C51), stringResource(R.string.set_show_all), stringResource(R.string.set_show_all_d)) {
+                    scope.launch { hiddenCount = vm.repo.hiddenIds().size; if (hiddenCount == 0) vm.showSnack(ctx.getString(R.string.nothing_hidden)) else showAllAsk = true }
+                }
+            }
+            Spacer(Modifier.height(10.dp))
             ListCard {
                 SettingRow(
                     Icons.Rounded.Lock, Color(0xFF6E4FC8), stringResource(R.string.set_lock),
@@ -212,6 +230,28 @@ fun SettingsScreen(vm: MainViewModel, authenticate: (onOk: () -> Unit) -> Unit, 
         }
         Spacer(Modifier.height(24.dp))
     }
+    if (newSavesSheet) ModalBottomSheet(onDismissRequest = { newSavesSheet = false }) {
+        Text(stringResource(R.string.set_new_saves), style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp))
+        listOf(false to R.string.new_saves_hidden, true to R.string.new_saves_gallery).forEach { (v, l) ->
+            Row(
+                Modifier.fillMaxWidth().clickable(role = Role.RadioButton) { vm.updateSettings { it.copy(newSavesVisible = v) }; newSavesSheet = false }
+                    .padding(horizontal = 16.dp).heightIn(min = 52.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                RadioButton(selected = s.newSavesVisible == v, onClick = null)
+                Spacer(Modifier.width(12.dp))
+                Text(stringResource(l), style = MaterialTheme.typography.bodyLarge)
+            }
+        }
+        Spacer(Modifier.height(24.dp))
+    }
+    if (showAllAsk) AlertDialog(
+        onDismissRequest = { showAllAsk = false },
+        title = { Text(pluralStringResource(R.plurals.show_all_q, hiddenCount, hiddenCount)) },
+        text = { Text(stringResource(R.string.show_all_body)) },
+        confirmButton = { TextButton(onClick = { showAllAsk = false; vm.showAllInGallery() }, modifier = Modifier.testTag("show_all_ok")) { Text(stringResource(R.string.show_in_gallery)) } },
+        dismissButton = { TextButton(onClick = { showAllAsk = false }) { Text(stringResource(R.string.cancel)) } },
+    )
     if (notifAsk) AlertDialog(
         onDismissRequest = { notifAsk = false },
         title = { Text(stringResource(R.string.notif_reason_title)) },

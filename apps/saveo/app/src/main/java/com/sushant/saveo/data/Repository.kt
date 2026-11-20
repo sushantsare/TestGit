@@ -110,12 +110,14 @@ class Repository(
             dao.delete(existing.id) // stale row (file removed from the gallery) — save fresh
         }
         val mime = MediaTypes.mimeFor(item.name, item.kind)
-        val uri = saver.insert({ saver.open(item.uri) }, item.name, item.kind, mime, item.modified, hash)
+        val toGallery = prefs.settings.value.newSavesVisible
+        val uri = if (toGallery) saver.insert({ saver.open(item.uri) }, item.name, item.kind, mime, item.modified, hash)
+        else Uri.fromFile(vaultFile(hash, item.name).also { f -> saver.open(item.uri).use { i -> f.outputStream().use { o -> i.copyTo(o) } } })
         val duration = if (item.kind == MediaKind.VIDEO) (cachedDuration(item.uri) ?: saver.durationMs(item.uri)) else 0L
         val row = SavedItem(
             hash = hash, matchKey = item.matchKey, mediaUri = uri.toString(), kind = item.kind.name, mime = mime,
             source = item.source.name, originalName = item.name, sizeBytes = item.size, durationMs = duration,
-            statusTime = item.modified, savedAt = System.currentTimeMillis(),
+            statusTime = item.modified, savedAt = System.currentTimeMillis(), visible = toGallery,
         )
         val id = dao.insert(row)
         diagnostics.count(Diagnostics.SAVED)
@@ -183,9 +185,71 @@ class Repository(
         for (id in ids) dao.byId(id)?.let { runCatching { restoreInternal(it) } }
     }
 
+    private val vaultDir get() = File(ctx.filesDir, "vault").apply { mkdirs() }
+
+    private fun vaultFile(hash: String, name: String): File =
+        File(vaultDir, "${hash.take(16)}.${MediaTypes.extension(name).ifBlank { "bin" }}")
+
+    /**
+     * Moves saved items into the Gallery (visible) or back into Saveo's private vault (hidden).
+     * A move, never a copy. Returns NeedsConfirm if Android wants the user's OK to remove a Gallery file.
+     */
+    suspend fun setVisible(ids: List<Long>, visible: Boolean): DeleteResult = withContext(Dispatchers.IO) {
+        val done = ArrayList<Long>()
+        val needOk = ArrayList<Uri>(); val needIds = ArrayList<Long>()
+        var recoverable: IntentSender? = null
+        for (id in ids) {
+            val it = dao.byId(id) ?: continue
+            if (it.deletedAt != null || it.visible == visible) continue
+            val cur = Uri.parse(it.mediaUri)
+            try {
+                if (visible) {
+                    val uri = saver.insert({ saver.open(cur) }, it.originalName, it.mediaKind, it.mime, it.statusTime, it.hash)
+                    dao.update(it.copy(mediaUri = uri.toString(), visible = true))
+                    if (cur.scheme == "file") File(cur.path!!).delete()
+                    done += id
+                } else {
+                    val f = vaultFile(it.hash, it.originalName)
+                    if (!f.exists() || f.length() == 0L) saver.open(cur).use { i -> f.outputStream().use { o -> i.copyTo(o) } }
+                    try {
+                        saver.delete(cur)
+                        dao.update(it.copy(mediaUri = Uri.fromFile(f).toString(), visible = false))
+                        done += id
+                    } catch (e: SecurityException) {
+                        needOk += cur; needIds += id
+                        if (Build.VERSION.SDK_INT == 29 && e is RecoverableSecurityException) recoverable = e.userAction.actionIntent.intentSender
+                    }
+                }
+            } catch (_: Exception) { /* skip this one; others continue */ }
+        }
+        if (needOk.isNotEmpty()) {
+            val sender = if (Build.VERSION.SDK_INT >= 30) MediaStore.createDeleteRequest(ctx.contentResolver, needOk).intentSender else recoverable
+            if (sender != null) return@withContext DeleteResult.NeedsConfirm(sender, needIds)
+        }
+        DeleteResult.Done(done)
+    }
+
+    /** After the user allowed Android's prompt while hiding: finish the move into the vault. */
+    suspend fun confirmHidden(ids: List<Long>) = withContext(Dispatchers.IO) {
+        for (id in ids) {
+            val it = dao.byId(id) ?: continue
+            val cur = Uri.parse(it.mediaUri)
+            if (!saver.exists(cur)) dao.update(it.copy(mediaUri = Uri.fromFile(vaultFile(it.hash, it.originalName)).toString(), visible = false))
+        }
+    }
+
+    suspend fun hiddenIds(): List<Long> = withContext(Dispatchers.IO) { dao.hiddenIds() }
+
     private suspend fun restoreInternal(item: SavedItem): SavedItem {
         val path = item.binPath ?: error("Missing bin file")
         val f = File(path)
+        if (!item.visible) {
+            val dest = vaultFile(item.hash, item.originalName)
+            if (!f.renameTo(dest)) { f.inputStream().use { i -> dest.outputStream().use { o -> i.copyTo(o) } }; f.delete() }
+            val restored = item.copy(mediaUri = Uri.fromFile(dest).toString(), deletedAt = null, binPath = null, savedAt = System.currentTimeMillis())
+            dao.update(restored)
+            return restored
+        }
         val uri = saver.insert({ f.inputStream() }, item.originalName, item.mediaKind, item.mime, item.statusTime, item.hash)
         val restored = item.copy(mediaUri = uri.toString(), deletedAt = null, binPath = null, savedAt = System.currentTimeMillis())
         dao.update(restored)
@@ -206,7 +270,7 @@ class Repository(
         dao.allSaved().forEach { if (!saver.exists(Uri.parse(it.mediaUri))) dao.delete(it.id) }
     }
 
-    /** Copies a status into the share cache so other apps can read it. Saved items are shared from the gallery directly. */
+    /** Copies a status into the share cache so other apps can read it. Gallery items are shared directly, hidden ones via FileProvider. */
     suspend fun shareableCopy(item: StatusItem): File = withContext(Dispatchers.IO) {
         val dir = File(ctx.cacheDir, "share").apply { mkdirs() }
         dir.listFiles()?.filter { System.currentTimeMillis() - it.lastModified() > Formats.DAY }?.forEach { it.delete() }

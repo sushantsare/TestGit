@@ -84,12 +84,14 @@ class WalkthroughTest {
         val root = dir ?: Seed.statuses(ctx)
         app.prefs.testDir = root.absolutePath
         app.prefs.update { it.copy(onboarded = onboarded, theme = if (dark) ThemeMode.DARK else ThemeMode.LIGHT) }
+        app.prefs.privateInfoShown = true
         app.repository.refresh()
         app.repository.markSeenAndGetNew(app.repository.status.value.items)
     }
 
     @Test fun walkthrough() {
         fresh(onboarded = false)
+        app.prefs.privateInfoShown = false
         val sc = ActivityScenario.launch(MainActivity::class.java)
 
         step("onboarding") { waitTag("get_started"); shot("01_onboarding") }
@@ -106,7 +108,9 @@ class WalkthroughTest {
         }
         step("save_one") {
             compose.onAllNodesWithContentDescription("Save to gallery", useUnmergedTree = true).onFirst().performClick()
-            waitText("saved to gallery"); shot("04_saved_snackbar")
+            waitTag("got_it"); shot("04_private_info_sheet")
+            tag("got_it").performClick(); Thread.sleep(600)
+            waitText("only in Saveo"); shot("04b_saved_snackbar")
         }
         step("viewer_photo") {
             compose.onAllNodesWithTag("tile", useUnmergedTree = true).onFirst().performClick()
@@ -132,10 +136,16 @@ class WalkthroughTest {
             Thread.sleep(400)
             compose.onAllNodesWithTag("tile", useUnmergedTree = true)[3].performClick()
             Thread.sleep(400); shot("08_select_many")
-            compose.onNodeWithText("Save 2", useUnmergedTree = true).performClick(); waitText("saved to gallery")
+            compose.onNodeWithText("Save 2", useUnmergedTree = true).performClick(); waitText("saved")
         }
-        step("save_all") { tag("save_all").performClick(); waitText("saved to gallery"); Thread.sleep(800); shot("09_all_saved") }
+        step("save_all") { tag("save_all").performClick(); waitText("saved"); Thread.sleep(800); shot("09_all_saved") }
         step("saved_tab") { tag("tab_saved").performClick(); waitTag("saved_tile"); Thread.sleep(1200); shot("10_saved_tab") }
+        step("eye_toggle") {
+            compose.onAllNodesWithTag("eye", useUnmergedTree = true).onFirst().performClick()
+            waitText("visible in Gallery"); Thread.sleep(800); shot("10b_eye_now_in_gallery")
+            compose.onNodeWithText("In gallery", useUnmergedTree = true).performClick(); Thread.sleep(800); shot("10c_in_gallery_filter")
+            compose.onAllNodesWithText("All", useUnmergedTree = true).onFirst().performClick(); Thread.sleep(500)
+        }
         step("saved_viewer_delete") {
             compose.onAllNodesWithTag("saved_tile", useUnmergedTree = true).onFirst().performClick(); waitTag("viewer"); Thread.sleep(800)
             shot("11_saved_viewer")
@@ -172,7 +182,7 @@ class WalkthroughTest {
         step("dark_home") { waitTag("tile", 15000); Thread.sleep(1500); shot("20_dark_home") }
         step("dark_viewer") { compose.onAllNodesWithTag("tile", useUnmergedTree = true).onFirst().performClick(); waitTag("viewer"); Thread.sleep(1000); shot("21_dark_viewer"); back() }
         step("dark_saved") {
-            tag("save_all").performClick(); waitText("saved to gallery")
+            tag("save_all").performClick(); waitText("saved")
             tag("tab_saved").performClick(); waitTag("saved_tile"); Thread.sleep(1000); shot("22_dark_saved")
             tag("tab_statuses").performClick()
         }

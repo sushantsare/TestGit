@@ -46,6 +46,9 @@ import androidx.compose.material.icons.rounded.Pause
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Repeat
 import androidx.compose.material.icons.rounded.Share
+import androidx.compose.material.icons.rounded.Visibility
+import androidx.compose.material.icons.rounded.VisibilityOff
+import android.net.Uri
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -130,7 +133,10 @@ private val Frost = Color.White.copy(alpha = 0.24f)
  */
 @Composable
 fun ViewerScreen(vm: MainViewModel, session: ViewerSession, inPane: Boolean, modifier: Modifier = Modifier) {
-    val items = session.items
+    // Saved items can move between Gallery and Saveo while open: always use their live location
+    val savedLive by vm.savedAll.collectAsStateWithLifecycle()
+    val byId = remember(savedLive) { savedLive.associateBy { it.id } }
+    val items = remember(session.items, byId) { session.items.map { m -> m.saved?.let { s -> byId[s.id]?.let { live -> m.copy(uri = Uri.parse(live.mediaUri), saved = live) } } ?: m } }
     val itemsNow by rememberUpdatedState(items)
     val pager = rememberPagerState(initialPage = session.startIndex.coerceIn(0, (items.size - 1).coerceAtLeast(0))) { itemsNow.size }
     val savedKeys by vm.savedKeys.collectAsStateWithLifecycle()
@@ -279,6 +285,7 @@ fun ViewerScreen(vm: MainViewModel, session: ViewerSession, inPane: Boolean, mod
                 }
             }
 
+            // (saved) where the file lives
             // Page dots (or count when many)
             Box(Modifier.fillMaxWidth().height(22.dp), contentAlignment = Alignment.Center) {
                 if (items.size in 2..15) Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -296,6 +303,12 @@ fun ViewerScreen(vm: MainViewModel, session: ViewerSession, inPane: Boolean, mod
                 if (session.fromSaved) {
                     BigPill(stringResource(R.string.share), Icons.Rounded.Share, false, Modifier.weight(1f)) { vm.share(listOf(current)) }
                     FrostButton(Icons.Rounded.Repeat, stringResource(R.string.repost), big = true) { vm.share(listOf(current), repostTo = current.source.pkg ?: "com.whatsapp") }
+                    val vis = current.saved?.visible == true
+                    FrostButton(
+                        if (vis) Icons.Rounded.Visibility else Icons.Rounded.VisibilityOff,
+                        stringResource(if (vis) R.string.cd_eye_hide else R.string.cd_eye_show), big = true,
+                        modifier = Modifier.testTag("viewer_eye"), active = vis,
+                    ) { current.saved?.let { s -> vm.setVisible(listOf(s.id), !s.visible) } }
                     FrostButton(Icons.Rounded.Delete, stringResource(R.string.delete), big = true, modifier = Modifier.testTag("viewer_delete")) {
                         current.saved?.let { s -> vm.viewerRemoved(current.key); vm.delete(listOf(s.id)) }
                     }
@@ -311,6 +324,11 @@ fun ViewerScreen(vm: MainViewModel, session: ViewerSession, inPane: Boolean, mod
                     FrostButton(Icons.Rounded.Repeat, stringResource(R.string.repost), big = true) { vm.share(listOf(current), repostTo = current.source.pkg ?: "com.whatsapp") }
                 }
             }
+            if (session.fromSaved && current?.saved != null) Text(
+                stringResource(if (current.saved.visible) R.string.viewer_visible_hint else R.string.viewer_hidden_hint),
+                color = Color.White.copy(alpha = 0.9f), fontSize = 12.sp, textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth().padding(bottom = 10.dp),
+            )
         }
     }
 
@@ -436,9 +454,11 @@ private fun CtlButton(icon: ImageVector, desc: String, tint: Color, onClick: () 
 }
 
 @Composable
-private fun FrostButton(icon: ImageVector, desc: String, modifier: Modifier = Modifier, big: Boolean = false, onClick: () -> Unit) {
+private fun FrostButton(icon: ImageVector, desc: String, modifier: Modifier = Modifier, big: Boolean = false, active: Boolean = false, onClick: () -> Unit) {
     Box(
-        modifier.size(if (big) 56.dp else 48.dp).clip(CircleShape).background(Frost).clickable(role = Role.Button, onClick = onClick),
+        modifier.size(if (big) 56.dp else 48.dp).clip(CircleShape)
+            .then(if (active) Modifier.background(androidx.compose.ui.graphics.Brush.verticalGradient(listOf(Color(0xFF3CCB89), Color(0xFF148654)))) else Modifier.background(Frost))
+            .clickable(role = Role.Button, onClick = onClick),
         contentAlignment = Alignment.Center,
     ) { Icon(icon, desc, tint = Color.White) }
 }

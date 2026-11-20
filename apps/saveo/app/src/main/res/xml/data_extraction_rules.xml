@@ -3,6 +3,7 @@
     <cloud-backup>
         <exclude domain="sharedpref" path="saveo_device.xml" />
         <exclude domain="file" path="bin/" />
+        <exclude domain="file" path="vault/" />
         <exclude domain="database" path="." />
     </cloud-backup>
     <device-transfer>

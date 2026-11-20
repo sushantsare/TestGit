@@ -52,3 +52,8 @@ Confirmed to him: photo + music statuses arrive as MP4 video; app detects the re
 ## Approval (20 Nov 2026)
 - He approved the prototype: "Everything was good… Rest is okay and I approve build the APK."
 - Extra requirement (his words): "when the thumbnail is clicked and the media like picture or video is previewed, so swiping them brings the another next media, right? So this process should be like smooth, so I don't want here any jitters."
+
+## Change request 1 (20 Nov 2026) — hidden saves
+- His words: "when a status is saved, it goes into the saved tabs, but it should not be visible in the gallery as of now. And if someone wants to make the status visible ... in the saved tab there will be a icon ... on the bottom right corner, which when clicked, it will make it visible in the gallery, and if again clicked, it will make the media invisible inside the gallery."
+- Confirmed: icon = eye; new saves hidden by default = yes; no extra lock for hidden items (current app lock is enough).
+- Accepted plan (my proposal, he did not object): hidden = app-private storage, visible = moved into gallery album Saveo; move not copy; "Keep app data?" on uninstall; "Show all in gallery" in Settings; "In gallery" filter chip; eye in viewer and in multi-select; Settings "New saves go to: Hidden / Gallery"; v1.0.0 saves count as visible.

@@ -111,3 +111,21 @@ Local only: crash handler → local log; usage counters (saves, shares, reposts,
 
 ## 11. Approval notes (must-haves from his approval)
 - **Viewer swipe must be perfectly smooth, no jitter:** use Compose `HorizontalPager` (beyondViewportPageCount = 1) with stable keys; pre-decode neighbour images with Coil at screen size (memory cache) and pre-load the next/previous thumbnail as placeholder so no blank frame; one shared ExoPlayer instance attached only to the settled page (prepare on `settledPage`, pause others) so video setup never blocks the swipe; blurred background crossfades (no recomposition of the whole screen per scroll frame — read `currentPageOffsetFraction` only in graphicsLayer/draw lambdas); no layout jumps (card size fixed); target 60/90/120 fps with zero dropped frames on swipe — verify with a Macrobenchmark/JankStats check in the audit.
+
+## 12. Change 1 — v1.1.0: hidden saves (approved mockups: mockups/v1.1/)
+- **Default:** every new save (manual, Save all, auto-save) is **hidden**: stored in app-private storage (`filesDir/vault/`), not in MediaStore, so no gallery app sees it. Setting "New saves go to: Hidden / Gallery" (Privacy section) can change the default.
+- **Eye toggle** on each Saved tile, bottom-right (same glossy round style as the save button): crossed grey eye = hidden; green open eye = visible in Gallery. Tap = **move** (not copy):
+  - hidden → visible: insert into MediaStore Pictures/Saveo or Movies/Saveo, then delete the private file.
+  - visible → hidden: copy MediaStore file into vault, then delete the gallery item (own item: no prompt; if Android asks — files from before a reinstall — use createDeleteRequest).
+  - Snackbar "Now visible in Gallery · Undo" / "Hidden from Gallery · Undo".
+- **Saved filter chip** "In gallery" (eye icon) next to All · Photos · Videos.
+- **Viewer from Saved:** Share · Repost · Eye · Delete; caption under buttons "Visible in Gallery · tap the eye to hide" / "Only in Saveo · tap the eye to show in Gallery".
+- **Multi-select on Saved:** Show in gallery · Hide · Share · Delete.
+- **Settings › Privacy:** "New saves go to" (Hidden / Gallery) and "Show all in gallery" (with confirm, progress, result snackbar).
+- **One-time info sheet** the first time something is saved after the update: "Saved items are private now … before uninstalling use Show all in gallery".
+- `android:hasFragileUserData="true"` so Android 10+ asks "Keep app data?" on uninstall.
+- **Migration:** Room v1 → v2 adds `visible INTEGER NOT NULL DEFAULT 1` and `vaultPath TEXT`; all v1.0.0 rows stay visible (they are in the gallery). Migration test required.
+- Recycle bin: works for both states (bin copy taken from whichever place the file is). Restore returns it to its previous state.
+- Sharing hidden items via FileProvider (`files/vault/`). Duplicate detection unchanged (hash).
+- Reconcile on resume only checks visible items against MediaStore; hidden items check the vault file.
+- No extra lock for hidden items (App lock covers it).
