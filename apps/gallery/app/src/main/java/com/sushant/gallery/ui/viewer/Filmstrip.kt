@@ -183,16 +183,7 @@ fun Filmstrip(
                 contentAlignment = Alignment.Center,
             ) { Icon(Icons.Rounded.Delete, null, tint = fixed.onMedia) }
 
-            AnimatedVisibility(showHint && !isVault, enter = fadeIn(), exit = fadeOut(), modifier = Modifier.align(Alignment.TopCenter).padding(top = 8.dp)) {
-                Row(
-                    Modifier.background(fixed.hintFill, RoundedCornerShape(50)).border(1.dp, fixed.hintBorder, RoundedCornerShape(50))
-                        .padding(horizontal = 14.dp, vertical = 7.dp).testTag("flick_hint"),
-                    verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp),
-                ) {
-                    Icon(Icons.Rounded.SwipeUp, null, tint = fixed.onMedia, modifier = Modifier.size(18.dp))
-                    Text(stringResource(R.string.hint_flick), color = fixed.onMedia, style = MaterialTheme.typography.bodySmall)
-                }
-            }
+            FlickHint(showHint && !isVault, Modifier.align(Alignment.TopCenter).padding(top = 8.dp))
 
             HorizontalPager(
                 state = pager,
@@ -300,6 +291,21 @@ fun Filmstrip(
                     ) { AsyncImage(thumbModel(m), null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize()) }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun FlickHint(visible: Boolean, modifier: Modifier) {
+    val fixed = LocalFixedColors.current
+    AnimatedVisibility(visible, enter = fadeIn(), exit = fadeOut(), modifier = modifier) {
+        Row(
+            Modifier.background(fixed.hintFill, RoundedCornerShape(50)).border(1.dp, fixed.hintBorder, RoundedCornerShape(50))
+                .padding(horizontal = 14.dp, vertical = 7.dp).testTag("flick_hint"),
+            verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            Icon(Icons.Rounded.SwipeUp, null, tint = fixed.onMedia, modifier = Modifier.size(18.dp))
+            Text(stringResource(R.string.hint_flick), color = fixed.onMedia, style = MaterialTheme.typography.bodySmall)
         }
     }
 }

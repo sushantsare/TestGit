@@ -161,9 +161,10 @@ private fun Home(vm: MainViewModel, nav: Nav) {
     var tab by rememberSaveable { mutableStateOf(0) }
     BoxWithConstraints(Modifier.fillMaxSize()) {
         val wide = maxWidth >= 600.dp
+        val expanded = maxWidth >= 840.dp
         val content: @Composable (Modifier) -> Unit = { m ->
             Box(m) {
-                if (tab == 0) PhotosScreen(vm, nav, wide = wide) else AlbumsScreen(vm, nav, expanded = maxWidth >= 840.dp)
+                if (tab == 0) PhotosScreen(vm, nav, wide = wide) else AlbumsScreen(vm, nav, expanded = expanded)
             }
         }
         if (wide) {
