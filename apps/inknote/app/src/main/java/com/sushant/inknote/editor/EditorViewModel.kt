@@ -55,7 +55,10 @@ class EditorViewModel(app: Application, private val saved: SavedStateHandle, val
     val recorder = inkApp.recorder
 
     val note: StateFlow<NoteEntity?> = repo.observeNote(noteId).stateIn(viewModelScope, SharingStarted.Eagerly, null)
-    val pages: StateFlow<List<PageEntity>> = repo.observePages(noteId).stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+    private val _pages = kotlinx.coroutines.flow.MutableStateFlow<List<PageEntity>>(emptyList())
+    /** Pages of the note: follows the database and is also reloaded right after every page change. */
+    val pages: StateFlow<List<PageEntity>> = _pages
+    private fun reloadPages() = viewModelScope.launch { _pages.value = repo.pages(noteId) }
     val recordings: StateFlow<List<RecordingEntity>> = repo.observeRecordings(noteId).stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
     val tags = mutableStateOf<List<String>>(emptyList())
 
@@ -93,6 +96,7 @@ class EditorViewModel(app: Application, private val saved: SavedStateHandle, val
     private var tick: Job? = null
 
     init {
+        viewModelScope.launch { repo.observePages(noteId).collect { _pages.value = it } }
         viewModelScope.launch { tags.value = repo.tagsFor(noteId) }
         viewModelScope.launch { recordings.collectLatest { list -> if (playingRec != null && list.none { it.id == playingRec?.id }) stopPlayer() } }
     }
@@ -153,7 +157,7 @@ class EditorViewModel(app: Application, private val saved: SavedStateHandle, val
         val n = note.value ?: return@launch
         if (n.pageType != PageType.ENDLESS) return@launch
         val p = repo.page(pageId) ?: return@launch
-        repo.updatePage(p.copy(height = p.height + 700f))
+        repo.updatePage(p.copy(height = p.height + 700f)); reloadPages()
     }
 
     // ================= selection actions =================
@@ -255,21 +259,21 @@ class EditorViewModel(app: Application, private val saved: SavedStateHandle, val
     }
 
     // ================= pages =================
-    fun addPage() = viewModelScope.launch { repo.addPage(noteId, pages.value.getOrNull(currentPage)?.idx ?: (pages.value.size - 1)); msg("Page added") }
+    fun addPage() = viewModelScope.launch { repo.addPage(noteId, pages.value.getOrNull(currentPage)?.idx ?: (pages.value.size - 1)); _pages.value = repo.pages(noteId); msg("Page added") }
     fun turnPage(p: PageEntity) = viewModelScope.launch {
         flushNow()
         if (p.pdfFile != null) { msg("PDF pages keep their own direction"); return@launch }
         if (note.value?.pageType == PageType.ENDLESS) { msg("A long page can't be turned"); return@launch }
-        repo.turnPage(noteId, p.id); contents[p.id] = repo.readPage(noteId, p.id); selection = null
+        repo.turnPage(noteId, p.id); _pages.value = repo.pages(noteId); contents[p.id] = repo.readPage(noteId, p.id); selection = null
         undo.removeAll { it.pageId == p.id }; redo.removeAll { it.pageId == p.id }; canUndo = undo.isNotEmpty(); canRedo = redo.isNotEmpty()
         msg(if (p.orientation == com.sushant.inknote.data.Orientation.PORTRAIT) "Page turned to horizontal" else "Page turned to vertical")
     }
-    fun setPaper(p: PageEntity, paper: String) = viewModelScope.launch { repo.setPaper(p.id, paper) }
-    fun duplicatePage(p: PageEntity) = viewModelScope.launch { flushNow(); repo.duplicatePage(noteId, p.id); msg("Page duplicated") }
+    fun setPaper(p: PageEntity, paper: String) = viewModelScope.launch { repo.setPaper(p.id, paper); _pages.value = repo.pages(noteId) }
+    fun duplicatePage(p: PageEntity) = viewModelScope.launch { flushNow(); repo.duplicatePage(noteId, p.id); _pages.value = repo.pages(noteId); msg("Page duplicated") }
     fun deletePage(p: PageEntity) = viewModelScope.launch {
-        if (!repo.deletePage(noteId, p.id)) msg("A note needs at least one page") else { contents.remove(p.id); undo.removeAll { it.pageId == p.id }; redo.removeAll { it.pageId == p.id }; canUndo = undo.isNotEmpty(); canRedo = redo.isNotEmpty(); msg("Page deleted") }
+        if (!repo.deletePage(noteId, p.id)) msg("A note needs at least one page") else { _pages.value = repo.pages(noteId); contents.remove(p.id); undo.removeAll { it.pageId == p.id }; redo.removeAll { it.pageId == p.id }; canUndo = undo.isNotEmpty(); canRedo = redo.isNotEmpty(); msg("Page deleted") }
     }
-    fun movePage(from: Int, to: Int) = viewModelScope.launch { repo.movePage(noteId, from, to) }
+    fun movePage(from: Int, to: Int) = viewModelScope.launch { repo.movePage(noteId, from, to); _pages.value = repo.pages(noteId) }
 
     // ================= note =================
     fun rename(t: String) = viewModelScope.launch { repo.rename(noteId, t) }
@@ -287,13 +291,13 @@ class EditorViewModel(app: Application, private val saved: SavedStateHandle, val
         val n = ImageImport.addImages(getApplication(), repo, noteId, p.id, uris)
         pages.value.forEach { pg -> contents[pg.id] = repo.readPage(noteId, pg.id) }
         repo.pages(noteId).forEach { pg -> contents[pg.id] = repo.readPage(noteId, pg.id) }
-        undo.clear(); redo.clear(); canUndo = false; canRedo = false
+        undo.clear(); redo.clear(); canUndo = false; canRedo = false; reloadPages()
         msg(if (n == 0) "Couldn't add that picture" else if (n == 1) "Picture added" else "$n pictures added")
     }
 
     fun insertPdf(uri: Uri) = viewModelScope.launch {
         val p = currentPageEntity() ?: return@launch
-        runCatching { repo.insertPdfPages(noteId, p.idx, uri) }.onSuccess { msg("$it PDF pages added") }.onFailure { msg("Couldn't open that PDF") }
+        runCatching { repo.insertPdfPages(noteId, p.idx, uri) }.onSuccess { reloadPages(); msg("$it PDF pages added") }.onFailure { msg("Couldn't open that PDF") }
     }
 
     fun insertAudio(uri: Uri) = viewModelScope.launch { msg(if (Recorder.importAudio(getApplication(), repo, noteId, uri)) "Audio added" else "Couldn't add that audio file") }

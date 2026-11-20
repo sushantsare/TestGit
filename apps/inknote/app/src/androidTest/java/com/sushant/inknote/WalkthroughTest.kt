@@ -174,7 +174,7 @@ class WalkthroughTest {
             tag("open_drawer").performClick(); waitTag("nav"); tag("nav_trash").performClick(); waitTag("trash_screen"); shot("17_trash")
             compose.onNodeWithTag("restore_Class timetable").performClick(); Thread.sleep(500)
         }
-        step("settings") { tag("open_drawer").performClick(); waitTag("nav"); tag("nav_settings").performClick(); waitTag("settings_screen"); shot("18_settings") }
+        step("settings") { back(); waitTag("home"); tag("open_drawer").performClick(); waitTag("nav"); tag("nav_settings").performClick(); waitTag("settings_screen"); shot("18_settings") }
         step("about") { tag("row_about").performScrollTo().performClick(); waitTag("about_screen"); shot("20_about"); back() }
 
         // ---------- dark theme ----------
@@ -198,7 +198,7 @@ class WalkthroughTest {
             waitTag("home"); shot("land_01_home")
             compose.onNodeWithText("Hamlet – Act III").performClick(); waitTag("page_0"); Thread.sleep(1200); shot("land_02_editor_list")
             tag("editor_more").performClick(); tag("m_beside").performClick(); Thread.sleep(800)
-            compose.onAllNodes(hasText("Romantic Poets lecture")).onFirst().performClick(); waitTag("editor2"); Thread.sleep(1200); shot("land_03_two_notes")
+            tag("beside_Romantic Poets lecture").performClick(); waitTag("editor2"); Thread.sleep(1200); shot("land_03_two_notes")
             device.setOrientationNatural(); Thread.sleep(2000); device.unfreezeRotation()
             compose.waitForIdle(); shot("land_04_back_to_portrait")
         }

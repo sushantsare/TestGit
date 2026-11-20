@@ -359,7 +359,7 @@ private fun NoteRoute(
                     items(home.all.filter { it.note.id != id && !it.note.locked }, key = { it.note.id }) { n ->
                         ListItem(headlineContent = { Text(n.note.title, maxLines = 1, overflow = TextOverflow.Ellipsis) }, supportingContent = { Text(Dates.short(n.note.updatedAt)) },
                             leadingContent = { NoteThumb(n.note, Modifier.size(width = 44.dp, height = 54.dp)) },
-                            modifier = Modifier.clickable { beside = n.note.id; pick = false })
+                            modifier = Modifier.clickable { beside = n.note.id; pick = false }.testTag("beside_${n.note.title}"))
                     }
                 }
             }

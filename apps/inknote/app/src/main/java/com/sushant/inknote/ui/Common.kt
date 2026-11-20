@@ -94,7 +94,7 @@ fun NoteThumb(n: NoteEntity, modifier: Modifier = Modifier) {
         contentAlignment = Alignment.Center,
     ) {
         if (n.locked) Icon(Icons.Outlined.Lock, null, tint = ink.muted)
-        else bmp?.let { Image(it.asImageBitmap(), null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop, alignment = Alignment.TopCenter) }
+        else bmp?.let { Image(it.asImageBitmap(), null, Modifier.fillMaxSize(), contentScale = ContentScale.FillWidth, alignment = Alignment.TopCenter) }
     }
 }
 
