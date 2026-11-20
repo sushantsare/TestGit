@@ -269,8 +269,8 @@ private fun TitleBar(
         leading = if (brand) ({ AppIcon(34.dp) }) else null,
     ) {
         val shortLabel = stringResource(when (source) { null -> R.string.src_all_short; Source.WHATSAPP -> R.string.src_wa_short; Source.BUSINESS -> R.string.src_b_short; Source.DUAL -> R.string.src_dual_short })
-        Surface(onClick = onSource, shape = CircleShape, color = MaterialTheme.colorScheme.surfaceContainerHigh, modifier = Modifier.heightIn(min = 40.dp).widthIn(max = 150.dp).testTag("source_chip")) {
-            Row(Modifier.padding(start = 12.dp, end = 8.dp, top = 9.dp, bottom = 9.dp), verticalAlignment = Alignment.CenterVertically) {
+        Surface(onClick = onSource, shape = CircleShape, color = MaterialTheme.colorScheme.surfaceContainerHigh, modifier = Modifier.heightIn(min = 32.dp).widthIn(max = 150.dp).testTag("source_chip")) {
+            Row(Modifier.padding(start = 12.dp, end = 6.dp, top = 6.dp, bottom = 6.dp), verticalAlignment = Alignment.CenterVertically) {
                 Text(shortLabel, color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.labelLarge, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
                 Icon(Icons.Rounded.ArrowDropDown, null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(20.dp))
             }
@@ -329,7 +329,6 @@ private fun GlossChip(text: String, selected: Boolean, icon: ImageVector? = null
             selectedLeadingIconColor = MaterialTheme.colorScheme.onSecondaryContainer,
             iconColor = MaterialTheme.colorScheme.primary,
         ),
-        modifier = Modifier.heightIn(min = 40.dp),
     )
 }
 
