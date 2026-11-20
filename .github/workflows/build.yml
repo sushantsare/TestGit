@@ -1,57 +1,175 @@
 name: Build APK
+# Parallel pipeline: the release build, the debug + test APK build, unit tests and lint run
+# at the same time on separate runners. Then every emulator run (walkthrough, audit,
+# Android 14 and 15 checks) gets its own emulator, all at once, booting from a cached
+# AVD snapshot and installing the APKs built above instead of recompiling.
+# Results are merged and published to the apk-builds branch in the same layout as before.
 on:
   push:
     branches: [main]
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
+
+env:
+  AVD_CACHE_VERSION: v1
 
 jobs:
-  build:
+  target:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
-    env:
-      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+    timeout-minutes: 5
+    outputs:
+      dir: ${{ steps.t.outputs.dir }}
+      name: ${{ steps.t.outputs.name }}
+      matrix: ${{ steps.t.outputs.matrix }}
     steps:
       - uses: actions/checkout@v4
-
-      - name: Read build target
-        id: target
+        with: { sparse-checkout: apps, sparse-checkout-cone-mode: true }
+      - name: Read build target and plan emulator runs
+        id: t
         run: |
           APP_DIR=$(head -n1 .build-target | tr -d '[:space:]')
           echo "dir=$APP_DIR" >> "$GITHUB_OUTPUT"
           echo "name=$(basename "$APP_DIR")" >> "$GITHUB_OUTPUT"
+          if [ -f "$APP_DIR/e2e.sh" ]; then
+            M='{"include":[{"role":"ui","api":33},{"role":"audit","api":33},{"role":"e2e","api":34},{"role":"e2e","api":35}]}'
+          else
+            M='{"include":[{"role":"ui","api":33}]}'
+          fi
+          echo "matrix=$M" >> "$GITHUB_OUTPUT"
 
+  build-release:
+    needs: target
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
         with: { distribution: temurin, java-version: '17' }
-
       - uses: gradle/actions/setup-gradle@v4
-
-      - name: Prepare output folder
-        run: mkdir -p /tmp/out/screens && echo FAILED > /tmp/out/STATUS && echo "${GITHUB_SHA}" > /tmp/out/SOURCE_SHA
-
+        with: { cache-read-only: true }   # restores the shared cache; saving is left to jobs nobody waits on
       - name: Build release APK
-        working-directory: ${{ steps.target.outputs.dir }}
+        working-directory: ${{ needs.target.outputs.dir }}
         run: |
+          mkdir -p /tmp/out && echo FAILED > /tmp/out/STATUS
           chmod +x gradlew
           set -o pipefail
           ./gradlew :app:assembleRelease --stacktrace 2>&1 | tee /tmp/out/build.log
           # Apps with per-CPU APKs: deliver the 64-bit phone APK, keep all variants in apks/
           main=$(ls app/build/outputs/apk/release/*arm64-v8a*.apk 2>/dev/null | head -1 || true)
           [ -z "$main" ] && main=$(ls app/build/outputs/apk/release/*.apk | head -1)
-          cp "$main" "/tmp/out/${{ steps.target.outputs.name }}.apk"
+          cp "$main" "/tmp/out/${{ needs.target.outputs.name }}.apk"
           mkdir -p /tmp/out/apks && cp app/build/outputs/apk/release/*.apk /tmp/out/apks/
           echo BUILT > /tmp/out/STATUS
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with: { name: out-release, path: /tmp/out, retention-days: 3 }
 
-      - name: Unit tests
-        id: unit
-        continue-on-error: true
-        working-directory: ${{ steps.target.outputs.dir }}
+  build-debug:
+    needs: target
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: '17' }
+      - uses: gradle/actions/setup-gradle@v4
+        with: { cache-read-only: true }
+      - name: Build debug + instrumented-test APKs
+        working-directory: ${{ needs.target.outputs.dir }}
         run: |
+          mkdir -p /tmp/out
+          chmod +x gradlew
+          set -o pipefail
+          ./gradlew :app:assembleDebug :app:assembleDebugAndroidTest --stacktrace 2>&1 | tee /tmp/out/debug-build.log
+      - uses: actions/upload-artifact@v4
+        with:
+          name: debug-apks
+          retention-days: 3
+          path: |
+            ${{ needs.target.outputs.dir }}/app/build/outputs/apk/debug
+            ${{ needs.target.outputs.dir }}/app/build/outputs/apk/androidTest
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with: { name: out-debug-log, path: /tmp/out, retention-days: 3 }
+
+  unit:
+    needs: target
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: '17' }
+      - uses: gradle/actions/setup-gradle@v4   # saves the Gradle cache (on main)
+      - name: Unit tests
+        continue-on-error: true
+        working-directory: ${{ needs.target.outputs.dir }}
+        run: |
+          mkdir -p /tmp/out/screens
+          echo FAILED > /tmp/out/UNIT_TESTS
+          chmod +x gradlew
           set -o pipefail
           ./gradlew :app:testDebugUnitTest --stacktrace 2>&1 | tee /tmp/out/unit-tests.log
           echo PASSED > /tmp/out/UNIT_TESTS
+      - name: Collect unit reports
+        if: always()
+        working-directory: ${{ needs.target.outputs.dir }}
+        run: |
+          mkdir -p /tmp/out/reports /tmp/out/screens
+          cp -r app/build/test-results /tmp/out/reports/unit 2>/dev/null || true
+          cp -r app/build/outputs/roborazzi /tmp/out/reports/roborazzi 2>/dev/null || true
+          find app/build -name '*.png' -path '*robolectric*' -exec cp {} /tmp/out/screens/ \; 2>/dev/null || true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with: { name: out-unit, path: /tmp/out, retention-days: 3 }
+
+  lint:
+    needs: target
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: '17' }
+      - uses: gradle/actions/setup-gradle@v4   # saves the Gradle cache (on main)
+      - name: Android Lint (audit T1)
+        continue-on-error: true
+        working-directory: ${{ needs.target.outputs.dir }}
+        run: |
+          mkdir -p /tmp/out/audit
+          chmod +x gradlew
+          ./gradlew :app:lintDebug -q > /tmp/out/audit/lint.log 2>&1
+      - name: Collect lint reports
+        if: always()
+        working-directory: ${{ needs.target.outputs.dir }}
+        run: |
+          mkdir -p /tmp/out/audit
+          cp app/build/reports/lint-results-debug.* /tmp/out/audit/ 2>/dev/null || true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with: { name: out-lint, path: /tmp/out, retention-days: 3 }
+
+  emulator:
+    name: emulator ${{ matrix.role }} (API ${{ matrix.api }})
+    needs: [target, build-release, build-debug]
+    if: ${{ always() && needs.build-release.result == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.target.outputs.matrix) }}
+    steps:
+      - uses: actions/checkout@v4
 
       - name: Enable KVM
         run: |
@@ -59,73 +177,91 @@ jobs:
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
 
-      - name: Emulator walkthrough test
-        id: ui
+      - name: Get release APK
+        uses: actions/download-artifact@v4
+        with: { name: out-release, path: /tmp/out }
+
+      - name: Get debug + test APKs
         continue-on-error: true
+        uses: actions/download-artifact@v4
+        with: { name: debug-apks, path: '${{ needs.target.outputs.dir }}/app/build/outputs/apk' }
+
+      - name: Restore emulator (system image + booted snapshot)
+        uses: actions/cache@v4
+        id: avd-cache
+        with:
+          path: |
+            ~/.android/avd/*
+            ~/.android/adb*
+            /usr/local/lib/android/sdk/system-images/android-${{ matrix.api }}
+          key: avd-${{ env.AVD_CACHE_VERSION }}-${{ matrix.api }}-google_apis-x86_64-pixel_6
+
+      - name: Create emulator snapshot (first run only)
+        if: steps.avd-cache.outputs.cache-hit != 'true'
         uses: reactivecircus/android-emulator-runner@v2
         with:
-          api-level: 33
+          api-level: ${{ matrix.api }}
           arch: x86_64
           target: google_apis
           profile: pixel_6
-          disable-animations: true
-          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -no-snapshot
-          working-directory: ${{ steps.target.outputs.dir }}
-          script: |
-            adb shell settings put global hide_error_dialogs 1 || true
-            adb shell settings put secure anr_show_background 0 || true
-            ./gradlew :app:connectedDebugAndroidTest --stacktrace > /tmp/out/ui-tests.log 2>&1 && echo PASSED > /tmp/out/UI_TESTS || echo FAILED > /tmp/out/UI_TESTS
-            adb pull /sdcard/Pictures/GymShots/. /tmp/out/screens/ || true
-            adb pull /sdcard/Pictures/AppShots/. /tmp/out/screens/ || true
-            if [ -f e2e.sh ]; then bash e2e.sh || true; fi
-            adb logcat -d -t 3000 > /tmp/out/logcat.txt || true
-            if [ ! -f e2e.sh ]; then adb logcat -d -s GrabbitE2E:I > /tmp/out/e2e-results.txt || true; fi
+          force-avd-creation: false
+          disable-animations: false
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim
+          script: echo "Emulator snapshot saved for caching."
 
-      - name: Real-world e2e on Android 14
-        id: e2e34
-        if: hashFiles(format('{0}/e2e.sh', steps.target.outputs.dir)) != ''
-        continue-on-error: true
+      - name: Run ${{ matrix.role }} on API ${{ matrix.api }}
         uses: reactivecircus/android-emulator-runner@v2
+        env:
+          CI_SPLIT: '1'   # tells e2e.sh that lint and the walkthrough log are handled by other jobs
         with:
-          api-level: 34
+          api-level: ${{ matrix.api }}
           arch: x86_64
           target: google_apis
           profile: pixel_6
+          force-avd-creation: false
           disable-animations: true
-          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -no-snapshot
-          working-directory: ${{ steps.target.outputs.dir }}
-          script: bash e2e.sh 34 || true
+          emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim
+          working-directory: ${{ needs.target.outputs.dir }}
+          script: bash "$GITHUB_WORKSPACE/.github/scripts/emulator-run.sh" ${{ matrix.role }} ${{ matrix.api }}
 
-      - name: Real-world e2e on Android 15
-        id: e2e35
-        if: hashFiles(format('{0}/e2e.sh', steps.target.outputs.dir)) != ''
-        continue-on-error: true
-        uses: reactivecircus/android-emulator-runner@v2
-        with:
-          api-level: 35
-          arch: x86_64
-          target: google_apis
-          profile: pixel_6
-          disable-animations: true
-          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -no-snapshot
-          working-directory: ${{ steps.target.outputs.dir }}
-          script: bash e2e.sh 35 || true
-
-      - name: Collect reports
+      - name: Keep only this run's results
         if: always()
-        working-directory: ${{ steps.target.outputs.dir }}
+        run: rm -rf /tmp/out/apks /tmp/out/*.apk /tmp/out/STATUS /tmp/out/build.log
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with: { name: 'out-emu-${{ matrix.role }}-${{ matrix.api }}', path: /tmp/out, retention-days: 3 }
+
+  publish:
+    needs: [target, build-release, build-debug, unit, lint, emulator]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write   # only this job pushes (to apk-builds)
+    steps:
+      - name: Merge results from all jobs
+        continue-on-error: true
+        uses: actions/download-artifact@v4
+        with: { pattern: out-*, path: /tmp/out, merge-multiple: true }
+
+      - name: Fill in missing statuses and trim logs
         run: |
-          [ -f /tmp/out/UNIT_TESTS ] || echo FAILED > /tmp/out/UNIT_TESTS
-          [ -f /tmp/out/UI_TESTS ] || echo NOT_RUN > /tmp/out/UI_TESTS
-          mkdir -p /tmp/out/reports
-          cp -r app/build/test-results /tmp/out/reports/unit 2>/dev/null || true
-          cp -r app/build/outputs/androidTest-results /tmp/out/reports/ui 2>/dev/null || true
-          cp -r app/build/outputs/roborazzi /tmp/out/reports/roborazzi 2>/dev/null || true
-          find app/build -name '*.png' -path '*robolectric*' -exec cp {} /tmp/out/screens/ \; 2>/dev/null || true
-          for f in build.log unit-tests.log ui-tests.log; do [ -f /tmp/out/$f ] && tail -c 80000 /tmp/out/$f > /tmp/out/$f.tmp && mv /tmp/out/$f.tmp /tmp/out/$f; done
+          mkdir -p /tmp/out/screens && cd /tmp/out
+          echo "${GITHUB_SHA}" > SOURCE_SHA
+          [ -f STATUS ] || echo FAILED > STATUS
+          [ -f UNIT_TESTS ] || echo FAILED > UNIT_TESTS
+          [ -f UI_TESTS ] || echo NOT_RUN > UI_TESTS
+          for f in build.log debug-build.log unit-tests.log ui-tests.log; do
+            [ -f $f ] && tail -c 80000 $f > $f.tmp && mv $f.tmp $f
+          done
+          {
+            echo "release=${{ needs.build-release.result }} debug=${{ needs.build-debug.result }}"
+            echo "unit=${{ needs.unit.result }} lint=${{ needs.lint.result }} emulators=${{ needs.emulator.result }}"
+          } > JOBS
+          echo "STATUS=$(cat STATUS) UNIT_TESTS=$(cat UNIT_TESTS) UI_TESTS=$(cat UI_TESTS)"
 
       - name: Publish to apk-builds branch
-        if: always()
         run: |
           cd /tmp/out
           git init -q -b apk-builds

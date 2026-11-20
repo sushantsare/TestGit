@@ -8,7 +8,7 @@ ACT=$PKG/.MainActivity
 REL=$OUT/saveo.apk
 DBG=$(ls app/build/outputs/apk/debug/*x86_64*.apk app/build/outputs/apk/debug/app-debug.apk 2>/dev/null | head -1)
 LOG=$OUT/e2e-results-$TAG.txt
-[ "$TAG" = "33" ] && adb logcat -d -s SaveoWalk:I SaveoWalk:E TestRunner:I AndroidJUnitRunner:I > $OUT/walk-log.txt 2>&1
+[ "$TAG" = "33" ] && [ -z "$CI_SPLIT" ] && adb logcat -d -s SaveoWalk:I SaveoWalk:E TestRunner:I AndroidJUnitRunner:I > $OUT/walk-log.txt 2>&1
 echo "== Saveo e2e on Android $(adb shell getprop ro.build.version.release) (API $TAG) ==" > $LOG
 adb shell settings put global hide_error_dialogs 1 >/dev/null 2>&1
 
@@ -34,7 +34,8 @@ adb logcat -d | grep -B2 -A25 "FATAL EXCEPTION" | head -80 >> $LOG
 # ---------- AUDIT (main run only) ----------
 A=$OUT/audit
 # T1 lint
-(./gradlew :app:lintDebug --offline -q > $A/lint.log 2>&1 || ./gradlew :app:lintDebug -q >> $A/lint.log 2>&1); cp app/build/reports/lint-results-debug.* $A/ 2>/dev/null
+# (in CI the separate lint job writes these files; CI_SPLIT=1)
+if [ -z "$CI_SPLIT" ]; then (./gradlew :app:lintDebug --offline -q > $A/lint.log 2>&1 || ./gradlew :app:lintDebug -q >> $A/lint.log 2>&1); cp app/build/reports/lint-results-debug.* $A/ 2>/dev/null; fi
 # T3/T4/T5 debug build: monkey crash crawl + StrictMode + LeakCanary
 if [ -f "$DBG" ]; then
   adb uninstall $PKG >/dev/null 2>&1; adb install -r -g $DBG >> $LOG 2>&1; adb logcat -c
