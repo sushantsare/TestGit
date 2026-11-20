@@ -145,7 +145,7 @@
 
     <!-- Onboarding / setup -->
     <string name="onb_title">Keep the statuses you love</string>
-    <string name="onb_body">Save photos and videos from WhatsApp statuses in one tap. They stay in your gallery forever.</string>
+    <string name="onb_body">Save photos and videos from WhatsApp statuses in one tap. They stay safe in Saveo, private unless you choose to show them in Gallery.</string>
     <string name="onb_1_t">Watch, then save</string>
     <string name="onb_1_b">View a status in WhatsApp, then tap the download button here</string>
     <string name="onb_2_t">Private by design</string>
