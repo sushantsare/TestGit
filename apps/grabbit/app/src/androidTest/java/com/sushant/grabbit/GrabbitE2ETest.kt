@@ -82,6 +82,39 @@ class GrabbitE2ETest {
         ctx.contentResolver.openOutputStream(uri)?.use { bmp.compress(Bitmap.CompressFormat.PNG, 100, it) }
     }
 
+    private fun saveBitmap(name: String, bmp: Bitmap) {
+        val values = ContentValues().apply {
+            put(MediaStore.Images.Media.DISPLAY_NAME, "$name.png")
+            put(MediaStore.Images.Media.MIME_TYPE, "image/png")
+            put(MediaStore.Images.Media.RELATIVE_PATH, "Pictures/AppShots")
+        }
+        val uri = ctx.contentResolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values) ?: return
+        ctx.contentResolver.openOutputStream(uri)?.use { bmp.compress(Bitmap.CompressFormat.PNG, 100, it) }
+    }
+
+    /** Draws the real launcher icon (and its themed/monochrome layer) from the APK for review. */
+    private fun renderIcons() {
+        val size = 432
+        val out = Bitmap.createBitmap(size * 3 + 80, size, Bitmap.Config.ARGB_8888)
+        val c = android.graphics.Canvas(out)
+        c.drawColor(android.graphics.Color.WHITE)
+        val icon = ctx.packageManager.getApplicationIcon(ctx.packageName)
+        icon.setBounds(0, 0, size, size); icon.draw(c)
+        val round = androidx.core.content.ContextCompat.getDrawable(ctx, R.mipmap.ic_launcher_round)!!
+        round.setBounds(size + 40, 0, size * 2 + 40, size); round.draw(c)
+        if (android.os.Build.VERSION.SDK_INT >= 33 && icon is android.graphics.drawable.AdaptiveIconDrawable) {
+            val mono = icon.monochrome
+            if (mono != null) {
+                val p = android.graphics.Paint().apply { color = 0xFFD7E8DF.toInt() }
+                c.drawCircle(size * 2.5f + 80, size / 2f, size / 2f, p)
+                mono.setTint(0xFF1F3A2E.toInt())
+                val inset = size / 6
+                mono.setBounds(size * 2 + 80 - inset, -inset, size * 3 + 80 + inset, size + inset); mono.draw(c)
+            }
+        }
+        saveBitmap("icon_launcher", out)
+    }
+
     private fun exists(tag: String) =
         compose.onAllNodesWithTag(tag, useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty()
 
@@ -275,6 +308,7 @@ class GrabbitE2ETest {
 
     @Test
     fun endToEnd() {
+        renderIcons()
         shot("00_home_start")
         val ready = runBlocking { withTimeout(180_000) { Engine.awaitReady() } }
         log("Engine ready=$ready version=${Engine.version.value} state=${Engine.state.value}")

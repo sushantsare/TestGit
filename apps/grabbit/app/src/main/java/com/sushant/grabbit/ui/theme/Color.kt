@@ -118,8 +118,8 @@ val DarkSemantic = SemanticColors(
 
 val LocalSemanticColors = staticCompositionLocalOf { LightSemantic }
 
-/** Brand mark gradient (app icon, logo tile). Fixed in both themes; always carries white content. */
-val BrandGradient = Brush.linearGradient(listOf(Color(0xFFFF7A3D), Color(0xFFE8470F)))
+/** Brand mark gradient (app icon, logo tile): mint, matching the launcher icon. Always carries white content. */
+val BrandGradient = Brush.linearGradient(listOf(Color(0xFF34D399), Color(0xFF047857)))
 val OnBrand = Color.White
 
 /** Scrim and labels drawn on top of video thumbnails (always dark, any theme). */

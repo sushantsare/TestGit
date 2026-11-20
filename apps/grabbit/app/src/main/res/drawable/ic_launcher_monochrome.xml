@@ -1,13 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Themed (monochrome) icon: brand glyph scaled into the 66dp safe zone -->
+<!-- Themed (monochrome) icon: same ring and arrow as one colour -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp" android:height="108dp"
     android:viewportWidth="108" android:viewportHeight="108">
-    <group android:pivotX="54" android:pivotY="54" android:scaleX="0.7" android:scaleY="0.7">
-        <path android:fillColor="#FFFFFF" android:pathData="M45.5,18a5.5,5.5 0,0 1,5.5 5.5v23a5.5,5.5 0,0 1,-11 0v-23a5.5,5.5 0,0 1,5.5 -5.5z" />
-        <path android:fillColor="#FFFFFF" android:pathData="M62.5,18a5.5,5.5 0,0 1,5.5 5.5v23a5.5,5.5 0,0 1,-11 0v-23a5.5,5.5 0,0 1,5.5 -5.5z" />
-        <path android:fillColor="#FFFFFF" android:strokeColor="#FFFFFF" android:strokeWidth="8"
-            android:strokeLineJoin="round" android:pathData="M30,50h48l-24,26z" />
-        <path android:fillColor="#FFFFFF" android:pathData="M32.5,82h43a4.5,4.5 0,0 1,0 9h-43a4.5,4.5 0,0 1,0 -9z" />
+    <group android:pivotX="54" android:pivotY="54" android:scaleX="0.8" android:scaleY="0.8">
+        <path android:pathData="M58.2,30.4 A24,24 0 0,1 77.6,49.8" android:strokeColor="#FFFFFFFF" android:strokeWidth="8" android:strokeLineCap="round" />
+        <path android:pathData="M76.2,62.6 A24,24 0 0,1 45.4,76.4" android:strokeColor="#FFFFFFFF" android:strokeWidth="8" android:strokeLineCap="round" />
+        <path android:pathData="M34.9,68.5 A24,24 0 0,1 45.4,31.6" android:strokeColor="#FFFFFFFF" android:strokeWidth="8" android:strokeLineCap="round" />
+        <path android:pathData="M54,41 V64" android:strokeColor="#FFFFFFFF" android:strokeWidth="7" android:strokeLineCap="round" android:strokeLineJoin="round" />
+        <path android:pathData="M45,56 L54,65 L63,56" android:strokeColor="#FFFFFFFF" android:strokeWidth="7" android:strokeLineCap="round" android:strokeLineJoin="round" />
     </group>
 </vector>
