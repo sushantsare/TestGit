@@ -42,6 +42,7 @@ import org.junit.runner.RunWith
 @OptIn(ExperimentalTestApi::class)
 @RunWith(AndroidJUnit4::class)
 class WalkthroughTest {
+    @get:Rule val timeout: org.junit.rules.Timeout = org.junit.rules.Timeout.seconds(1500)
     @get:Rule val compose = createEmptyComposeRule()
     @get:Rule val perms: GrantPermissionRule = if (Build.VERSION.SDK_INT >= 33) GrantPermissionRule.grant(Manifest.permission.POST_NOTIFICATIONS, Manifest.permission.RECORD_AUDIO)
         else GrantPermissionRule.grant(Manifest.permission.RECORD_AUDIO)
@@ -64,7 +65,9 @@ class WalkthroughTest {
     }
 
     private fun step(name: String, block: () -> Unit) {
-        try { block() } catch (t: Throwable) { failures += "$name: ${t.message?.take(300)}"; Log.e("InkWalk", "step $name failed", t); runCatching { shot("FAIL_$name") } }
+        Log.i("InkWalk", "step $name start")
+        val t0 = System.currentTimeMillis()
+        try { block(); Log.i("InkWalk", "step $name ok ${System.currentTimeMillis() - t0}ms") } catch (t: Throwable) { failures += "$name: ${t.message?.take(300)}"; Log.e("InkWalk", "step $name failed", t); runCatching { shot("FAIL_$name") } }
     }
 
     private fun waitTag(tag: String, ms: Long = 8000) = compose.waitUntil(ms) { compose.onAllNodesWithTag(tag, useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty() }
@@ -88,6 +91,9 @@ class WalkthroughTest {
     }
 
     @Test fun walkThroughEveryScreen() {
+        // fail fast instead of hanging if the UI never becomes idle
+        androidx.test.espresso.IdlingPolicies.setMasterPolicyTimeout(15, java.util.concurrent.TimeUnit.SECONDS)
+        androidx.test.espresso.IdlingPolicies.setIdlingResourceTimeout(15, java.util.concurrent.TimeUnit.SECONDS)
         // ---------- first launch: empty ----------
         var sc = ActivityScenario.launch(MainActivity::class.java)
         step("empty") { waitTag("empty_home"); shot("02_home_empty") }

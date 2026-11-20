@@ -8,6 +8,7 @@ ACT=$PKG/.MainActivity
 REL=$OUT/inknote.apk
 DBG=app/build/outputs/apk/debug/app-debug.apk
 LOG=$OUT/e2e-results-$TAG.txt
+[ "$TAG" = "33" ] && adb logcat -d -s InkWalk:I InkWalk:E TestRunner:I AndroidJUnitRunner:I > $OUT/walk-log.txt 2>&1
 echo "== InkNote e2e on Android $(adb shell getprop ro.build.version.release) (API $TAG) ==" > $LOG
 adb shell settings put global hide_error_dialogs 1 >/dev/null 2>&1
 
