@@ -17,6 +17,7 @@ import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipeLeft
 import androidx.compose.ui.test.swipeRight
@@ -109,8 +110,7 @@ class WalkthroughTest {
         step("save_one") {
             compose.onAllNodesWithContentDescription("Save to gallery", useUnmergedTree = true).onFirst().performClick()
             waitTag("got_it"); shot("04_private_info_sheet")
-            tag("got_it").performClick(); Thread.sleep(600)
-            waitText("only in Saveo"); shot("04b_saved_snackbar")
+            tag("got_it").performClick(); Thread.sleep(800); shot("04b_after_first_save")
         }
         step("viewer_photo") {
             compose.onAllNodesWithTag("tile", useUnmergedTree = true).onFirst().performClick()
@@ -158,8 +158,8 @@ class WalkthroughTest {
             waitText("Auto-save"); shot("13_settings")
         }
         step("bin") { compose.onNodeWithText("Recycle bin").performClick(); waitText("deleted forever"); Thread.sleep(800); shot("14_recycle_bin"); back() }
-        step("diagnostics") { compose.onNodeWithText("Diagnostics").performClick(); waitText("Crash log"); shot("15_diagnostics"); back() }
-        step("about") { compose.onNodeWithText("About Saveo").performClick(); waitText("sushant.sare@gmail.com"); shot("16_about"); back() }
+        step("diagnostics") { compose.onNodeWithText("Diagnostics").performScrollTo().performClick(); waitText("Crash log"); shot("15_diagnostics"); back() }
+        step("about") { compose.onNodeWithText("About Saveo").performScrollTo().performClick(); waitText("sushant.sare@gmail.com"); shot("16_about"); back() }
         step("folders") { compose.onNodeWithText("WhatsApp folders").performClick(); waitTag("continue"); shot("17_folders"); back() }
         step("notif_rationale") {
             compose.onNodeWithText("New status alerts").performClick(); Thread.sleep(600)

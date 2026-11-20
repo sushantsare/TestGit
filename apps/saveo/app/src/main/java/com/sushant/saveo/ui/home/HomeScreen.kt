@@ -461,10 +461,7 @@ private fun SavedPage(vm: MainViewModel, onSort: () -> Unit, onDates: () -> Unit
         modifier = Modifier.fillMaxSize().testTag("saved_grid"),
     ) {
         item(key = "filters", span = { GridItemSpan(maxLineSpan) }) {
-            FilterRow(vm, savedTab = true) {
-                RoundAction(Icons.Rounded.SwapVert, stringResource(R.string.sort), onSort)
-                RoundAction(Icons.Rounded.CalendarMonth, stringResource(R.string.dates), onDates, active = dk != DateRangeKind.ANY)
-            }
+            FilterRow(vm, savedTab = true)
         }
         if (dk != DateRangeKind.ANY) item(key = "dk", span = { GridItemSpan(maxLineSpan) }) {
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(horizontal = 4.dp)) {
@@ -484,7 +481,14 @@ private fun SavedPage(vm: MainViewModel, onSort: () -> Unit, onDates: () -> Unit
             }
             else -> groupedTiles(
                 list, { it.saved?.savedAt ?: it.time },
-                header = { g, n, _ -> GroupHeader("${stringResource(groupLabel(g))} · $n") },
+                header = { g, n, first ->
+                    GroupHeader("${stringResource(groupLabel(g))} · $n") {
+                        if (first) {
+                            RoundAction(Icons.Rounded.SwapVert, stringResource(R.string.sort), onSort)
+                            RoundAction(Icons.Rounded.CalendarMonth, stringResource(R.string.dates), onDates, active = dk != DateRangeKind.ANY)
+                        }
+                    }
+                },
             ) { m ->
                 val sel = selection
                 MediaTile(
@@ -526,10 +530,11 @@ private fun RoundAction(icon: ImageVector, desc: String, onClick: () -> Unit, ac
 }
 
 @Composable
-private fun GroupHeader(text: String, action: String? = null, onAction: () -> Unit = {}) {
+private fun GroupHeader(text: String, action: String? = null, onAction: () -> Unit = {}, trailing: @Composable () -> Unit = {}) {
     Row(Modifier.fillMaxWidth().padding(start = 4.dp, top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
         Text(text, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1f).semantics { heading() })
         if (action != null) TextButton(onClick = onAction) { Text(action) }
+        trailing()
     }
 }
 
