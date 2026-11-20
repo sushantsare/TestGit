@@ -119,7 +119,7 @@ class GrabbitE2ETest {
     }
 
     private fun hasTestTagPrefix(prefix: String) = SemanticsMatcher("tag starts with $prefix") {
-        it.config.getOrNull(SemanticsProperties.TestTag)?.startsWith(prefix) == true
+        (if (SemanticsProperties.TestTag in it.config) it.config[SemanticsProperties.TestTag] else "").startsWith(prefix)
     }
 
     private fun exists(tag: String) =
