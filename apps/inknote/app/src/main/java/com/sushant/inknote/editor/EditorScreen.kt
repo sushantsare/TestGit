@@ -116,6 +116,7 @@ import com.sushant.inknote.ink.EditTool
 import com.sushant.inknote.ink.InkPageView
 import com.sushant.inknote.ink.PagePalette
 import com.sushant.inknote.ink.PageListener
+import com.sushant.inknote.ink.PageRenderer
 import com.sushant.inknote.ink.Selection
 import com.sushant.inknote.io.ExportFormat
 import com.sushant.inknote.ui.app
@@ -224,7 +225,7 @@ fun EditorPane(
         val n = note ?: return
         exportBusy = true
         scope.launch {
-            vm.finishText(); vm.flush(); delay(150)
+            vm.finishText(); vm.flushNow()
             val files = runCatching { ctx.app().exporter.export(n, fmt, if (onlyThis) pages.getOrNull(vm.currentPage) else null) }.getOrElse { emptyList() }
             exportBusy = false
             if (files.isEmpty()) { ctx.toast(ctx.getString(R.string.export_failed)); return@launch }
@@ -398,7 +399,7 @@ private fun PageItem(vm: EditorViewModel, p: PageEntity, index: Int, count: Int,
                 key(e.boxId) {
                     val xDp = with(density) { (e.x * pxPerUnit).toDp() }; val yDp = with(density) { (e.y * pxPerUnit).toDp() }
                     val wDp = with(density) { (e.w * pxPerUnit).toDp() }
-                    AndroidView(factory = { c -> holder.create(c, e.initial, 30f * pxPerUnit, dark) { stored, plain -> vm.textChanged(stored, plain) } },
+                    AndroidView(factory = { c -> holder.create(c, e.initial, PageRenderer.TEXT_SIZE * pxPerUnit, dark) { stored, plain -> vm.textChanged(stored, plain) } },
                         modifier = Modifier.offset(xDp, yDp).width(wDp).testTag("text_box"))
                     LaunchedEffect(e.boxId) { delay(120); holder.focus() }
                 }

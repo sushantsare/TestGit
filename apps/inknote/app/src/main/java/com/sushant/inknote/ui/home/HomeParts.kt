@@ -241,18 +241,18 @@ fun NewNoteSheet(
                 }
             }
             SectionLabel(stringResource(R.string.paper))
-            FlowRow(Modifier.padding(horizontal = 20.dp), maxItemsInEachRow = 4, horizontalArrangement = Arrangement.spacedBy(10.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Paper.ALL.forEach { p ->
+            Paper.ALL.chunked(4).forEach { rowPapers -> Row(Modifier.padding(horizontal = 20.dp, vertical = 5.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                rowPapers.forEach { p ->
                     Column(Modifier.weight(1f).clip(RoundedCornerShape(10.dp)).clickable { paper = p }.testTag("paper_$p"), horizontalAlignment = Alignment.CenterHorizontally) {
                         Box(Modifier.fillMaxWidth().aspectRatio(if (orientation == Orientation.LANDSCAPE && !paperOnly) 4f / 3f else 3f / 4f).clip(RoundedCornerShape(8.dp))
                             .background(if (ink.dark) Color(0xFF1E2024) else Color.White)
                             .border(if (paper == p) BorderStroke(2.5.dp, MaterialTheme.colorScheme.primary) else BorderStroke(1.dp, ink.divider), RoundedCornerShape(8.dp))) {
                             Canvas(Modifier.matchParentSize()) { paperPreview(p, ink.paperLine, ink.muted) }
                         }
-                        Text(paperName(p), style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 4.dp), maxLines = 1)
+                        Text(paperName(p), style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 4.dp), maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
                 }
-            }
+            } }
             if (!paperOnly && kind == Kind.INK) {
                 SectionLabel(stringResource(R.string.page_type))
                 SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth().padding(horizontal = 20.dp)) {

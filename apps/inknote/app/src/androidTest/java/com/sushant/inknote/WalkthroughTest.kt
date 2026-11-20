@@ -140,7 +140,12 @@ class WalkthroughTest {
         step("tags") { tag("editor_more").performClick(); tag("m_tags").performClick(); waitTag("tags_sheet"); shot("15b_folder_tags"); back() }
         step("pages") {
             tag("editor_more").performClick(); tag("m_pages").performClick(); waitTag("pages_screen"); Thread.sleep(800); shot("11_pages_direction")
-            tag("pthumb_1").performClick(); tag("pg_turn").performClick(); Thread.sleep(1200); shot("11b_page_turned")
+            tag("pthumb_1").performClick(); tag("pg_turn").performClick(); Thread.sleep(2500)
+            val ham = runBlocking { app.repo.db.notes().all().first { it.title == "Hamlet – Act III" } }
+            val p1 = runBlocking { app.repo.pages(ham.id)[1] }
+            Log.i("InkWalk", "page 2 after turn: ${p1.orientation} ${p1.width}x${p1.height}")
+            shot("11b_page_turned")
+            assertTrue("page 2 turned", p1.orientation == "LANDSCAPE")
             back()
         }
         step("editor_back") { waitTag("editor"); tag("editor_back").performClick(); waitTag("home") }
@@ -155,14 +160,14 @@ class WalkthroughTest {
             shot("13_search"); back(); back()
         }
         step("locked") {
-            waitTag("home"); tag("note_grid").performScrollToNode(hasText("Exam form details")); compose.onNodeWithText("Exam form details").performClick(); waitTag("lock_screen"); device.pressBack(); Thread.sleep(600)
-            if (compose.onAllNodesWithTag("lock_screen").fetchSemanticsNodes().isEmpty()) compose.onNodeWithText("Exam form details").performClick()
+            waitTag("home"); tag("note_grid").performScrollToNode(hasText("Exam form details"))
+            compose.onNodeWithText("Exam form details").performTouchInput { click(Offset(centerX, top + 30f)) }
             waitTag("lock_screen"); shot("14_locked_note")
             listOf("pin_1", "pin_2", "pin_3", "pin_4", "pin_ok").forEach { tag(it).performClick() }
             waitTag("editor"); shot("14b_unlocked"); tag("editor_back").performClick(); waitTag("home")
         }
         step("select_mode") {
-            tag("note_grid").performScrollToNode(hasText("Class timetable")); compose.onNodeWithText("Class timetable").performTouchInput { longClick() }
+            tag("note_grid").performScrollToNode(hasText("Class timetable")); compose.onNodeWithText("Class timetable").performTouchInput { longClick(Offset(centerX, top + 30f)) }
             waitTag("sel_delete"); shot("16_select_notes"); tag("sel_delete").performClick(); Thread.sleep(600)
         }
         step("trash") {

@@ -127,11 +127,11 @@ fun ToolPanel(
                 }
             }
             Row(Modifier.widthIn(max = 640.dp).fillMaxWidth().padding(horizontal = 8.dp), horizontalArrangement = Arrangement.SpaceAround) {
-                ToolButton(Icons.Outlined.Edit, stringResource(R.string.tool_pen), t.tool == EditTool.PEN) { if (t.tool == EditTool.PEN) onPenSheet() else onTools(t.copy(tool = EditTool.PEN)) }
-                ToolButton(Icons.Outlined.Draw, stringResource(R.string.tool_highlighter), t.tool == EditTool.HIGHLIGHTER) { onTools(t.copy(tool = EditTool.HIGHLIGHTER)) }
-                ToolButton(Icons.Outlined.AutoFixHigh, stringResource(R.string.tool_eraser), t.tool == EditTool.ERASER) { onTools(t.copy(tool = EditTool.ERASER)) }
-                ToolButton(Icons.Outlined.Gesture, stringResource(R.string.tool_select), t.tool == EditTool.LASSO) { onTools(t.copy(tool = EditTool.LASSO)) }
-                ToolButton(Icons.Outlined.Interests, stringResource(R.string.tool_shapes), t.tool == EditTool.SHAPE) { onTools(t.copy(tool = EditTool.SHAPE)) }
+                ToolButton(com.sushant.inknote.ui.InkIcons.Pen, stringResource(R.string.tool_pen), t.tool == EditTool.PEN) { if (t.tool == EditTool.PEN) onPenSheet() else onTools(t.copy(tool = EditTool.PEN)) }
+                ToolButton(com.sushant.inknote.ui.InkIcons.Highlighter, stringResource(R.string.tool_highlighter), t.tool == EditTool.HIGHLIGHTER) { onTools(t.copy(tool = EditTool.HIGHLIGHTER)) }
+                ToolButton(com.sushant.inknote.ui.InkIcons.Eraser, stringResource(R.string.tool_eraser), t.tool == EditTool.ERASER) { onTools(t.copy(tool = EditTool.ERASER)) }
+                ToolButton(com.sushant.inknote.ui.InkIcons.Lasso, stringResource(R.string.tool_select), t.tool == EditTool.LASSO) { onTools(t.copy(tool = EditTool.LASSO)) }
+                ToolButton(com.sushant.inknote.ui.InkIcons.Shapes, stringResource(R.string.tool_shapes), t.tool == EditTool.SHAPE) { onTools(t.copy(tool = EditTool.SHAPE)) }
                 ToolButton(Icons.Outlined.Title, stringResource(R.string.tool_text), t.tool == EditTool.TEXT) { onTools(t.copy(tool = EditTool.TEXT)) }
                 ToolButton(Icons.Outlined.Add, stringResource(R.string.tool_insert), false, onInsert)
             }

@@ -15,7 +15,9 @@ import kotlin.math.max
 /** Draws a whole page (paper, PDF, images, text, ink). Used by the editor, thumbnails, export and printing. */
 object PageRenderer {
     private val bmpPaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
-    private val textPaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply { textSize = 30f }
+    /** Typed text size in page units (a page is 1000 units wide): about 15 sp on a phone. */
+    const val TEXT_SIZE = 40f
+    private val textPaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply { textSize = TEXT_SIZE }
 
     fun textLayout(stored: String, w: Float, dark: Boolean = false): StaticLayout {
         val sp = RichText.decode(stored)

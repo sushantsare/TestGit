@@ -139,6 +139,13 @@ class EditorViewModel(app: Application, private val saved: SavedStateHandle, val
         saveJobs.clear()
     }
 
+    /** Saves pending page edits and waits until they are on disk. */
+    suspend fun flushNow() {
+        val ids = saveJobs.keys.toList()
+        ids.forEach { saveJobs[it]?.cancel() }; saveJobs.clear()
+        for (id in ids) contents[id]?.let { repo.savePage(noteId, id, it) }
+    }
+
     override fun onCleared() { finishText(); flush(); player?.release(); player = null; super.onCleared() }
 
     // ================= endless page =================
@@ -250,7 +257,7 @@ class EditorViewModel(app: Application, private val saved: SavedStateHandle, val
     // ================= pages =================
     fun addPage() = viewModelScope.launch { repo.addPage(noteId, pages.value.getOrNull(currentPage)?.idx ?: (pages.value.size - 1)); msg("Page added") }
     fun turnPage(p: PageEntity) = viewModelScope.launch {
-        flush()
+        flushNow()
         if (p.pdfFile != null) { msg("PDF pages keep their own direction"); return@launch }
         if (note.value?.pageType == PageType.ENDLESS) { msg("A long page can't be turned"); return@launch }
         repo.turnPage(noteId, p.id); contents[p.id] = repo.readPage(noteId, p.id); selection = null
@@ -258,7 +265,7 @@ class EditorViewModel(app: Application, private val saved: SavedStateHandle, val
         msg(if (p.orientation == com.sushant.inknote.data.Orientation.PORTRAIT) "Page turned to horizontal" else "Page turned to vertical")
     }
     fun setPaper(p: PageEntity, paper: String) = viewModelScope.launch { repo.setPaper(p.id, paper) }
-    fun duplicatePage(p: PageEntity) = viewModelScope.launch { flush(); repo.duplicatePage(noteId, p.id); msg("Page duplicated") }
+    fun duplicatePage(p: PageEntity) = viewModelScope.launch { flushNow(); repo.duplicatePage(noteId, p.id); msg("Page duplicated") }
     fun deletePage(p: PageEntity) = viewModelScope.launch {
         if (!repo.deletePage(noteId, p.id)) msg("A note needs at least one page") else { contents.remove(p.id); undo.removeAll { it.pageId == p.id }; redo.removeAll { it.pageId == p.id }; canUndo = undo.isNotEmpty(); canRedo = redo.isNotEmpty(); msg("Page deleted") }
     }
@@ -267,16 +274,16 @@ class EditorViewModel(app: Application, private val saved: SavedStateHandle, val
     // ================= note =================
     fun rename(t: String) = viewModelScope.launch { repo.rename(noteId, t) }
     fun toggleFavourite() = viewModelScope.launch { note.value?.let { repo.setFavourite(noteId, !it.favourite); msg(if (it.favourite) "Removed from favourites" else "Added to favourites") } }
-    fun setLocked(v: Boolean) = viewModelScope.launch { flush(); repo.setLocked(listOf(noteId), v); msg(if (v) "Note locked" else "Note unlocked") }
+    fun setLocked(v: Boolean) = viewModelScope.launch { flushNow(); repo.setLocked(listOf(noteId), v); msg(if (v) "Note locked" else "Note unlocked") }
     fun setTagsAndFolder(t: List<String>, folder: Long?) = viewModelScope.launch { repo.setTags(noteId, t); repo.moveToFolder(listOf(noteId), folder); tags.value = repo.tagsFor(noteId) }
-    fun trash() = viewModelScope.launch { flush(); repo.moveToTrash(listOf(noteId)) }
+    fun trash() = viewModelScope.launch { flushNow(); repo.moveToTrash(listOf(noteId)) }
 
     // ================= inserts =================
     private fun currentPageEntity() = pages.value.getOrNull(currentPage) ?: pages.value.firstOrNull()
 
     fun insertImages(uris: List<Uri>) = viewModelScope.launch {
         val p = currentPageEntity() ?: return@launch
-        flush()
+        flushNow()
         val n = ImageImport.addImages(getApplication(), repo, noteId, p.id, uris)
         pages.value.forEach { pg -> contents[pg.id] = repo.readPage(noteId, pg.id) }
         repo.pages(noteId).forEach { pg -> contents[pg.id] = repo.readPage(noteId, pg.id) }
