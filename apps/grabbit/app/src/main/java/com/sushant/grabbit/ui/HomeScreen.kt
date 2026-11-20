@@ -145,10 +145,10 @@ fun HomeScreen(vm: MainViewModel, modifier: Modifier) {
         contentPadding = PaddingValues(start = sp.screen, end = sp.screen, bottom = sp.xl),
         verticalArrangement = Arrangement.spacedBy(sp.m),
     ) {
-        item { AppBar() }
-        if (!loaded) item { Hero() }
-        if (engine !is Engine.State.Ready) item { EngineBanner(engine) { vm.restartEngine() } }
-        item {
+        item(key = "appbar") { AppBar() }
+        if (!loaded) item(key = "hero") { Hero() }
+        if (engine !is Engine.State.Ready) item(key = "engine") { EngineBanner(engine) { vm.restartEngine() } }
+        item(key = "input") {
             LinkInput(
                 url = vm.url,
                 onUrl = {
@@ -162,13 +162,13 @@ fun HomeScreen(vm: MainViewModel, modifier: Modifier) {
             )
         }
         when (val f = vm.fetchState) {
-            FetchState.Idle -> item { HowItWorks() }
-            FetchState.Loading -> item { MediaSkeleton() }
-            is FetchState.Failed -> item {
+            FetchState.Idle -> item(key = "how") { HowItWorks() }
+            FetchState.Loading -> item(key = "loading") { MediaSkeleton() }
+            is FetchState.Failed -> item(key = "error") {
                 ErrorCard("Couldn't get this video", f.message, f.raw, onRetry = { vm.fetch() },
                     modifier = Modifier.testTag("fetchError"))
             }
-            is FetchState.Loaded -> item { MediaCard(f.info) { q -> startDownload(f.info, q) } }
+            is FetchState.Loaded -> item(key = "media") { MediaCard(f.info) { q -> startDownload(f.info, q) } }
         }
     }
 }

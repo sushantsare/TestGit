@@ -125,14 +125,14 @@ fun DownloadsScreen(vm: MainViewModel, modifier: Modifier) {
         contentPadding = PaddingValues(start = sp.screen, end = sp.screen, bottom = sp.xl),
         verticalArrangement = Arrangement.spacedBy(sp.s),
     ) {
-        item {
+        item(key = "title") {
             ScreenTitle("Downloads") {
                 if (works.any { it.state.isFinished }) TextButton(onClick = { vm.clearFinished() }) { Text("Clear finished") }
             }
         }
 
         if (active.isEmpty() && library.isEmpty()) {
-            item {
+            item(key = "empty") {
                 EmptyState(
                     EmptyType.FIRST_TIME, "No downloads yet", "Videos you grab show up here and in your gallery",
                     Modifier.padding(top = sp.xxxl), actionLabel = "Grab a video", actionIcon = Icons.Rounded.Link,
@@ -143,15 +143,15 @@ fun DownloadsScreen(vm: MainViewModel, modifier: Modifier) {
         }
 
         if (active.isNotEmpty()) {
-            item { SectionLabel("In progress · ${active.size}") }
+            item(key = "activeLabel") { SectionLabel("In progress · ${active.size}") }
             items(active, key = { it.id.toString() }) { w -> ActiveCard(w, vm, Modifier.animateItem()) }
-            item { Spacer(Modifier.height(sp.s)) }
+            item(key = "activeGap") { Spacer(Modifier.height(sp.s)) }
         }
 
         if (library.isNotEmpty()) {
-            item { SectionLabel("Saved · ${library.size}") }
-            item { SearchSortRow(query, { query = it }, sort, { sort = it }) }
-            item {
+            item(key = "savedLabel") { SectionLabel("Saved · ${library.size}") }
+            item(key = "search") { SearchSortRow(query, { query = it }, sort, { sort = it }) }
+            item(key = "chips") {
                 LazyRow(horizontalArrangement = Arrangement.spacedBy(sp.s), contentPadding = PaddingValues(vertical = sp.xs)) {
                     items(sites) { s ->
                         val sel = filter == s
@@ -163,7 +163,7 @@ fun DownloadsScreen(vm: MainViewModel, modifier: Modifier) {
                     }
                 }
             }
-            if (shown.isEmpty()) item {
+            if (shown.isEmpty()) item(key = "noResults") {
                 EmptyState(
                     EmptyType.NO_RESULTS,
                     if (q.isNotEmpty()) "No results for \"$q\"" else "Nothing in this filter",
