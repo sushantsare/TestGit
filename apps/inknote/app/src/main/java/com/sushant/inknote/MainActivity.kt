@@ -186,8 +186,9 @@ fun InkRoot(vm: MainViewModel, activity: MainActivity) {
     val backStack by nav.currentBackStackEntryAsState()
     val route = backStack?.destination?.route ?: Routes.HOME
 
-    fun openNote(id: Long, page: Int = -1, voice: Boolean = false) { vm.clearSelection(); nav.navigate(Routes.note(id, page, voice)) { launchSingleTop = true } }
-    fun goTop(r: String) { scope.launch { drawer.close() }; nav.navigate(r) { popUpTo(Routes.HOME); launchSingleTop = true } }
+    // Navigation must always happen on the main thread.
+    fun openNote(id: Long, page: Int = -1, voice: Boolean = false) = activity.runOnUiThread { vm.clearSelection(); nav.navigate(Routes.note(id, page, voice)) { launchSingleTop = true } }
+    fun goTop(r: String) = activity.runOnUiThread { scope.launch { drawer.close() }; nav.navigate(r) { popUpTo(Routes.HOME); launchSingleTop = true } }
 
     val importPdf = androidx.activity.compose.rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) scope.launch { vm.importPdf(uri).onSuccess { openNote(it) }.onFailure { ctx.toast(ctx.getString(R.string.pdf_failed)) } }
