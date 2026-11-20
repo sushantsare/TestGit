@@ -111,6 +111,8 @@ class DownloadWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(c
         val source = if (Threads.isThreads(url)) {
             try {
                 Threads.resolve(url).videos.first()
+            } catch (e: com.sushant.grabbit.engine.FriendlyError) {
+                return fail(e.message ?: "Threads download failed", e.raw)
             } catch (e: Exception) {
                 val raw = e.message ?: e.toString()
                 return fail(Errors.friendly(raw), raw)

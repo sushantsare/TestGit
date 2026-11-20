@@ -145,6 +145,8 @@ class ShareViewModel(app: android.app.Application) : AndroidViewModel(app) {
                 FetchState.Loaded(Media.fetchInfo(getApplication(), url))
             } catch (e: CancellationException) {
                 throw e
+            } catch (e: com.sushant.grabbit.engine.FriendlyError) {
+                FetchState.Failed(e.message ?: "", e.raw)
             } catch (e: Throwable) {
                 val raw = e.message ?: e.toString()
                 FetchState.Failed(Errors.friendly(raw), raw)

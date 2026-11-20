@@ -13,6 +13,9 @@ import java.net.URL
  * media as JSON ("video_versions"), or as og:video tags for link-preview crawlers. The direct video file
  * is then handed to the normal download engine.
  */
+/** An error whose message is already user-friendly; [raw] carries technical details for "Details". */
+class FriendlyError(message: String, val raw: String) : Exception(message)
+
 object Threads {
     data class Post(val videos: List<String>, val thumb: String, val caption: String, val user: String)
 
@@ -30,20 +33,28 @@ object Threads {
         val clean = url.substringBefore('?')
         val host = Uri.parse(clean).host ?: "www.threads.com"
         val ua = Prefs.loginUserAgent.ifBlank { CHROME }
-        var lastError: Exception? = null
-        for ((agent, cookie) in listOf(ua to Cookies.headerFor(host), PREVIEW_BOT to "")) {
+        val diag = mutableListOf<String>()
+        var blocked: String? = null
+        for ((name, agent, cookie) in listOf(
+            Triple("browser", ua, Cookies.headerFor(host)),
+            Triple("preview", PREVIEW_BOT, ""),
+        )) {
             try {
                 val html = get(clean, agent, cookie)
                 val post = ThreadsParser.parse(html, userFromUrl(clean))
+                diag += "$name: page ${html.length / 1024} KB, login=${cookie.isNotBlank()}, " +
+                    "video_versions=${"video_versions" in html}, og_video=${"og:video" in html}, videos=${post.videos.size}"
                 if (post.videos.isNotEmpty()) return@withContext post
             } catch (e: Exception) {
-                lastError = e
+                diag += "$name: ${e.message}"
+                if (blocked == null && e is IllegalStateException) blocked = e.message
+                if (blocked == null && e is java.io.IOException) blocked = "Couldn't reach Threads. Check your internet connection and try again."
             }
         }
-        if (lastError != null) throw lastError
-        throw IllegalStateException(
-            "No video found in this Threads post. It may be a photo or text post, or from a private account " +
-                "(log in to Threads in Settings → Accounts)."
+        throw FriendlyError(
+            blocked ?: ("No video found in this Threads post. It may be a photo or text post, or from a private " +
+                "account (log in to Threads in Settings → Accounts)."),
+            "Threads reader\n" + diag.joinToString("\n"),
         )
     }
 
