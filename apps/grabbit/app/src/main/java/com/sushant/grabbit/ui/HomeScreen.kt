@@ -323,6 +323,41 @@ private fun videoOptions(info: MediaInfo): List<QOpt> = buildList {
     info.heights.forEach { h -> add(QOpt("h$h", qualityLabel(h), info.sizes[h] ?: 0)) }
 }
 
+/** Best + each audio bitrate the site offers; size is the estimated MP3 at that bitrate. */
+private fun audioOptions(info: MediaInfo): List<QOpt> = buildList {
+    add(QOpt("audio", "Best", 0))
+    info.audios.forEach { a ->
+        val est = if (info.duration > 0) info.duration * a.kbps * 1000L / 8 else a.size
+        add(QOpt("a${a.kbps}", "${a.kbps} kbps", est))
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun QualityChips(options: List<QOpt>, selected: String, onSelect: (String) -> Unit) {
+    val sp = LocalSpacing.current
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(sp.s)) {
+        options.forEach { o ->
+            val sel = selected == o.key
+            FilterChip(
+                selected = sel,
+                onClick = { onSelect(o.key) },
+                label = {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(o.label, style = MaterialTheme.typography.labelLarge)
+                        val s = fmtSize(o.size)
+                        if (s.isNotEmpty()) Text(" · $s", style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                },
+                leadingIcon = if (sel) ({ Icon(Icons.Rounded.Check, null, Modifier.size(FilterChipDefaults.IconSize)) }) else null,
+                shape = MaterialTheme.shapes.small,
+                modifier = Modifier.testTag("q_${o.key}"),
+            )
+        }
+    }
+}
+
 private fun defaultVideoChoice(opts: List<QOpt>): String {
     val pref = Prefs.defaultQuality
     if (opts.any { it.key == pref }) return pref
@@ -343,6 +378,11 @@ internal fun MediaCard(info: MediaInfo, framed: Boolean = true, onDownload: (Str
     val startAudio = !info.hasVideo || Prefs.defaultQuality == "audio"
     var audio by rememberSaveable(info.url) { mutableStateOf(startAudio) }
     var video by rememberSaveable(info.url) { mutableStateOf(defaultVideoChoice(opts)) }
+    val audioOpts = remember(info) { audioOptions(info) }
+    var aud by rememberSaveable(info.url) {
+        mutableStateOf(Prefs.defaultQuality.takeIf { q -> audioOpts.any { it.key == q } } ?: "audio")
+    }
+    val chosenAudio = audioOpts.firstOrNull { it.key == aud }
     val chosen = opts.firstOrNull { it.key == video }
 
     val body: @Composable () -> Unit = {
@@ -379,40 +419,22 @@ internal fun MediaCard(info: MediaInfo, framed: Boolean = true, onDownload: (Str
                         selected = audio, onClick = { audio = true },
                         shape = SegmentedButtonDefaults.itemShape(1, 2),
                         icon = { SegmentedButtonDefaults.Icon(audio) { Icon(Icons.Rounded.MusicNote, null, Modifier.size(sz.iconSmall)) } },
-                    ) { Text("Audio (MP3)") }
+                    ) { Text("Audio") }
                 }
             }
-            if (info.hasVideo && !audio) {
-                Spacer(Modifier.height(sp.m))
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(sp.s)) {
-                    opts.forEach { o ->
-                        val sel = video == o.key
-                        FilterChip(
-                            selected = sel,
-                            onClick = { video = o.key },
-                            label = {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Text(o.label, style = MaterialTheme.typography.labelLarge)
-                                    val s = fmtSize(o.size)
-                                    if (s.isNotEmpty()) Text(" · $s", style = MaterialTheme.typography.labelMedium,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                }
-                            },
-                            leadingIcon = if (sel) ({ Icon(Icons.Rounded.Check, null, Modifier.size(FilterChipDefaults.IconSize)) }) else null,
-                            shape = MaterialTheme.shapes.small,
-                        )
-                    }
-                }
-            }
+            Spacer(Modifier.height(sp.m))
+            if (audio) QualityChips(audioOpts, aud) { aud = it }
+            else if (info.hasVideo) QualityChips(opts, video) { video = it }
             Spacer(Modifier.height(sp.l))
             val label = when {
                 info.isPlaylist -> "Download all (${info.count})"
-                audio -> "Download MP3"
+                audio && (chosenAudio == null || chosenAudio.key == "audio") -> "Download MP3 · best"
+                audio -> "Download MP3 · ${chosenAudio!!.label}" + fmtSize(chosenAudio.size).let { if (it.isEmpty()) "" else " · $it" }
                 chosen == null || chosen.key == "best" -> "Download best quality"
                 else -> "Download ${chosen.label}" + fmtSize(chosen.size).let { if (it.isEmpty()) "" else " · $it" }
             }
             Button(
-                onClick = { onDownload(if (audio) "audio" else video) },
+                onClick = { onDownload(if (audio) aud else video) },
                 modifier = Modifier.fillMaxWidth().height(sz.button).testTag("downloadBtn"),
                 shape = PillShape,
             ) {

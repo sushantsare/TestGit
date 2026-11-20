@@ -15,6 +15,8 @@ import com.sushant.grabbit.data.Prefs
 import com.sushant.grabbit.engine.Engine
 import com.sushant.grabbit.engine.Errors
 import com.sushant.grabbit.engine.InstaStory
+import com.sushant.grabbit.engine.audioKbps
+import com.sushant.grabbit.engine.isAudioQuality
 import com.sushant.grabbit.engine.Threads
 import com.yausername.youtubedl_android.YoutubeDL
 import com.yausername.youtubedl_android.YoutubeDLRequest
@@ -50,11 +52,14 @@ class DownloadWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(c
             val template = if (playlist) "%(playlist_index)03d - %(title).90B [%(id)s].%(ext)s"
             else "%(title).120B [%(id)s].%(ext)s"
             r.addOption("-o", File(dir, template).absolutePath)
-            if (quality == "audio") {
-                r.addOption("-f", "ba/b")
+            if (isAudioQuality(quality)) {
+                val kbps = audioKbps(quality)
+                // Chosen bitrate: take the closest source stream at or above it, then encode MP3 at that rate
+                r.addOption("-f", if (kbps != null) "ba[abr>=${kbps - 8}]/ba/b" else "ba/b")
+                if (kbps != null) r.addOption("-S", "+abr")
                 r.addOption("-x")
                 r.addOption("--audio-format", "mp3")
-                r.addOption("--audio-quality", "0")
+                r.addOption("--audio-quality", if (kbps != null) "${kbps}K" else "0")
                 r.addOption("--embed-metadata")
                 if (Prefs.embedThumb) {
                     r.addOption("--embed-thumbnail")
@@ -123,7 +128,7 @@ class DownloadWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(c
         val nm = ctx.getSystemService(NotificationManager::class.java)
         var last = 0L
         var total = 0L
-        var status = if (quality == "audio") "Downloading audio…" else "Downloading…"
+        var status = if (isAudioQuality(quality)) "Downloading audio…" else "Downloading…"
 
         try {
             withContext(Dispatchers.IO) {

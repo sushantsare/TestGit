@@ -20,6 +20,9 @@ import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.compose.ui.test.performClick
@@ -115,6 +118,10 @@ class GrabbitE2ETest {
         saveBitmap("icon_launcher", out)
     }
 
+    private fun hasTestTagPrefix(prefix: String) = SemanticsMatcher("tag starts with $prefix") {
+        it.config.getOrNull(SemanticsProperties.TestTag)?.startsWith(prefix) == true
+    }
+
     private fun exists(tag: String) =
         compose.onAllNodesWithTag(tag, useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty()
 
@@ -136,6 +143,13 @@ class GrabbitE2ETest {
             log("[$name] FETCH FAILED"); shot("${name}_fetch_error"); return false
         }
         shot("${name}_1_info")
+        if (name == "x" && compose.onAllNodesWithText("Audio").fetchSemanticsNodes().isNotEmpty()) {
+            compose.onNodeWithText("Audio").performClick()
+            compose.onNodeWithTag("downloadBtn").performScrollTo()
+            shot("${name}_1b_audio")
+            log("[$name] audio options: " + compose.onAllNodes(hasTestTagPrefix("q_a")).fetchSemanticsNodes().size)
+            compose.onNodeWithText("Video").performClick()
+        }
         val before = Library.items.value.size
         val failedBefore = failedCount()
         compose.onNodeWithTag("downloadBtn").performScrollTo().performClick()

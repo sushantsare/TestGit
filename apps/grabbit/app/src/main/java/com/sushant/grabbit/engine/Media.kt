@@ -23,7 +23,29 @@ data class MediaInfo(
     /** Approx. bytes per resolution incl. audio */
     val sizes: Map<Int, Long>,
     val hasVideo: Boolean,
+    /** Audio streams the site offers (best first): bitrate in kbps and source size in bytes */
+    val audios: List<AudioOpt> = emptyList(),
 )
+
+data class AudioOpt(val kbps: Int, val size: Long)
+
+/** "audio" = best audio; "a128" = MP3 at about 128 kbps. */
+fun isAudioQuality(q: String) = q == "audio" || (q.length > 1 && q[0] == 'a' && q.drop(1).all { it.isDigit() })
+fun audioKbps(q: String): Int? = if (q.startsWith("a")) q.drop(1).toIntOrNull() else null
+
+/** Groups audio-only formats into distinct bitrates (rounded to common steps), largest size per step. */
+object AudioOptions {
+    private val STEPS = listOf(32, 48, 64, 96, 128, 160, 192, 256, 320)
+    fun build(raw: List<Pair<Double, Long>>): List<AudioOpt> {
+        val byStep = sortedMapOf<Int, Long>(reverseOrder())
+        for ((abr, size) in raw) {
+            if (abr <= 0) continue
+            val step = STEPS.minByOrNull { kotlin.math.abs(it - abr) } ?: continue
+            byStep[step] = maxOf(byStep[step] ?: 0L, size)
+        }
+        return byStep.entries.take(5).map { AudioOpt(it.key, it.value) }
+    }
+}
 
 object Media {
     @Volatile private var currentPid: String? = null
@@ -91,6 +113,7 @@ object Media {
         val sizes = HashMap<Int, Long>()
         var bestAudio = 0L
         var anyVideo = false
+        val audioRaw = mutableListOf<Pair<Double, Long>>()
         val formats = j.optJSONArray("formats")
         if (formats != null) {
             for (i in 0 until formats.length()) {
@@ -111,6 +134,8 @@ object Media {
                     }
                 } else if (a != "none") {
                     bestAudio = maxOf(bestAudio, size)
+                    val abr = f.optDouble("abr", 0.0).takeIf { !it.isNaN() && it > 0 } ?: f.optDouble("tbr", 0.0)
+                    if (!abr.isNaN()) audioRaw += abr to size
                 }
             }
         }
@@ -129,6 +154,7 @@ object Media {
             heights = heights.filter { it >= 140 }.toList(),
             sizes = finalSizes,
             hasVideo = hasVideo,
+            audios = AudioOptions.build(audioRaw),
         )
     }
 }

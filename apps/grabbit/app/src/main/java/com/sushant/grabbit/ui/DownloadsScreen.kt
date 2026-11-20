@@ -73,6 +73,8 @@ import androidx.work.WorkInfo
 import com.sushant.grabbit.data.SavedItem
 import com.sushant.grabbit.download.DownloadWorker
 import com.sushant.grabbit.download.Downloads
+import com.sushant.grabbit.engine.audioKbps
+import com.sushant.grabbit.engine.isAudioQuality
 import com.sushant.grabbit.ui.components.AppCard
 import com.sushant.grabbit.ui.components.EmptyState
 import com.sushant.grabbit.ui.components.EmptyType
@@ -199,7 +201,7 @@ private fun ActiveCard(w: WorkInfo, vm: MainViewModel, modifier: Modifier) {
     }
     AppCard(modifier, padding = sp.m) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            VideoThumb(job.thumb, job.quality == "audio", Modifier.width(sz.rowThumbW).height(sz.rowThumbH))
+            VideoThumb(job.thumb, isAudioQuality(job.quality), Modifier.width(sz.rowThumbW).height(sz.rowThumbH))
             Spacer(Modifier.width(sp.m))
             Column(Modifier.weight(1f)) {
                 Text(job.title.ifBlank { job.url }, style = MaterialTheme.typography.titleSmall, maxLines = 2, overflow = TextOverflow.Ellipsis)
@@ -234,6 +236,7 @@ private fun ActiveCard(w: WorkInfo, vm: MainViewModel, modifier: Modifier) {
 
 private fun qualityText(q: String) = when {
     q == "audio" -> "MP3"
+    audioKbps(q) != null -> "MP3 · ${audioKbps(q)} kbps"
     q == "best" -> "Best"
     q.startsWith("h") -> q.drop(1).toIntOrNull()?.let { qualityLabel(it) } ?: q
     else -> q
