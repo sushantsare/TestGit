@@ -8,7 +8,7 @@ ACT=$PKG/.MainActivity
 REL=$OUT/gallery.apk
 DBG=$(ls app/build/outputs/apk/debug/*x86_64*.apk app/build/outputs/apk/debug/app-debug.apk 2>/dev/null | head -1)
 LOG=$OUT/e2e-results-$TAG.txt
-[ "$TAG" = "33" ] && adb logcat -d -s GalleryWalk:I GalleryWalk:E TestRunner:I AndroidJUnitRunner:I > $OUT/walk-log.txt 2>&1
+[ "$TAG" = "33" ] && adb logcat -d -s GalleryNav:I AndroidRuntime:E GalleryWalk:I GalleryWalk:E TestRunner:I AndroidJUnitRunner:I > $OUT/walk-log.txt 2>&1
 echo "== Gallery e2e on Android $(adb shell getprop ro.build.version.release) (API $TAG) ==" > $LOG
 adb shell settings put global hide_error_dialogs 1 >/dev/null 2>&1
 

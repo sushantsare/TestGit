@@ -85,8 +85,9 @@ class WalkthroughTest {
         }
         step("albums") {
             tag("tab_albums").performClick(); waitTag("album_card"); shot("albums")
-            compose.onAllNodesWithTag("album_card", useUnmergedTree = true).onFirst().performClick(); waitTag("cell"); shot("album_camera"); back()
-            tag("pin_fav").performClick(); Thread.sleep(800); shot("favourites_empty"); back()
+            compose.onAllNodesWithTag("album_card", useUnmergedTree = true).onFirst().performClick(); waitTag("cell"); shot("album_camera"); back(); waitTag("pin_fav")
+            compose.waitForIdle(); Thread.sleep(800)
+            tag("pin_fav").performClick(); waitTag("empty"); shot("favourites_empty"); back(); waitTag("pin_fav")
             tag("tab_photos").performClick(); waitTag("cell")
         }
         step("viewer") {

@@ -95,13 +95,13 @@ class Repository(
     suspend fun moveToBin(list: List<MediaItem>, fromFilmstrip: Boolean = false): List<TrashEntity> {
         val keys = list.map { it.key }.toSet()
         raw.value = raw.value.filterNot { it.key in keys }
-        val favs = favourites.value
         val done = withContext(Dispatchers.IO) {
             io.withLock {
                 list.mapNotNull { m ->
-                    val e = ops.moveToTrash(m, m.path in favs) ?: return@mapNotNull null
+                    val fav = db.favourites().count(m.path) > 0
+                    val e = ops.moveToTrash(m, fav) ?: return@mapNotNull null
                     val id = db.trash().insert(e)
-                    if (m.path in favs) db.favourites().remove(m.path)
+                    if (fav) db.favourites().remove(m.path)
                     e.copy(id = id)
                 }
             }
@@ -146,7 +146,7 @@ class Repository(
         io.withLock {
             for (m in list) {
                 val to = ops.transfer(m, folder, copy) ?: continue
-                if (!copy && m.path in favourites.value && to != m.path) db.favourites().move(m.path, to)
+                if (!copy && to != m.path) db.favourites().move(m.path, to)
                 n++
             }
         }

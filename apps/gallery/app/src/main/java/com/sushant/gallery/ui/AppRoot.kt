@@ -101,6 +101,7 @@ fun AppRoot(vm: MainViewModel, startExternal: Boolean) {
     val media = route.startsWith("viewer") || route.startsWith("editor")
     val secure = route == "vault" || route == "pin" || (route.startsWith("viewer") && entry?.arguments?.getInt("id")?.let { vm.viewerArgs(it).first == Source.Vault } == true)
 
+    if (com.sushant.gallery.BuildConfig.DEBUG) LaunchedEffect(route) { android.util.Log.i("GalleryNav", "route=$route") }
     StatusBarIcons(light = !media && !isDark(theme))
     SecureWindow(secure)
 

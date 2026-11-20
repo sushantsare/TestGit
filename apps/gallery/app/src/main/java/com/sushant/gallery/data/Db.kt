@@ -59,6 +59,7 @@ interface TrashDao {
 @Dao
 interface FavouriteDao {
     @Query("SELECT path FROM favourite") fun paths(): Flow<List<String>>
+    @Query("SELECT COUNT(*) FROM favourite WHERE path = :path") suspend fun count(path: String): Int
     @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun add(e: FavouriteEntity)
     @Query("DELETE FROM favourite WHERE path = :path") suspend fun remove(path: String)
     @Query("UPDATE favourite SET path = :to WHERE path = :from") suspend fun move(from: String, to: String)
