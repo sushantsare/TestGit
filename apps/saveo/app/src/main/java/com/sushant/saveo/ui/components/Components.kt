@@ -44,7 +44,9 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.produceState
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -170,7 +172,8 @@ fun MediaTile(
     sizePx: Int = 360,
 ) {
     val known = media.saved?.durationMs?.takeIf { it > 0 }
-    val duration by produceState(known ?: -1L, media.uri) { value = if (media.kind == MediaKind.VIDEO && known == null) durationOf(media.uri) else (known ?: -1L) }
+    var duration by remember(media.uri) { mutableLongStateOf(known ?: -1L) }
+    LaunchedEffect(media.uri) { if (media.kind == MediaKind.VIDEO && known == null) duration = durationOf(media.uri) }
     val durText = if (media.kind == MediaKind.VIDEO && duration > 0) Formats.duration(duration) else null
     val desc = if (media.kind == MediaKind.VIDEO) stringResource(R.string.cd_video_status, durText ?: "") else stringResource(R.string.cd_photo_status)
     val selDesc = if (selecting) stringResource(if (selected) R.string.cd_selected else R.string.cd_not_selected) else null

@@ -56,6 +56,7 @@ sealed interface UiEvent {
     data class Snack(val text: String, val action: String? = null, val onAction: (() -> Unit)? = null) : UiEvent
     data class Launch(val intent: Intent) : UiEvent
     data class ConfirmDelete(val sender: IntentSender, val ids: List<Long>) : UiEvent
+    data object DismissSnack : UiEvent
 }
 
 /** Viewer session: the list is frozen when opened so saving/deleting never jumps pages. */
@@ -200,6 +201,7 @@ class MainViewModel(app: Application, private val handle: SavedStateHandle) : An
 
     // ---- selection ----------------------------------------------------------
     fun startSelection(first: String? = null) {
+        _events.tryEmit(UiEvent.DismissSnack)
         handle["sel"] = ArrayList<String>().apply { if (first != null) add(first) }
         if (!prefs.hintSelectShown) prefs.hintSelectShown = true
     }

@@ -158,7 +158,7 @@ class WalkthroughTest {
             back()
         }
         step("landscape") {
-            device.setOrientationLeft(); Thread.sleep(2500); shot("19_landscape_home")
+            device.setOrientationLeft(); Thread.sleep(4500); shot("19_landscape_home")
             device.setOrientationNatural(); Thread.sleep(2000)
         }
         sc.close()

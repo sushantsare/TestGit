@@ -74,6 +74,7 @@ class Prefs(ctx: Context) {
         set(v) { dev.edit().putString("testDir", v).apply(); _folders.value = readFolders() }
 
     /** Test helper: forget everything (settings, folders, flags). */
+    @android.annotation.SuppressLint("ApplySharedPref")
     fun resetAll() {
         sp.edit().clear().commit(); dev.edit().clear().commit()
         _settings.value = read(); _folders.value = readFolders()

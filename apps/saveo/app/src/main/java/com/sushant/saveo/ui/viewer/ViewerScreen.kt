@@ -192,7 +192,9 @@ fun ViewerScreen(vm: MainViewModel, session: ViewerSession, inPane: Boolean, mod
     }
     LaunchedEffect(Unit) { runCatching { focus.requestFocus() } }
 
-    val current = items.getOrNull(pager.settledPage)
+    // Labels and buttons follow the page that is mostly on screen; playback and background follow the settled page
+    val current = items.getOrNull(pager.currentPage)
+    val settled = items.getOrNull(pager.settledPage)
 
     Box(
         modifier.fillMaxSize().background(Color(0xFF111312))
@@ -203,7 +205,7 @@ fun ViewerScreen(vm: MainViewModel, session: ViewerSession, inPane: Boolean, mod
                     Key.DirectionRight -> { scope.launch { pager.animateScrollToPage((pager.currentPage + 1).coerceAtMost(items.size - 1)) }; true }
                     Key.DirectionLeft -> { scope.launch { pager.animateScrollToPage((pager.currentPage - 1).coerceAtLeast(0)) }; true }
                     Key.Spacebar -> {
-                        if (current?.kind == MediaKind.VIDEO) { if (player.isPlaying) player.pause() else player.play() }
+                        if (settled?.kind == MediaKind.VIDEO) { if (player.isPlaying) player.pause() else player.play() }
                         true
                     }
                     Key.Escape -> { vm.closeViewer(); true }
@@ -213,7 +215,7 @@ fun ViewerScreen(vm: MainViewModel, session: ViewerSession, inPane: Boolean, mod
             .testTag("viewer"),
     ) {
         // Blurred background of the settled item (changes only after a swipe settles)
-        Crossfade(current?.key, animationSpec = tween(350), label = "bg") { key ->
+        Crossfade(settled?.key, animationSpec = tween(350), label = "bg") { key ->
             val m = items.firstOrNull { it.key == key }
             if (m != null) {
                 // Pre-blurred once into a tiny bitmap: no per-frame blur cost while swiping

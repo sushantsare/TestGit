@@ -136,9 +136,7 @@ fun SettingsScreen(vm: MainViewModel, authenticate: (onOk: () -> Unit) -> Unit, 
         resumeTick++
     }
     fun openNotifSettings() {
-        val i = if (Build.VERSION.SDK_INT >= 26) Intent(AndroidSettings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(AndroidSettings.EXTRA_APP_PACKAGE, ctx.packageName)
-        else Intent(AndroidSettings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.fromParts("package", ctx.packageName, null))
-        ctx.startActivity(i)
+        ctx.startActivity(Intent(AndroidSettings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(AndroidSettings.EXTRA_APP_PACKAGE, ctx.packageName))
     }
     fun toggleAlerts() {
         if (s.alerts) { vm.updateSettings { it.copy(alerts = false) }; return }
@@ -222,10 +220,11 @@ fun SettingsScreen(vm: MainViewModel, authenticate: (onOk: () -> Unit) -> Unit, 
             TextButton(onClick = {
                 notifAsk = false
                 val activity = ctx as? android.app.Activity
-                val permanentlyDenied = vm.repo.prefs.notifAsked && activity != null && Build.VERSION.SDK_INT >= 33 &&
-                    !activity.shouldShowRequestPermissionRationale(Manifest.permission.POST_NOTIFICATIONS)
-                if (permanentlyDenied) openNotifSettings()
-                else if (Build.VERSION.SDK_INT >= 33) notifLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                if (Build.VERSION.SDK_INT >= 33) {
+                    val permanentlyDenied = vm.repo.prefs.notifAsked && activity != null &&
+                        !activity.shouldShowRequestPermissionRationale(Manifest.permission.POST_NOTIFICATIONS)
+                    if (permanentlyDenied) openNotifSettings() else notifLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                }
             }) { Text(stringResource(R.string.allow)) }
         },
         dismissButton = { TextButton(onClick = { notifAsk = false }) { Text(stringResource(R.string.not_now)) } },

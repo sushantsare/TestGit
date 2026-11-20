@@ -98,6 +98,7 @@ fun AppRoot(
                     if (r == SnackbarResult.ActionPerformed) e.onAction?.invoke()
                 }
                 is UiEvent.Launch -> runCatching { ctx.startActivity(e.intent) }.onFailure { vm.showSnack(ctx.getString(R.string.snack_no_whatsapp)) }
+                UiEvent.DismissSnack -> snackHost.currentSnackbarData?.dismiss()
                 is UiEvent.ConfirmDelete -> { vm.pendingDeleteIds = e.ids; deleteLauncher.launch(IntentSenderRequest.Builder(e.sender).build()) }
             }
         }
@@ -151,7 +152,7 @@ fun AppRoot(
                 else PanePlaceholder()
             }
         }
-        SnackbarHost(snackHost, Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(bottom = if (viewer != null && !twoPane) 96.dp else if (screen == Screen.HOME) 92.dp else 8.dp).widthIn(max = 560.dp)) { d ->
+        SnackbarHost(snackHost, Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(bottom = if (viewer != null && !twoPane) 96.dp else if (screen == Screen.HOME) 112.dp else 8.dp).widthIn(max = 560.dp)) { d ->
             val ex = LocalSaveo.current
             Snackbar(d, containerColor = ex.snackBg, contentColor = androidx.compose.ui.graphics.Color.White, actionColor = ex.snackAction, shape = MaterialTheme.shapes.medium, modifier = Modifier.padding(horizontal = 16.dp))
         }
