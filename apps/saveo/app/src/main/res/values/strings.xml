@@ -1,0 +1,224 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Saveo</string>
+
+    <!-- Home -->
+    <string name="tab_statuses">Statuses</string>
+    <string name="tab_saved">Saved</string>
+    <string name="filter_all">All</string>
+    <string name="filter_photos">Photos</string>
+    <string name="filter_videos">Videos</string>
+    <string name="today">Today</string>
+    <string name="yesterday">Yesterday</string>
+    <string name="earlier">Earlier</string>
+    <string name="select">Select</string>
+    <string name="select_all">Select all</string>
+    <string name="all_sources">All sources</string>
+    <string name="show_from">Show statuses from</string>
+    <string name="open_whatsapp">Open WhatsApp</string>
+    <string name="more_options">More options</string>
+    <string name="settings">Settings</string>
+    <string name="refresh">Refresh</string>
+    <string name="save_all_n">Save all · %1$d</string>
+    <string name="n_selected">%1$d selected</string>
+    <string name="close_selection">Close selection</string>
+    <string name="save_n">Save %1$d</string>
+    <string name="share">Share</string>
+    <string name="repost">Repost</string>
+    <string name="delete">Delete</string>
+    <string name="sort">Sort</string>
+    <string name="sort_title">Sort saved items</string>
+    <string name="newest_first">Newest first</string>
+    <string name="oldest_first">Oldest first</string>
+    <string name="dates">Pick dates</string>
+    <string name="dates_title">Show saved from</string>
+    <string name="dates_any">Any time</string>
+    <string name="dates_today">Today</string>
+    <string name="dates_week">Last 7 days</string>
+    <string name="dates_month">Last 30 days</string>
+    <string name="dates_pick">Pick dates…</string>
+    <string name="pane_hint">Tap a status to see it here</string>
+    <string name="clear_dates">Clear dates</string>
+    <string name="saved_count_today">Saved today</string>
+    <string name="saved_on">Saved %1$s</string>
+
+    <!-- Tiles -->
+    <string name="cd_save">Save to gallery</string>
+    <string name="cd_saved">Saved</string>
+    <string name="cd_saving">Saving</string>
+    <string name="cd_video_status">Video, %1$s</string>
+    <string name="cd_photo_status">Photo</string>
+    <string name="cd_selected">Selected</string>
+    <string name="cd_not_selected">Not selected</string>
+    <string name="business_badge">WhatsApp Business</string>
+
+    <!-- Empty / errors -->
+    <string name="empty_title">No statuses yet</string>
+    <string name="empty_body">Watch a few statuses in WhatsApp first. Videos need to be watched fully. They will show up here.</string>
+    <string name="saved_empty_title">Nothing saved yet</string>
+    <string name="saved_empty_body">Tap the download button on any status to keep it here forever.</string>
+    <string name="filter_empty_title">Nothing here</string>
+    <string name="filter_empty_body">Try another filter or date.</string>
+    <string name="lost_title">Saveo lost access to WhatsApp</string>
+    <string name="lost_body">This happens after WhatsApp is reinstalled or Android resets access. Your saved items are safe.</string>
+    <string name="fix_now">Fix now</string>
+    <string name="not_setup_title">Connect WhatsApp to start</string>
+    <string name="not_setup_body">Allow Saveo to read the WhatsApp status folder once.</string>
+    <string name="connect">Connect</string>
+
+    <!-- Snackbars -->
+    <string name="snack_photo_saved">Photo saved to gallery</string>
+    <string name="snack_video_saved">Video saved to gallery</string>
+    <string name="snack_already">Already saved · it is in Saved</string>
+    <string name="snack_failed">Could not save: %1$s</string>
+    <string name="snack_n_saved">%1$d saved to gallery</string>
+    <string name="snack_all_already">All of these are already saved</string>
+    <string name="snack_moved_bin">%1$d moved to Recycle bin</string>
+    <string name="snack_restored">Restored to Saved</string>
+    <string name="snack_undo">Undo</string>
+    <string name="snack_no_whatsapp">WhatsApp is not installed</string>
+    <string name="snack_bin_emptied">Recycle bin emptied</string>
+    <string name="snack_log_cleared">Crash log cleared</string>
+    <string name="snack_updated">Up to date</string>
+    <string name="hint_select">Tip: long-press a status to select many</string>
+
+    <!-- Viewer -->
+    <string name="back">Back</string>
+    <string name="save_to_gallery">Save to gallery</string>
+    <string name="saved_check">Saved</string>
+    <string name="photo">Photo</string>
+    <string name="video">Video</string>
+    <string name="n_of_m">%1$d of %2$d</string>
+    <string name="play">Play</string>
+    <string name="pause">Pause</string>
+    <string name="mute">Mute</string>
+    <string name="unmute">Unmute</string>
+    <string name="loop_on">Loop on</string>
+    <string name="loop_off">Loop off</string>
+    <string name="speed">Playback speed %1$s</string>
+    <string name="details">Details</string>
+    <string name="from_source">From %1$s</string>
+    <string name="size_kb">%1$s</string>
+    <string name="video_error">This video cannot be played. You can still save or share it.</string>
+
+    <!-- Onboarding / setup -->
+    <string name="onb_title">Keep the statuses you love</string>
+    <string name="onb_body">Save photos and videos from WhatsApp statuses in one tap. They stay in your gallery forever.</string>
+    <string name="onb_1_t">Watch, then save</string>
+    <string name="onb_1_b">View a status in WhatsApp, then tap the download button here</string>
+    <string name="onb_2_t">Private by design</string>
+    <string name="onb_2_b">No ads, no internet, nothing leaves your phone</string>
+    <string name="onb_3_t">Yours forever</string>
+    <string name="onb_3_b">Saved even after the status disappears</string>
+    <string name="get_started">Get started</string>
+    <string name="setup_title">Connect WhatsApp</string>
+    <string name="setup_body">Android keeps statuses in a protected folder. Allow it once and Saveo will find new statuses by itself.</string>
+    <string name="setup_body_legacy">Saveo needs access to your photos and files to read WhatsApp statuses and save them to your gallery.</string>
+    <string name="connected_n">Connected · %1$d statuses</string>
+    <string name="connected">Connected</string>
+    <string name="not_connected">Not connected</string>
+    <string name="not_found">Not installed on this phone</string>
+    <string name="dual_hint">Works only if your phone allows it</string>
+    <string name="add_folder">Add folder</string>
+    <string name="done">Done</string>
+    <string name="continue_">Continue</string>
+    <string name="skip_for_now">Skip for now</string>
+    <string name="next_screen_hint">On the next screen tap USE THIS FOLDER, then ALLOW.</string>
+    <string name="wrong_folder">That folder has no WhatsApp statuses. Please choose the .Statuses folder.</string>
+    <string name="allow_access">Allow access</string>
+    <string name="access_denied">Saveo cannot read statuses without access.</string>
+    <string name="open_settings">Open settings</string>
+    <string name="disconnect">Disconnect</string>
+
+    <!-- Settings -->
+    <string name="sec_saving">Saving</string>
+    <string name="sec_privacy">Privacy</string>
+    <string name="sec_appearance">Appearance</string>
+    <string name="sec_more">More</string>
+    <string name="set_autosave">Auto-save new statuses</string>
+    <string name="set_autosave_d">Saves every new status by itself</string>
+    <string name="set_alerts">New status alerts</string>
+    <string name="set_alerts_d">Checks about every 15 minutes</string>
+    <string name="set_alerts_blocked">Notifications are blocked · tap to open settings</string>
+    <string name="set_folders">WhatsApp folders</string>
+    <string name="set_lock">App lock</string>
+    <string name="set_lock_d">Fingerprint or phone PIN</string>
+    <string name="set_lock_unavailable">Set a screen lock on your phone first</string>
+    <string name="set_bin">Recycle bin</string>
+    <string name="set_bin_d">%1$d items · removed after 30 days</string>
+    <string name="set_theme">Theme</string>
+    <string name="theme_system">Follow phone</string>
+    <string name="theme_light">Light</string>
+    <string name="theme_dark">Dark</string>
+    <string name="set_dynamic">Use wallpaper colours</string>
+    <string name="set_dynamic_d">Match Saveo to your wallpaper</string>
+    <string name="set_diag">Diagnostics</string>
+    <string name="set_diag_d">Crash log and usage, on this phone only</string>
+    <string name="set_about">About Saveo</string>
+    <string name="version_x">Version %1$s</string>
+    <string name="notif_reason_title">Turn on alerts?</string>
+    <string name="notif_reason_body">Saveo will show a notification when new statuses appear. Android will ask you to allow notifications.</string>
+    <string name="allow">Allow</string>
+    <string name="not_now">Not now</string>
+    <string name="cancel">Cancel</string>
+
+    <!-- Bin -->
+    <string name="bin_title">Recycle bin</string>
+    <string name="bin_note">Items here are deleted forever after 30 days.</string>
+    <string name="bin_empty_title">Bin is empty</string>
+    <string name="bin_empty_body">Things you delete from Saved wait here for 30 days.</string>
+    <string name="empty_bin">Empty</string>
+    <string name="restore">Restore</string>
+    <string name="delete_forever">Delete forever</string>
+    <string name="empty_bin_q">Delete %1$d items forever?</string>
+    <string name="empty_bin_body">They will be removed from this phone and cannot be restored.</string>
+    <plurals name="days_left">
+        <item quantity="one">%d day left</item>
+        <item quantity="other">%d days left</item>
+    </plurals>
+
+    <!-- Diagnostics -->
+    <string name="diag_note">Kept only on this phone. Nothing is sent anywhere.</string>
+    <string name="diag_saved">Saved</string>
+    <string name="diag_shared">Shared</string>
+    <string name="diag_reposted">Reposted</string>
+    <string name="diag_opens">App opens</string>
+    <string name="diag_crashes">Crash log</string>
+    <string name="diag_no_crashes">No crashes recorded. Good news!</string>
+    <string name="export_log">Export log</string>
+    <string name="clear">Clear</string>
+
+    <!-- About -->
+    <string name="about_developer">Developer</string>
+    <string name="about_info">Info</string>
+    <string name="dev_name">Sushant Kumar</string>
+    <string name="dev_email">sushant.sare@gmail.com</string>
+    <string name="about_privacy">Privacy</string>
+    <string name="about_privacy_d">No internet, no ads. Your data stays on this phone.</string>
+    <string name="about_licences">Open-source licences</string>
+    <string name="about_licences_d">Jetpack Compose, Room, WorkManager, Media3, Coil (Apache 2.0)</string>
+    <string name="email_subject">Saveo feedback</string>
+
+    <!-- Lock -->
+    <string name="locked_title">Saveo is locked</string>
+    <string name="locked_body">Use your fingerprint or phone PIN to open</string>
+    <string name="unlock">Unlock</string>
+    <string name="unlock_title">Unlock Saveo</string>
+
+    <!-- Notifications -->
+    <string name="channel_name">New statuses</string>
+    <string name="channel_desc">Tells you when new WhatsApp statuses are ready to save</string>
+    <string name="notif_tap">Tap to open Saveo</string>
+    <plurals name="notif_new_title">
+        <item quantity="one">%d new status</item>
+        <item quantity="other">%d new statuses</item>
+    </plurals>
+    <plurals name="notif_videos">
+        <item quantity="one">Includes %d video · tap to save</item>
+        <item quantity="other">Includes %d videos · tap to save</item>
+    </plurals>
+    <plurals name="notif_autosaved">
+        <item quantity="one">%d saved to your gallery automatically</item>
+        <item quantity="other">%d saved to your gallery automatically</item>
+    </plurals>
+</resources>
