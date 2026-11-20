@@ -38,7 +38,7 @@ grant; seed
 if launch_ok; then echo "launch=PASSED" >> $LOG; else echo "launch=FAILED" >> $LOG; adb logcat -d | grep -A 20 "FATAL EXCEPTION" | head -40 >> $LOG; fi
 adb exec-out screencap -p > $OUT/screens/e2e_${TAG}_launch.png
 # real-phone style: open the first photo, pinch is not possible with adb, so use the on-screen filmstrip hint
-adb shell input tap 140 420; sleep 2; adb exec-out screencap -p > $OUT/screens/e2e_${TAG}_viewer.png
+adb shell input tap 150 640; sleep 2; adb exec-out screencap -p > $OUT/screens/e2e_${TAG}_viewer.png
 adb shell input keyevent KEYCODE_BACK; sleep 1
 adb shell monkey -p $PKG -s 7 --throttle 60 --pct-syskeys 0 -v 1500 > $OUT/audit/monkey_$TAG.txt 2>&1
 CR=$(( $(mycrash) + $(adb logcat -d | grep -c "ANR in $PKG") ))

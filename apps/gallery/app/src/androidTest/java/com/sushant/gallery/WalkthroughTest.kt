@@ -3,6 +3,7 @@ package com.sushant.gallery
 import android.graphics.Bitmap
 import android.util.Log
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.SemanticsNodeInteraction
 import androidx.compose.ui.test.junit4.createEmptyComposeRule
