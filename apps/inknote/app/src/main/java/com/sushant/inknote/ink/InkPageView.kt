@@ -111,6 +111,7 @@ class InkPageView(context: Context, private val files: NoteFiles) : View(context
     private val handle = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = 0xFF2B5BD7.toInt() }
     private val eraserPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; strokeWidth = 2f; color = 0xFF888888.toInt() }
     private val path = Path()
+    private val selRect = RectF()
 
     init { isFocusable = false; setLayerType(LAYER_TYPE_HARDWARE, null) }
 
@@ -138,7 +139,7 @@ class InkPageView(context: Context, private val files: NoteFiles) : View(context
         }
         selection?.takeIf { it.pageId == p.id }?.let { sel ->
             val b = sel.bounds
-            val r = RectF(b[0] + dragDx, b[1] + dragDy, 0f, 0f)
+            val r = selRect; r.set(b[0] + dragDx, b[1] + dragDy, 0f, 0f)
             r.right = r.left + (b[2] - b[0]) * dragScale; r.bottom = r.top + (b[3] - b[1]) * dragScale
             if (drag != Drag.NONE) drawSelectionPreview(c, sel)
             c.drawRect(r, selFill); selPaint.strokeWidth = 3f / s; c.drawRect(r, selPaint)

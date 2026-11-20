@@ -15,6 +15,7 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 
 @RunWith(RobolectricTestRunner::class)
+@org.robolectric.annotation.Config(application = android.app.Application::class)
 class RichTextTest {
     @Test fun spansSurviveSaving() {
         val sb = android.text.SpannableStringBuilder("Hamlet notes\n☐ revise Act III\nbullet line")

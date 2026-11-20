@@ -214,7 +214,7 @@ fun InkRoot(vm: MainViewModel, activity: MainActivity) {
             when {
                 name.endsWith(".inknote", true) || name.endsWith(".inkbackup", true) -> {
                     val r = Backup(ctx, app.repo).restore(uris.first(), null); IndexWorker.schedule(ctx, 1)
-                    ctx.toast(ctx.getString(R.string.restore_done, r.notes))
+                    ctx.toast(ctx.resources.getQuantityString(R.plurals.restore_done, r.notes, r.notes))
                 }
                 type == "application/pdf" || name.endsWith(".pdf", true) -> vm.importPdf(uris.first()).onSuccess { openNote(it) }.onFailure { ctx.toast(ctx.getString(R.string.pdf_failed)) }
                 type.startsWith("image/") && uris.isNotEmpty() -> openNote(vm.createWithImages(uris))
@@ -239,7 +239,7 @@ fun InkRoot(vm: MainViewModel, activity: MainActivity) {
             openNote = { openNote(it) }, openDrawer = { scope.launch { drawer.open() } }, newNote = { newSheet = true }, search = { nav.navigate(Routes.SEARCH) },
             settings = { goTop(Routes.SETTINGS) }, importPdf = { importPdf.launch(arrayOf("application/pdf")) }, scan = ::scan, setFilter = vm::setFilter,
             toggleSelect = vm::toggleSelect, clearSelection = vm::clearSelection, pin = { vm.pin(it) }, move = { moveSheet = true },
-            lock = { ids, v -> if (v && !app.securePrefs.hasPin.value) setPinThenLock = true else vm.lock(ids, v) }, delete = { vm.trashNotes(it); ctx.toast(ctx.getString(R.string.moved_to_trash_n, it.size)) },
+            lock = { ids, v -> if (v && !app.securePrefs.hasPin.value) setPinThenLock = true else vm.lock(ids, v) }, delete = { vm.trashNotes(it); ctx.toast(ctx.resources.getQuantityString(R.plurals.moved_to_trash_n, it.size, it.size)) },
             setGrid = vm::setGrid, setSort = vm::setSort,
         )
         val place = when (route) { Routes.TRASH -> Place.TRASH; Routes.SETTINGS, Routes.ABOUT -> Place.SETTINGS; else -> Place.HOME }

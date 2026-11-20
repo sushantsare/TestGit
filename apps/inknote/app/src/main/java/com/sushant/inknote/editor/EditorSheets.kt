@@ -203,7 +203,7 @@ fun ExportSheet(title: String, pageCount: Int, busy: Boolean, onSave: (ExportFor
             if (fmt != ExportFormat.INKNOTE && pageCount > 1) {
                 Text(stringResource(R.string.pages), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(start = 20.dp, top = 12.dp, bottom = 6.dp))
                 SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth().padding(horizontal = 20.dp)) {
-                    SegmentedButton(!onlyThis, { onlyThis = false }, SegmentedButtonDefaults.itemShape(0, 2)) { Text(stringResource(R.string.all_n_pages, pageCount)) }
+                    SegmentedButton(!onlyThis, { onlyThis = false }, SegmentedButtonDefaults.itemShape(0, 2)) { Text(androidx.compose.ui.res.pluralStringResource(R.plurals.all_n_pages, pageCount, pageCount)) }
                     SegmentedButton(onlyThis, { onlyThis = true }, SegmentedButtonDefaults.itemShape(1, 2)) { Text(stringResource(R.string.this_page)) }
                 }
             }

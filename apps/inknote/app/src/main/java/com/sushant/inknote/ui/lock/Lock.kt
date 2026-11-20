@@ -35,6 +35,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.rememberCoroutineScope
@@ -78,7 +79,8 @@ fun LockScreen(title: String, onUnlocked: () -> Unit, onBack: () -> Unit, expand
     val ctx = LocalContext.current
     val activity = ctx as FragmentActivity
     val app = ctx.app()
-    val bio = app.settings.state.value.biometric && canUseBiometric(activity)
+    val settings by app.settings.state.collectAsState()
+    val bio = settings.biometric && canUseBiometric(activity)
     var pin by rememberSaveable { mutableStateOf("") }
     var error by rememberSaveable { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()

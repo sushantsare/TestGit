@@ -122,7 +122,7 @@ fun HomeScreen(s: HomeState, selected: Set<Long>, grid: Boolean, sortBy: Int, ex
             if (selecting) {
                 Row(Modifier.fillMaxWidth().height(64.dp).padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                     IconButton(onClick = a.clearSelection) { Icon(Icons.Outlined.Close, stringResource(R.string.cancel_selection)) }
-                    Text(stringResource(R.string.n_selected, selected.size), style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
+                    Text(androidx.compose.ui.res.pluralStringResource(R.plurals.n_selected, selected.size, selected.size), style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
                     IconButton(onClick = { a.pin(selected) }) { Icon(Icons.Outlined.PushPin, stringResource(R.string.pin)) }
                     IconButton(onClick = { a.move(selected) }) { Icon(Icons.Outlined.DriveFileMove, stringResource(R.string.move_to_folder)) }
                     val allLocked = selected.all { id -> s.all.firstOrNull { it.note.id == id }?.note?.locked == true }

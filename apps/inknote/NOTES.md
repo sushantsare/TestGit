@@ -10,6 +10,8 @@ Blueprint: `blueprint/app-spec.md` (source of truth), mockups in `blueprint/mock
 | FOREGROUND_SERVICE, FOREGROUND_SERVICE_MICROPHONE | Keep recording with the screen off | Not a prompt (install-time) | — |
 | USE_BIOMETRIC | Fingerprint / face unlock for locked notes | Not a prompt; system sheet when opening a locked note | PIN pad always works |
 | INTERNET | One-time download of the offline English handwriting pack (ML Kit) | Not a prompt; only when the user taps Download pack | Handwriting→text and handwriting search unavailable; all else offline |
+| ACCESS_NETWORK_STATE, WAKE_LOCK, RECEIVE_BOOT_COMPLETED | Added by WorkManager: run the background search indexing and the daily Trash clean-up, and resume them after a restart | Not prompts (install-time) | — |
+
 Zero-permission paths: photos via Photo Picker, camera via the camera app (TakePicture), files via the system file picker (SAF), saving exports via the system Save screen, sharing via the share sheet.
 
 ## Deviations from the spec (stack limits)

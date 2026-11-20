@@ -40,13 +40,11 @@
     <string name="scan_document">Scan document</string>
     <string name="scan_unavailable">Document scanning isn\'t available on this phone</string>
     <string name="cancel_selection">Cancel selection</string>
-    <string name="n_selected">%1$d selected</string>
     <string name="pin">PIN</string>
     <string name="lock">Lock</string>
     <string name="unlock">Unlock</string>
     <string name="move_to_folder">Move to folder</string>
     <string name="move_to_trash">Move to Trash</string>
-    <string name="moved_to_trash_n">Moved %1$d to Trash</string>
     <string name="moved">Moved</string>
     <string name="audio">Audio</string>
     <string name="empty_filter">No notes here yet.</string>
@@ -131,7 +129,6 @@
     <string name="no_camera_app">No camera app found</string>
     <string name="export_failed">Couldn\'t export this note</string>
     <string name="saved">Saved</string>
-    <string name="saved_n">Saved %1$d files</string>
     <string name="save_failed">Couldn\'t save there</string>
 
     <string name="tool_pen">Pen</string>
@@ -207,7 +204,6 @@
     <string name="fmt_text_sub">Typed text and converted handwriting</string>
     <string name="fmt_inknote">InkNote file</string>
     <string name="fmt_inknote_sub">Full note with recordings — opens in InkNote</string>
-    <string name="all_n_pages">All %1$d pages</string>
     <string name="this_page">This page</string>
     <string name="share">Share</string>
     <string name="new_tag">New tag</string>
@@ -230,7 +226,6 @@
     <string name="indexing">Reading handwriting, photos and PDFs for search…</string>
     <string name="search_help">Search finds words you typed, wrote by hand, and words inside photos and PDFs — all offline.</string>
     <string name="no_matches">No matches — try another word</string>
-    <string name="results_count">%1$d results in %2$d notes</string>
     <string name="in_pdf">In PDF text · page %1$d</string>
     <string name="in_hw">In handwriting · page %1$d</string>
     <string name="in_photo">In a photo</string>
@@ -259,14 +254,12 @@
     <string name="empty">Empty</string>
     <string name="trash_info">Deleted notes stay here for 30 days, then they\'re removed for good.</string>
     <string name="trash_empty">Trash is empty</string>
-    <string name="days_left">%1$d days left</string>
     <string name="restore">Restore</string>
     <string name="restored">Restored to All notes</string>
     <string name="delete_forever">Delete forever</string>
     <string name="delete_forever_q">Delete forever?</string>
     <string name="cant_undo">This can\'t be undone.</string>
     <string name="empty_trash_q">Empty Trash?</string>
-    <string name="empty_trash_body">%1$d notes will be deleted for good. This can\'t be undone.</string>
     <string name="delete_all">Delete all</string>
 
     <string name="s_writing">Writing</string>
@@ -295,14 +288,22 @@
     <string name="backup_pin_body">You have locked notes. Enter your PIN so they can be included safely — they stay locked in the backup.</string>
     <string name="backing_up">Backing up…</string>
     <string name="restoring">Restoring…</string>
-    <string name="backup_done">Backed up %1$d notes</string>
     <string name="backup_failed">Backup failed. Try another location.</string>
-    <string name="restore_done">Restored %1$d notes</string>
-    <string name="restore_done_skipped">Restored %1$d notes · %2$d locked notes skipped</string>
     <string name="restore_failed">Couldn\'t restore that file</string>
     <string name="not_backup">This isn\'t an InkNote backup file</string>
     <string name="theme">Theme</string>
     <string name="theme_system">System default</string>
     <string name="theme_light">Light</string>
     <string name="theme_dark">Dark</string>
+    <plurals name="n_selected"><item quantity="one">%1$d selected</item><item quantity="other">%1$d selected</item></plurals>
+    <plurals name="moved_to_trash_n"><item quantity="one">Moved %1$d note to Trash</item><item quantity="other">Moved %1$d notes to Trash</item></plurals>
+    <plurals name="saved_n"><item quantity="one">Saved %1$d file</item><item quantity="other">Saved %1$d files</item></plurals>
+    <plurals name="backup_done"><item quantity="one">Backed up %1$d note</item><item quantity="other">Backed up %1$d notes</item></plurals>
+    <plurals name="restore_done"><item quantity="one">Restored %1$d note</item><item quantity="other">Restored %1$d notes</item></plurals>
+    <plurals name="locked_skipped"><item quantity="one">%1$d locked note skipped</item><item quantity="other">%1$d locked notes skipped</item></plurals>
+    <plurals name="days_left"><item quantity="one">%1$d day left</item><item quantity="other">%1$d days left</item></plurals>
+    <plurals name="all_n_pages"><item quantity="one">All %1$d page</item><item quantity="other">All %1$d pages</item></plurals>
+    <plurals name="empty_trash_body"><item quantity="one">%1$d note will be deleted for good. This can\'t be undone.</item><item quantity="other">%1$d notes will be deleted for good. This can\'t be undone.</item></plurals>
+    <plurals name="results_count"><item quantity="one">%1$d result</item><item quantity="other">%1$d results</item></plurals>
+    <plurals name="in_notes"><item quantity="one">in %1$d note</item><item quantity="other">in %1$d notes</item></plurals>
 </resources>

@@ -119,7 +119,7 @@ fun SearchScreen(notes: List<NoteItem>, onBack: () -> Unit, onOpen: (Long, Int) 
             !searched -> Text(stringResource(R.string.search_help), color = ink.muted, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.padding(24.dp))
             shown.isEmpty() -> Text(stringResource(R.string.no_matches), color = ink.muted, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.padding(24.dp).testTag("no_matches"))
             else -> LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                item { Text(stringResource(R.string.results_count, shown.size, shown.map { it.hit.noteId }.distinct().size), color = ink.muted, style = MaterialTheme.typography.bodyMedium) }
+                item { Text(androidx.compose.ui.res.pluralStringResource(R.plurals.results_count, shown.size, shown.size) + " · " + androidx.compose.ui.res.pluralStringResource(R.plurals.in_notes, shown.map { it.hit.noteId }.distinct().size, shown.map { it.hit.noteId }.distinct().size), color = ink.muted, style = MaterialTheme.typography.bodyMedium) }
                 items(shown, key = { "${it.hit.noteId}_${it.hit.pageId}_${it.hit.source}" }) { r -> ResultCard(r, q) { onOpen(r.hit.noteId, r.hit.pageIdx) } }
             }
         }

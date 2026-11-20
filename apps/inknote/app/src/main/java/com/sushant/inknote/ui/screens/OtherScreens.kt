@@ -138,7 +138,7 @@ fun TrashScreen(items: List<NoteEntity>, expanded: Boolean, onBack: () -> Unit, 
                         Column {
                             NoteThumb(n, Modifier.padding(6.dp).fillMaxWidth().height(130.dp))
                             Text(n.title, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(horizontal = 11.dp))
-                            Text(stringResource(R.string.days_left, left.toInt()), style = MaterialTheme.typography.bodySmall, color = ink.muted, modifier = Modifier.padding(horizontal = 11.dp))
+                            Text(androidx.compose.ui.res.pluralStringResource(R.plurals.days_left, left.toInt(), left.toInt()), style = MaterialTheme.typography.bodySmall, color = ink.muted, modifier = Modifier.padding(horizontal = 11.dp))
                             Row {
                                 TextButton(onClick = { onRestore(n.id) }, Modifier.weight(1f).testTag("restore_${n.title}")) { Icon(Icons.Outlined.Restore, null, Modifier.size(18.dp)); Text(stringResource(R.string.restore), Modifier.padding(start = 4.dp)) }
                                 IconButton(onClick = { confirmOne = n.id }) { Icon(Icons.Outlined.DeleteForever, stringResource(R.string.delete_forever)) }
@@ -150,7 +150,7 @@ fun TrashScreen(items: List<NoteEntity>, expanded: Boolean, onBack: () -> Unit, 
             }
         }
     }
-    if (confirmEmpty) AlertDialog(onDismissRequest = { confirmEmpty = false }, title = { Text(stringResource(R.string.empty_trash_q)) }, text = { Text(stringResource(R.string.empty_trash_body, items.size)) },
+    if (confirmEmpty) AlertDialog(onDismissRequest = { confirmEmpty = false }, title = { Text(stringResource(R.string.empty_trash_q)) }, text = { Text(androidx.compose.ui.res.pluralStringResource(R.plurals.empty_trash_body, items.size, items.size)) },
         confirmButton = { TextButton(onClick = { confirmEmpty = false; onEmpty() }, modifier = Modifier.testTag("confirm_empty")) { Text(stringResource(R.string.delete_all), color = MaterialTheme.colorScheme.error) } },
         dismissButton = { TextButton(onClick = { confirmEmpty = false }) { Text(stringResource(R.string.cancel)) } })
     confirmOne?.let { id ->
@@ -184,7 +184,7 @@ fun SettingsScreen(st: AppSettings, update: ((AppSettings) -> AppSettings) -> Un
             val tmp = File(ctx.cacheDir, "backup.tmp")
             val res = runCatching { val n = Backup(ctx, app.repo).writeAll(tmp, pin); app.exporter.saveTo(tmp, uri).also { if (!it) error("write") }; n }
             tmp.delete(); busy = null
-            res.onSuccess { n -> app.settings.update { it.copy(lastBackupAt = System.currentTimeMillis(), lastBackupSize = 0) }; ctx.toast(ctx.getString(R.string.backup_done, n)) }
+            res.onSuccess { n -> app.settings.update { it.copy(lastBackupAt = System.currentTimeMillis(), lastBackupSize = 0) }; ctx.toast(ctx.resources.getQuantityString(R.plurals.backup_done, n, n)) }
                 .onFailure { ctx.toast(ctx.getString(R.string.backup_failed)) }
         }
     }
@@ -193,7 +193,7 @@ fun SettingsScreen(st: AppSettings, update: ((AppSettings) -> AppSettings) -> Un
         scope.launch {
             val r = runCatching { Backup(ctx, app.repo).restore(uri, pin) }
             busy = null
-            r.onSuccess { ctx.toast(if (it.skippedLocked > 0) ctx.getString(R.string.restore_done_skipped, it.notes, it.skippedLocked) else ctx.getString(R.string.restore_done, it.notes)); IndexWorker.schedule(ctx, 1) }
+            r.onSuccess { ctx.toast(if (it.skippedLocked > 0) ctx.resources.getQuantityString(R.plurals.restore_done, it.notes, it.notes) + " · " + ctx.resources.getQuantityString(R.plurals.locked_skipped, it.skippedLocked, it.skippedLocked) else ctx.resources.getQuantityString(R.plurals.restore_done, it.notes, it.notes)); IndexWorker.schedule(ctx, 1) }
                 .onFailure { ctx.toast(it.message ?: ctx.getString(R.string.restore_failed)) }
         }
     }

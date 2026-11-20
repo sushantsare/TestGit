@@ -188,7 +188,7 @@ fun EditorPane(
     }
     val saveMany = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
         val pe = pendingExport; pendingExport = null
-        if (uri != null && pe != null) scope.launch { val n = ctx.app().exporter.saveToTree(pe.first, uri, pe.second.mime); ctx.toast(ctx.getString(R.string.saved_n, n)) }
+        if (uri != null && pe != null) scope.launch { val n = ctx.app().exporter.saveToTree(pe.first, uri, pe.second.mime); ctx.toast(ctx.resources.getQuantityString(R.plurals.saved_n, n, n)) }
     }
 
     fun onInsert(k: InsertKind) {

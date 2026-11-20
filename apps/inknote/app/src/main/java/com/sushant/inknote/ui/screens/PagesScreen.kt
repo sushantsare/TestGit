@@ -121,7 +121,8 @@ fun PagesScreen(vm: EditorViewModel, settings: AppSettings, onBack: () -> Unit, 
 private fun PageThumb(vm: EditorViewModel, p: PageEntity, i: Int, on: Boolean, dark: Boolean, onClick: () -> Unit) {
     val content = vm.content(p.id)
     val bmp by produceState<Bitmap?>(null, p, content, dark) {
-        value = if (content == null) null else withContext(Dispatchers.Default) { runCatching { PageRenderer.bitmap(vm.files, vm.noteId, p, content, 360, if (dark) PagePalette.DARK else PagePalette.LIGHT) }.getOrNull() }
+        val rendered = if (content == null) null else withContext(Dispatchers.Default) { runCatching { PageRenderer.bitmap(vm.files, vm.noteId, p, content, 360, if (dark) PagePalette.DARK else PagePalette.LIGHT) }.getOrNull() }
+        value = rendered
     }
     Column(Modifier.clip(RoundedCornerShape(10.dp)).clickable(onClick = onClick).testTag("pthumb_$i"), horizontalAlignment = Alignment.CenterHorizontally) {
         Box(Modifier.fillMaxWidth().aspectRatio(0.75f), contentAlignment = Alignment.Center) {

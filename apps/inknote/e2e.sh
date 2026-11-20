@@ -11,6 +11,8 @@ LOG=$OUT/e2e-results-$TAG.txt
 echo "== InkNote e2e on Android $(adb shell getprop ro.build.version.release) (API $TAG) ==" > $LOG
 adb shell settings put global hide_error_dialogs 1 >/dev/null 2>&1
 
+# crashes of InkNote only (other system apps sometimes crash on emulators)
+mycrash() { adb logcat -d | grep -A3 "FATAL EXCEPTION" | grep -c "Process: $PKG"; }
 launch_ok() {
   adb shell am force-stop $PKG; adb logcat -c
   adb shell am start -W -n $ACT > /tmp/start.txt 2>&1; sleep 3
@@ -23,7 +25,7 @@ adb install -r $REL >> $LOG 2>&1
 if launch_ok; then echo "launch=PASSED" >> $LOG; else echo "launch=FAILED" >> $LOG; adb logcat -d | grep -A 20 "FATAL EXCEPTION" | head -40 >> $LOG; fi
 adb exec-out screencap -p > $OUT/screens/e2e_${TAG}_launch.png
 adb shell monkey -p $PKG -s 7 --throttle 60 --pct-syskeys 0 -v 1500 > $OUT/audit/monkey_$TAG.txt 2>&1
-CR=$(adb logcat -d | grep -c "FATAL EXCEPTION.*\|ANR in $PKG")
+CR=$(( $(mycrash) + $(adb logcat -d | grep -c "ANR in $PKG") ))
 echo "monkey_crashes_$TAG=$CR" >> $LOG
 adb logcat -d | grep -B2 -A25 "FATAL EXCEPTION" | head -80 >> $LOG
 [ "$TAG" != "33" ] && { grep -q "launch=PASSED" $LOG && [ "$CR" = "0" ] && echo PASSED > $OUT/E2E_$TAG || echo FAILED > $OUT/E2E_$TAG; exit 0; }
@@ -39,7 +41,7 @@ if [ -f "$DBG" ]; then
   adb shell monkey -p $PKG -s 42 --throttle 80 --pct-syskeys 0 -v 5000 > $A/T3_monkey.txt 2>&1
   sleep 10
   adb logcat -d > $A/T3_logcat_debug.txt
-  echo "T3 crashes=$(grep -c 'FATAL EXCEPTION' $A/T3_logcat_debug.txt) anrs=$(grep -c "ANR in $PKG" $A/T3_logcat_debug.txt)" >> $A/summary.txt
+  echo "T3 crashes=$(grep -A3 'FATAL EXCEPTION' $A/T3_logcat_debug.txt | grep -c "Process: $PKG") anrs=$(grep -c "ANR in $PKG" $A/T3_logcat_debug.txt)" >> $A/summary.txt
   echo "T4 strictmode=$(grep -c 'StrictMode policy violation' $A/T3_logcat_debug.txt)" >> $A/summary.txt
   grep -A3 "StrictMode policy violation" $A/T3_logcat_debug.txt | head -120 > $A/T4_strictmode.txt
   echo "T5 leaks=$(grep -cE 'HEAP ANALYSIS RESULT|APPLICATION LEAKS' $A/T3_logcat_debug.txt) leakcanary_lines=$(grep -c LeakCanary $A/T3_logcat_debug.txt)" >> $A/summary.txt
@@ -67,18 +69,18 @@ adb shell am start -n $ACT >/dev/null; sleep 2
 adb shell input keyevent KEYCODE_HOME; sleep 1; adb shell am kill $PKG; sleep 1
 adb shell am start -n $ACT >/dev/null; sleep 3
 adb exec-out screencap -p > $OUT/screens/audit_T9_after_kill.png
-echo "T9 crash_after_kill=$(adb logcat -d | grep -c 'FATAL EXCEPTION')" >> $A/summary.txt
+echo "T9 crash_after_kill=$(mycrash)" >> $A/summary.txt
 # T10 offline
 adb shell svc wifi disable; adb shell svc data disable; sleep 1; adb logcat -c
 adb shell am force-stop $PKG; adb shell am start -W -n $ACT >/dev/null; sleep 3
 adb shell monkey -p $PKG -s 11 --throttle 80 --pct-syskeys 0 -v 800 >/dev/null 2>&1
-echo "T10 offline_crashes=$(adb logcat -d | grep -c 'FATAL EXCEPTION')" >> $A/summary.txt
+echo "T10 offline_crashes=$(mycrash)" >> $A/summary.txt; adb logcat -d | grep -B2 -A25 "FATAL EXCEPTION" | head -60 > $A/T10_crash.txt
 adb shell svc wifi enable; adb shell svc data enable
 # T11 battery modes
 adb logcat -c; adb shell dumpsys deviceidle force-idle >/dev/null; adb shell am set-inactive $PKG true
 adb shell am start -W -n $ACT >/dev/null; sleep 3
 adb shell dumpsys deviceidle unforce >/dev/null; adb shell am set-inactive $PKG false
-echo "T11 crashes=$(adb logcat -d | grep -c 'FATAL EXCEPTION')" >> $A/summary.txt
+echo "T11 crashes=$(mycrash)" >> $A/summary.txt; adb logcat -d | grep -B2 -A25 "FATAL EXCEPTION" | head -60 > $A/T11_crash.txt
 # T14 config stress
 adb logcat -c
 adb shell settings put system accelerometer_rotation 0
@@ -88,7 +90,7 @@ adb shell settings put system font_scale 2.0; sleep 2; adb exec-out screencap -p
 adb shell settings put system font_scale 1.0
 adb shell wm size 1600x2560; adb shell wm density 320; sleep 3; adb exec-out screencap -p > $OUT/screens/audit_T14_tablet.png
 adb shell wm size reset; adb shell wm density reset; sleep 2
-echo "T14 crashes=$(adb logcat -d | grep -c 'FATAL EXCEPTION')" >> $A/summary.txt
+echo "T14 crashes=$(mycrash)" >> $A/summary.txt
 adb logcat -d | grep -B2 -A25 "FATAL EXCEPTION" | head -60 > $A/T14_crash.txt
 # T15 apk checks
 BT=$(ls -d $ANDROID_HOME/build-tools/* 2>/dev/null | sort -V | tail -1)
