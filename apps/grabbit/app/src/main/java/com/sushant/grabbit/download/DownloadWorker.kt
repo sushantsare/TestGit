@@ -133,10 +133,11 @@ class DownloadWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(c
                         nm.notify(nid, Notifs.progress(ctx, title, text, pct.toInt(), p <= 0f, id))
                     }
                 })
-                resp.err.lineSequence().filter { "ffmpeg" in it.lowercase() || "section" in it || "Invoking" in it }
-                    .take(20).forEach { android.util.Log.i("GrabbitDL", "err: ${it.take(900)}") }
+                if (opts.trimmed) resp.err.lineSequence().filter { "command line" in it || "section" in it || "Invoking" in it }
+                    .take(12).forEach { l -> l.chunked(700).forEach { android.util.Log.i("GrabbitDL", "err: $it") } }
             }
         } catch (e: Exception) {
+            if (opts.trimmed) (e.message ?: e.toString()).takeLast(3000).chunked(700).forEach { android.util.Log.i("GrabbitDL", "fail: $it") }
             if (isStopped) {
                 tmp.deleteRecursively()
                 return Result.failure(workDataOf(K_ERROR to "Cancelled"))
