@@ -118,9 +118,11 @@ class WalkthroughTest {
         step("typing") {
             tag("tool_Type text").performClick()
             tag("page_0").performTouchInput { click(Offset(width * 0.1f, height * 0.93f)) }
+            val box = runCatching { waitTag("text_box", 5000); true }.getOrDefault(false)
             device.wait(Until.hasObject(By.clazz("android.widget.EditText")), 5000)
             device.findObject(By.clazz("android.widget.EditText"))?.text = "Exam tip: revise soliloquies"
-            Thread.sleep(500); shot("07_editor_typing")
+            Thread.sleep(500); shot("07_editor_typing_box-$box")
+            assertTrue("tapping the page with the text tool opens a text box", box)
             tag("text_done").performClick()
         }
         step("lasso") {
