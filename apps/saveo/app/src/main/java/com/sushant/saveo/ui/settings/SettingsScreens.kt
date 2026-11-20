@@ -51,6 +51,8 @@ import androidx.compose.material.icons.rounded.Restore
 import androidx.compose.material.icons.rounded.Share
 import androidx.compose.material.icons.rounded.Description
 import androidx.compose.material.icons.rounded.Contrast
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import com.sushant.saveo.ui.components.ScreenTitle
 import androidx.compose.material.icons.rounded.Visibility
 import androidx.compose.material.icons.rounded.VisibilityOff
@@ -459,9 +461,9 @@ fun LockScreen(onUnlock: () -> Unit) {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun <T> Segmented(options: List<Pair<String, T>>, selected: T, modifier: Modifier = Modifier, onPick: (T) -> Unit) {
-    androidx.compose.material3.SingleChoiceSegmentedButtonRow(modifier.fillMaxWidth()) {
+    SingleChoiceSegmentedButtonRow(modifier.fillMaxWidth()) {
         options.forEachIndexed { i, (label, v) ->
-            androidx.compose.material3.SegmentedButton(
+            SegmentedButton(
                 selected = v == selected, onClick = { onPick(v) },
                 shape = androidx.compose.material3.SegmentedButtonDefaults.itemShape(i, options.size),
                 modifier = Modifier.heightIn(min = 48.dp),

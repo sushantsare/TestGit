@@ -28,6 +28,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.GridView
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material.icons.outlined.Collections
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.consumeWindowInsets
@@ -214,9 +216,9 @@ private val NavDests = listOf(
 /** Selected = filled icon, unselected = outlined (Grabbit / Material 3). */
 @Composable
 private fun BottomBar(current: Int, onTab: (Int) -> Unit) {
-    androidx.compose.material3.NavigationBar(containerColor = MaterialTheme.colorScheme.surfaceContainerLow) {
+    NavigationBar(containerColor = MaterialTheme.colorScheme.surfaceContainerLow) {
         NavDests.forEachIndexed { i, d ->
-            androidx.compose.material3.NavigationBarItem(
+            NavigationBarItem(
                 selected = current == i, onClick = { onTab(i) },
                 icon = { Icon(if (current == i) d.filled else d.outlined, null) },
                 label = { Text(stringResource(d.label), style = MaterialTheme.typography.labelMedium) },
