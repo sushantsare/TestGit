@@ -39,6 +39,7 @@ object Notifs {
         val cancel = androidx.work.WorkManager.getInstance(ctx).createCancelPendingIntent(workId)
         return NotificationCompat.Builder(ctx, CH_PROGRESS)
             .setSmallIcon(R.drawable.ic_notification)
+            .setColor(0xFFE8470F.toInt())
             .setContentTitle(title)
             .setContentText(text)
             .setProgress(100, pct, indeterminate)
@@ -55,6 +56,7 @@ object Notifs {
         ) return
         val n = NotificationCompat.Builder(ctx, CH_DONE)
             .setSmallIcon(R.drawable.ic_notification)
+            .setColor(0xFFE8470F.toInt())
             .setContentTitle(if (ok) "Downloaded ✓  $title" else "Download failed  ·  $title")
             .setContentText(text)
             .setStyle(NotificationCompat.BigTextStyle().bigText(text))

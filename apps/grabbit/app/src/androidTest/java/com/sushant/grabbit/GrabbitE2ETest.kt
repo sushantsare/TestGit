@@ -176,6 +176,9 @@ class GrabbitE2ETest {
         while (Engine.updating.value && System.currentTimeMillis() - t0 < 300_000) Thread.sleep(1000)
         log("After auto-update: version=${Engine.version.value} lastUpdate=${Prefs.lastUpdate}")
         shot("01_home_ready")
+        compose.onNodeWithTag("nav_downloads").performClick()
+        shot("02_downloads_empty")
+        compose.onNodeWithTag("nav_home").performClick()
 
         val direct = grab("direct", "https://www.w3schools.com/html/mov_bbb.mp4")
         val x = grab("x", "https://x.com/SpaceX/status/1732824684683784516")
@@ -186,6 +189,12 @@ class GrabbitE2ETest {
         compose.onNodeWithTag("nav_downloads").performClick()
         shot("90_downloads")
         compose.onNodeWithTag("nav_settings").performClick()
+        compose.activity.runOnUiThread {
+            val a = compose.activity
+            a.currentFocus?.clearFocus()
+            WindowCompat.getInsetsController(a.window, a.window.decorView).hide(WindowInsetsCompat.Type.ime())
+        }
+        Thread.sleep(800)
         shot("91_settings")
         compose.onNodeWithTag("settingsList").performScrollToNode(hasText("Developed by Sushant Kumar"))
         shot("91b_about")
@@ -238,6 +247,12 @@ class GrabbitE2ETest {
         shot("96_dark_downloads")
         compose.onNodeWithTag("nav_settings").performClick()
         shot("97_dark_settings")
+        Prefs.amoled = true
+        Thread.sleep(800)
+        shot("98_black_settings")
+        compose.onNodeWithTag("nav_downloads").performClick()
+        shot("99_black_downloads")
+        Prefs.amoled = false
         Prefs.theme = 0
 
         log("SUMMARY direct=$direct x=$x dailymotion=$dm facebook=$fb youtube=$youtube")

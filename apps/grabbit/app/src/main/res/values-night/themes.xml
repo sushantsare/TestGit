@@ -1,8 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <style name="Theme.Grabbit" parent="android:Theme.Material.NoActionBar">
-        <item name="android:windowBackground">#0F0F0F</item>
+        <item name="android:windowBackground">#121212</item>
         <item name="android:statusBarColor">@android:color/transparent</item>
         <item name="android:navigationBarColor">@android:color/transparent</item>
+    </style>
+
+    <!-- Launch screen (AndroidX SplashScreen): brand icon on the app background, shown only while the app starts -->
+    <style name="Theme.Grabbit.Starting" parent="Theme.SplashScreen.IconBackground">
+        <item name="windowSplashScreenBackground">#121212</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/ic_launcher_foreground</item>
+        <item name="windowSplashScreenIconBackgroundColor">#F25A1D</item>
+        <item name="postSplashScreenTheme">@style/Theme.Grabbit</item>
     </style>
 </resources>

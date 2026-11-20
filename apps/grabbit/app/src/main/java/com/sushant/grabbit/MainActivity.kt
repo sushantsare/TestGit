@@ -5,13 +5,14 @@ import android.graphics.Color
 import android.os.Bundle
 import androidx.activity.SystemBarStyle
 import androidx.compose.runtime.LaunchedEffect
-import com.sushant.grabbit.ui.isDarkTheme
+import com.sushant.grabbit.ui.theme.isDarkTheme
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import com.sushant.grabbit.ui.GrabbitRoot
-import com.sushant.grabbit.ui.GrabbitTheme
+import com.sushant.grabbit.ui.theme.GrabbitTheme
 import com.sushant.grabbit.ui.MainViewModel
 
 class MainActivity : ComponentActivity() {
@@ -22,6 +23,7 @@ class MainActivity : ComponentActivity() {
     private val vm: MainViewModel by viewModels()
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        installSplashScreen()
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         if (savedInstanceState == null) handleIntent(intent)

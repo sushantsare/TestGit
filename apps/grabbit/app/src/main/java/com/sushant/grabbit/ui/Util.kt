@@ -4,7 +4,7 @@ import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
-import android.widget.Toast
+import kotlinx.coroutines.flow.MutableSharedFlow
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
@@ -47,7 +47,14 @@ fun qualityLabel(res: Int): String = when {
     else -> "${res}p"
 }
 
-fun Context.toast(msg: String) = Toast.makeText(this, msg, Toast.LENGTH_SHORT).show()
+/** App messages are shown as snackbars by the root screen (no Toasts). */
+object UiMessages {
+    val flow = MutableSharedFlow<String>(extraBufferCapacity = 8)
+    fun say(msg: String) { flow.tryEmit(msg) }
+}
+
+@Suppress("UnusedReceiverParameter")
+fun Context.toast(msg: String) = UiMessages.say(msg)
 
 fun Context.openUri(uri: String, mime: String) {
     val i = Intent(Intent.ACTION_VIEW)

@@ -10,15 +10,29 @@ object Prefs {
 
     /** 0 = follow system, 1 = light, 2 = dark */
     val themeFlow = MutableStateFlow(0)
+    /** Pure black backgrounds in dark mode (OLED) */
+    val amoledFlow = MutableStateFlow(false)
+    /** Android 12+ wallpaper colours instead of the Grabbit palette */
+    val dynamicFlow = MutableStateFlow(false)
 
     fun init(ctx: Context) {
         p = ctx.getSharedPreferences("grabbit", Context.MODE_PRIVATE)
         themeFlow.value = p.getInt("theme", 0)
+        amoledFlow.value = p.getBoolean("amoled", false)
+        dynamicFlow.value = p.getBoolean("dynamic", false)
     }
 
     var theme: Int
         get() = p.getInt("theme", 0)
         set(v) { p.edit().putInt("theme", v).apply(); themeFlow.value = v }
+
+    var amoled: Boolean
+        get() = p.getBoolean("amoled", false)
+        set(v) { p.edit().putBoolean("amoled", v).apply(); amoledFlow.value = v }
+
+    var dynamic: Boolean
+        get() = p.getBoolean("dynamic", false)
+        set(v) { p.edit().putBoolean("dynamic", v).apply(); dynamicFlow.value = v }
 
     /** "best", "h1080", "h720" … or "audio" */
     var defaultQuality: String

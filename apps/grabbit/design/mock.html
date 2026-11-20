@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8">
+<style>
+@font-face{font-family:Jakarta;font-weight:400;src:url(file:///tmp/fonts/package/400Regular/PlusJakartaSans_400Regular.ttf)}
+@font-face{font-family:Jakarta;font-weight:500;src:url(file:///tmp/fonts/package/500Medium/PlusJakartaSans_500Medium.ttf)}
+@font-face{font-family:Jakarta;font-weight:600;src:url(file:///tmp/fonts/package/600SemiBold/PlusJakartaSans_600SemiBold.ttf)}
+@font-face{font-family:Jakarta;font-weight:700;src:url(file:///tmp/fonts/package/700Bold/PlusJakartaSans_700Bold.ttf)}
+@font-face{font-family:Jakarta;font-weight:800;src:url(file:///tmp/fonts/package/800ExtraBold/PlusJakartaSans_800ExtraBold.ttf)}
+@font-face{font-family:MS;src:url(file:///tmp/fonts/package/material-symbols-rounded.woff2)}
+.i{font-family:MS;font-size:24px;line-height:1;font-variation-settings:'FILL' 0;display:inline-block;vertical-align:middle}
+.f{font-variation-settings:'FILL' 1}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:Jakarta;width:360px;height:800px;background:var(--surface);color:var(--onSurface);position:relative;overflow:hidden;font-size:14px;line-height:20px;letter-spacing:.1px}
+.status{height:32px;padding:0 20px;display:flex;align-items:center;justify-content:space-between;font-weight:600;font-size:13px}
+.content{position:absolute;top:32px;bottom:80px;left:0;right:0;overflow:hidden;padding:0 16px}
+.nav{position:absolute;bottom:0;left:0;right:0;height:80px;background:var(--surfaceContainer);display:flex;justify-content:space-around;padding-top:12px}
+.nav div{display:flex;flex-direction:column;align-items:center;gap:4px;font-size:12px;font-weight:600;color:var(--onSurfaceVariant);width:90px}
+.nav .pill{width:64px;height:32px;border-radius:16px;display:flex;align-items:center;justify-content:center}
+.nav .on{color:var(--onSurface)} .nav .on .pill{background:var(--secondaryContainer);color:var(--onSecondaryContainer)}
+.topbar{height:64px;display:flex;align-items:center;gap:10px}
+.logo{width:36px;height:36px;border-radius:11px;background:linear-gradient(135deg,#FF7A3D,#E8470F);display:flex;align-items:center;justify-content:center}
+.word{font-weight:800;font-size:22px;letter-spacing:-.3px}
+h1{font-weight:800;font-size:30px;line-height:36px;letter-spacing:-.6px;margin:8px 0 6px}
+.sub{color:var(--onSurfaceVariant);font-size:14px}
+.card{background:var(--surfaceContainerLow);border-radius:24px;padding:16px}
+.field{height:56px;border-radius:16px;background:var(--surfaceContainerHighest);display:flex;align-items:center;gap:12px;padding:0 14px;color:var(--onSurfaceVariant);font-size:16px}
+.btn{height:52px;border-radius:26px;background:var(--primary);color:var(--onPrimary);display:flex;align-items:center;justify-content:center;gap:8px;font-weight:700;font-size:16px}
+.tonal{height:40px;border-radius:20px;background:var(--secondaryContainer);color:var(--onSecondaryContainer);display:inline-flex;align-items:center;gap:6px;padding:0 16px;font-weight:600}
+.lab{font-size:12px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:var(--onSurfaceVariant);margin:20px 4px 10px}
+.step{display:flex;gap:14px;align-items:center;padding:10px 0}
+.num{width:36px;height:36px;border-radius:12px;background:var(--primaryContainer);color:var(--onPrimaryContainer);display:flex;align-items:center;justify-content:center;font-weight:800}
+.chips{display:flex;gap:8px;flex-wrap:wrap}
+.chip{height:36px;border-radius:12px;border:1px solid var(--outlineVariant);display:flex;align-items:center;gap:6px;padding:0 12px;font-weight:600;font-size:13px}
+.chip small{color:var(--onSurfaceVariant);font-weight:500}
+.chip.sel{background:var(--secondaryContainer);border-color:transparent;color:var(--onSecondaryContainer)}
+.thumb{border-radius:18px;aspect-ratio:16/9;background:linear-gradient(135deg,#3b6e8f,#d98a4e 60%,#2b2b48);position:relative;overflow:hidden}
+.scrim{position:absolute;inset:0;background:linear-gradient(transparent 55%,rgba(0,0,0,.55))}
+.tag{position:absolute;background:rgba(0,0,0,.6);color:#fff;font-size:12px;font-weight:700;border-radius:8px;padding:2px 8px}
+.seg{display:flex;border:1px solid var(--outline);border-radius:20px;height:40px;overflow:hidden}
+.seg div{flex:1;display:flex;align-items:center;justify-content:center;gap:6px;font-weight:600}
+.seg div+div{border-left:1px solid var(--outline)}
+.seg .sel{background:var(--secondaryContainer);color:var(--onSecondaryContainer)}
+.title{font-weight:700;font-size:17px;line-height:23px}
+.row{display:flex;gap:12px;align-items:center}
+.t{width:104px;height:58px;border-radius:12px;flex:none;position:relative;overflow:hidden}
+.meta{font-size:12px;color:var(--onSurfaceVariant);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rt{font-weight:600;font-size:14px;line-height:19px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.bar{height:6px;border-radius:3px;background:var(--surfaceContainerHighest);overflow:hidden}
+.bar div{height:100%;background:var(--primary);border-radius:3px}
+.search{height:48px;border-radius:24px;background:var(--surfaceContainerHigh);display:flex;align-items:center;gap:12px;padding:0 16px;color:var(--onSurfaceVariant)}
+.h{font-weight:800;font-size:28px;letter-spacing:-.5px;height:64px;display:flex;align-items:center}
+.set{background:var(--surfaceContainerLow);border-radius:24px;overflow:hidden}
+.si{display:flex;align-items:center;gap:16px;padding:14px 16px;min-height:64px}
+.si .i{color:var(--onSurfaceVariant)}
+.si b{font-weight:600;display:block;font-size:15px}
+.si span.s{font-size:12.5px;color:var(--onSurfaceVariant);line-height:17px}
+.sw{width:52px;height:32px;border-radius:16px;background:var(--surfaceContainerHighest);border:2px solid var(--outline);position:relative;flex:none}
+.sw:after{content:"";position:absolute;width:16px;height:16px;border-radius:50%;background:var(--outline);top:6px;left:6px}
+.sw.on{background:var(--primary);border-color:var(--primary)} .sw.on:after{background:var(--onPrimary);width:24px;height:24px;top:2px;left:22px}
+.div{height:1px;background:var(--outlineVariant);margin-left:56px}
+</style></head><body>
+<div class="status"><span>9:41</span><span><span class="i" style="font-size:16px">signal_cellular_alt</span> <span class="i" style="font-size:16px">wifi</span> <span class="i" style="font-size:16px">battery_full</span></span></div>
+<div class="content" id="c"></div>
+<div class="nav" id="nav"></div>
+<script>
+const P=PALETTE, q=new URLSearchParams(location.search), th=q.get('t')||'L', sc=q.get('s');
+for(const[k,v]of Object.entries(P[th]))document.body.style.setProperty('--'+k,v);
+const ic=(n,f,s)=>`<span class="i ${f?'f':''}" ${s?`style="font-size:${s}px"`:''}>${n}</span>`;
+const tab={home:0,loaded:0,downloads:1,empty:1,settings:2}[sc];
+nav.innerHTML=[['home','Grab'],['download','Downloads'],['settings','Settings']].map((x,i)=>`<div class="${i==tab?'on':''}"><div class="pill">${ic(x[0],i==tab)}</div>${x[1]}</div>`).join('');
+const logo=`<div class="logo"><svg width="26" height="26" viewBox="0 0 108 108"><g fill="#fff"><rect x="40" y="18" width="11" height="34" rx="5.5"/><rect x="57" y="18" width="11" height="34" rx="5.5"/><path d="M30 50h48L54 76z" stroke="#fff" stroke-width="8" stroke-linejoin="round"/><rect x="28" y="82" width="52" height="9" rx="4.5"/></g></svg></div>`;
+const topb=`<div class="topbar">${logo}<span class="word">Grabbit</span></div>`;
+const input=`<div class="card" style="display:flex;flex-direction:column;gap:12px">
+ <div class="field">${ic('link')}<span style="flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:${sc=='loaded'?'var(--onSurface)':'inherit'}">${sc=='loaded'?'https://x.com/SpaceX/status/18':'Paste a video link'}</span>${sc=='loaded'?ic('close'):''}</div>
+ <div class="btn" style="${sc=='loaded'?'opacity:.38':''}">${ic('download')} Grab video</div></div>`;
+const C={
+home:()=>`${topb}<h1>Paste a link.<br>Get the video.</h1><div class="sub">YouTube, Instagram, X, Facebook and 1,000+ more sites</div><div style="height:20px"></div>${input}
+<div class="lab">How it works</div>
+<div class="card" style="padding:6px 16px">
+${[['Copy the link','From any app: Share → Copy link'],['Paste it above','Then tap Grab video'],['Pick a quality','Video or MP3 — saved to your gallery']].map((s,i)=>`<div class="step"><div class="num">${i+1}</div><div><b style="font-weight:600">${s[0]}</b><div class="meta">${s[1]}</div></div></div>`).join('')}
+</div>
+<div class="card" style="margin-top:12px;background:var(--tertiaryContainer);color:var(--onTertiaryContainer);display:flex;gap:14px;align-items:center">${ic('ios_share')}<div style="font-size:13px;line-height:18px"><b>Faster:</b> tap Share in any app and pick Grabbit</div></div>`,
+loaded:()=>`${topb}${input}<div style="height:12px"></div>
+<div class="card" style="padding:12px">
+ <div class="thumb"><div class="scrim"></div><span class="tag" style="left:10px;top:10px">X</span><span class="tag" style="right:10px;bottom:10px">2:14</span></div>
+ <div style="padding:14px 4px 4px">
+  <div class="title">SpaceX — At dawn from the gateway to Mars, the launch of Starship</div>
+  <div class="meta" style="margin-top:4px">SpaceX</div>
+  <div class="seg" style="margin:16px 0 12px"><div class="sel">${ic('check',0,18)} Video</div><div>${ic('music_note',0,18)} Audio</div></div>
+  <div class="chips">${[['Best',''],['1080p','48 MB'],['720p','21 MB'],['480p','9.8 MB'],['360p','5.1 MB']].map((c,i)=>`<div class="chip ${i==1?'sel':''}">${i==1?ic('check',0,18):''}${c[0]} ${c[1]?`<small>· ${c[1]}</small>`:''}</div>`).join('')}</div>
+  <div class="btn" style="margin-top:16px">${ic('download')} Download 1080p · 48 MB</div>
+ </div></div>`,
+downloads:()=>`<div class="row" style="justify-content:space-between"><div class="h">Downloads</div><span style="color:var(--primary);font-weight:600">Clear finished</span></div>
+<div class="lab" style="margin-top:4px">In progress · 1</div>
+<div class="card" style="padding:12px">
+ <div class="row"><div class="t" style="background:linear-gradient(135deg,#2c3e50,#c0743b)"></div><div style="flex:1;min-width:0"><div class="rt">Midnight Sun | Iceland 4K</div><div class="meta">Dailymotion · 1080p</div></div><span class="i" style="color:var(--onSurfaceVariant)">close</span></div>
+ <div class="row" style="margin-top:12px;justify-content:space-between"><b style="font-weight:600;font-size:13px">Downloading</b><b style="color:var(--primary);font-size:13px">45%</b></div>
+ <div class="bar" style="margin:6px 0"><div style="width:45%"></div></div>
+ <div class="meta">9.5 MB of 21.1 MB · 2.3 MB/s · 0:05 left</div>
+</div>
+<div class="lab">Saved · 3</div>
+<div class="row"><div class="search" style="flex:1">${ic('search')} Search downloads</div><div style="width:48px;height:48px;display:flex;align-items:center;justify-content:center">${ic('swap_vert')}</div></div>
+<div class="chips" style="margin:12px 0;flex-wrap:nowrap">${['All','Dailymotion','Facebook','X','Audio'].map((c,i)=>`<div class="chip ${i==0?'sel':''}">${i==0?ic('check',0,18):''}${c}</div>`).join('')}</div>
+${[['How to Share With Just Friends','Facebook · 5.1 MB · 5:54 AM','#4267B2,#e9a0c0'],['SpaceX — At dawn from the gateway to Mars','X · 20.2 MB · Yesterday','#111,#8a5a3c'],['Lofi beats to study to','YouTube · MP3 · 4.2 MB · 18 Nov','#5b3fc4,#2bb3a3']].map((r,i)=>`<div class="row" style="padding:8px 0"><div class="t" style="background:linear-gradient(135deg,${r[2]})">${i==2?`<span class="tag" style="left:6px;bottom:6px;padding:1px 4px">${ic('music_note',1,14)}</span>`:''}</div><div style="flex:1;min-width:0"><div class="rt">${r[0]}</div><div class="meta">${r[1]}</div></div><span class="i" style="color:var(--onSurfaceVariant)">more_vert</span></div>`).join('')}`,
+empty:()=>`<div class="h">Downloads</div><div style="display:flex;flex-direction:column;align-items:center;text-align:center;margin-top:110px">
+<svg width="180" height="140" viewBox="0 0 180 140"><rect x="20" y="30" width="140" height="92" rx="20" fill="var(--surfaceContainerHigh)"/><rect x="40" y="48" width="64" height="36" rx="10" fill="var(--primaryContainer)"/><path d="M66 58l14 8-14 8z" fill="var(--primary)"/><rect x="40" y="94" width="100" height="8" rx="4" fill="var(--surfaceContainerHighest)"/><rect x="112" y="48" width="28" height="8" rx="4" fill="var(--surfaceContainerHighest)"/><rect x="112" y="62" width="20" height="8" rx="4" fill="var(--surfaceContainerHighest)"/><circle cx="146" cy="30" r="20" fill="var(--primary)"/><path d="M146 20v16m-7-7l7 7 7-7" stroke="var(--onPrimary)" stroke-width="3.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+<div style="font-size:22px;font-weight:700;margin-top:24px">No downloads yet</div><div class="sub" style="max-width:260px;margin-top:8px">Videos you grab show up here and in your gallery</div><div class="btn" style="margin-top:24px;padding:0 24px;height:44px;font-size:14px">${ic('link',0,20)} Grab a video</div></div>`,
+settings:()=>`<div class="h">Settings</div>
+<div class="lab" style="margin-top:4px">Appearance</div>
+<div class="set"><div class="si" style="display:block"><b style="margin-bottom:10px">Theme</b><div class="seg"><div>System</div><div class="sel">${ic('check',0,18)} Light</div><div>Dark</div></div></div>
+<div class="si">${ic('contrast')}<div style="flex:1"><b>Pure black</b><span class="s">Darker dark mode for OLED screens</span></div><div class="sw"></div></div>
+<div class="si">${ic('palette')}<div style="flex:1"><b>Wallpaper colours</b><span class="s">Match the app to your wallpaper</span></div><div class="sw"></div></div></div>
+<div class="lab">Downloads</div>
+<div class="set"><div class="si">${ic('high_quality')}<div style="flex:1"><b>Default quality</b><span class="s">Best available</span></div>${ic('chevron_right')}</div><div class="div"></div>
+<div class="si">${ic('subtitles')}<div style="flex:1"><b>Embed subtitles</b><span class="s">English subtitles inside the video, when available</span></div><div class="sw"></div></div><div class="div"></div>
+<div class="si">${ic('album')}<div style="flex:1"><b>Album art in MP3</b><span class="s">Uses the thumbnail as the cover</span></div><div class="sw on"></div></div></div>`};
+c.innerHTML=C[sc]();
+</script></body></html>

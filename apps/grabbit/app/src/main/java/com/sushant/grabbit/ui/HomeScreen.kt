@@ -9,7 +9,7 @@ import android.os.Build
 import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.Image
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -23,73 +23,85 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.PlaylistPlay
+import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Download
-import androidx.compose.material.icons.rounded.ErrorOutline
 import androidx.compose.material.icons.rounded.Link
+import androidx.compose.material.icons.rounded.Movie
 import androidx.compose.material.icons.rounded.MusicNote
-import androidx.compose.material.icons.rounded.PlaylistPlay
-import androidx.compose.material.icons.rounded.Refresh
-import androidx.compose.material.icons.rounded.Search
+import androidx.compose.material.icons.rounded.Share
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
-import androidx.compose.material3.LinearProgressIndicator
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.TextField
+import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
+import androidx.core.app.ActivityCompat
 import coil.compose.AsyncImage
-import com.sushant.grabbit.R
 import com.sushant.grabbit.data.Prefs
 import com.sushant.grabbit.engine.Engine
 import com.sushant.grabbit.engine.MediaInfo
-import androidx.core.app.ActivityCompat
+import com.sushant.grabbit.ui.components.AppCard
+import com.sushant.grabbit.ui.components.BrandMark
+import com.sushant.grabbit.ui.components.ErrorCard
+import com.sushant.grabbit.ui.components.ImageTag
+import com.sushant.grabbit.ui.components.SectionLabel
+import com.sushant.grabbit.ui.components.SkeletonBlock
+import com.sushant.grabbit.ui.theme.ImageScrim
+import com.sushant.grabbit.ui.theme.LocalSizes
+import com.sushant.grabbit.ui.theme.LocalSpacing
+import com.sushant.grabbit.ui.theme.PillShape
+import com.sushant.grabbit.ui.theme.TabularNums
 
 @Composable
 fun HomeScreen(vm: MainViewModel, modifier: Modifier) {
+    val sp = LocalSpacing.current
     val engine by vm.engine.collectAsState()
     val focus = LocalFocusManager.current
     val go = { focus.clearFocus(); vm.fetch() }
     val ctx = LocalContext.current
     val list = rememberLazyListState()
+    val loaded = vm.fetchState is FetchState.Loaded
 
     // Permissions are asked here, the first time the user downloads, never at app start.
     var pending by remember { mutableStateOf<Pair<MediaInfo, String>?>(null) }
@@ -107,10 +119,8 @@ fun HomeScreen(vm: MainViewModel, modifier: Modifier) {
         if (need.isEmpty()) vm.download(info, q) else { pending = info to q; explain = need }
     }
 
-    // When video details arrive, bring the card (and its Download button) into view
-    LaunchedEffect(vm.fetchState) {
-        if (vm.fetchState is FetchState.Loaded) list.animateScrollToItem(if (engine !is Engine.State.Ready) 3 else 2)
-    }
+    // When video details arrive, bring the media card (and its Download button) into view
+    LaunchedEffect(loaded) { if (loaded) list.animateScrollToItem(0) }
 
     if (explain.isNotEmpty()) PermissionExplainDialog(
         need = explain,
@@ -132,244 +142,141 @@ fun HomeScreen(vm: MainViewModel, modifier: Modifier) {
     LazyColumn(
         modifier.fillMaxSize(),
         state = list,
-        contentPadding = PaddingValues(16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
+        contentPadding = PaddingValues(start = sp.screen, end = sp.screen, bottom = sp.xl),
+        verticalArrangement = Arrangement.spacedBy(sp.m),
     ) {
-        item { Header() }
+        item { AppBar() }
+        if (!loaded) item { Hero() }
         if (engine !is Engine.State.Ready) item { EngineBanner(engine) { vm.restartEngine() } }
         item {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                OutlinedTextField(
-                    value = vm.url,
-                    onValueChange = { vm.url = it },
-                    modifier = Modifier.fillMaxWidth().testTag("urlField"),
-                    placeholder = { Text("Paste a video link here") },
-                    leadingIcon = { Icon(Icons.Rounded.Link, null) },
-                    trailingIcon = {
-                        if (vm.url.isNotEmpty()) IconButton(onClick = { vm.url = ""; vm.resetFetch() }) {
-                            Icon(Icons.Rounded.Close, "Clear")
-                        }
-                    },
-                    singleLine = true,
-                    shape = RoundedCornerShape(16.dp),
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri, imeAction = ImeAction.Go),
-                    keyboardActions = KeyboardActions(onGo = { go() }),
-                )
-                Button(
-                    onClick = go,
-                    modifier = Modifier.fillMaxWidth().height(52.dp).testTag("grabBtn"),
-                    shape = RoundedCornerShape(16.dp),
-                    enabled = vm.fetchState !is FetchState.Loading && vm.url.isNotBlank(),
-                ) {
-                    Icon(Icons.Rounded.Search, null)
-                    Spacer(Modifier.width(8.dp))
-                    Text("Grab", fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
-                }
-            }
+            LinkInput(
+                url = vm.url,
+                onUrl = {
+                    vm.url = it
+                    if (vm.fetchState is FetchState.Loaded || vm.fetchState is FetchState.Failed) vm.resetFetch()
+                },
+                onClear = { vm.url = ""; vm.resetFetch() },
+                showButton = !loaded,
+                busy = vm.fetchState is FetchState.Loading,
+                onGo = go,
+            )
         }
         when (val f = vm.fetchState) {
-            FetchState.Idle -> item { HowToCard() }
-            FetchState.Loading -> item { LoadingCard() }
-            is FetchState.Failed -> item { FetchErrorCard(f.message, f.raw) { vm.fetch() } }
-            is FetchState.Loaded -> item { InfoCard(f.info) { q -> startDownload(f.info, q) } }
+            FetchState.Idle -> item { HowItWorks() }
+            FetchState.Loading -> item { MediaSkeleton() }
+            is FetchState.Failed -> item {
+                ErrorCard("Couldn't get this video", f.message, f.raw, onRetry = { vm.fetch() },
+                    modifier = Modifier.testTag("fetchError"))
+            }
+            is FetchState.Loaded -> item { MediaCard(f.info) { q -> startDownload(f.info, q) } }
         }
     }
 }
 
 @Composable
-private fun Header() {
-    Row(
-        Modifier.fillMaxWidth().clip(RoundedCornerShape(20.dp)).background(brandGradient())
-            .padding(horizontal = 16.dp, vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Image(
-            painterResource(R.drawable.ic_launcher_foreground), null,
-            Modifier.size(44.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.15f)),
+private fun AppBar() {
+    val sp = LocalSpacing.current
+    Row(Modifier.fillMaxWidth().heightIn(min = 64.dp), verticalAlignment = Alignment.CenterVertically) {
+        BrandMark()
+        Spacer(Modifier.width(sp.m))
+        Text("Grabbit", style = MaterialTheme.typography.titleLarge.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.ExtraBold))
+    }
+}
+
+@Composable
+private fun Hero() {
+    val sp = LocalSpacing.current
+    Column(Modifier.padding(top = sp.xs, bottom = sp.s)) {
+        Text("Paste a link.\nGet the video.", style = MaterialTheme.typography.headlineLarge)
+        Spacer(Modifier.height(sp.s))
+        Text(
+            "YouTube, Instagram, X, Facebook and 1,000+ more sites",
+            style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        Spacer(Modifier.width(12.dp))
-        Column {
-            Text("Grabbit", color = Color.White, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.ExtraBold)
-            Text("Grab videos from anywhere", color = Color.White.copy(alpha = 0.9f), style = MaterialTheme.typography.bodySmall)
+    }
+}
+
+@Composable
+private fun LinkInput(
+    url: String, onUrl: (String) -> Unit, onClear: () -> Unit,
+    showButton: Boolean, busy: Boolean, onGo: () -> Unit,
+) {
+    val sp = LocalSpacing.current
+    val sz = LocalSizes.current
+    AppCard {
+        TextField(
+            value = url,
+            onValueChange = onUrl,
+            modifier = Modifier.fillMaxWidth().testTag("urlField"),
+            placeholder = { Text("Paste a video link") },
+            leadingIcon = { Icon(Icons.Rounded.Link, null) },
+            trailingIcon = {
+                if (url.isNotEmpty()) IconButton(onClick = onClear) { Icon(Icons.Rounded.Close, "Clear link") }
+            },
+            singleLine = true,
+            shape = MaterialTheme.shapes.medium,
+            colors = TextFieldDefaults.colors(
+                focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                focusedIndicatorColor = Color.Transparent,
+                unfocusedIndicatorColor = Color.Transparent,
+            ),
+            textStyle = MaterialTheme.typography.bodyLarge,
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri, imeAction = ImeAction.Go),
+            keyboardActions = KeyboardActions(onGo = { onGo() }),
+        )
+        AnimatedVisibility(showButton) {
+            Column {
+                Spacer(Modifier.height(sp.m))
+                Button(
+                    onClick = onGo,
+                    modifier = Modifier.fillMaxWidth().height(sz.button).testTag("grabBtn"),
+                    enabled = !busy && url.isNotBlank(),
+                    shape = PillShape,
+                ) {
+                    Icon(Icons.Rounded.Download, null)
+                    Spacer(Modifier.width(sp.s))
+                    Text(if (busy) "Getting video…" else "Grab video", style = MaterialTheme.typography.titleMedium)
+                }
+            }
         }
     }
 }
 
 @Composable
 private fun EngineBanner(state: Engine.State, onRetry: () -> Unit) {
-    Card(border = cardBorder(), 
-        colors = CardDefaults.cardColors(
-            containerColor = if (state is Engine.State.Failed) MaterialTheme.colorScheme.errorContainer
-            else MaterialTheme.colorScheme.surfaceContainerHigh
-        ),
-        shape = RoundedCornerShape(16.dp),
-    ) {
-        Row(Modifier.fillMaxWidth().padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
-            if (state is Engine.State.Failed) {
-                Icon(Icons.Rounded.ErrorOutline, null)
-                Spacer(Modifier.width(12.dp))
-                Text("Engine couldn't start: ${state.message}", Modifier.weight(1f), style = MaterialTheme.typography.bodySmall)
-                TextButton(onClick = onRetry) { Text("Retry") }
-            } else {
-                Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("Setting up the download engine…", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
-                    LinearProgressIndicator(Modifier.fillMaxWidth().clip(RoundedCornerShape(4.dp)))
-                    Text("First launch only. Takes a few seconds.", style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-            }
+    val sp = LocalSpacing.current
+    if (state is Engine.State.Failed) {
+        ErrorCard("Download engine didn't start", state.message, "", onRetry = onRetry)
+        return
+    }
+    AppCard {
+        Text("Setting up the download engine…", style = MaterialTheme.typography.titleSmall)
+        Spacer(Modifier.height(sp.s))
+        LinearProgressIndicator(Modifier.fillMaxWidth().height(LocalSizes.current.progress), strokeCap = androidx.compose.ui.graphics.StrokeCap.Round)
+        Spacer(Modifier.height(sp.s))
+        Text("First launch only. Takes a few seconds.", style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
+
+@Composable
+private fun HowItWorks() {
+    val sp = LocalSpacing.current
+    Column(verticalArrangement = Arrangement.spacedBy(sp.m)) {
+        SectionLabel("How it works")
+        AppCard(padding = sp.s) {
+            Step(1, "Copy the link", "From any app: Share → Copy link")
+            Step(2, "Paste it above", "Then tap Grab video")
+            Step(3, "Pick a quality", "Video or MP3, saved to your gallery")
         }
-    }
-}
-
-@Composable
-private fun HowToCard() {
-    Card(border = cardBorder(), shape = RoundedCornerShape(20.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)) {
-        Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Text("How to use", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-            Step("1", "In YouTube, Instagram, Facebook or any app, tap Share → Grabbit.")
-            Step("2", "Or copy the link and paste it in the box above (long-press → Paste).")
-            Step("3", "Pick a quality or MP3, and tap Download.")
-            Text(
-                "Works with YouTube, Instagram, Facebook, X, Reddit, TikTok, Pinterest, Vimeo, Dailymotion, ShareChat, Moj, Threads, SoundCloud and 1000+ more sites.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-    }
-}
-
-@Composable
-private fun Step(n: String, text: String) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Box(
-            Modifier.size(26.dp).clip(CircleShape).background(brandGradient()),
-            contentAlignment = Alignment.Center,
-        ) { Text(n, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp) }
-        Spacer(Modifier.width(12.dp))
-        Text(text, style = MaterialTheme.typography.bodyMedium)
-    }
-}
-
-@Composable
-private fun LoadingCard() {
-    Card(border = cardBorder(), shape = RoundedCornerShape(20.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)) {
-        Row(Modifier.fillMaxWidth().padding(24.dp), verticalAlignment = Alignment.CenterVertically) {
-            CircularProgressIndicator(Modifier.size(28.dp))
-            Spacer(Modifier.width(16.dp))
-            Column {
-                Text("Fetching video info…", fontWeight = FontWeight.SemiBold)
-                Text("This can take a few seconds", style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-        }
-    }
-}
-
-@Composable
-fun FetchErrorCard(message: String, raw: String, onRetry: () -> Unit) {
-    var showRaw by remember { mutableStateOf(false) }
-    Card(border = cardBorder(), 
-        shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer),
-        modifier = Modifier.testTag("fetchError"),
-    ) {
-        Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        AppCard {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Rounded.ErrorOutline, null)
-                Spacer(Modifier.width(10.dp))
-                Text("Couldn't get this video", fontWeight = FontWeight.Bold)
-            }
-            Text(message)
-            if (showRaw && raw.isNotBlank()) {
-                Text(raw.takeLast(1500), style = MaterialTheme.typography.bodySmall)
-            }
-            Row {
-                Button(onClick = onRetry, shape = RoundedCornerShape(12.dp)) {
-                    Icon(Icons.Rounded.Refresh, null); Spacer(Modifier.width(6.dp)); Text("Retry")
-                }
-                Spacer(Modifier.width(8.dp))
-                if (raw.isNotBlank()) TextButton(onClick = { showRaw = !showRaw }) {
-                    Text(if (showRaw) "Hide details" else "Show details")
-                }
-            }
-        }
-    }
-}
-
-private data class QOpt(val key: String, val label: String, val size: String)
-
-private fun qualityOptions(info: MediaInfo): List<QOpt> = buildList {
-    if (info.hasVideo) {
-        add(QOpt("best", "Best", ""))
-        info.heights.forEach { h -> add(QOpt("h$h", qualityLabel(h), fmtSize(info.sizes[h] ?: 0))) }
-    }
-    add(QOpt("audio", "MP3", ""))
-}
-
-private fun defaultChoice(opts: List<QOpt>): String {
-    val pref = Prefs.defaultQuality
-    if (opts.any { it.key == pref }) return pref
-    val want = pref.removePrefix("h").toIntOrNull()
-    if (want != null) {
-        opts.filter { it.key.startsWith("h") }
-            .mapNotNull { it.key.drop(1).toIntOrNull() }
-            .filter { it <= want }.maxOrNull()?.let { return "h$it" }
-    }
-    return opts.first().key
-}
-
-@OptIn(ExperimentalLayoutApi::class)
-@Composable
-private fun InfoCard(info: MediaInfo, onDownload: (String) -> Unit) {
-    val opts = remember(info) { qualityOptions(info) }
-    var selected by remember(info) { mutableStateOf(defaultChoice(opts)) }
-    val audioIcon: @Composable () -> Unit = { Icon(Icons.Rounded.MusicNote, null, Modifier.size(18.dp)) }
-
-    Card(border = cardBorder(), shape = RoundedCornerShape(22.dp), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)) {
-        Box {
-            AsyncImage(
-                model = info.thumbnail.ifBlank { null },
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxWidth().aspectRatio(16f / 9f)
-                    .background(MaterialTheme.colorScheme.surfaceVariant),
-            )
-            Pill(info.site, Modifier.align(Alignment.TopStart).padding(10.dp))
-            val d = fmtDuration(info.duration)
-            if (d.isNotEmpty()) Pill(d, Modifier.align(Alignment.BottomEnd).padding(10.dp))
-        }
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Text(info.title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold,
-                maxLines = 3, overflow = TextOverflow.Ellipsis)
-            if (info.uploader.isNotBlank()) Text(info.uploader, style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant)
-            if (info.isPlaylist) Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Rounded.PlaylistPlay, null, tint = MaterialTheme.colorScheme.primary)
-                Spacer(Modifier.width(6.dp))
-                Text("Playlist · ${info.count} videos", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold)
-            }
-            Text("Quality", style = MaterialTheme.typography.labelLarge)
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                opts.forEach { o ->
-                    FilterChip(
-                        selected = selected == o.key,
-                        onClick = { selected = o.key },
-                        label = { Text(if (o.size.isNotEmpty()) "${o.label} · ${o.size}" else o.label) },
-                        leadingIcon = if (o.key == "audio") audioIcon else null,
-                    )
-                }
-            }
-            Button(
-                onClick = { onDownload(selected) },
-                modifier = Modifier.fillMaxWidth().height(52.dp).testTag("downloadBtn"),
-                shape = RoundedCornerShape(16.dp),
-            ) {
-                Icon(Icons.Rounded.Download, null)
-                Spacer(Modifier.width(8.dp))
+                Icon(Icons.Rounded.Share, null, tint = MaterialTheme.colorScheme.tertiary)
+                Spacer(Modifier.width(sp.l))
                 Text(
-                    if (info.isPlaylist) "Download all (${info.count})" else "Download",
-                    fontWeight = FontWeight.SemiBold, fontSize = 16.sp,
+                    "Faster: tap Share in any app and pick Grabbit",
+                    style = MaterialTheme.typography.bodyMedium,
                 )
             }
         }
@@ -377,11 +284,145 @@ private fun InfoCard(info: MediaInfo, onDownload: (String) -> Unit) {
 }
 
 @Composable
-fun Pill(text: String, modifier: Modifier = Modifier) {
-    Box(
-        modifier.clip(RoundedCornerShape(8.dp)).background(Color.Black.copy(alpha = 0.65f))
-            .padding(horizontal = 8.dp, vertical = 3.dp)
-    ) { Text(text, color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.SemiBold) }
+private fun Step(n: Int, title: String, sub: String) {
+    val sp = LocalSpacing.current
+    Row(Modifier.fillMaxWidth().padding(sp.s), verticalAlignment = Alignment.CenterVertically) {
+        Box(
+            Modifier.size(LocalSizes.current.stepBadge)
+                .clip(MaterialTheme.shapes.small)
+                .background(MaterialTheme.colorScheme.primaryContainer),
+            contentAlignment = Alignment.Center,
+        ) { Text("$n", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onPrimaryContainer) }
+        Spacer(Modifier.width(sp.l))
+        Column {
+            Text(title, style = MaterialTheme.typography.titleSmall)
+            Text(sub, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+}
+
+@Composable
+private fun MediaSkeleton() {
+    val sp = LocalSpacing.current
+    AppCard(padding = sp.m) {
+        SkeletonBlock(Modifier.fillMaxWidth().aspectRatio(16f / 9f), MaterialTheme.shapes.large)
+        Spacer(Modifier.height(sp.l))
+        SkeletonBlock(Modifier.fillMaxWidth(0.9f).height(18.dp))
+        Spacer(Modifier.height(sp.s))
+        SkeletonBlock(Modifier.fillMaxWidth(0.55f).height(18.dp))
+        Spacer(Modifier.height(sp.l))
+        Text("Getting video details…", style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(horizontal = sp.xs))
+    }
+}
+
+private data class QOpt(val key: String, val label: String, val size: Long)
+
+private fun videoOptions(info: MediaInfo): List<QOpt> = buildList {
+    add(QOpt("best", "Best", 0))
+    info.heights.forEach { h -> add(QOpt("h$h", qualityLabel(h), info.sizes[h] ?: 0)) }
+}
+
+private fun defaultVideoChoice(opts: List<QOpt>): String {
+    val pref = Prefs.defaultQuality
+    if (opts.any { it.key == pref }) return pref
+    val want = pref.removePrefix("h").toIntOrNull()
+    if (want != null) {
+        opts.filter { it.key.startsWith("h") }.mapNotNull { it.key.drop(1).toIntOrNull() }
+            .filter { it <= want }.maxOrNull()?.let { return "h$it" }
+    }
+    return opts.first().key
+}
+
+@OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class)
+@Composable
+private fun MediaCard(info: MediaInfo, onDownload: (String) -> Unit) {
+    val sp = LocalSpacing.current
+    val sz = LocalSizes.current
+    val opts = remember(info) { videoOptions(info) }
+    val startAudio = !info.hasVideo || Prefs.defaultQuality == "audio"
+    var audio by rememberSaveable(info.url) { mutableStateOf(startAudio) }
+    var video by rememberSaveable(info.url) { mutableStateOf(defaultVideoChoice(opts)) }
+    val chosen = opts.firstOrNull { it.key == video }
+
+    AppCard(padding = sp.m) {
+        Box(Modifier.fillMaxWidth().aspectRatio(16f / 9f).clip(MaterialTheme.shapes.large)
+            .background(MaterialTheme.colorScheme.surfaceContainerHighest)) {
+            AsyncImage(info.thumbnail.ifBlank { null }, null, contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+                modifier = Modifier.fillMaxSize())
+            Box(Modifier.fillMaxSize().background(Brush.verticalGradient(0.55f to Color.Transparent, 1f to ImageScrim)))
+            ImageTag(info.site, modifier = Modifier.align(Alignment.TopStart).padding(sp.m))
+            val d = fmtDuration(info.duration)
+            if (d.isNotEmpty()) ImageTag(d, modifier = Modifier.align(Alignment.BottomEnd).padding(sp.m))
+        }
+        Column(Modifier.padding(horizontal = sp.xs).padding(top = sp.l, bottom = sp.xs)) {
+            Text(info.title, style = MaterialTheme.typography.titleMedium.copy(fontSize = MaterialTheme.typography.titleLarge.fontSize * 0.8f),
+                maxLines = 2, overflow = TextOverflow.Ellipsis)
+            if (info.uploader.isNotBlank()) Text(info.uploader, style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            if (info.isPlaylist) Row(Modifier.padding(top = sp.s), verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.AutoMirrored.Rounded.PlaylistPlay, null, tint = MaterialTheme.colorScheme.primary)
+                Spacer(Modifier.width(sp.s))
+                Text("Playlist · ${info.count} videos", style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.primary)
+            }
+
+            if (info.hasVideo) {
+                Spacer(Modifier.height(sp.l))
+                SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
+                    SegmentedButton(
+                        selected = !audio, onClick = { audio = false },
+                        shape = SegmentedButtonDefaults.itemShape(0, 2),
+                        icon = { SegmentedButtonDefaults.Icon(!audio) { Icon(Icons.Rounded.Movie, null, Modifier.size(sz.iconSmall)) } },
+                    ) { Text("Video") }
+                    SegmentedButton(
+                        selected = audio, onClick = { audio = true },
+                        shape = SegmentedButtonDefaults.itemShape(1, 2),
+                        icon = { SegmentedButtonDefaults.Icon(audio) { Icon(Icons.Rounded.MusicNote, null, Modifier.size(sz.iconSmall)) } },
+                    ) { Text("Audio (MP3)") }
+                }
+            }
+            if (info.hasVideo && !audio) {
+                Spacer(Modifier.height(sp.m))
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(sp.s)) {
+                    opts.forEach { o ->
+                        val sel = video == o.key
+                        FilterChip(
+                            selected = sel,
+                            onClick = { video = o.key },
+                            label = {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text(o.label, style = MaterialTheme.typography.labelLarge)
+                                    val s = fmtSize(o.size)
+                                    if (s.isNotEmpty()) Text(" · $s", style = MaterialTheme.typography.labelMedium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                            },
+                            leadingIcon = if (sel) ({ Icon(Icons.Rounded.Check, null, Modifier.size(FilterChipDefaults.IconSize)) }) else null,
+                            shape = MaterialTheme.shapes.small,
+                        )
+                    }
+                }
+            }
+            Spacer(Modifier.height(sp.l))
+            val label = when {
+                info.isPlaylist -> "Download all (${info.count})"
+                audio -> "Download MP3"
+                chosen == null || chosen.key == "best" -> "Download best quality"
+                else -> "Download ${chosen.label}" + fmtSize(chosen.size).let { if (it.isEmpty()) "" else " · $it" }
+            }
+            Button(
+                onClick = { onDownload(if (audio) "audio" else video) },
+                modifier = Modifier.fillMaxWidth().height(sz.button).testTag("downloadBtn"),
+                shape = PillShape,
+            ) {
+                Icon(Icons.Rounded.Download, null)
+                Spacer(Modifier.width(sp.s))
+                Text(label, style = MaterialTheme.typography.titleMedium.copy(fontFeatureSettings = TabularNums),
+                    maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+        }
+    }
 }
 
 /** Permissions still needed before a download: notifications (asked once, optional) and storage on Android 9 and older. */

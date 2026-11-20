@@ -13,6 +13,7 @@
         android:maxSdkVersion="28" />
 
     <application
+        android:enableOnBackInvokedCallback="true"
         android:name=".GrabbitApp"
         android:allowBackup="true"
         android:dataExtractionRules="@xml/data_extraction_rules"
@@ -24,6 +25,7 @@
 
         <activity
             android:name=".MainActivity"
+            android:theme="@style/Theme.Grabbit.Starting"
             android:exported="true"
             android:launchMode="singleTask"
             android:windowSoftInputMode="adjustResize">
