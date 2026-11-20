@@ -4,6 +4,14 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Build
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.material3.Button
+import androidx.compose.material3.Checkbox
+import androidx.compose.material.icons.rounded.ContentCut
+import androidx.compose.material.icons.rounded.Speed
+import androidx.compose.material.icons.rounded.MusicNote
+import androidx.compose.material.icons.rounded.Movie
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -91,7 +99,13 @@ fun SettingsScreen(vm: MainViewModel, modifier: Modifier) {
     val version by vm.engineVersion.collectAsState()
     val updating by vm.engineUpdating.collectAsState()
     var quality by remember { mutableStateOf(Prefs.defaultQuality) }
-    var subs by remember { mutableStateOf(Prefs.embedSubs) }
+    var subLang by remember { mutableStateOf(Prefs.subLang) }
+    var subMode by remember { mutableStateOf(Prefs.subMode) }
+    var videoFormat by remember { mutableStateOf(Prefs.videoFormat) }
+    var audioFormat by remember { mutableStateOf(Prefs.audioFormat) }
+    var faster by remember { mutableStateOf(Prefs.fasterDownloads) }
+    var sponsor by remember { mutableStateOf(Prefs.sponsorCats) }
+    var sheet by remember { mutableStateOf<String?>(null) }
     var thumb by remember { mutableStateOf(Prefs.embedThumb) }
     var auto by remember { mutableStateOf(Prefs.autoUpdate) }
     var qualitySheet by remember { mutableStateOf(false) }
@@ -136,9 +150,28 @@ fun SettingsScreen(vm: MainViewModel, modifier: Modifier) {
                     Icons.Rounded.HighQuality, onClick = { qualitySheet = true },
                 ) { Icon(Icons.AutoMirrored.Rounded.KeyboardArrowRight, null, tint = MaterialTheme.colorScheme.onSurfaceVariant) }
                 SettingsDivider()
-                SettingsSwitch("Embed subtitles", "English subtitles inside the video, when available", Icons.Rounded.Subtitles, subs) {
-                    subs = it; Prefs.embedSubs = it
+                SettingsItem("Video format", VIDEO_FORMATS[videoFormat].second, Icons.Rounded.Movie, onClick = { sheet = "video" }) { Icon(Icons.AutoMirrored.Rounded.KeyboardArrowRight, null, tint = MaterialTheme.colorScheme.onSurfaceVariant) }
+                SettingsDivider()
+                SettingsItem("Audio format", AUDIO_FORMATS_SET.first { it.first == audioFormat }.second, Icons.Rounded.MusicNote,
+                    onClick = { sheet = "audio" }) { Icon(Icons.AutoMirrored.Rounded.KeyboardArrowRight, null, tint = MaterialTheme.colorScheme.onSurfaceVariant) }
+                SettingsDivider()
+                SettingsItem(
+                    "Subtitles",
+                    if (subLang.isEmpty()) "Off" else "${SUB_LANGS.firstOrNull { it.first == subLang }?.second ?: subLang} · " +
+                        SUB_MODES.first { it.first == subMode }.second.lowercase(),
+                    Icons.Rounded.Subtitles, onClick = { sheet = "subs" },
+                ) { Icon(Icons.AutoMirrored.Rounded.KeyboardArrowRight, null, tint = MaterialTheme.colorScheme.onSurfaceVariant) }
+                SettingsDivider()
+                SettingsSwitch("Faster downloads", "Downloads several parts of a video at once", Icons.Rounded.Speed, faster) {
+                    faster = it; Prefs.fasterDownloads = it
                 }
+                SettingsDivider()
+                SettingsItem(
+                    "SponsorBlock",
+                    if (sponsor.isEmpty()) "Off · cut sponsor segments from YouTube videos"
+                    else "Removes " + SPONSOR_CATS.filter { it.first in sponsor }.joinToString(", ") { it.second.lowercase() },
+                    Icons.Rounded.ContentCut, onClick = { sheet = "sponsor" },
+                ) { Icon(Icons.AutoMirrored.Rounded.KeyboardArrowRight, null, tint = MaterialTheme.colorScheme.onSurfaceVariant) }
                 SettingsDivider()
                 SettingsSwitch("Album art in MP3", "Uses the video thumbnail as the cover", Icons.Rounded.Album, thumb) {
                     thumb = it; Prefs.embedThumb = it
@@ -219,6 +252,15 @@ fun SettingsScreen(vm: MainViewModel, modifier: Modifier) {
         }
     }
 
+    when (sheet) {
+        "video" -> ChoiceSheet("Video format", "Used for every video download", VIDEO_FORMATS.map { "${it.first}" to it.second },
+            VIDEO_FORMAT_NOTES, videoFormat.toString(), { videoFormat = it.toInt(); Prefs.videoFormat = videoFormat }) { sheet = null }
+        "audio" -> ChoiceSheet("Audio format", "Used when you choose Audio", AUDIO_FORMATS_SET, AUDIO_FORMAT_NOTES, audioFormat,
+            { audioFormat = it; Prefs.audioFormat = it }) { sheet = null }
+        "subs" -> SubtitleDefaultsSheet(subLang, subMode, { subLang = it; Prefs.subLang = it }, { subMode = it; Prefs.subMode = it }) { sheet = null }
+        "sponsor" -> SponsorSheet(sponsor, { sponsor = it; Prefs.sponsorCats = it }) { sheet = null }
+    }
+
     if (qualitySheet) {
         val state = rememberModalBottomSheetState(skipPartiallyExpanded = true)
         ModalBottomSheet(onDismissRequest = { qualitySheet = false }, sheetState = state) {
@@ -241,6 +283,126 @@ fun SettingsScreen(vm: MainViewModel, modifier: Modifier) {
                     }
                 }
             }
+        }
+    }
+}
+
+private val VIDEO_FORMATS = listOf(0 to "Most compatible", 1 to "Highest quality")
+private val VIDEO_FORMAT_NOTES = mapOf(
+    "0" to "H.264 MP4. Plays in every gallery, player and app",
+    "1" to "VP9/AV1 when available. Sometimes sharper, may not play everywhere",
+)
+private val AUDIO_FORMATS_SET = listOf("mp3" to "MP3", "m4a" to "M4A", "opus" to "Opus", "best" to "Original")
+private val AUDIO_FORMAT_NOTES = mapOf(
+    "mp3" to "Plays everywhere",
+    "m4a" to "Smaller files, same quality as MP3",
+    "opus" to "Smallest files, best quality per MB",
+    "best" to "The site's own audio file, no conversion",
+)
+private val SUB_LANGS = listOf("" to "Off", "en" to "English", "hi" to "Hindi", "bn" to "Bengali", "ta" to "Tamil",
+    "te" to "Telugu", "mr" to "Marathi", "ur" to "Urdu", "es" to "Spanish", "fr" to "French", "ar" to "Arabic")
+private val SUB_MODES = listOf("embed" to "Inside the video", "file" to "Separate file", "both" to "Both")
+private val SPONSOR_CATS = listOf(
+    "sponsor" to "Sponsors", "selfpromo" to "Self-promotion", "interaction" to "Subscribe reminders",
+    "intro" to "Intros", "outro" to "Outros / end cards", "music_offtopic" to "Non-music parts in songs",
+)
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ChoiceSheet(
+    title: String, subtitle: String, options: List<Pair<String, String>>, notes: Map<String, String>,
+    selected: String, onPick: (String) -> Unit, onClose: () -> Unit,
+) {
+    val sp = LocalSpacing.current
+    ModalBottomSheet(onDismissRequest = onClose, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
+        Column(Modifier.navigationBarsPadding().padding(bottom = sp.l)) {
+            Text(title, style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(horizontal = sp.xl, vertical = sp.s))
+            Text(subtitle, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = sp.xl))
+            Spacer(Modifier.size(sp.s))
+            options.forEach { (k, l) ->
+                Row(
+                    Modifier.fillMaxWidth().heightIn(min = 56.dp)
+                        .clickable(role = Role.RadioButton) { onPick(k); onClose() }
+                        .padding(horizontal = sp.xl, vertical = sp.s),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    RadioButton(selected = selected == k, onClick = null)
+                    Spacer(Modifier.width(sp.l))
+                    Column {
+                        Text(l, style = MaterialTheme.typography.bodyLarge)
+                        notes[k]?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun SubtitleDefaultsSheet(
+    lang: String, mode: String, onLang: (String) -> Unit, onMode: (String) -> Unit, onClose: () -> Unit,
+) {
+    val sp = LocalSpacing.current
+    ModalBottomSheet(onDismissRequest = onClose, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
+        Column(Modifier.navigationBarsPadding().padding(bottom = sp.l)) {
+            Text("Subtitles", style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(horizontal = sp.xl, vertical = sp.s))
+            Text("Pre-selected for every video. You can still pick another language per video.",
+                style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = sp.xl))
+            Spacer(Modifier.size(sp.m))
+            SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth().padding(horizontal = sp.xl)) {
+                SUB_MODES.forEachIndexed { i, (k, l) ->
+                    SegmentedButton(selected = mode == k, onClick = { onMode(k) }, shape = SegmentedButtonDefaults.itemShape(i, SUB_MODES.size)) {
+                        Text(l.replace("Inside the video", "Inside video"), maxLines = 1)
+                    }
+                }
+            }
+            Spacer(Modifier.size(sp.s))
+            Column(Modifier.heightIn(max = 380.dp).verticalScroll(rememberScrollState())) {
+                SUB_LANGS.forEach { (k, l) ->
+                    Row(
+                        Modifier.fillMaxWidth().heightIn(min = 52.dp).clickable(role = Role.RadioButton) { onLang(k) }
+                            .padding(horizontal = sp.xl),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        RadioButton(selected = lang == k, onClick = null)
+                        Spacer(Modifier.width(sp.l))
+                        Text(l, style = MaterialTheme.typography.bodyLarge)
+                    }
+                }
+            }
+            Button(onClick = onClose, modifier = Modifier.fillMaxWidth().padding(horizontal = sp.xl)) { Text("Done") }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun SponsorSheet(cats: Set<String>, onChange: (Set<String>) -> Unit, onClose: () -> Unit) {
+    val sp = LocalSpacing.current
+    ModalBottomSheet(onDismissRequest = onClose, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)) {
+        Column(Modifier.navigationBarsPadding().padding(bottom = sp.l)) {
+            Text("SponsorBlock", style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(horizontal = sp.xl, vertical = sp.s))
+            Text("Cuts these parts out of YouTube videos, using SponsorBlock's community-marked segments. Untick all to turn it off.",
+                style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = sp.xl))
+            Spacer(Modifier.size(sp.s))
+            SPONSOR_CATS.forEach { (k, l) ->
+                val on = k in cats
+                Row(
+                    Modifier.fillMaxWidth().heightIn(min = 52.dp)
+                        .clickable(role = Role.Checkbox) { onChange(if (on) cats - k else cats + k) }
+                        .padding(horizontal = sp.xl),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Checkbox(checked = on, onCheckedChange = null)
+                    Spacer(Modifier.width(sp.l))
+                    Text(l, style = MaterialTheme.typography.bodyLarge)
+                }
+            }
+            Button(onClick = onClose, modifier = Modifier.fillMaxWidth().padding(horizontal = sp.xl)) { Text("Done") }
         }
     }
 }

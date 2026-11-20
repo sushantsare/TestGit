@@ -81,6 +81,7 @@ import coil.compose.AsyncImage
 import com.sushant.grabbit.data.Prefs
 import com.sushant.grabbit.engine.Engine
 import com.sushant.grabbit.engine.MediaInfo
+import com.sushant.grabbit.download.DlOpts
 import com.sushant.grabbit.ui.components.AppCard
 import com.sushant.grabbit.ui.components.BrandMark
 import com.sushant.grabbit.ui.components.ErrorCard
@@ -104,7 +105,7 @@ fun HomeScreen(vm: MainViewModel, modifier: Modifier) {
     val loaded = vm.fetchState is FetchState.Loaded
 
     // Permissions are asked here, the first time the user downloads, never at app start.
-    var pending by remember { mutableStateOf<Pair<MediaInfo, String>?>(null) }
+    var pending by remember { mutableStateOf<Triple<MediaInfo, String, DlOpts>?>(null) }
     var explain by remember { mutableStateOf<List<String>>(emptyList()) }
     var storageBlocked by remember { mutableStateOf(false) }
     val permLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { res ->
@@ -112,11 +113,11 @@ fun HomeScreen(vm: MainViewModel, modifier: Modifier) {
         pending = null
         val storageDenied = Build.VERSION.SDK_INT <= 28 && res[Manifest.permission.WRITE_EXTERNAL_STORAGE] == false
         if (storageDenied) storageBlocked = true
-        else if (p != null) vm.download(p.first, p.second)
+        else if (p != null) vm.download(p.first, p.second, p.third)
     }
-    val startDownload: (MediaInfo, String) -> Unit = { info, q ->
+    val startDownload: (MediaInfo, String, DlOpts) -> Unit = { info, q, o ->
         val need = neededPermissions(ctx)
-        if (need.isEmpty()) vm.download(info, q) else { pending = info to q; explain = need }
+        if (need.isEmpty()) vm.download(info, q, o) else { pending = Triple(info, q, o); explain = need }
     }
 
     // When video details arrive, bring the media card (and its Download button) into view
@@ -134,7 +135,7 @@ fun HomeScreen(vm: MainViewModel, modifier: Modifier) {
             pending = null
             val storageNeeded = explain.contains(Manifest.permission.WRITE_EXTERNAL_STORAGE)
             explain = emptyList()
-            if (storageNeeded) storageBlocked = true else if (p != null) vm.download(p.first, p.second)
+            if (storageNeeded) storageBlocked = true else if (p != null) vm.download(p.first, p.second, p.third)
         },
     )
     if (storageBlocked) StorageBlockedDialog(ctx) { storageBlocked = false }
@@ -168,7 +169,7 @@ fun HomeScreen(vm: MainViewModel, modifier: Modifier) {
                 ErrorCard("Couldn't get this video", f.message, f.raw, onRetry = { vm.fetch() },
                     modifier = Modifier.testTag("fetchError"))
             }
-            is FetchState.Loaded -> item(key = "media") { MediaCard(f.info) { q -> startDownload(f.info, q) } }
+            is FetchState.Loaded -> item(key = "media") { MediaCard(f.info) { q, o -> startDownload(f.info, q, o) } }
         }
     }
 }
@@ -371,7 +372,7 @@ private fun defaultVideoChoice(opts: List<QOpt>): String {
 
 @OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class)
 @Composable
-internal fun MediaCard(info: MediaInfo, framed: Boolean = true, onDownload: (String) -> Unit) {
+internal fun MediaCard(info: MediaInfo, framed: Boolean = true, onDownload: (String, DlOpts) -> Unit) {
     val sp = LocalSpacing.current
     val sz = LocalSizes.current
     val opts = remember(info) { videoOptions(info) }
@@ -383,6 +384,7 @@ internal fun MediaCard(info: MediaInfo, framed: Boolean = true, onDownload: (Str
         mutableStateOf(Prefs.defaultQuality.takeIf { q -> audioOpts.any { it.key == q } } ?: "audio")
     }
     val chosenAudio = audioOpts.firstOrNull { it.key == aud }
+    val st = remember(info) { OptsState(info) }
     val chosen = opts.firstOrNull { it.key == video }
 
     val body: @Composable () -> Unit = {
@@ -425,16 +427,19 @@ internal fun MediaCard(info: MediaInfo, framed: Boolean = true, onDownload: (Str
             Spacer(Modifier.height(sp.m))
             if (audio) QualityChips(audioOpts, aud) { aud = it }
             else if (info.hasVideo) QualityChips(opts, video) { video = it }
+            Spacer(Modifier.height(sp.m))
+            DownloadOptionsRow(info, audio, st)
             Spacer(Modifier.height(sp.l))
+            val fmtName = AUDIO_FORMAT_LABELS.firstOrNull { it.first == st.audioFormat }?.second ?: "MP3"
             val label = when {
                 info.isPlaylist -> "Download all (${info.count})"
-                audio && (chosenAudio == null || chosenAudio.key == "audio") -> "Download MP3 · best"
-                audio -> "Download MP3 · ${chosenAudio!!.label}" + fmtSize(chosenAudio.size).let { if (it.isEmpty()) "" else " · $it" }
-                chosen == null || chosen.key == "best" -> "Download best quality"
-                else -> "Download ${chosen.label}" + fmtSize(chosen.size).let { if (it.isEmpty()) "" else " · $it" }
+                audio && (chosenAudio == null || chosenAudio.key == "audio") -> "Download $fmtName · best"
+                audio -> "Download $fmtName · ${chosenAudio!!.label}" + fmtSize((chosenAudio.size * st.keptShare).toLong()).let { if (it.isEmpty()) "" else " · $it" }
+                chosen == null || chosen.key == "best" -> if (st.trimmed) "Download best quality · trimmed" else "Download best quality"
+                else -> "Download ${chosen.label}" + fmtSize((chosen.size * st.keptShare).toLong()).let { if (it.isEmpty()) "" else " · $it" }
             }
             Button(
-                onClick = { onDownload(if (audio) aud else video) },
+                onClick = { onDownload(if (audio) aud else video, st.toOpts(audio)) },
                 modifier = Modifier.fillMaxWidth().height(sz.button).testTag("downloadBtn"),
                 shape = PillShape,
             ) {

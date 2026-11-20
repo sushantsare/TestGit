@@ -98,10 +98,10 @@ class MainViewModel(private val app: Application) : AndroidViewModel(app) {
         }
     }
 
-    fun download(info: MediaInfo, quality: String) {
+    fun download(info: MediaInfo, quality: String, opts: com.sushant.grabbit.download.DlOpts = com.sushant.grabbit.download.DlOpts()) {
         Downloads.enqueue(
             app,
-            Downloads.Job(info.url, info.title, info.thumbnail, info.site, quality, info.isPlaylist),
+            Downloads.Job(info.url, info.title, info.thumbnail, info.site, quality, info.isPlaylist, opts),
         )
         app.toast(if (info.isPlaylist) "Added ${info.count} videos to downloads" else "Download started")
         // The job is queued: start the Grab tab fresh for the next link

@@ -15,8 +15,8 @@ import com.sushant.grabbit.data.Prefs
 import com.sushant.grabbit.engine.Engine
 import com.sushant.grabbit.engine.Errors
 import com.sushant.grabbit.engine.InstaStory
-import com.sushant.grabbit.engine.audioKbps
 import com.sushant.grabbit.engine.isAudioQuality
+import com.sushant.grabbit.data.Sites
 import com.sushant.grabbit.engine.Threads
 import com.yausername.youtubedl_android.YoutubeDL
 import com.yausername.youtubedl_android.YoutubeDLRequest
@@ -33,6 +33,7 @@ class DownloadWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(c
         const val K_SITE = "site"
         const val K_QUALITY = "quality"
         const val K_PLAYLIST = "playlist"
+        const val K_OPTS = "opts"
         const val K_ERROR = "error"
         const val K_RAW = "raw"
         const val P_PCT = "p"
@@ -43,39 +44,12 @@ class DownloadWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(c
         private val SPEED = Regex("""at\s+~?\s*([\d.]+\s*[KMG]i?B/s)""")
         private val ITEM = Regex("""Downloading item (\d+) of (\d+)""")
 
-        fun buildRequest(ctx: Context, url: String, quality: String, playlist: Boolean, dir: File): YoutubeDLRequest {
+        fun buildRequest(ctx: Context, url: String, quality: String, playlist: Boolean, dir: File, opts: DlOpts): YoutubeDLRequest {
             val r = YoutubeDLRequest(url)
-            r.addOption("--no-mtime")
-            r.addOption("--no-warnings")
-            r.addOption(if (playlist) "--yes-playlist" else "--no-playlist")
-            if (playlist) r.addOption("--ignore-errors")
-            val template = if (playlist) "%(playlist_index)03d - %(title).90B [%(id)s].%(ext)s"
-            else "%(title).120B [%(id)s].%(ext)s"
-            r.addOption("-o", File(dir, template).absolutePath)
-            if (isAudioQuality(quality)) {
-                val kbps = audioKbps(quality)
-                // Chosen bitrate: take the closest source stream at or above it, then encode MP3 at that rate
-                r.addOption("-f", if (kbps != null) "ba[abr>=${kbps - 8}]/ba/b" else "ba/b")
-                if (kbps != null) r.addOption("-S", "+abr")
-                r.addOption("-x")
-                r.addOption("--audio-format", "mp3")
-                r.addOption("--audio-quality", if (kbps != null) "${kbps}K" else "0")
-                r.addOption("--embed-metadata")
-                if (Prefs.embedThumb) {
-                    r.addOption("--embed-thumbnail")
-                    r.addOption("--convert-thumbnails", "jpg")
-                }
-            } else {
-                val h = quality.removePrefix("h").toIntOrNull()
-                r.addOption("-f", "bv*+ba/b")
-                // Prefer H.264 + AAC so the file plays in every gallery/player
-                r.addOption("-S", if (h != null) "res:$h,vcodec:h264,acodec:aac" else "res,vcodec:h264,acodec:aac")
-                r.addOption("--merge-output-format", "mp4")
-                r.addOption("--embed-metadata")
-                if (Prefs.embedSubs) {
-                    r.addOption("--embed-subs")
-                    r.addOption("--sub-langs", "en.*,hi.*")
-                }
+            val g = GlobalOpts(Prefs.videoFormat, Prefs.fasterDownloads, Prefs.embedThumb, Prefs.sponsorCats)
+            val yt = Sites.siteName(url) == "YouTube"
+            DownloadArgs.build(quality, playlist, dir.absolutePath, opts, g, yt).forEach { (k, v) ->
+                if (v == null) r.addOption(k) else r.addOption(k, v)
             }
             Cookies.apply(ctx, r)
             return r
@@ -124,7 +98,8 @@ class DownloadWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(c
                 return fail(Errors.friendly(raw), raw)
             }
         } else url
-        val req = buildRequest(ctx, source, quality, playlist, tmp)
+        val opts = DlOpts.decode(inputData.getString(K_OPTS))
+        val req = buildRequest(ctx, source, quality, playlist, tmp, opts)
         val nm = ctx.getSystemService(NotificationManager::class.java)
         var last = 0L
         var total = 0L
@@ -174,8 +149,15 @@ class DownloadWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(c
         }
 
         setProgress(workDataOf(P_PCT to 100f, P_STATUS to "Saving to your phone…"))
+        // Split by chapters: keep the chapter files, drop the full-length original
+        if (opts.splitChapters) {
+            val media = tmp.walkTopDown().filter { it.isFile && Saver.mimeOf(it.extension).let { m -> m.startsWith("video") || m.startsWith("audio") } }.toList()
+            if (media.any { it.name.startsWith(DownloadArgs.CHAPTER_PREFIX) }) {
+                media.filterNot { it.name.startsWith(DownloadArgs.CHAPTER_PREFIX) }.forEach { it.delete() }
+            }
+        }
         val saved = try {
-            Saver.saveAll(ctx, tmp, title, site, thumb, url)
+            Saver.saveAll(ctx, tmp, title, site, thumb, url, keepSubs = opts.keepSubFiles)
         } catch (e: Exception) {
             return fail("Couldn't save the file: ${e.message ?: e}", e.toString())
         } finally {

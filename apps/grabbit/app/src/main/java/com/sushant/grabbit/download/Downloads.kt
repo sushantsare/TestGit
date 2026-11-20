@@ -16,6 +16,7 @@ object Downloads {
     data class Job(
         val url: String, val title: String, val thumb: String,
         val site: String, val quality: String, val playlist: Boolean,
+        val opts: DlOpts = DlOpts(),
     )
 
     fun enqueue(ctx: Context, job: Job): UUID {
@@ -28,6 +29,7 @@ object Downloads {
                     DownloadWorker.K_SITE to job.site,
                     DownloadWorker.K_QUALITY to job.quality,
                     DownloadWorker.K_PLAYLIST to job.playlist,
+                    DownloadWorker.K_OPTS to job.opts.encode(),
                 )
             )
             .setExpedited(OutOfQuotaPolicy.RUN_AS_NON_EXPEDITED_WORK_REQUEST)
@@ -38,6 +40,7 @@ object Downloads {
             .addTag("s:${job.site}")
             .addTag("q:${job.quality}")
             .addTag("p:${job.playlist}")
+            .addTag("o:${job.opts.encode()}")
             .addTag("c:${System.currentTimeMillis()}")
             .build()
         WorkManager.getInstance(ctx).enqueue(req)
@@ -56,6 +59,7 @@ object Downloads {
         site = w.tag("s:"),
         quality = w.tag("q:").ifBlank { "best" },
         playlist = w.tag("p:") == "true",
+        opts = DlOpts.decode(w.tag("o:")),
     )
 
     fun created(w: WorkInfo): Long = w.tag("c:").toLongOrNull() ?: 0L

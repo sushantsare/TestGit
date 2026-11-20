@@ -53,6 +53,7 @@ import androidx.lifecycle.viewModelScope
 import com.sushant.grabbit.data.Prefs
 import com.sushant.grabbit.data.Sites
 import com.sushant.grabbit.download.Downloads
+import com.sushant.grabbit.download.DlOpts
 import com.sushant.grabbit.engine.Errors
 import com.sushant.grabbit.engine.Media
 import com.sushant.grabbit.engine.MediaInfo
@@ -155,10 +156,10 @@ class ShareViewModel(app: android.app.Application) : AndroidViewModel(app) {
     }
 
     /** Queues the download and returns the confirmation text. */
-    fun download(info: MediaInfo, quality: String): String {
+    fun download(info: MediaInfo, quality: String, opts: DlOpts): String {
         Downloads.enqueue(
             getApplication(),
-            Downloads.Job(info.url, info.title, info.thumbnail, info.site, quality, info.isPlaylist),
+            Downloads.Job(info.url, info.title, info.thumbnail, info.site, quality, info.isPlaylist, opts),
         )
         return if (info.isPlaylist) "Downloading ${info.count} videos" else "Download started"
     }
@@ -177,22 +178,22 @@ private fun ShareSheet(vm: ShareViewModel, onClose: () -> Unit, onStarted: (Stri
         scope.launch { sheet.hide() }.invokeOnCompletion { action() }
     }
 
-    var pending by remember { mutableStateOf<Pair<MediaInfo, String>?>(null) }
+    var pending by remember { mutableStateOf<Triple<MediaInfo, String, DlOpts>?>(null) }
     var explain by remember { mutableStateOf<List<String>>(emptyList()) }
     var storageBlocked by remember { mutableStateOf(false) }
-    val startNow: (MediaInfo, String) -> Unit = { info, q ->
-        val msg = vm.download(info, q)
+    val startNow: (MediaInfo, String, DlOpts) -> Unit = { info, q, o ->
+        val msg = vm.download(info, q, o)
         closeThen { onStarted(msg) }
     }
     val permLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { res ->
         val p = pending
         pending = null
         if (Build.VERSION.SDK_INT <= 28 && res[Manifest.permission.WRITE_EXTERNAL_STORAGE] == false) storageBlocked = true
-        else if (p != null) startNow(p.first, p.second)
+        else if (p != null) startNow(p.first, p.second, p.third)
     }
-    val onDownload: (MediaInfo, String) -> Unit = { info, q ->
+    val onDownload: (MediaInfo, String, DlOpts) -> Unit = { info, q, o ->
         val need = neededPermissions(ctx)
-        if (need.isEmpty()) startNow(info, q) else { pending = info to q; explain = need }
+        if (need.isEmpty()) startNow(info, q, o) else { pending = Triple(info, q, o); explain = need }
     }
 
     ModalBottomSheet(
@@ -233,7 +234,7 @@ private fun ShareSheet(vm: ShareViewModel, onClose: () -> Unit, onStarted: (Stri
                         Text("Open in Grabbit")
                     }
                 }
-                is FetchState.Loaded -> MediaCard(s.info, framed = false) { q -> onDownload(s.info, q) }
+                is FetchState.Loaded -> MediaCard(s.info, framed = false) { q, o -> onDownload(s.info, q, o) }
             }
         }
     }
@@ -250,7 +251,7 @@ private fun ShareSheet(vm: ShareViewModel, onClose: () -> Unit, onStarted: (Stri
             pending = null
             val storageNeeded = Manifest.permission.WRITE_EXTERNAL_STORAGE in explain
             explain = emptyList()
-            if (storageNeeded) storageBlocked = true else if (p != null) startNow(p.first, p.second)
+            if (storageNeeded) storageBlocked = true else if (p != null) startNow(p.first, p.second, p.third)
         },
     )
     if (storageBlocked) StorageBlockedDialog(ctx) { storageBlocked = false }

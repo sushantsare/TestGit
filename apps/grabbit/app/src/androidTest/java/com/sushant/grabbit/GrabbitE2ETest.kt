@@ -149,6 +149,12 @@ class GrabbitE2ETest {
             shot("${name}_1b_audio")
             log("[$name] audio options: " + compose.onAllNodes(hasTestTagPrefix("q_a")).fetchSemanticsNodes().size)
             compose.onNodeWithText("Video").performClick()
+            if (exists("trimChip")) {
+                compose.onNodeWithTag("trimChip").performClick()
+                Thread.sleep(800)
+                shot("${name}_1c_trim")
+                compose.onNodeWithText("Done").performClick()
+            }
         }
         val before = Library.items.value.size
         val failedBefore = failedCount()
@@ -322,6 +328,36 @@ class GrabbitE2ETest {
         return if (grab("threads", u)) "ok" else "failed"
     }
 
+
+    // ---------- Per-download options: trim + audio format ----------
+
+    private fun durationMs(uri: String): Long = runCatching {
+        val r = android.media.MediaMetadataRetriever()
+        r.setDataSource(ctx, android.net.Uri.parse(uri))
+        val d = r.extractMetadata(android.media.MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLong() ?: -1
+        r.release(); d
+    }.getOrDefault(-1)
+
+    private fun optionsFlow(): String {
+        val url = "https://www.w3schools.com/html/mov_bbb.mp4"
+        val vm = ViewModelProvider(compose.activity)[MainViewModel::class.java]
+        val info = runBlocking { com.sushant.grabbit.engine.Media.fetchInfo(ctx, url) }
+        // Trim 2s..6s
+        var before = Library.items.value.size
+        compose.activity.runOnUiThread { vm.download(info, "best", com.sushant.grabbit.download.DlOpts(trimStart = 2, trimEnd = 6)) }
+        val trimOk = try { compose.waitUntil(180_000) { Library.items.value.size > before }; true } catch (e: Throwable) { false }
+        val trimmed = Library.items.value.maxByOrNull { it.time }
+        val d = trimmed?.let { durationMs(it.uri) } ?: -1
+        log("OPTIONS trim saved=$trimOk durationMs=$d")
+        // Audio as M4A
+        before = Library.items.value.size
+        compose.activity.runOnUiThread { vm.download(info, "audio", com.sushant.grabbit.download.DlOpts(audioFormat = "m4a")) }
+        val m4aOk = try { compose.waitUntil(180_000) { Library.items.value.size > before }; true } catch (e: Throwable) { false }
+        val m4a = Library.items.value.maxByOrNull { it.time }
+        log("OPTIONS m4a saved=$m4aOk mime=${m4a?.mime} name=${m4a?.fileName}")
+        return "trim=${trimOk && d in 2500..6500} m4a=${m4aOk && m4a?.mime == "audio/mp4"}"
+    }
+
     @Test
     fun endToEnd() {
         renderIcons()
@@ -417,8 +453,9 @@ class GrabbitE2ETest {
 
         val share = shareFlow()
         val threads = threadsFlow()
+        val options = optionsFlow()
 
-        log("SUMMARY direct=$direct x=$x dailymotion=$dm facebook=$fb youtube=$youtube share=$share threads=$threads")
+        log("SUMMARY direct=$direct x=$x dailymotion=$dm facebook=$fb youtube=$youtube share=$share threads=$threads $options")
         results.forEach { Log.i("GrabbitE2E", "RESULT $it") }
         assertTrue("Downloads failed", direct && x)
         assertTrue("Share sheet download failed", share)

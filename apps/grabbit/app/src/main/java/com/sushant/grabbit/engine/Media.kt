@@ -25,7 +25,43 @@ data class MediaInfo(
     val hasVideo: Boolean,
     /** Audio streams the site offers (best first): bitrate in kbps and source size in bytes */
     val audios: List<AudioOpt> = emptyList(),
+    /** Subtitle languages: uploaded ones first, then auto-generated / auto-translated */
+    val subtitles: List<SubLang> = emptyList(),
+    /** Number of chapters in the video (0 = none) */
+    val chapters: Int = 0,
 )
+
+data class SubLang(val code: String, val name: String, val auto: Boolean)
+
+object SubtitleOptions {
+    /** Auto-translated captions come in ~100 languages; offer the useful few. */
+    private val AUTO_KEEP = setOf("en", "hi", "bn", "ta", "te", "mr", "ur", "es", "fr", "de", "ar", "ja", "ko", "zh-Hans")
+
+    fun name(code: String): String {
+        val base = code.substringBefore('-')
+        val n = java.util.Locale.forLanguageTag(code).getDisplayName(java.util.Locale.ENGLISH)
+            .ifBlank { java.util.Locale(base).getDisplayLanguage(java.util.Locale.ENGLISH) }
+        return n.ifBlank { code }
+    }
+
+    /** [manual] and [auto] are the language codes yt-dlp reports. [original] = the video's spoken language. */
+    fun build(manual: List<String>, auto: List<String>, original: String?, deviceLang: String): List<SubLang> {
+        val out = LinkedHashMap<String, SubLang>()
+        manual.filter { it != "live_chat" }.sortedBy { name(it) }.forEach { out[it] = SubLang(it, name(it), false) }
+        val keep = AUTO_KEEP + deviceLang
+        val autoOrig = original?.let { o -> auto.firstOrNull { it == "$o-orig" } ?: auto.firstOrNull { it == o } }
+        val autos = buildList {
+            if (autoOrig != null) add(autoOrig)
+            addAll(auto.filter { it in keep && it != autoOrig })
+        }
+        autos.forEach { code ->
+            if (out.keys.none { it.substringBefore('-') == code.substringBefore('-') && !out[it]!!.auto }) {
+                out.putIfAbsent("auto:$code", SubLang(code, name(code.removeSuffix("-orig")), true))
+            }
+        }
+        return out.values.toList()
+    }
+}
 
 data class AudioOpt(val kbps: Int, val size: Long)
 
@@ -155,6 +191,13 @@ object Media {
             sizes = finalSizes,
             hasVideo = hasVideo,
             audios = AudioOptions.build(audioRaw),
+            subtitles = SubtitleOptions.build(
+                j.optJSONObject("subtitles")?.keys()?.asSequence()?.toList().orEmpty(),
+                j.optJSONObject("automatic_captions")?.keys()?.asSequence()?.toList().orEmpty(),
+                j.str("language").ifBlank { null },
+                java.util.Locale.getDefault().language,
+            ),
+            chapters = j.optJSONArray("chapters")?.length() ?: 0,
         )
     }
 }

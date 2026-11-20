@@ -44,9 +44,34 @@ object Prefs {
         get() = p.getString("quality", "best") ?: "best"
         set(v) = p.edit().putString("quality", v).apply()
 
-    var embedSubs: Boolean
-        get() = p.getBoolean("embed_subs", false)
-        set(v) = p.edit().putBoolean("embed_subs", v).apply()
+    /** Default subtitle language ("" = off). Older versions had an on/off switch for English. */
+    var subLang: String
+        get() = p.getString("sub_lang", null) ?: if (p.getBoolean("embed_subs", false)) "en" else ""
+        set(v) = p.edit().putString("sub_lang", v).apply()
+
+    /** "embed", "file" or "both" */
+    var subMode: String
+        get() = p.getString("sub_mode", "embed") ?: "embed"
+        set(v) = p.edit().putString("sub_mode", v).apply()
+
+    /** 0 = most compatible, 1 = highest quality */
+    var videoFormat: Int
+        get() = p.getInt("video_format", 0)
+        set(v) = p.edit().putInt("video_format", v).apply()
+
+    /** "mp3", "m4a", "opus", "best" */
+    var audioFormat: String
+        get() = p.getString("audio_format", "mp3") ?: "mp3"
+        set(v) = p.edit().putString("audio_format", v).apply()
+
+    var fasterDownloads: Boolean
+        get() = p.getBoolean("faster", true)
+        set(v) = p.edit().putBoolean("faster", v).apply()
+
+    /** SponsorBlock categories removed from YouTube videos (empty = off) */
+    var sponsorCats: Set<String>
+        get() = p.getStringSet("sponsor_cats", emptySet())?.toSet() ?: emptySet()
+        set(v) = p.edit().putStringSet("sponsor_cats", v).apply()
 
     var embedThumb: Boolean
         get() = p.getBoolean("embed_thumb", true)

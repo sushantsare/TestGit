@@ -33,16 +33,25 @@ object Saver {
         else -> MimeTypeMap.getSingleton().getMimeTypeFromExtension(ext.lowercase()) ?: "application/octet-stream"
     }
 
-    fun saveAll(ctx: Context, dir: File, title: String, site: String, thumb: String, url: String): List<SavedItem> {
-        val files = dir.walkTopDown()
-            .filter { it.isFile && it.length() > 0 && it.extension.lowercase() !in SKIP }
-            .sortedBy { it.name }
-            .toList()
+    private val SUBS = setOf("srt", "vtt", "ass")
+
+    /**
+     * Saves every finished media file. With [keepSubs], subtitle files are also saved (to Download/Grabbit,
+     * next to nothing else, since Movies/ only accepts video) but they don't appear in the downloads list.
+     */
+    fun saveAll(ctx: Context, dir: File, title: String, site: String, thumb: String, url: String, keepSubs: Boolean = false): List<SavedItem> {
+        val all = dir.walkTopDown().filter { it.isFile && it.length() > 0 }.sortedBy { it.name }.toList()
+        val files = all.filter { it.extension.lowercase() !in SKIP }
         val single = files.size == 1
-        return files.map { f ->
+        val items = files.map { f ->
             val cleanName = f.nameWithoutExtension.replace(Regex("""\s*\[[^\]]+]$"""), "")
+                .removePrefix(DownloadArgs.CHAPTER_PREFIX)
             save(ctx, f, if (single) title else cleanName, site, thumb, url)
         }
+        if (keepSubs) all.filter { it.extension.lowercase() in SUBS && it.exists() }.forEach { f ->
+            runCatching { save(ctx, f, f.nameWithoutExtension, site, thumb, url) }
+        }
+        return items
     }
 
     private fun save(ctx: Context, f: File, title: String, site: String, thumb: String, url: String): SavedItem {
