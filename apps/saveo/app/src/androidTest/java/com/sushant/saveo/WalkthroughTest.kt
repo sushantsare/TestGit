@@ -160,7 +160,7 @@ class WalkthroughTest {
             waitText("Auto-save"); shot("13_settings")
         }
         step("bin") { compose.onNodeWithText("Recycle bin").performScrollTo().performClick(); waitText("deleted forever"); Thread.sleep(800); shot("14_recycle_bin"); back() }
-        step("diagnostics") { compose.onNodeWithText("Diagnostics").performScrollTo().performClick(); waitText("Crash log"); shot("15_diagnostics"); back() }
+        step("diagnostics") { compose.onNodeWithText("Diagnostics").performScrollTo().performClick(); waitText("Export log"); shot("15_diagnostics"); back() }
         step("about") { compose.onNodeWithText("About Saveo").performScrollTo().performClick(); waitText("sushant.sare@gmail.com"); shot("16_about"); back() }
         step("folders") { compose.onNodeWithText("WhatsApp folders").performScrollTo().performClick(); waitTag("continue"); shot("17_folders"); back() }
         step("notif_rationale") {
