@@ -109,6 +109,7 @@ fun PlayerBar(
 ) {
     val ink = LocalInk.current
     val r = current ?: recs.last()
+    val posLabel = stringResource(R.string.position)
     var menu by remember { mutableStateOf(false) }
     var confirm by remember { mutableStateOf<RecordingEntity?>(null) }
     Column(Modifier.padding(horizontal = 12.dp, vertical = 4.dp).testTag("player")) {
@@ -121,7 +122,7 @@ fun PlayerBar(
                 }
                 val dur = r.durationMs.coerceAtLeast(1)
                 Slider((if (current?.id == r.id) pos else 0L).coerceAtMost(dur).toFloat(), { onSeek(it.toLong()) }, valueRange = 0f..dur.toFloat(),
-                    modifier = Modifier.weight(1f).semantics { contentDescription = "Recording position" })
+                    modifier = Modifier.weight(1f).semantics { contentDescription = posLabel })
                 Text("${Dates.mmss(if (current?.id == r.id) pos else 0)} / ${Dates.mmss(r.durationMs)}", style = MaterialTheme.typography.bodySmall, color = ink.muted, modifier = Modifier.padding(horizontal = 6.dp))
                 Box {
                     IconButton(onClick = { menu = true }) { Icon(Icons.Outlined.ArrowDropDown, stringResource(R.string.recordings)) }

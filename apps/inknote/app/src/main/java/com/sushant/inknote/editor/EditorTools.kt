@@ -152,7 +152,8 @@ private fun ToolButton(icon: ImageVector, label: String, on: Boolean, onClick: (
 @Composable
 fun ColorDot(c: Int, on: Boolean, size: Int = 26, onClick: () -> Unit) {
     val p = MaterialTheme.colorScheme.primary
-    Box(Modifier.size(44.dp).clickable(onClickLabel = "Colour", onClick = onClick).semantics { contentDescription = "Colour"; selected = on }, contentAlignment = Alignment.Center) {
+    val label = stringResource(R.string.colour)
+    Box(Modifier.size(48.dp).clickable(onClickLabel = label, onClick = onClick).semantics { contentDescription = label; selected = on }, contentAlignment = Alignment.Center) {
         Box(Modifier.size(size.dp).then(if (on) Modifier.border(2.5.dp, p, CircleShape).padding(4.dp) else Modifier)
             .clip(CircleShape).background(Color(c)).border(1.dp, Color(0x55888888), CircleShape))
     }
@@ -160,7 +161,8 @@ fun ColorDot(c: Int, on: Boolean, size: Int = 26, onClick: () -> Unit) {
 
 @Composable
 private fun RainbowDot(onClick: () -> Unit) {
-    Box(Modifier.size(44.dp).clickable(onClickLabel = "More colours and pens", onClick = onClick).semantics { contentDescription = "More colours and pens" }, contentAlignment = Alignment.Center) {
+    val label = stringResource(R.string.more_colours)
+    Box(Modifier.size(48.dp).clickable(onClickLabel = label, onClick = onClick).semantics { contentDescription = label }, contentAlignment = Alignment.Center) {
         Box(Modifier.size(26.dp).clip(CircleShape).background(GBrush.sweepGradient(listOf(Color.Red, Color(0xFFFF9800), Color.Yellow, Color.Green, Color.Blue, Color(0xFF9C27B0), Color.Red))))
     }
 }
@@ -169,7 +171,7 @@ private fun RainbowDot(onClick: () -> Unit) {
 private fun SizeSlider(v: Float, range: ClosedFloatingPointRange<Float>, onChange: (Float) -> Unit) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         Text(stringResource(R.string.size), style = MaterialTheme.typography.bodySmall, color = LocalInk.current.muted)
-        Slider(v, onChange, valueRange = range, modifier = Modifier.width(110.dp).padding(start = 6.dp).semantics { contentDescription = "Size" })
+        Slider(v, onChange, valueRange = range, modifier = Modifier.width(110.dp).padding(start = 6.dp))
     }
 }
 
@@ -177,14 +179,14 @@ private fun SizeSlider(v: Float, range: ClosedFloatingPointRange<Float>, onChang
 private fun FormatBar(h: TextEditorHolder, onDone: () -> Unit) {
     var colors by remember { mutableStateOf(false) }
     Row(Modifier.horizontalScroll(rememberScrollState()), verticalAlignment = Alignment.CenterVertically) {
-        FmtButton(Icons.Outlined.FormatBold, "Bold") { h.toggleStyle(Typeface.BOLD) }
-        FmtButton(Icons.Outlined.FormatItalic, "Italic") { h.toggleStyle(Typeface.ITALIC) }
-        FmtButton(Icons.Outlined.FormatUnderlined, "Underline") { h.toggleUnderline() }
-        FmtButton(Icons.Outlined.Title, "Heading") { h.toggleHeading() }
-        FmtButton(Icons.AutoMirrored.Outlined.FormatListBulleted, "Bullet list") { h.toggleBullet() }
-        FmtButton(Icons.Outlined.CheckBox, "Checklist") { h.toggleCheck() }
+        FmtButton(Icons.Outlined.FormatBold, stringResource(R.string.f_bold)) { h.toggleStyle(Typeface.BOLD) }
+        FmtButton(Icons.Outlined.FormatItalic, stringResource(R.string.f_italic)) { h.toggleStyle(Typeface.ITALIC) }
+        FmtButton(Icons.Outlined.FormatUnderlined, stringResource(R.string.f_underline)) { h.toggleUnderline() }
+        FmtButton(Icons.Outlined.Title, stringResource(R.string.f_heading)) { h.toggleHeading() }
+        FmtButton(Icons.AutoMirrored.Outlined.FormatListBulleted, stringResource(R.string.f_bullets)) { h.toggleBullet() }
+        FmtButton(Icons.Outlined.CheckBox, stringResource(R.string.f_checklist)) { h.toggleCheck() }
         Box {
-            FmtButton(Icons.Outlined.FormatColorText, "Text colour") { colors = true }
+            FmtButton(Icons.Outlined.FormatColorText, stringResource(R.string.f_text_colour)) { colors = true }
             androidx.compose.material3.DropdownMenu(colors, { colors = false }) {
                 Row(Modifier.padding(horizontal = 8.dp)) {
                     listOf(0xFF1C1B1F, 0xFFC0392B, 0xFF2B5BD7, 0xFF0E8A6B, 0xFFE67E22, 0xFF8A3FB8).forEach { c ->
@@ -193,7 +195,7 @@ private fun FormatBar(h: TextEditorHolder, onDone: () -> Unit) {
                 }
             }
         }
-        FmtButton(Icons.AutoMirrored.Outlined.FormatAlignLeft, "Alignment") { h.cycleAlign() }
+        FmtButton(Icons.AutoMirrored.Outlined.FormatAlignLeft, stringResource(R.string.f_align)) { h.cycleAlign() }
         TextButton(onClick = onDone, modifier = Modifier.testTag("text_done")) { Icon(Icons.Filled.Check, null); Text(stringResource(R.string.done), Modifier.padding(start = 4.dp)) }
     }
 }
@@ -275,9 +277,9 @@ fun PenSheet(t: ToolState, saved: List<SavedPen>, onTools: (ToolState) -> Unit, 
             Text(stringResource(R.string.colour), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(start = 20.dp, top = 8.dp))
             FlowRow(Modifier.padding(horizontal = 12.dp), maxItemsInEachRow = 8) { PEN_COLORS.forEach { c -> ColorDot(c, t.color == c, 30) { onTools(t.copy(color = c)) } } }
             Text(stringResource(R.string.thickness), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(start = 20.dp, top = 8.dp))
-            Slider(t.width, { onTools(t.copy(width = it)) }, valueRange = 1f..30f, modifier = Modifier.padding(horizontal = 20.dp).semantics { contentDescription = "Thickness" })
+            Slider(t.width, { onTools(t.copy(width = it)) }, valueRange = 1f..30f, modifier = Modifier.padding(horizontal = 20.dp))
             Text(stringResource(R.string.opacity), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(start = 20.dp))
-            Slider(t.alpha, { onTools(t.copy(alpha = it)) }, valueRange = 0.2f..1f, modifier = Modifier.padding(horizontal = 20.dp).semantics { contentDescription = "Opacity" })
+            Slider(t.alpha, { onTools(t.copy(alpha = it)) }, valueRange = 0.2f..1f, modifier = Modifier.padding(horizontal = 20.dp))
             Text(stringResource(R.string.saved_pens), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(start = 20.dp))
             Row(Modifier.padding(horizontal = 16.dp, vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 saved.forEach { sp ->
@@ -286,7 +288,7 @@ fun PenSheet(t: ToolState, saved: List<SavedPen>, onTools: (ToolState) -> Unit, 
                     }
                 }
                 if (saved.size < 5) Box(Modifier.size(52.dp).clip(RoundedCornerShape(14.dp)).border(BorderStroke(1.5.dp, ink.muted), RoundedCornerShape(14.dp))
-                    .clickable(onClickLabel = "Save this pen") { onSavePen(saved + SavedPen(t.brush, t.color, t.width, t.alpha)) }, contentAlignment = Alignment.Center) { Icon(Icons.Outlined.Add, "Save this pen", tint = ink.muted) }
+                    .clickable(onClickLabel = stringResource(R.string.save_this_pen)) { onSavePen(saved + SavedPen(t.brush, t.color, t.width, t.alpha)) }, contentAlignment = Alignment.Center) { Icon(Icons.Outlined.Add, stringResource(R.string.save_this_pen), tint = ink.muted) }
             }
         }
     }

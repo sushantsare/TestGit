@@ -72,6 +72,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -243,7 +246,7 @@ fun NewNoteSheet(
             SectionLabel(stringResource(R.string.paper))
             Paper.ALL.chunked(4).forEach { rowPapers -> Row(Modifier.padding(horizontal = 20.dp, vertical = 5.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 rowPapers.forEach { p ->
-                    Column(Modifier.weight(1f).clip(RoundedCornerShape(10.dp)).clickable { paper = p }.testTag("paper_$p"), horizontalAlignment = Alignment.CenterHorizontally) {
+                    Column(Modifier.weight(1f).clip(RoundedCornerShape(10.dp)).selectable(paper == p, role = androidx.compose.ui.semantics.Role.RadioButton) { paper = p }.testTag("paper_$p"), horizontalAlignment = Alignment.CenterHorizontally) {
                         Box(Modifier.fillMaxWidth().aspectRatio(if (orientation == Orientation.LANDSCAPE && !paperOnly) 4f / 3f else 3f / 4f).clip(RoundedCornerShape(8.dp))
                             .background(if (ink.dark) Color(0xFF1E2024) else Color.White)
                             .border(if (paper == p) BorderStroke(2.5.dp, MaterialTheme.colorScheme.primary) else BorderStroke(1.dp, ink.divider), RoundedCornerShape(8.dp))) {
@@ -272,7 +275,7 @@ fun NewNoteSheet(
 }
 
 @Composable
-private fun SectionLabel(t: String) = Text(t, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(start = 20.dp, top = 16.dp, bottom = 8.dp))
+private fun SectionLabel(t: String) = Text(t, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(start = 20.dp, top = 16.dp, bottom = 8.dp).semantics { heading() })
 
 @Composable
 private fun KindTile(icon: ImageVector, label: String, on: Boolean, modifier: Modifier, onClick: () -> Unit) {

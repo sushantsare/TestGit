@@ -238,7 +238,6 @@
     <string name="unlock_subtitle">Use your fingerprint or face</string>
     <string name="use_pin">Use PIN</string>
     <string name="wrong_pin">Wrong PIN</string>
-    <string name="pin_wait">Too many tries. Wait %1$d seconds.</string>
     <string name="delete_digit">Delete digit</string>
     <string name="set_pin">Set PIN</string>
     <string name="change_pin">Change PIN</string>
@@ -306,4 +305,46 @@
     <plurals name="empty_trash_body"><item quantity="one">%1$d note will be deleted for good. This can\'t be undone.</item><item quantity="other">%1$d notes will be deleted for good. This can\'t be undone.</item></plurals>
     <plurals name="results_count"><item quantity="one">%1$d result</item><item quantity="other">%1$d results</item></plurals>
     <plurals name="in_notes"><item quantity="one">in %1$d note</item><item quantity="other">in %1$d notes</item></plurals>
+    <plurals name="pin_wait"><item quantity="one">Too many tries. Wait %1$d second.</item><item quantity="other">Too many tries. Wait %1$d seconds.</item></plurals>
+    <string name="msg_page_added">Page added</string>
+    <string name="msg_page_duplicated">Page duplicated</string>
+    <string name="msg_page_deleted">Page deleted</string>
+    <string name="msg_need_one_page">A note needs at least one page</string>
+    <string name="msg_pdf_pages_fixed">PDF pages keep their own direction</string>
+    <string name="msg_long_page_fixed">A long page can\'t be turned</string>
+    <string name="msg_turned_h">Page turned to horizontal</string>
+    <string name="msg_turned_v">Page turned to vertical</string>
+    <string name="msg_fav_added">Added to favourites</string>
+    <string name="msg_fav_removed">Removed from favourites</string>
+    <string name="msg_locked">Note locked</string>
+    <string name="msg_unlocked">Lock removed</string>
+    <string name="msg_picture_failed">Couldn\'t add that picture</string>
+    <plurals name="msg_pictures_added"><item quantity="one">Picture added</item><item quantity="other">%1$d pictures added</item></plurals>
+    <plurals name="msg_pdf_pages_added"><item quantity="one">%1$d PDF page added</item><item quantity="other">%1$d PDF pages added</item></plurals>
+    <string name="msg_audio_added">Audio added</string>
+    <string name="msg_audio_failed">Couldn\'t add that audio file</string>
+    <string name="msg_rec_failed">Couldn\'t start recording. Is another app using the microphone?</string>
+    <string name="msg_rec_saved">Recording saved · synced to your writing</string>
+    <string name="msg_cant_play">Can\'t play this recording</string>
+    <string name="msg_rec_deleted">Recording deleted</string>
+    <string name="msg_pack_ready">Handwriting pack ready</string>
+    <string name="msg_save_failed">Couldn\'t save your last change. Free some space on the phone, then keep writing — it will save again.</string>
+    <string name="recording_label">Recording · %1$s</string>
+    <string name="page_x_of_y">Page %1$d of %2$d</string>
+    <string name="text_box">Text box</string>
+    <string name="start_typing">Start typing</string>
+    <string name="more_colours">More colours and pens</string>
+    <string name="save_this_pen">Save this pen</string>
+    <string name="f_bold">Bold</string>
+    <string name="f_italic">Italic</string>
+    <string name="f_underline">Underline</string>
+    <string name="f_heading">Heading</string>
+    <string name="f_bullets">Bullet list</string>
+    <string name="f_checklist">Tick box</string>
+    <string name="f_text_colour">Text colour</string>
+    <string name="f_align">Alignment</string>
+    <string name="position">Recording position</string>
+    <string name="unlock_fingerprint">Unlock with fingerprint</string>
+    <string name="page_heading">Page %1$d</string>
+    <string name="shortcuts_hint">Keyboard: Ctrl+N new note · Ctrl+F search · Ctrl+Z undo · Ctrl+Y redo</string>
 </resources>

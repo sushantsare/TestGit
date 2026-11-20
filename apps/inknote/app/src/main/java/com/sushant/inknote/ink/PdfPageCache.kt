@@ -16,6 +16,8 @@ object PdfPageCache {
     private val main = Handler(Looper.getMainLooper())
     private val cache = object : LruCache<String, Bitmap>(48 * 1024 * 1024) { override fun sizeOf(k: String, v: Bitmap) = v.byteCount }
     private val pending = HashSet<String>()
+    /** Maps a stored PDF to a readable file (decrypts locked notes' PDFs into app cache). Set by the app. */
+    @Volatile var resolve: (File) -> File = { it }
 
     private fun bucket(w: Int) = ((w.coerceIn(200, 2200) + 199) / 200) * 200
     private fun key(f: File, page: Int, w: Int) = "${f.absolutePath}#$page@${bucket(w)}"
@@ -35,7 +37,7 @@ object PdfPageCache {
 
     /** Synchronous render (used by export, OCR and tests). */
     fun renderNow(f: File, page: Int, widthPx: Int): Bitmap? = runCatching {
-        ParcelFileDescriptor.open(f, ParcelFileDescriptor.MODE_READ_ONLY).use { fd ->
+        ParcelFileDescriptor.open(resolve(f), ParcelFileDescriptor.MODE_READ_ONLY).use { fd ->
             PdfRenderer(fd).use { r ->
                 r.openPage(page).use { p ->
                     val h = (widthPx * p.height / p.width.toFloat()).toInt().coerceAtLeast(1)

@@ -5,8 +5,8 @@ TAG=${1:-33}
 OUT=/tmp/out; mkdir -p $OUT/screens $OUT/audit
 PKG=com.sushant.inknote
 ACT=$PKG/.MainActivity
-REL=$OUT/inknote.apk
-DBG=app/build/outputs/apk/debug/app-debug.apk
+REL=$(ls $OUT/apks/*x86_64*.apk 2>/dev/null | head -1); [ -z "$REL" ] && REL=$OUT/inknote.apk
+DBG=$(ls app/build/outputs/apk/debug/*x86_64*.apk app/build/outputs/apk/debug/app-debug.apk 2>/dev/null | head -1)
 LOG=$OUT/e2e-results-$TAG.txt
 [ "$TAG" = "33" ] && adb logcat -d -s InkWalk:I InkWalk:E TestRunner:I AndroidJUnitRunner:I > $OUT/walk-log.txt 2>&1
 echo "== InkNote e2e on Android $(adb shell getprop ro.build.version.release) (API $TAG) ==" > $LOG
@@ -96,6 +96,8 @@ adb logcat -d | grep -B2 -A25 "FATAL EXCEPTION" | head -60 > $A/T14_crash.txt
 # T15 apk checks
 BT=$(ls -d $ANDROID_HOME/build-tools/* 2>/dev/null | sort -V | tail -1)
 $BT/apksigner verify -v --print-certs $REL > $A/T15_apksigner.txt 2>&1
+ARM=$OUT/inknote.apk; $BT/apksigner verify -v $ARM >> $A/T15_apksigner.txt 2>&1; ls -la $OUT/apks >> $A/T15_apksigner.txt
+echo "T15 arm64_apk_bytes=$(stat -c %s $ARM)" >> $A/summary.txt
 echo "T15 signature=$(grep -c 'Verified using v2 scheme (APK Signature Scheme v2): true' $A/T15_apksigner.txt) native_libs=$(unzip -l $REL | grep -c '\.so$')" >> $A/summary.txt
 unzip -l $REL | grep '\.so$' | awk '{print $4}' > $A/T15_native_libs.txt
 $BT/zipalign -c -P 16 -v 4 $REL > $A/T15_zipalign.txt 2>&1; echo "T15 zipalign16_exit=$?" >> $A/summary.txt

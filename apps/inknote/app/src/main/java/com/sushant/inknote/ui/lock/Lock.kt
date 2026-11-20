@@ -86,9 +86,11 @@ fun LockScreen(title: String, onUnlocked: () -> Unit, onBack: () -> Unit, expand
     val scope = rememberCoroutineScope()
     val unlockTitle = stringResource(R.string.unlock_note_title, title)
     LaunchedEffect(Unit) { if (bio) showBiometric(activity, unlockTitle, onUnlocked) }
+    val view = androidx.compose.ui.platform.LocalView.current
+    androidx.compose.runtime.DisposableEffect(view) { val old = view.filterTouchesWhenObscured; view.filterTouchesWhenObscured = true; onDispose { view.filterTouchesWhenObscured = old } }
     fun check() {
         val wait = app.securePrefs.waitMs()
-        if (wait > 0) { error = ctx.getString(R.string.pin_wait, (wait / 1000).toInt() + 1); pin = ""; return }
+        if (wait > 0) { error = ctx.resources.getQuantityString(R.plurals.pin_wait, (wait / 1000).toInt() + 1, (wait / 1000).toInt() + 1); pin = ""; return }
         val p = pin
         scope.launch {
             val ok = withContext(Dispatchers.Default) { app.securePrefs.checkPin(p) }
@@ -103,7 +105,7 @@ fun LockScreen(title: String, onUnlocked: () -> Unit, onBack: () -> Unit, expand
             Text(stringResource(R.string.note_is_locked), color = LocalInk.current.muted, modifier = Modifier.padding(top = 6.dp))
             if (bio) {
                 Surface(onClick = { showBiometric(activity, unlockTitle, onUnlocked) }, shape = CircleShape, color = MaterialTheme.colorScheme.primaryContainer,
-                    modifier = Modifier.padding(top = 24.dp).size(84.dp).semantics { contentDescription = "Unlock with fingerprint" }) {
+                    modifier = Modifier.padding(top = 24.dp).size(84.dp).semantics { contentDescription = ctx.getString(R.string.unlock_fingerprint) }) {
                     Box(contentAlignment = Alignment.Center) { Icon(Icons.Outlined.Fingerprint, null, tint = MaterialTheme.colorScheme.onPrimaryContainer, modifier = Modifier.size(44.dp)) }
                 }
                 Text(stringResource(R.string.touch_or_pin), color = LocalInk.current.muted, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 10.dp))

@@ -50,7 +50,7 @@ class Recorder(private val context: Context, private val repo: Repository, priva
         if (_state.value != null) return false
         val name = "rec_${Ids.next()}.m4a"
         val f = repo.files.audio(noteId, name).also { it.parentFile?.mkdirs() }
-        val label = "Recording " + SimpleDateFormat("d MMM, h:mm a", Locale.getDefault()).format(Date())
+        val label = context.getString(com.sushant.inknote.R.string.recording_label, SimpleDateFormat("d MMM, h:mm a", Locale.getDefault()).format(Date()))
         val recId = repo.addRecording(RecordingEntity(noteId = noteId, file = name, name = label, durationMs = 0, createdAt = System.currentTimeMillis()))
         val r = (if (Build.VERSION.SDK_INT >= 31) MediaRecorder(context) else @Suppress("DEPRECATION") MediaRecorder())
         return try {
@@ -80,7 +80,7 @@ class Recorder(private val context: Context, private val repo: Repository, priva
         scope.launch {
             val r = repo.recordings(s.noteId).firstOrNull { it.id == s.recId } ?: return@launch
             if (!s.file.exists() || s.file.length() == 0L) repo.deleteRecording(r)
-            else repo.db.recordings().update(r.copy(durationMs = durationOf(s.file).takeIf { it > 0 } ?: dur))
+            else { repo.db.recordings().update(r.copy(durationMs = durationOf(s.file).takeIf { it > 0 } ?: dur)); repo.secureIfLocked(s.noteId) }
         }
     }
 
@@ -98,6 +98,7 @@ class Recorder(private val context: Context, private val repo: Repository, priva
             val ok = runCatching { context.contentResolver.openInputStream(uri)?.use { i -> f.outputStream().use { i.copyTo(it) } } != null }.getOrDefault(false)
             if (!ok || f.length() == 0L) { f.delete(); return false }
             repo.addRecording(RecordingEntity(noteId = noteId, file = name, name = display, durationMs = durationOf(f), createdAt = System.currentTimeMillis(), kind = AudioKind.FILE))
+            repo.secureIfLocked(noteId)
             return true
         }
     }

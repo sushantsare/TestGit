@@ -33,7 +33,9 @@ import com.sushant.inknote.ml.Handwriting
 import com.sushant.inknote.ui.ImageImport
 import com.sushant.inknote.ui.app
 import com.sushant.inknote.work.IndexWorker
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -102,6 +104,8 @@ class EditorViewModel(app: Application, private val saved: SavedStateHandle, val
     }
 
     fun msg(s: String) { _msg.tryEmit(s) }
+    private fun str(id: Int, vararg a: Any) = getApplication<Application>().getString(id, *a)
+    private fun qty(id: Int, n: Int) = getApplication<Application>().resources.getQuantityString(id, n, n)
 
     // ================= content =================
     fun content(pageId: Long): PageContent? {
@@ -129,7 +133,7 @@ class EditorViewModel(app: Application, private val saved: SavedStateHandle, val
         saveJobs[pageId]?.cancel()
         saveJobs[pageId] = viewModelScope.launch {
             delay(400)
-            contents[pageId]?.let { repo.savePage(noteId, pageId, it) }
+            contents[pageId]?.let { save(pageId, it) }
             IndexWorker.schedule(getApplication(), 6)
         }
     }
@@ -139,7 +143,7 @@ class EditorViewModel(app: Application, private val saved: SavedStateHandle, val
 
     fun flush() {
         val ids = saveJobs.keys.toList()
-        for (id in ids) { saveJobs[id]?.cancel(); contents[id]?.let { c -> inkApp.appScope.launch { repo.savePage(noteId, id, c) } } }
+        for (id in ids) { saveJobs[id]?.cancel(); contents[id]?.let { c -> inkApp.appScope.launch { runCatching { repo.savePage(noteId, id, c) } } } }
         saveJobs.clear()
     }
 
@@ -147,7 +151,13 @@ class EditorViewModel(app: Application, private val saved: SavedStateHandle, val
     suspend fun flushNow() {
         val ids = saveJobs.keys.toList()
         ids.forEach { saveJobs[it]?.cancel() }; saveJobs.clear()
-        for (id in ids) contents[id]?.let { repo.savePage(noteId, id, it) }
+        for (id in ids) contents[id]?.let { save(id, it) }
+    }
+
+    /** Writes a page; if the phone is out of space the edit stays in memory and the user is told in plain words. */
+    private suspend fun save(pageId: Long, c: PageContent): Boolean = try { repo.savePage(noteId, pageId, c); true } catch (e: Exception) {
+        if (e is kotlinx.coroutines.CancellationException) throw e
+        msg(str(com.sushant.inknote.R.string.msg_save_failed)); false
     }
 
     override fun onCleared() { finishText(); flush(); player?.release(); player = null; super.onCleared() }
@@ -197,7 +207,7 @@ class EditorViewModel(app: Application, private val saved: SavedStateHandle, val
     fun downloadModel() = viewModelScope.launch {
         convert = ConvertResult(null, true, true)
         val err = Handwriting.download()
-        if (err != null) { msg(err); convert = ConvertResult(null, true, false) } else { msg("Handwriting pack ready"); startConvert(pages.value.getOrNull(currentPage)) }
+        if (err != null) { msg(err); convert = ConvertResult(null, true, false) } else { msg(str(com.sushant.inknote.R.string.msg_pack_ready)); startConvert(pages.value.getOrNull(currentPage)) }
     }
 
     fun applyConvert(text: String, replace: Boolean) {
@@ -259,26 +269,26 @@ class EditorViewModel(app: Application, private val saved: SavedStateHandle, val
     }
 
     // ================= pages =================
-    fun addPage() = viewModelScope.launch { repo.addPage(noteId, pages.value.getOrNull(currentPage)?.idx ?: (pages.value.size - 1)); _pages.value = repo.pages(noteId); msg("Page added") }
+    fun addPage() = viewModelScope.launch { repo.addPage(noteId, pages.value.getOrNull(currentPage)?.idx ?: (pages.value.size - 1)); _pages.value = repo.pages(noteId); msg(str(com.sushant.inknote.R.string.msg_page_added)) }
     fun turnPage(p: PageEntity) = viewModelScope.launch {
         flushNow()
-        if (p.pdfFile != null) { msg("PDF pages keep their own direction"); return@launch }
-        if (note.value?.pageType == PageType.ENDLESS) { msg("A long page can't be turned"); return@launch }
+        if (p.pdfFile != null) { msg(str(com.sushant.inknote.R.string.msg_pdf_pages_fixed)); return@launch }
+        if (note.value?.pageType == PageType.ENDLESS) { msg(str(com.sushant.inknote.R.string.msg_long_page_fixed)); return@launch }
         repo.turnPage(noteId, p.id); _pages.value = repo.pages(noteId); contents[p.id] = repo.readPage(noteId, p.id); selection = null
         undo.removeAll { it.pageId == p.id }; redo.removeAll { it.pageId == p.id }; canUndo = undo.isNotEmpty(); canRedo = redo.isNotEmpty()
-        msg(if (p.orientation == com.sushant.inknote.data.Orientation.PORTRAIT) "Page turned to horizontal" else "Page turned to vertical")
+        msg(str(if (p.orientation == com.sushant.inknote.data.Orientation.PORTRAIT) com.sushant.inknote.R.string.msg_turned_h else com.sushant.inknote.R.string.msg_turned_v))
     }
     fun setPaper(p: PageEntity, paper: String) = viewModelScope.launch { repo.setPaper(p.id, paper); _pages.value = repo.pages(noteId) }
-    fun duplicatePage(p: PageEntity) = viewModelScope.launch { flushNow(); repo.duplicatePage(noteId, p.id); _pages.value = repo.pages(noteId); msg("Page duplicated") }
+    fun duplicatePage(p: PageEntity) = viewModelScope.launch { flushNow(); repo.duplicatePage(noteId, p.id); _pages.value = repo.pages(noteId); msg(str(com.sushant.inknote.R.string.msg_page_duplicated)) }
     fun deletePage(p: PageEntity) = viewModelScope.launch {
-        if (!repo.deletePage(noteId, p.id)) msg("A note needs at least one page") else { _pages.value = repo.pages(noteId); contents.remove(p.id); undo.removeAll { it.pageId == p.id }; redo.removeAll { it.pageId == p.id }; canUndo = undo.isNotEmpty(); canRedo = redo.isNotEmpty(); msg("Page deleted") }
+        if (!repo.deletePage(noteId, p.id)) msg(str(com.sushant.inknote.R.string.msg_need_one_page)) else { _pages.value = repo.pages(noteId); contents.remove(p.id); undo.removeAll { it.pageId == p.id }; redo.removeAll { it.pageId == p.id }; canUndo = undo.isNotEmpty(); canRedo = redo.isNotEmpty(); msg(str(com.sushant.inknote.R.string.msg_page_deleted)) }
     }
     fun movePage(from: Int, to: Int) = viewModelScope.launch { repo.movePage(noteId, from, to); _pages.value = repo.pages(noteId) }
 
     // ================= note =================
     fun rename(t: String) = viewModelScope.launch { repo.rename(noteId, t) }
-    fun toggleFavourite() = viewModelScope.launch { note.value?.let { repo.setFavourite(noteId, !it.favourite); msg(if (it.favourite) "Removed from favourites" else "Added to favourites") } }
-    fun setLocked(v: Boolean) = viewModelScope.launch { flushNow(); repo.setLocked(listOf(noteId), v); msg(if (v) "Note locked" else "Note unlocked") }
+    fun toggleFavourite() = viewModelScope.launch { note.value?.let { repo.setFavourite(noteId, !it.favourite); msg(str(if (it.favourite) com.sushant.inknote.R.string.msg_fav_removed else com.sushant.inknote.R.string.msg_fav_added)) } }
+    fun setLocked(v: Boolean) = viewModelScope.launch { flushNow(); repo.setLocked(listOf(noteId), v); msg(str(if (v) com.sushant.inknote.R.string.msg_locked else com.sushant.inknote.R.string.msg_unlocked)) }
     fun setTagsAndFolder(t: List<String>, folder: Long?) = viewModelScope.launch { repo.setTags(noteId, t); repo.moveToFolder(listOf(noteId), folder); tags.value = repo.tagsFor(noteId) }
     fun trash() = viewModelScope.launch { flushNow(); repo.moveToTrash(listOf(noteId)) }
 
@@ -288,44 +298,65 @@ class EditorViewModel(app: Application, private val saved: SavedStateHandle, val
     fun insertImages(uris: List<Uri>) = viewModelScope.launch {
         val p = currentPageEntity() ?: return@launch
         flushNow()
-        val n = ImageImport.addImages(getApplication(), repo, noteId, p.id, uris)
+        val n = runCatching { ImageImport.addImages(getApplication(), repo, noteId, p.id, uris) }.getOrDefault(0)
         pages.value.forEach { pg -> contents[pg.id] = repo.readPage(noteId, pg.id) }
         repo.pages(noteId).forEach { pg -> contents[pg.id] = repo.readPage(noteId, pg.id) }
         undo.clear(); redo.clear(); canUndo = false; canRedo = false; reloadPages()
-        msg(if (n == 0) "Couldn't add that picture" else if (n == 1) "Picture added" else "$n pictures added")
+        msg(if (n == 0) str(com.sushant.inknote.R.string.msg_picture_failed) else qty(com.sushant.inknote.R.plurals.msg_pictures_added, n))
     }
 
     fun insertPdf(uri: Uri) = viewModelScope.launch {
         val p = currentPageEntity() ?: return@launch
-        runCatching { repo.insertPdfPages(noteId, p.idx, uri) }.onSuccess { reloadPages(); msg("$it PDF pages added") }.onFailure { msg("Couldn't open that PDF") }
+        runCatching { repo.insertPdfPages(noteId, p.idx, uri) }.onSuccess { reloadPages(); msg(qty(com.sushant.inknote.R.plurals.msg_pdf_pages_added, it)) }.onFailure { msg(str(com.sushant.inknote.R.string.pdf_failed)) }
     }
 
-    fun insertAudio(uri: Uri) = viewModelScope.launch { msg(if (Recorder.importAudio(getApplication(), repo, noteId, uri)) "Audio added" else "Couldn't add that audio file") }
+    fun insertAudio(uri: Uri) = viewModelScope.launch { msg(str(if (Recorder.importAudio(getApplication(), repo, noteId, uri)) com.sushant.inknote.R.string.msg_audio_added else com.sushant.inknote.R.string.msg_audio_failed)) }
 
     fun startRecording() = viewModelScope.launch {
         stopPlayer()
-        if (recorder.state.value != null) { msg("Already recording"); return@launch }
-        if (!recorder.start(noteId)) msg("Couldn't start recording. Is another app using the microphone?")
+        if (recorder.state.value != null) { msg(str(com.sushant.inknote.R.string.already_recording)); return@launch }
+        if (!recorder.start(noteId)) msg(str(com.sushant.inknote.R.string.msg_rec_failed))
     }
 
-    fun stopRecording() { recorder.stop(); msg("Recording saved · synced to your writing") }
+    fun stopRecording() { recorder.stop(); msg(str(com.sushant.inknote.R.string.msg_rec_saved)) }
 
     // ================= playback =================
     fun play(r: RecordingEntity) {
-        if (playingRec?.id == r.id && player != null) { player?.start(); isPlaying = true; startTick(); return }
+        if (playingRec?.id == r.id && player != null) { if (!requestFocus()) return; player?.start(); isPlaying = true; startTick(); return }
         stopPlayer()
-        val f = files.audio(noteId, r.file)
-        val mp = MediaPlayer()
-        try { mp.setDataSource(f.absolutePath); mp.prepare() } catch (e: Exception) { mp.release(); msg("Can't play this recording"); return }
-        mp.setOnCompletionListener { isPlaying = false; positionMs = r.durationMs.coerceAtLeast(mp.duration.toLong()) }
-        player = mp; playingRec = r; mp.start(); isPlaying = true; startTick()
+        playingRec = r
+        viewModelScope.launch {
+            // file access and decoding stay off the main thread
+            val mp = withContext(Dispatchers.IO) {
+                runCatching { MediaPlayer().apply { setDataSource(files.readable(files.audio(noteId, r.file)).absolutePath); prepare() } }.getOrNull()
+            }
+            if (mp == null) { msg(str(com.sushant.inknote.R.string.msg_cant_play)); return@launch }
+            if (playingRec?.id != r.id) { mp.release(); return@launch }
+            mp.setOnCompletionListener { isPlaying = false; positionMs = r.durationMs.coerceAtLeast(mp.duration.toLong()) }
+            player = mp
+            if (pendingSeek >= 0) { mp.seekTo(pendingSeek.toInt()); positionMs = pendingSeek; pendingSeek = -1 }
+            if (!requestFocus()) return@launch
+            mp.start(); isPlaying = true; startTick()
+        }
     }
+    private var pendingSeek = -1L
     fun select(r: RecordingEntity) { stopPlayer(); playingRec = r; positionMs = 0 }
     fun pause() { player?.pause(); isPlaying = false }
-    fun seek(ms: Long) { val r = playingRec ?: return; if (player == null) play(r); player?.seekTo(ms.toInt()); positionMs = ms }
-    fun seekToStroke(recId: Long, ms: Long) { val r = recordings.value.firstOrNull { it.id == recId } ?: return; if (playingRec?.id != r.id) play(r); seek(ms); if (!isPlaying) { player?.start(); isPlaying = true; startTick() } }
-    fun stopPlayer() { tick?.cancel(); player?.release(); player = null; isPlaying = false }
-    fun deleteRecording(r: RecordingEntity) = viewModelScope.launch { if (playingRec?.id == r.id) { stopPlayer(); playingRec = null }; repo.deleteRecording(r); msg("Recording deleted") }
+
+    // ---- audio focus: other apps' sound pauses our playback and vice versa ----
+    private val audio = app.getSystemService(android.media.AudioManager::class.java)
+    private val focusRequest = android.media.AudioFocusRequest.Builder(android.media.AudioManager.AUDIOFOCUS_GAIN)
+        .setAudioAttributes(android.media.AudioAttributes.Builder().setUsage(android.media.AudioAttributes.USAGE_MEDIA).setContentType(android.media.AudioAttributes.CONTENT_TYPE_SPEECH).build())
+        .setOnAudioFocusChangeListener { if (it <= 0) pause() }.build()
+    private fun requestFocus() = audio.requestAudioFocus(focusRequest) == android.media.AudioManager.AUDIOFOCUS_REQUEST_GRANTED
+    fun seek(ms: Long) { val r = playingRec ?: return; if (player == null) { pendingSeek = ms; positionMs = ms; play(r); return }; player?.seekTo(ms.toInt()); positionMs = ms }
+    fun seekToStroke(recId: Long, ms: Long) {
+        val r = recordings.value.firstOrNull { it.id == recId } ?: return
+        if (playingRec?.id != r.id || player == null) { pendingSeek = ms; positionMs = ms; play(r); return }
+        seek(ms); if (!isPlaying && requestFocus()) { player?.start(); isPlaying = true; startTick() }
+    }
+    fun stopPlayer() { tick?.cancel(); player?.release(); player = null; isPlaying = false; audio.abandonAudioFocusRequest(focusRequest) }
+    fun deleteRecording(r: RecordingEntity) = viewModelScope.launch { if (playingRec?.id == r.id) { stopPlayer(); playingRec = null }; repo.deleteRecording(r); msg(str(com.sushant.inknote.R.string.msg_rec_deleted)) }
     private fun startTick() { tick?.cancel(); tick = viewModelScope.launch { while (isActive && isPlaying) { positionMs = player?.currentPosition?.toLong() ?: positionMs; delay(100) } } }
 
     companion object {

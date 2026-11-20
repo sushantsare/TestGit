@@ -32,6 +32,6 @@ class InkApp : Application() {
             StrictMode.setVmPolicy(StrictMode.VmPolicy.Builder().detectLeakedClosableObjects().detectActivityLeaks().penaltyLog().build())
         }
         // Open preferences, folders and the database off the main thread so the first screen never waits on disk.
-        appScope.launch(Dispatchers.IO) { files; settings; securePrefs; repo; db.openHelper.writableDatabase; PurgeWorker.schedule(this@InkApp) }
+        appScope.launch(Dispatchers.IO) { com.sushant.inknote.ink.PdfPageCache.resolve = { files.readable(it) }; files.clearPlain(); files; settings; securePrefs; repo; db.openHelper.writableDatabase; PurgeWorker.schedule(this@InkApp) }
     }
 }

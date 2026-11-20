@@ -16,6 +16,7 @@ import com.sushant.inknote.io.ExportFormat
 import com.sushant.inknote.io.Exporter
 import com.sushant.inknote.work.Indexer
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.flow.first
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -167,5 +168,19 @@ class RepositoryTest {
         }
         assertEquals(2, Exporter(ctx, r).export(n, ExportFormat.PNG, null).size)
         r.deleteForever(listOf(id))
+    }
+
+    /** T13: 2,000 notes with indexed text — the home list loads and search answers in under a second. */
+    @Test fun largeDataStaysFast(): Unit = runBlocking {
+        val t = System.currentTimeMillis()
+        val ids = db.notes().let { dao -> (1..2000).map { i -> dao.insert(com.sushant.inknote.data.NoteEntity(title = "Lecture note $i", createdAt = t - i, updatedAt = t - i)) } }
+        ids.forEachIndexed { i, id -> repo.replaceIndex(id, listOf(com.sushant.inknote.data.SearchFts(id, -1, 0, Source.TYPED, "topic number $i romantic poetry keats wordsworth"))) }
+        val t0 = System.nanoTime(); val items = repo.noteItems.first(); val listMs = (System.nanoTime() - t0) / 1_000_000
+        assertEquals(2000, items.size)
+        val t1 = System.nanoTime(); val hits = repo.search("wordsworth"); val searchMs = (System.nanoTime() - t1) / 1_000_000
+        assertTrue("search returned results", hits.isNotEmpty())
+        android.util.Log.i("InkWalk", "T13 list=${listMs}ms search=${searchMs}ms")
+        assertTrue("list loads in < 1 s (was $listMs ms)", listMs < 1000)
+        assertTrue("search in < 1 s (was $searchMs ms)", searchMs < 1000)
     }
 }

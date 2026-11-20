@@ -35,6 +35,11 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Search
+import androidx.compose.material.icons.outlined.Menu
+import androidx.compose.material.icons.outlined.Description
+import androidx.compose.material.icons.outlined.StarOutline
+import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
@@ -137,12 +142,27 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    /** Keyboard shortcuts for keyboards, Chromebooks and tablets with keyboard covers. */
+    override fun dispatchKeyEvent(event: android.view.KeyEvent): Boolean {
+        if (event.action == android.view.KeyEvent.ACTION_DOWN && event.isCtrlPressed) {
+            val s = when (event.keyCode) {
+                android.view.KeyEvent.KEYCODE_N -> Shortcut.NEW
+                android.view.KeyEvent.KEYCODE_F -> Shortcut.SEARCH
+                android.view.KeyEvent.KEYCODE_Z -> if (event.isShiftPressed) Shortcut.REDO else Shortcut.UNDO
+                android.view.KeyEvent.KEYCODE_Y -> Shortcut.REDO
+                else -> null
+            }
+            if (s != null && Shortcuts.events.tryEmit(s)) return true
+        }
+        return super.dispatchKeyEvent(event)
+    }
+
     override fun onNewIntent(intent: Intent) { super.onNewIntent(intent); if (isIncoming(intent)) pendingIntent.value = intent }
 
     override fun onStart() {
         super.onStart()
         // Locked notes lock again after the app has been in the background for 30 seconds.
-        if (stoppedAt > 0 && SystemClock.elapsedRealtime() - stoppedAt > 30_000) vm.unlocked.value = emptySet()
+        if (stoppedAt > 0 && SystemClock.elapsedRealtime() - stoppedAt > 30_000) { vm.unlocked.value = emptySet(); (application as InkApp).let { a -> a.appScope.launch(kotlinx.coroutines.Dispatchers.IO) { a.files.clearPlain() } } }
     }
 
     override fun onStop() { super.onStop(); stoppedAt = SystemClock.elapsedRealtime() }
@@ -151,6 +171,9 @@ class MainActivity : AppCompatActivity() {
 
     private fun isIncoming(i: Intent) = i.action == Intent.ACTION_SEND || i.action == Intent.ACTION_SEND_MULTIPLE || i.action == Intent.ACTION_VIEW
 }
+
+enum class Shortcut { NEW, SEARCH, UNDO, REDO }
+object Shortcuts { val events = kotlinx.coroutines.flow.MutableSharedFlow<Shortcut>(extraBufferCapacity = 4) }
 
 object Routes {
     const val HOME = "home"; const val SEARCH = "search"; const val TRASH = "trash"; const val SETTINGS = "settings"; const val ABOUT = "about"
@@ -203,6 +226,17 @@ fun InkRoot(vm: MainViewModel, activity: MainActivity) {
             .addOnFailureListener { ctx.toast(ctx.getString(R.string.scan_unavailable)) }
     }
 
+    val routeNow by androidx.compose.runtime.rememberUpdatedState(route)
+    LaunchedEffect(Unit) {
+        Shortcuts.events.collect { s ->
+            when (s) {
+                Shortcut.NEW -> if (routeNow == Routes.HOME) newSheet = true
+                Shortcut.SEARCH -> if (routeNow != Routes.SEARCH) nav.navigate(Routes.SEARCH)
+                else -> Unit
+            }
+        }
+    }
+
     // ---- share into InkNote / open files ----
     val incoming by activity.pendingIntent
     LaunchedEffect(incoming) {
@@ -235,11 +269,13 @@ fun InkRoot(vm: MainViewModel, activity: MainActivity) {
         val expanded = maxWidth >= 840.dp
         LaunchedEffect(expanded) { if (expanded) drawer.snapTo(DrawerValue.Closed) }
         val canSplit = maxWidth >= 600.dp
+        val medium = !expanded && canSplit
         val navContent: @Composable (Place) -> Unit = { place ->
             NavContent(home, place, onFilter = { vm.setFilter(it); goTop(Routes.HOME) }, onTrash = { goTop(Routes.TRASH) }, onSettings = { goTop(Routes.SETTINGS) },
                 onNewFolder = { folderEdit = -1L }, onEditFolder = { folderEdit = it.id })
         }
         val actions = HomeActions(
+            railShown = medium,
             openNote = { openNote(it) }, openDrawer = { scope.launch { drawer.open() } }, newNote = { newSheet = true }, search = { nav.navigate(Routes.SEARCH) },
             settings = { goTop(Routes.SETTINGS) }, importPdf = { importPdf.launch(arrayOf("application/pdf")) }, scan = ::scan, setFilter = vm::setFilter,
             toggleSelect = vm::toggleSelect, clearSelection = vm::clearSelection, pin = { vm.pin(it) }, move = { moveSheet = true },
@@ -252,6 +288,19 @@ fun InkRoot(vm: MainViewModel, activity: MainActivity) {
                 Box(Modifier.width(280.dp).fillMaxHeight().background(LocalInk.current.card).statusBarsPadding()) { navContent(place) }
                 VerticalDivider(color = LocalInk.current.divider)
                 Box(Modifier.weight(1f).statusBarsPadding()) { content() }
+            } else if (medium) Row(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.displayCutout)) {
+                // Medium width (small tablets, unfolded foldables, phone landscape): navigation rail
+                androidx.compose.material3.NavigationRail(containerColor = LocalInk.current.card, modifier = Modifier.fillMaxHeight().testTag("nav_rail"),
+                    header = { IconButton(onClick = { scope.launch { drawer.open() } }) { Icon(androidx.compose.material.icons.Icons.Outlined.Menu, stringResource(R.string.open_menu)) } }) {
+                    @Composable fun item(sel: Boolean, icon: androidx.compose.ui.graphics.vector.ImageVector, label: Int, onClick: () -> Unit) =
+                        androidx.compose.material3.NavigationRailItem(selected = sel, onClick = onClick, icon = { Icon(icon, null) }, label = { Text(stringResource(label), maxLines = 1) })
+                    item(place == Place.HOME && home.filter == com.sushant.inknote.ui.Filter.All, androidx.compose.material.icons.Icons.Outlined.Description, R.string.all_notes) { vm.setFilter(com.sushant.inknote.ui.Filter.All); goTop(Routes.HOME) }
+                    item(place == Place.HOME && home.filter == com.sushant.inknote.ui.Filter.Favourites, androidx.compose.material.icons.Icons.Outlined.StarOutline, R.string.favourites) { vm.setFilter(com.sushant.inknote.ui.Filter.Favourites); goTop(Routes.HOME) }
+                    item(place == Place.TRASH, androidx.compose.material.icons.Icons.Outlined.Delete, R.string.trash) { goTop(Routes.TRASH) }
+                    item(place == Place.SETTINGS, androidx.compose.material.icons.Icons.Outlined.Settings, R.string.settings) { goTop(Routes.SETTINGS) }
+                }
+                VerticalDivider(color = LocalInk.current.divider)
+                Box(Modifier.weight(1f)) { content() }
             } else content()
         }
         ModalNavigationDrawer(drawerState = drawer, gesturesEnabled = !expanded && route in listOf(Routes.HOME, Routes.TRASH, Routes.SETTINGS),

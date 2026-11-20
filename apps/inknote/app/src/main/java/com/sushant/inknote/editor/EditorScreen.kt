@@ -151,10 +151,11 @@ fun EditorPane(
     val holder = remember { TextEditorHolder() }
 
     LaunchedEffect(vm) { vm.messages.collect { ctx.toast(it) } }
+    if (!second) LaunchedEffect(vm) { com.sushant.inknote.Shortcuts.events.collect { if (it == com.sushant.inknote.Shortcut.UNDO) { vm.finishText(); vm.undo() } else if (it == com.sushant.inknote.Shortcut.REDO) vm.redo() } }
     BackHandler(enabled = vm.editing != null || vm.selection != null) { if (vm.editing != null) { holder.hideKeyboard(); vm.finishText() } else vm.selection = null }
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     DisposableEffect(lifecycle) {
-        val obs = LifecycleEventObserver { _, e -> if (e == Lifecycle.Event.ON_PAUSE) { vm.finishText(); vm.flush() } }
+        val obs = LifecycleEventObserver { _, e -> if (e == Lifecycle.Event.ON_PAUSE) { vm.finishText(); vm.flush(); vm.pause() } }
         lifecycle.addObserver(obs); onDispose { lifecycle.removeObserver(obs) }
     }
     // typed notes open straight into typing
@@ -393,7 +394,7 @@ private fun PageItem(vm: EditorViewModel, p: PageEntity, index: Int, count: Int,
                 v.selection = vm.selection?.takeIf { it.pageId == p.id }
                 v.editingTextId = vm.editing?.takeIf { it.pageId == p.id }?.boxId ?: -1
                 v.playback = if (vm.isPlaying || vm.positionMs > 0) vm.playingRec?.let { it.id to vm.positionMs } else null
-                v.contentDescription = "Page ${index + 1} of $count"
+                v.contentDescription = ctx.getString(R.string.page_x_of_y, index + 1, count)
             })
             vm.editing?.takeIf { it.pageId == p.id }?.let { e ->
                 key(e.boxId) {

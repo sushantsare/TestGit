@@ -115,7 +115,7 @@ class Repository(
             pages.updateAll(shifted)
             pages.insertAll(sizes.mapIndexed { i, wh -> pdfPageEntity(noteId, afterIdx + 1 + i, file, i, wh) })
         }
-        syncPageCount(noteId); notes.touch(noteId, now())
+        syncPageCount(noteId); notes.touch(noteId, now()); secureIfLocked(noteId)
         return sizes.size
     }
 
@@ -239,6 +239,9 @@ class Repository(
     suspend fun deleteFolder(id: Long) = db.withTransaction { folders.unlinkNotes(id); folders.delete(id) }
 
     // ---------- audio ----------
+    /** Files added to a locked note (PDF pages, recordings, audio) are encrypted like the rest of it. */
+    suspend fun secureIfLocked(noteId: Long) { if (notes.get(noteId)?.locked == true) withContext(Dispatchers.IO) { files.setLocked(noteId, true) } }
+
     suspend fun addRecording(r: RecordingEntity): Long {
         val id = recs.insert(r)
         notes.get(r.noteId)?.let { notes.update(it.copy(hasRecording = true, updatedAt = now())) }

@@ -33,11 +33,11 @@ class TextEditorHolder {
         e.setLineSpacing(0f, 1.25f)
         e.setTextColor(if (dark) 0xFFECE8E1.toInt() else 0xFF1C1B1F.toInt())
         e.setHintTextColor(if (dark) 0xFF8C877E.toInt() else 0xFF8A8478.toInt())
-        e.hint = "Start typing"
+        e.hint = context.getString(com.sushant.inknote.R.string.start_typing)
         e.imeOptions = EditorInfo.IME_FLAG_NO_FULLSCREEN
         e.setText(RichText.decode(initial))
         e.setSelection(e.text.length)
-        e.contentDescription = "Text box"
+        e.contentDescription = context.getString(com.sushant.inknote.R.string.text_box)
         e.addTextChangedListener(object : TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, a: Int, b: Int, c: Int) = Unit
             override fun onTextChanged(s: CharSequence?, a: Int, b: Int, c: Int) = Unit

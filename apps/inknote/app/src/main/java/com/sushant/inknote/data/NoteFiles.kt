@@ -69,15 +69,31 @@ class NoteFiles(private val context: Context) {
 
     /** Re-encrypts or decrypts every page and image of a note when it is locked or unlocked. */
     fun setLocked(noteId: Long, locked: Boolean) {
-        val dirs = listOf(File(noteDir(noteId), "pages"), File(noteDir(noteId), "img"))
+        val dirs = listOf("pages", "img", "pdf", "audio").map { File(noteDir(noteId), it) }
         for (d in dirs) d.listFiles()?.forEach { f ->
             val raw = f.readBytes()
             val enc = Crypto.isEncrypted(raw)
             if (locked && !enc) atomicWrite(f, Crypto.encrypt(raw))
             if (!locked && enc) atomicWrite(f, Crypto.decrypt(raw))
         }
-        cache.evictAll(); bmpCache.evictAll()
+        cache.evictAll(); bmpCache.evictAll(); if (locked) clearPlain()
     }
+
+    private val plainDir get() = File(context.cacheDir, "plain")
+
+    /** A readable copy of a note file: the file itself, or (for locked notes) a temporary decrypted copy in app cache. */
+    fun readable(f: File): File {
+        if (!f.exists()) return f
+        val head = ByteArray(8)
+        val n = runCatching { f.inputStream().use { it.read(head) } }.getOrDefault(0)
+        if (n < 8 || !Crypto.isEncrypted(head + ByteArray(16))) return f
+        val out = File(plainDir.apply { mkdirs() }, "${f.parentFile?.parentFile?.name}_${f.name}")
+        if (!out.exists()) runCatching { atomicWrite(out, Crypto.decrypt(f.readBytes())) }
+        return out
+    }
+
+    /** Removes decrypted temporary copies (when locked notes lock again). */
+    fun clearPlain() { plainDir.deleteRecursively() }
 
     fun deleteNote(noteId: Long) { noteDir(noteId).deleteRecursively(); thumb(noteId).delete(); cache.evictAll() }
 

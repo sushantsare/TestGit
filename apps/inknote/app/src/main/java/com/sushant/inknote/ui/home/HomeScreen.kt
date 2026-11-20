@@ -86,6 +86,7 @@ import com.sushant.inknote.ui.NoteThumb
 import com.sushant.inknote.ui.theme.LocalInk
 
 data class HomeActions(
+    val railShown: Boolean = false,
     val openNote: (Long) -> Unit,
     val openDrawer: () -> Unit,
     val newNote: () -> Unit,
@@ -131,7 +132,7 @@ fun HomeScreen(s: HomeState, selected: Set<Long>, grid: Boolean, sortBy: Int, ex
                 }
             } else {
                 Row(Modifier.fillMaxWidth().height(64.dp).padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                    if (!expanded) IconButton(onClick = a.openDrawer, Modifier.testTag("open_drawer")) { Icon(Icons.Outlined.Menu, stringResource(R.string.open_menu)) }
+                    if (!expanded && !a.railShown) IconButton(onClick = a.openDrawer, Modifier.testTag("open_drawer")) { Icon(Icons.Outlined.Menu, stringResource(R.string.open_menu)) }
                     else Spacer(Modifier.width(12.dp))
                     Text(filterTitle(s.filter, s, stringResource(R.string.all_notes), stringResource(R.string.pinned), stringResource(R.string.favourites), stringResource(R.string.locked_notes)),
                         style = MaterialTheme.typography.headlineSmall, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f).padding(start = 4.dp))
@@ -145,7 +146,6 @@ fun HomeScreen(s: HomeState, selected: Set<Long>, grid: Boolean, sortBy: Int, ex
                             DropdownMenuItem({ Text(stringResource(R.string.sort_by)) }, { menu = false; sortMenu = true }, leadingIcon = { Icon(Icons.Outlined.Sort, null) })
                             DropdownMenuItem({ Text(stringResource(R.string.import_pdf)) }, { menu = false; a.importPdf() }, leadingIcon = { Icon(Icons.Outlined.PictureAsPdf, null) })
                             DropdownMenuItem({ Text(stringResource(R.string.scan_document)) }, { menu = false; a.scan() }, leadingIcon = { Icon(Icons.Outlined.DocumentScanner, null) })
-                            if (!expanded) DropdownMenuItem({ Text(stringResource(R.string.settings)) }, { menu = false; a.settings() }, leadingIcon = { Icon(Icons.Outlined.Settings, null) })
                         }
                         DropdownMenu(sortMenu, { sortMenu = false }) {
                             listOf(SortBy.MODIFIED to R.string.sort_modified, SortBy.CREATED to R.string.sort_created, SortBy.TITLE to R.string.sort_title).forEach { (v, l) ->
@@ -191,8 +191,9 @@ fun HomeScreen(s: HomeState, selected: Set<Long>, grid: Boolean, sortBy: Int, ex
 
 @Composable
 fun Fab(onClick: () -> Unit, modifier: Modifier = Modifier) {
+    val newNoteLabel = stringResource(R.string.new_note)
     Surface(onClick = onClick, shape = RoundedCornerShape(18.dp), color = MaterialTheme.colorScheme.primary, shadowElevation = 6.dp,
-        modifier = modifier.size(60.dp).testTag("fab_new").semantics { contentDescription = "New note" }) {
+        modifier = modifier.size(60.dp).testTag("fab_new").semantics { contentDescription = newNoteLabel }) {
         Box(contentAlignment = Alignment.Center) { Icon(Icons.Outlined.Add, null, tint = MaterialTheme.colorScheme.onPrimary, modifier = Modifier.size(30.dp)) }
     }
 }
