@@ -87,7 +87,7 @@ object ThumbCache {
 fun NoteThumb(n: NoteEntity, modifier: Modifier = Modifier) {
     val ink = LocalInk.current
     val ctx = LocalContext.current
-    val bmp by produceState<Bitmap?>(null, n.id, n.thumbVersion, n.locked, ink.dark) { value = ThumbCache.load(ctx.app(), n, ink.dark) }
+    val bmp by produceState<Bitmap?>(null, n.id, n.thumbVersion, n.locked, ink.dark) { value = null; value = ThumbCache.load(ctx.app(), n, ink.dark) }
     Box(
         modifier.clip(RoundedCornerShape(11.dp)).background(if (n.locked) ink.surf2 else if (ink.dark) Color(0xFF1E2024) else Color.White)
             .border(1.dp, ink.divider, RoundedCornerShape(11.dp)),

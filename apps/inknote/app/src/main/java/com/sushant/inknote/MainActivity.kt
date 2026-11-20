@@ -233,6 +233,7 @@ fun InkRoot(vm: MainViewModel, activity: MainActivity) {
     androidx.activity.compose.BackHandler(enabled = selected.isNotEmpty() && route == Routes.HOME) { vm.clearSelection() }
     BoxWithConstraints(Modifier.fillMaxSize().background(LocalInk.current.bg)) {
         val expanded = maxWidth >= 840.dp
+        LaunchedEffect(expanded) { if (expanded) drawer.snapTo(DrawerValue.Closed) }
         val canSplit = maxWidth >= 600.dp
         val navContent: @Composable (Place) -> Unit = { place ->
             NavContent(home, place, onFilter = { vm.setFilter(it); goTop(Routes.HOME) }, onTrash = { goTop(Routes.TRASH) }, onSettings = { goTop(Routes.SETTINGS) },
@@ -254,7 +255,7 @@ fun InkRoot(vm: MainViewModel, activity: MainActivity) {
             } else content()
         }
         ModalNavigationDrawer(drawerState = drawer, gesturesEnabled = !expanded && route in listOf(Routes.HOME, Routes.TRASH, Routes.SETTINGS),
-            drawerContent = { if (!expanded) ModalDrawerSheet(drawerContainerColor = LocalInk.current.card, modifier = Modifier.width(300.dp)) { Box(Modifier.statusBarsPadding()) { navContent(place) } } }) {
+            drawerContent = { ModalDrawerSheet(drawerContainerColor = LocalInk.current.card, modifier = Modifier.width(300.dp)) { Box(Modifier.statusBarsPadding()) { navContent(place) } } }) {
             NavHost(nav, Routes.HOME, Modifier.fillMaxSize()) {
                 composable(Routes.HOME) { withPanel { HomeScreen(home, selected, st.gridView, st.sortBy, expanded, actions) } }
                 composable(Routes.SEARCH) { withPanel { SearchScreen(home.all, { nav.popBackStack() }, { id, page -> openNote(id, page) }, expanded) } }

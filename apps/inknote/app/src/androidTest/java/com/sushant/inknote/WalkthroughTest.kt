@@ -143,8 +143,9 @@ class WalkthroughTest {
             tag("pthumb_1").performClick(); tag("pg_turn").performClick(); Thread.sleep(2500)
             val ham = runBlocking { app.repo.db.notes().all().first { it.title == "Hamlet – Act III" } }
             val p1 = runBlocking { app.repo.pages(ham.id)[1] }
-            Log.i("InkWalk", "page 2 after turn: ${p1.orientation} ${p1.width}x${p1.height}")
-            shot("11b_page_turned")
+            val uiTurned = runCatching { waitText("Page 2 · Horizontal", 6000); true }.getOrDefault(false)
+            shot("11b_page_turned_db-${p1.orientation}_ui-$uiTurned")
+            assertTrue("pages screen shows the turned page", uiTurned)
             assertTrue("page 2 turned", p1.orientation == "LANDSCAPE")
             back()
         }
