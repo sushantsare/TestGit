@@ -49,34 +49,58 @@ object InstaStory {
             "Stories need your Instagram login. Go to Settings → Accounts → Instagram and log in, then try again.",
             diag.joinToString("\n"),
         )
-        fun api(path: String): JSONObject {
-            var last = ""
+        var limited = false
+        var expired = false
+        /** One Instagram API call (app host, then web host). Null if Instagram didn't return JSON. */
+        fun api(path: String): JSONObject? {
             for (host in listOf("https://i.instagram.com", "https://www.instagram.com")) {
                 val (code, body) = get("$host$path", ua, cookie, csrf)
-                diag += "$host$path → HTTP $code, ${body.length} chars"
+                diag += "${host.removePrefix("https://")}${path.substringBefore('?')} → HTTP $code"
+                if (code == 429) limited = true
+                if ("login_required" in body || "checkpoint_required" in body) expired = true
                 if (code == 200 && body.trimStart().startsWith("{")) return JSONObject(body)
-                last = body.take(200)
             }
-            throw FriendlyError(
-                when {
-                    "login_required" in last || "checkpoint" in last ->
-                        "Instagram says your login has expired or needs confirming. Open Instagram, check for a security " +
-                            "prompt, then log out and log in again in Settings → Accounts."
-                    else -> "Instagram didn't return this story. Try again in a minute."
-                },
-                diag.joinToString("\n") + "\n" + last,
-            )
+            return null
+        }
+        fun ok(st: InstaStory.Story?): Boolean = st != null && st.video.isNotBlank()
+        var found: InstaStory.Story? = null
+
+        // 1) The shared link already holds the story's media id: ask for that media directly
+        if (!highlight && wanted != null) {
+            api("/api/v1/media/$wanted/info/")?.let { found = InstaParser.fromMediaInfo(it) }
+            diag += "media lookup: ${if (found == null) "nothing" else if (ok(found)) "video found" else "no video"}"
         }
 
-        val reelId = if (highlight) "highlight:${seg.getOrNull(2)}" else {
-            val profile = api("/api/v1/users/web_profile_info/?username=${Uri.encode(user)}")
-            profile.optJSONObject("data")?.optJSONObject("user")?.optString("id")?.takeIf { it.isNotBlank() }
-                ?: throw FriendlyError("Couldn't find the Instagram account @$user.", diag.joinToString("\n"))
+        // 2) Otherwise the account's current stories (account id from the story page, then the profile lookup)
+        if (!ok(found)) {
+            val reelId = if (highlight) "highlight:${seg.getOrNull(2)}" else {
+                val page = runCatching { get("https://www.instagram.com/stories/$user/${wanted ?: ""}/", ua, cookie, csrf) }.getOrNull()
+                if (page != null) diag += "story page → HTTP ${page.first}"
+                page?.second?.let { InstaParser.userIdFromPage(it, user) }
+                    ?: api("/api/v1/users/web_profile_info/?username=${Uri.encode(user)}")
+                        ?.optJSONObject("data")?.optJSONObject("user")?.optString("id")?.takeIf { it.isNotBlank() }
+            }
+            diag += "account id: ${reelId ?: "not found"}"
+            if (reelId != null) {
+                val feed = api("/api/v1/feed/reels_media/?reel_ids=${Uri.encode(reelId)}")
+                if (feed != null) {
+                    found = InstaParser.pick(feed, reelId, wanted) ?: found
+                    diag += "stories found: ${InstaParser.count(feed, reelId)}, match: ${found != null}"
+                }
+            }
         }
-        val feed = api("/api/v1/feed/reels_media/?reel_ids=${Uri.encode(reelId)}")
-        val story = InstaParser.pick(feed, reelId, wanted)
-        diag += "stories found: ${InstaParser.count(feed, reelId)}, match: ${story != null}"
+
+        val story = found
         when {
+            story == null && limited -> throw FriendlyError(
+                "Instagram is limiting requests right now (too many in a short time). Wait 10–15 minutes, then try again.",
+                diag.joinToString("\n"),
+            )
+            story == null && expired -> throw FriendlyError(
+                "Instagram says your login has expired or needs confirming. Open Instagram, check for a security " +
+                    "prompt, then log out and log in again in Settings → Accounts.",
+                diag.joinToString("\n"),
+            )
             story == null -> throw FriendlyError(
                 "This story isn't available any more, or your account can't see it (private accounts need you to follow them).",
                 diag.joinToString("\n"),
@@ -130,6 +154,22 @@ object InstaParser {
 
     fun count(feed: JSONObject, reelId: String): Int = items(feed, reelId)?.length() ?: 0
 
+    /** media/<id>/info response: {"items":[{...}]} */
+    fun fromMediaInfo(j: JSONObject): InstaStory.Story? = j.optJSONArray("items")?.optJSONObject(0)?.let { fromItem(it) }
+
+    /** Account id of [user] embedded in a story/profile page. */
+    fun userIdFromPage(html: String, user: String): String? {
+        val u = Regex.escape(user)
+        val patterns = listOf(
+            """"username"\s*:\s*"$u"[^{}]{0,400}?"(?:pk|id)"\s*:\s*"(\d+)"""",
+            """"(?:pk|id)"\s*:\s*"(\d+)"[^{}]{0,400}?"username"\s*:\s*"$u"""",
+            """"profile_id"\s*:\s*"(\d+)"""",
+            """"owner_id"\s*:\s*"(\d+)"""",
+        )
+        for (p in patterns) Regex(p).find(html)?.let { return it.groupValues[1] }
+        return null
+    }
+
     /** The story with media id [wanted] (or the first one), with its best video and thumbnail. */
     fun pick(feed: JSONObject, reelId: String, wanted: String?): InstaStory.Story? {
         val arr = items(feed, reelId) ?: return null
@@ -139,7 +179,10 @@ object InstaParser {
             val pk = it.optString("pk").ifBlank { it.optString("id").substringBefore('_') }
             if (wanted == null || pk == wanted) { chosen = it; break }
         }
-        val s = chosen ?: return null
+        return chosen?.let { fromItem(it) }
+    }
+
+    fun fromItem(s: JSONObject): InstaStory.Story {
         val video = s.optJSONArray("video_versions")?.let { v ->
             (0 until v.length()).mapNotNull { v.optJSONObject(it) }
                 .maxByOrNull { it.optInt("width", 0) * it.optInt("height", 0) }?.optString("url")

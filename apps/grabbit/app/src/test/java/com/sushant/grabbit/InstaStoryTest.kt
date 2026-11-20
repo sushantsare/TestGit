@@ -44,4 +44,22 @@ class InstaStoryTest {
         val alt = JSONObject("""{"reels_media":[{"id":"highlight:9","items":[{"pk":"5","video_versions":[{"width":1,"height":1,"url":"https://cdn/h.mp4"}]}]}]}""")
         assertEquals("https://cdn/h.mp4", InstaParser.pick(alt, "highlight:9", null)!!.video)
     }
+
+    @Test
+    fun readsMediaInfoResponse(): Unit {
+        val j = JSONObject("""{"items":[{"pk":"4034","user":{"username":"amy"},"video_versions":[{"width":720,"height":1280,"url":"https://cdn/s.mp4"}]}],"status":"ok"}""")
+        val s = InstaParser.fromMediaInfo(j)!!
+        assertEquals("https://cdn/s.mp4", s.video)
+        assertEquals("amy", s.user)
+        assertNull(InstaParser.fromMediaInfo(JSONObject("""{"items":[]}""")))
+    }
+
+    @Test
+    fun findsAccountIdInStoryPage(): Unit {
+        val page = """<script>{"user":{"username":"amyleona367","profile_pic_url":"x","id":"58123456789"}}</script>"""
+        assertEquals("58123456789", InstaParser.userIdFromPage(page, "amyleona367"))
+        assertEquals("777", InstaParser.userIdFromPage("""{"pk":"777","full_name":"A","username":"amy"}""", "amy"))
+        assertEquals("555", InstaParser.userIdFromPage("""{"profile_id":"555"}""", "someone"))
+        assertNull(InstaParser.userIdFromPage("<html>nothing</html>", "amy"))
+    }
 }
