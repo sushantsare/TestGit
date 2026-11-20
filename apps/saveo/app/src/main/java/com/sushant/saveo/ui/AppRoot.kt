@@ -113,6 +113,7 @@ fun AppRoot(
     BoxWithConstraints(Modifier.fillMaxSize()) {
         val rail = maxWidth >= 600.dp && screen != Screen.ONBOARD && screen != Screen.SETUP
         val twoPane = maxWidth >= 840.dp && screen == Screen.HOME
+        val shortWindow = maxHeight < 520.dp
         vm.twoPane = twoPane
         val statuses by vm.statuses.collectAsStateWithLifecycle()
         val savedList by vm.saved.collectAsStateWithLifecycle()
@@ -120,6 +121,7 @@ fun AppRoot(
         LaunchedEffect(twoPane, viewer == null, tab, statuses.isEmpty(), savedList.isEmpty()) {
             if (twoPane && viewer == null) (if (tab == 0) statuses else savedList).firstOrNull()?.let { vm.openViewer(tab == 1, it.key) }
         }
+        androidx.compose.runtime.CompositionLocalProvider(com.sushant.saveo.ui.home.LocalShortWindow provides shortWindow) {
         Row(Modifier.fillMaxSize()) {
             if (rail) SideRail(
                 current = if (screen == Screen.HOME) tab else 2,
@@ -151,6 +153,7 @@ fun AppRoot(
                 if (v != null) ViewerScreen(vm, v, inPane = true)
                 else PanePlaceholder()
             }
+        }
         }
         SnackbarHost(snackHost, Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(bottom = if (viewer != null && !twoPane) 96.dp else if (screen == Screen.HOME) 112.dp else 8.dp).widthIn(max = 560.dp)) { d ->
             val ex = LocalSaveo.current

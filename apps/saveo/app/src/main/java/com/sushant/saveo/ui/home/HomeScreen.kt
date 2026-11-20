@@ -93,6 +93,12 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.isCtrlPressed
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -143,7 +149,19 @@ fun HomeScreen(vm: MainViewModel, showTabs: Boolean, modifier: Modifier = Modifi
     val selecting = selection != null
     val unsaved = remember(statuses, savedKeys) { statuses.count { it.status != null && it.status.matchKey !in savedKeys } }
 
-    Box(modifier.fillMaxSize()) {
+    Box(
+        modifier.fillMaxSize().onPreviewKeyEvent { e ->
+            if (e.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+            val list = if (tab == 0) statuses else saved
+            when {
+                e.isCtrlPressed && e.key == Key.A -> { vm.selectAll(list.map { it.key }); true }
+                e.key == Key.Escape && selecting -> { vm.clearSelection(); true }
+                e.key == Key.Delete && selecting && tab == 1 -> { vm.delete(list.filter { it.key in selection.orEmpty() }.mapNotNull { it.saved?.id }); true }
+                e.isCtrlPressed && e.key == Key.R -> { vm.refresh(userAsked = true); true }
+                else -> false
+            }
+        },
+    ) {
         Column(Modifier.fillMaxSize()) {
             if (selecting) SelectionBar(
                 count = selection!!.size,
@@ -270,11 +288,12 @@ private fun TitleBar(
         Modifier.fillMaxWidth().statusBarsPadding().padding(start = 18.dp, end = 4.dp, top = 6.dp, bottom = 2.dp).heightIn(min = 56.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(title, style = MaterialTheme.typography.headlineSmall, modifier = Modifier.weight(1f).semantics { heading() }, maxLines = 1, overflow = TextOverflow.Ellipsis)
-        Surface(onClick = onSource, shape = CircleShape, color = MaterialTheme.colorScheme.secondaryContainer, modifier = Modifier.heightIn(min = 40.dp).testTag("source_chip")) {
+        Text(title, style = MaterialTheme.typography.headlineSmall, modifier = Modifier.weight(1f).widthIn(min = 72.dp).semantics { heading() }, maxLines = 1, softWrap = false)
+        val shortLabel = stringResource(when (source) { null -> R.string.src_all_short; Source.WHATSAPP -> R.string.src_wa_short; Source.BUSINESS -> R.string.src_b_short; Source.DUAL -> R.string.src_dual_short })
+        Surface(onClick = onSource, shape = CircleShape, color = MaterialTheme.colorScheme.secondaryContainer, modifier = Modifier.heightIn(min = 40.dp).widthIn(max = 150.dp).testTag("source_chip")) {
             Text(
-                (source?.label ?: stringResource(R.string.all_sources)) + " ▾", color = MaterialTheme.colorScheme.onSecondaryContainer,
-                style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp), maxLines = 1,
+                "$shortLabel ▾", color = MaterialTheme.colorScheme.onSecondaryContainer,
+                style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp), maxLines = 1, overflow = TextOverflow.Ellipsis,
             )
         }
         IconButton(onClick = onOpenWhatsApp) { Icon(Icons.AutoMirrored.Rounded.OpenInNew, stringResource(R.string.open_whatsapp)) }
@@ -572,5 +591,7 @@ private fun <T> OptionSheet(title: String, options: List<Pair<String, T>>, selec
 }
 
 /** Smaller tiles when the screen is short (phone landscape), so several rows fit. */
+val LocalShortWindow = androidx.compose.runtime.compositionLocalOf { false }
+
 @Composable
-private fun tileMin() = if (androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp < 520) 128.dp else 160.dp
+private fun tileMin() = if (LocalShortWindow.current) 128.dp else 160.dp

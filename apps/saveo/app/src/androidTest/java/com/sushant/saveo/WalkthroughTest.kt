@@ -158,7 +158,10 @@ class WalkthroughTest {
             back()
         }
         step("landscape") {
-            device.setOrientationLeft(); Thread.sleep(4500); shot("19_landscape_home")
+            device.setOrientationLeft(); Thread.sleep(3000); compose.waitForIdle()
+            val cfg = ctx.resources.configuration
+            Log.i("SaveoWalk", "landscape cfg ${cfg.screenWidthDp}x${cfg.screenHeightDp} viewerNodes=${compose.onAllNodesWithTag("viewer", useUnmergedTree = true).fetchSemanticsNodes().size} tiles=${compose.onAllNodesWithTag("tile", useUnmergedTree = true).fetchSemanticsNodes().size}")
+            waitTag("viewer"); Thread.sleep(1500); shot("19_landscape_home")
             device.setOrientationNatural(); Thread.sleep(2000)
         }
         sc.close()

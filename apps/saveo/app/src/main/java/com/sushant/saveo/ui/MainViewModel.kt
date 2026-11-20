@@ -30,6 +30,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import java.io.File
 
@@ -110,6 +111,7 @@ class MainViewModel(app: Application, private val handle: SavedStateHandle) : An
     init {
         repo.diagnostics.count(Diagnostics.OPENS)
         refresh()
+        restoreViewer()
         viewModelScope.launch { repo.purgeBin(); repo.reconcileSaved() }
     }
 
@@ -247,9 +249,20 @@ class MainViewModel(app: Application, private val handle: SavedStateHandle) : An
         val idx = list.indexOfFirst { it.key == key }.coerceAtLeast(0)
         if (list.isEmpty()) return
         _viewer.value = ViewerSession(fromSaved, list, idx)
+        handle["viewerKey"] = key; handle["viewerSaved"] = fromSaved
         repo.diagnostics.count(Diagnostics.VIEWED)
     }
-    fun closeViewer() { _viewer.value = null }
+    fun closeViewer() { _viewer.value = null; handle["viewerKey"] = null }
+
+    /** Re-opens the viewer after Android killed the app in the background. */
+    private fun restoreViewer() {
+        val key = handle.get<String>("viewerKey") ?: return
+        val fromSaved = handle.get<Boolean>("viewerSaved") == true
+        viewModelScope.launch {
+            val list = if (fromSaved) saved.first { it.isNotEmpty() } else statuses.first { it.isNotEmpty() }
+            if (_viewer.value == null && list.any { it.key == key }) openViewer(fromSaved, key)
+        }
+    }
     /** Drops deleted items from an open viewer. */
     fun viewerRemoved(key: String) {
         val v = _viewer.value ?: return

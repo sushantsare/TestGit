@@ -136,7 +136,7 @@ fun SettingsScreen(vm: MainViewModel, authenticate: (onOk: () -> Unit) -> Unit, 
         resumeTick++
     }
     fun openNotifSettings() {
-        ctx.startActivity(Intent(AndroidSettings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(AndroidSettings.EXTRA_APP_PACKAGE, ctx.packageName))
+        runCatching { ctx.startActivity(Intent(AndroidSettings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(AndroidSettings.EXTRA_APP_PACKAGE, ctx.packageName)) }
     }
     fun toggleAlerts() {
         if (s.alerts) { vm.updateSettings { it.copy(alerts = false) }; return }

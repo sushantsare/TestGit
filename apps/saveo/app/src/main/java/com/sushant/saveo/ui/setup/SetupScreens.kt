@@ -169,7 +169,7 @@ fun SetupScreen(vm: MainViewModel, onContinue: () -> Unit, onBack: () -> Unit) {
                 GlossyButton(stringResource(R.string.allow_access), {
                     val activity = ctx as? android.app.Activity
                     val blocked = vm.repo.prefs.storageAsked && activity != null && legacyPerms.none { activity.shouldShowRequestPermissionRationale(it) }
-                    if (blocked) ctx.startActivity(Intent(AndroidSettings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.fromParts("package", ctx.packageName, null)))
+                    if (blocked) runCatching { ctx.startActivity(Intent(AndroidSettings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.fromParts("package", ctx.packageName, null))) }
                     else permLauncher.launch(legacyPerms)
                 }, Modifier.padding(horizontal = 24.dp).testTag("allow_access"))
                 Spacer(Modifier.height(18.dp))
@@ -202,7 +202,7 @@ fun SetupScreen(vm: MainViewModel, onContinue: () -> Unit, onBack: () -> Unit) {
                             vm.setFolder(s, null)
                         } else {
                             pending = i
-                            treeLauncher.launch(StatusScanner.initialUri(s))
+                            runCatching { treeLauncher.launch(StatusScanner.initialUri(s)) }.onFailure { vm.showSnack(ctx.getString(R.string.wrong_folder)) }
                         }
                     }
                 }

@@ -36,6 +36,14 @@
     <string name="dates_week">Last 7 days</string>
     <string name="dates_month">Last 30 days</string>
     <string name="dates_pick">Pick dates…</string>
+    <string name="state_on">On</string>
+    <string name="state_off">Off</string>
+    <string name="cd_photo">Photo</string>
+    <string name="cd_speed">Playback speed %1$s</string>
+    <string name="src_all_short">All</string>
+    <string name="src_wa_short">WhatsApp</string>
+    <string name="src_b_short">Business</string>
+    <string name="src_dual_short">Dual</string>
     <string name="pane_hint">Tap a status to see it here</string>
     <string name="clear_dates">Clear dates</string>
     <string name="saved_on">Saved %1$s</string>

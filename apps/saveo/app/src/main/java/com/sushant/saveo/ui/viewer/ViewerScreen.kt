@@ -350,6 +350,7 @@ private fun whenText(t: Long): String {
 /** Pinch / double-tap zoom that lets single-finger swipes pass through to the pager while not zoomed. */
 @Composable
 private fun ZoomableImage(m: Media, fullPx: Int, thumbPx: Int, active: Boolean, onZoom: (Boolean) -> Unit) {
+    val photoDesc = stringResource(R.string.cd_photo)
     var scale by remember { mutableFloatStateOf(1f) }
     var offset by remember { mutableStateOf(Offset.Zero) }
     LaunchedEffect(active) { if (!active) { scale = 1f; offset = Offset.Zero } }
@@ -379,7 +380,7 @@ private fun ZoomableImage(m: Media, fullPx: Int, thumbPx: Int, active: Boolean, 
                     } while (event.changes.any { it.pressed })
                 }
             }
-            .semantics { contentDescription = "Photo" },
+            .semantics { contentDescription = photoDesc },
     ) {
         MediaImage(
             m.uri, m.kind,
@@ -415,10 +416,11 @@ private fun VideoControls(
             ) { Icon(if (playing) Icons.Rounded.Pause else Icons.Rounded.PlayArrow, stringResource(if (playing) R.string.pause else R.string.play), tint = Color(0xFF14804F)) }
             CtlButton(Icons.Rounded.Repeat, stringResource(if (loop) R.string.loop_on else R.string.loop_off), if (loop) Color(0xFF7EE2AE) else Color.White, onLoop)
             val label = if (speed % 1f == 0f) "${speed.toInt()}×" else "$speed×"
+            val speedDesc = stringResource(R.string.cd_speed, label)
             Text(
                 label, color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.SemiBold,
                 modifier = Modifier.heightIn(min = 48.dp).clip(CircleShape).clickable(role = Role.Button, onClick = onSpeed)
-                    .semantics { contentDescription = "Playback speed $label" }
+                    .semantics { contentDescription = speedDesc }
                     .background(Color.White.copy(alpha = 0.2f), CircleShape).padding(horizontal = 12.dp, vertical = 14.dp),
             )
         }
