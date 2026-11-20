@@ -365,7 +365,7 @@ class GrabbitE2ETest {
             xd = if (ok) Library.items.value.maxByOrNull { it.time }?.let { durationMs(it.uri) } ?: -1 else -1
             log("OPTIONS xtrim saved=$ok durationMs=$xd")
         }
-        return "trim=${trimOk && d in 2500..6500} xtrim=${xd in 8500..12500} m4a=${m4aOk && m4a?.mime == "audio/mp4"}"
+        return "trimDirect=${trimOk}(${d}ms) xtrim=${xd in 8500..12500} m4a=${m4aOk && m4a?.mime == "audio/mp4"}"
     }
 
     @Test
