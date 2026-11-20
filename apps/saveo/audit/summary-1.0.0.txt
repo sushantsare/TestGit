@@ -1,0 +1,13 @@
+T3 crashes=0 anrs=0
+T4 strictmode=0
+T5 app_leaks=0 heap_dumps=0
+T6 cold_median=1359 warm_median=326
+T7 Janky frames: 0 (0.00%)
+T8 before= TOTAL PSS: 63904 TOTAL RSS: 134516 TOTAL SWAP PSS: 247 after= TOTAL PSS: 74056 TOTAL RSS: 145800 TOTAL SWAP PSS: 137
+T9 crash_after_kill=0
+T10 offline_crashes=0
+T11 crashes=0
+T14 crashes=0
+T15 arm64_apk_bytes=15571464
+T15 signature=2 native_libs=4
+T15 zipalign16_exit=0
