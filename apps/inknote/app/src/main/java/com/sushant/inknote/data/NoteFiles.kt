@@ -8,8 +8,8 @@ import java.io.File
 
 /** All note data on disk lives in app-private storage: notes/<noteId>/{pages,img,audio,pdf}. */
 class NoteFiles(private val context: Context) {
-    val root = File(context.filesDir, "notes").apply { mkdirs() }
-    val thumbs = File(context.cacheDir, "thumbs").apply { mkdirs() }
+    val root = File(context.filesDir, "notes")
+    val thumbs = File(context.cacheDir, "thumbs")
 
     fun noteDir(noteId: Long) = File(root, noteId.toString())
     fun pageFile(noteId: Long, pageId: Long) = File(noteDir(noteId), "pages/$pageId.ink")

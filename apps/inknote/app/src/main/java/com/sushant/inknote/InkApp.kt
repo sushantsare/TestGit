@@ -13,6 +13,7 @@ import com.sushant.inknote.work.PurgeWorker
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 
 class InkApp : Application() {
     val appScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
@@ -30,6 +31,7 @@ class InkApp : Application() {
             StrictMode.setThreadPolicy(StrictMode.ThreadPolicy.Builder().detectAll().penaltyLog().build())
             StrictMode.setVmPolicy(StrictMode.VmPolicy.Builder().detectLeakedClosableObjects().detectActivityLeaks().penaltyLog().build())
         }
-        PurgeWorker.schedule(this)
+        // Open preferences, folders and the database off the main thread so the first screen never waits on disk.
+        appScope.launch(Dispatchers.IO) { files; settings; securePrefs; repo; db.openHelper.writableDatabase; PurgeWorker.schedule(this@InkApp) }
     }
 }

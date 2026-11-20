@@ -228,6 +228,8 @@ fun InkRoot(vm: MainViewModel, activity: MainActivity) {
         }.onFailure { ctx.toast(ctx.getString(R.string.cant_open_shared)) }
     }
 
+    androidx.activity.compose.BackHandler(enabled = drawer.isOpen) { scope.launch { drawer.close() } }
+    androidx.activity.compose.BackHandler(enabled = selected.isNotEmpty() && route == Routes.HOME) { vm.clearSelection() }
     BoxWithConstraints(Modifier.fillMaxSize().background(LocalInk.current.bg)) {
         val expanded = maxWidth >= 840.dp
         val canSplit = maxWidth >= 600.dp

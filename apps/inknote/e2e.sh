@@ -43,8 +43,8 @@ if [ -f "$DBG" ]; then
   adb logcat -d > $A/T3_logcat_debug.txt
   echo "T3 crashes=$(grep -A3 'FATAL EXCEPTION' $A/T3_logcat_debug.txt | grep -c "Process: $PKG") anrs=$(grep -c "ANR in $PKG" $A/T3_logcat_debug.txt)" >> $A/summary.txt
   echo "T4 strictmode=$(grep -c 'StrictMode policy violation' $A/T3_logcat_debug.txt)" >> $A/summary.txt
-  grep -A3 "StrictMode policy violation" $A/T3_logcat_debug.txt | head -120 > $A/T4_strictmode.txt
-  echo "T5 leaks=$(grep -cE 'HEAP ANALYSIS RESULT|APPLICATION LEAKS' $A/T3_logcat_debug.txt) leakcanary_lines=$(grep -c LeakCanary $A/T3_logcat_debug.txt)" >> $A/summary.txt
+  grep -A14 "StrictMode policy violation" $A/T3_logcat_debug.txt | head -300 > $A/T4_strictmode.txt
+  echo "T5 app_leaks=$(grep -oE '[0-9]+ APPLICATION LEAKS' $A/T3_logcat_debug.txt | awk '{s+=$1} END {print s+0}') heap_dumps=$(grep -c '0 APPLICATION LEAKS\|[1-9][0-9]* APPLICATION LEAKS' $A/T3_logcat_debug.txt)" >> $A/summary.txt
   grep -A30 "APPLICATION LEAKS" $A/T3_logcat_debug.txt | head -120 > $A/T5_leaks.txt
 fi
 # Release build for the rest

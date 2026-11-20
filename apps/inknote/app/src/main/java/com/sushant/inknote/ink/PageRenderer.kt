@@ -31,14 +31,14 @@ object PageRenderer {
      */
     fun draw(
         c: Canvas, files: NoteFiles, noteId: Long, p: PageEntity, content: PageContent, pal: PagePalette, pxPerUnit: Float,
-        sync: Boolean, playback: Pair<Long, Long>? = null, hideText: Long = -1,
+        sync: Boolean, playback: Pair<Long, Long>? = null, hideText: Long = -1, hiRes: Boolean = false,
         hidden: Selection? = null, onPdfReady: (() -> Unit)? = null,
     ) {
         c.save(); c.scale(pxPerUnit, pxPerUnit)
         PaperRenderer.draw(c, p.paper, p.width, p.height, pal)
         p.pdfFile?.let { name ->
             val f = files.pdf(noteId, name)
-            val px = if (sync) max((p.width * pxPerUnit).toInt(), 1600) else (p.width * pxPerUnit).toInt().coerceAtLeast(1)
+            val px = if (hiRes) max((p.width * pxPerUnit).toInt(), 1600) else (p.width * pxPerUnit).toInt().coerceAtLeast(1)
             val bmp = if (sync) PdfPageCache.renderNow(f, p.pdfPage, px) else PdfPageCache.get(f, p.pdfPage, px)
             if (bmp != null) c.drawBitmap(bmp, null, RectF(0f, 0f, p.width, p.height), bmpPaint)
             else if (!sync) PdfPageCache.request(f, p.pdfPage, px) { onPdfReady?.invoke() }

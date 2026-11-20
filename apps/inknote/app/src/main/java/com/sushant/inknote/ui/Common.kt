@@ -70,6 +70,7 @@ object ThumbCache {
         if (n.locked) return@withContext null
         lock.withLock {
             val name = "${n.id}_${n.thumbVersion}_${if (dark) "d" else "l"}.png"
+            app.files.thumbs.mkdirs()
             val f = File(app.files.thumbs, name)
             if (f.exists()) return@withLock BitmapFactory.decodeFile(f.path)
             val page = app.repo.pages(n.id).firstOrNull() ?: return@withLock null

@@ -51,7 +51,7 @@ class Exporter(private val context: Context, private val repo: Repository) {
                 val k = 0.595f // A4: 1000 page units = 595 pt
                 val info = PdfDocument.PageInfo.Builder((p.width * k).toInt(), (p.height * k).toInt(), i + 1).create()
                 val pg = doc.startPage(info)
-                PageRenderer.draw(pg.canvas, repo.files, note.id, p, repo.files.readPage(note.id, p.id), PagePalette.LIGHT, k, sync = true)
+                PageRenderer.draw(pg.canvas, repo.files, note.id, p, repo.files.readPage(note.id, p.id), PagePalette.LIGHT, k, sync = true, hiRes = true)
                 doc.finishPage(pg)
             }
             FileOutputStream(out).use { doc.writeTo(it) }
