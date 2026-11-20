@@ -62,7 +62,6 @@
     <string name="set_show_all_d">Makes every saved item visible in Gallery</string>
     <string name="show_all_body">They will appear in your Gallery app in the album Saveo. You can hide any of them again with the eye button.</string>
     <string name="nothing_hidden">Everything is already in your Gallery</string>
-    <string name="gallery_filter_note">Only these are in your phone Gallery. Everything else stays private inside Saveo.</string>
     <string name="gallery_empty_title">Nothing in Gallery</string>
     <string name="gallery_empty_body">Saved items stay private inside Saveo. Tap the eye on any item to show it in your Gallery.</string>
     <string name="private_title">Saved items are private now</string>

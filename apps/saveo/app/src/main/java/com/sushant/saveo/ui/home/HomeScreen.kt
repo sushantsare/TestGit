@@ -421,7 +421,7 @@ private fun StatusesPage(vm: MainViewModel) {
                 }
                 else -> groupedTiles(
                     list, { it.time },
-                    header = { g, n, first -> GroupHeader("${stringResource(groupLabel(g))} · $n", action = if (selection == null && first) stringResource(R.string.select) else null) { vm.startSelection() } },
+                    header = { g, n, first -> GroupHeader("${stringResource(groupLabel(g))} · $n", action = if (selection == null && first) stringResource(R.string.select) else null, onAction = { vm.startSelection() }) },
                 ) { m ->
                     val sel = selection
                     val state = when {
