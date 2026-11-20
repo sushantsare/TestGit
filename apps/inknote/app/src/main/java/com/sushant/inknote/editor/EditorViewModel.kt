@@ -106,7 +106,7 @@ class EditorViewModel(app: Application, private val saved: SavedStateHandle, val
         return null
     }
 
-    fun setTools(t: ToolState) {
+    fun updateTools(t: ToolState) {
         if (t.tool != tools.tool) { selection = null; if (t.tool != EditTool.TEXT) finishText() }
         tools = t
         saved["tool"] = t.tool.name; saved["color"] = t.color; saved["width"] = t.width; saved["brush"] = t.brush
@@ -241,7 +241,7 @@ class EditorViewModel(app: Application, private val saved: SavedStateHandle, val
         if (n.kind != Kind.TEXT || editing != null) return
         val p = pages.value.firstOrNull() ?: return
         val c = contents[p.id] ?: return
-        setTools(tools.copy(tool = EditTool.TEXT))
+        updateTools(tools.copy(tool = EditTool.TEXT))
         val box = c.texts.firstOrNull()
         editing = if (box != null) EditingText(p.id, box.id, box.x, box.y, box.w, box.html)
         else EditingText(p.id, Ids.next(), 60f, 60f, p.width - 120f, RichText.fromPlain(""))

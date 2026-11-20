@@ -286,13 +286,13 @@ fun EditorPane(
                     onDelete = vm::selectionDelete, onDone = { vm.selection = null }, modifier = Modifier.align(Alignment.BottomCenter).padding(12.dp))
             }
         }
-        ToolPanel(vm.tools, vm.editing != null, holder, onTools = { vm.setTools(it) }, onPenSheet = { sheet = Sheet.PEN }, onInsert = { vm.finishText(); sheet = Sheet.INSERT },
+        ToolPanel(vm.tools, vm.editing != null, holder, onTools = { vm.updateTools(it) }, onPenSheet = { sheet = Sheet.PEN }, onInsert = { vm.finishText(); sheet = Sheet.INSERT },
             onDoneText = { holder.hideKeyboard(); vm.finishText() }, recentColors = listOf(0xFF1F3F9A, 0xFF1C1B1F, 0xFFC0392B, 0xFF0E8A6B, 0xFFE67E22).map { it.toInt() }.let { base -> if (vm.tools.color in base) base else listOf(vm.tools.color) + base.take(4) })
     }
 
     // ---------- sheets & dialogs ----------
     when (sheet) {
-        Sheet.PEN -> PenSheet(vm.tools, SavedPen.decodeAll(settings.savedPens), { vm.setTools(it) }, { l -> updateSettings { it.copy(savedPens = SavedPen.encodeAll(l)) } }) { sheet = Sheet.NONE }
+        Sheet.PEN -> PenSheet(vm.tools, SavedPen.decodeAll(settings.savedPens), { vm.updateTools(it) }, { l -> updateSettings { it.copy(savedPens = SavedPen.encodeAll(l)) } }) { sheet = Sheet.NONE }
         Sheet.INSERT -> InsertSheet(::onInsert) { sheet = Sheet.NONE }
         Sheet.EXPORT -> ExportSheet(n?.title ?: "", pages.size, exportBusy, { f, o -> export(f, o, false) }, { f, o -> export(f, o, true) }) { sheet = Sheet.NONE }
         Sheet.TAGS -> TagsSheet(folders, n?.folderId, allTags, vm.tags.value, { t, f -> vm.setTagsAndFolder(t, f); sheet = Sheet.NONE }) { sheet = Sheet.NONE }
