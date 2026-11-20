@@ -143,7 +143,9 @@ class WalkthroughTest {
         step("eye_toggle") {
             compose.onAllNodesWithTag("eye", useUnmergedTree = true).onFirst().performClick()
             waitText("visible in Gallery"); Thread.sleep(800); shot("10b_eye_now_in_gallery")
-            compose.onNodeWithText("In gallery", useUnmergedTree = true).performClick(); Thread.sleep(800); shot("10c_in_gallery_filter")
+            compose.onNodeWithText("In gallery", useUnmergedTree = true).performClick()
+            compose.waitUntil(8000) { compose.onAllNodesWithTag("saved_tile", useUnmergedTree = true).fetchSemanticsNodes().size == 1 }
+            Thread.sleep(1200); shot("10c_in_gallery_filter")
             compose.onAllNodesWithText("All", useUnmergedTree = true).onFirst().performClick(); Thread.sleep(500)
         }
         step("saved_viewer_delete") {
