@@ -156,15 +156,15 @@ class WalkthroughTest {
         }
         step("settings") {
             tag("tab_statuses").performClick(); Thread.sleep(400)
-            tag("overflow").performClick(); waitTag("menu_settings"); tag("menu_settings").performClick()
+            tag("tab_settings").performClick()
             waitText("Auto-save"); shot("13_settings")
         }
-        step("bin") { compose.onNodeWithText("Recycle bin").performClick(); waitText("deleted forever"); Thread.sleep(800); shot("14_recycle_bin"); back() }
+        step("bin") { compose.onNodeWithText("Recycle bin").performScrollTo().performClick(); waitText("deleted forever"); Thread.sleep(800); shot("14_recycle_bin"); back() }
         step("diagnostics") { compose.onNodeWithText("Diagnostics").performScrollTo().performClick(); waitText("Crash log"); shot("15_diagnostics"); back() }
         step("about") { compose.onNodeWithText("About Saveo").performScrollTo().performClick(); waitText("sushant.sare@gmail.com"); shot("16_about"); back() }
-        step("folders") { compose.onNodeWithText("WhatsApp folders").performClick(); waitTag("continue"); shot("17_folders"); back() }
+        step("folders") { compose.onNodeWithText("WhatsApp folders").performScrollTo().performClick(); waitTag("continue"); shot("17_folders"); back() }
         step("notif_rationale") {
-            compose.onNodeWithText("New status alerts").performClick(); Thread.sleep(600)
+            compose.onNodeWithText("New status alerts").performScrollTo().performClick(); Thread.sleep(600)
             if (compose.onAllNodesWithText("Turn on alerts?").fetchSemanticsNodes().isNotEmpty()) { shot("18_alerts_reason"); compose.onNodeWithText("Not now").performClick() }
             else shot("18_alerts_on")
             back()
@@ -188,7 +188,7 @@ class WalkthroughTest {
             tag("tab_saved").performClick(); waitTag("saved_tile"); Thread.sleep(1000); shot("22_dark_saved")
             tag("tab_statuses").performClick()
         }
-        step("dark_settings") { tag("overflow").performClick(); waitTag("menu_settings"); tag("menu_settings").performClick(); waitText("Auto-save"); shot("23_dark_settings"); back() }
+        step("dark_settings") { tag("tab_settings").performClick(); waitText("Auto-save"); shot("23_dark_settings"); back() }
         step("lock_screen") {
             app.prefs.update { it.copy(appLock = true) }; app.lockNow()
             waitTag("lock_screen"); Thread.sleep(1500)

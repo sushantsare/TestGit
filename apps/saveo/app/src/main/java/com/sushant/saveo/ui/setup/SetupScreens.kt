@@ -230,16 +230,16 @@ private fun SourceRow(s: Source, sub: String, connected: Boolean, actionLabel: S
     Row(Modifier.fillMaxWidth().heightIn(min = 68.dp).padding(horizontal = 16.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
         Box(
             Modifier.size(36.dp).clip(RoundedCornerShape(11.dp))
-                .background(if (connected) androidx.compose.ui.graphics.Brush.verticalGradient(listOf(Color(0xFF3CCB89), Color(0xFF148654))) else androidx.compose.ui.graphics.SolidColor(MaterialTheme.colorScheme.surfaceContainerHigh)),
+                .background(if (connected) androidx.compose.ui.graphics.SolidColor(MaterialTheme.colorScheme.primary) else androidx.compose.ui.graphics.SolidColor(MaterialTheme.colorScheme.surfaceContainerHigh)),
             contentAlignment = Alignment.Center,
-        ) { Icon(if (connected) Icons.Rounded.Check else Icons.Rounded.Folder, null, tint = if (connected) Color.White else MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(20.dp)) }
+        ) { Icon(if (connected) Icons.Rounded.Check else Icons.Rounded.Folder, null, tint = if (connected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(20.dp)) }
         Spacer(Modifier.width(14.dp))
         Column(Modifier.weight(1f)) {
             Text(s.label, style = MaterialTheme.typography.titleMedium)
             Text(sub, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         if (actionLabel != null) FilledTonalButton(onClick = onAction, modifier = Modifier.testTag("connect_${s.name}")) { Text(actionLabel) }
-        else if (connected) Text(stringResource(R.string.done), color = ex.glossBottom, style = MaterialTheme.typography.labelLarge)
+        else if (connected) Text(stringResource(R.string.done), color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.labelLarge)
     }
 }
 

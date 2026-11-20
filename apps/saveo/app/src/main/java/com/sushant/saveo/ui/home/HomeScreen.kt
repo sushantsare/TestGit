@@ -124,7 +124,10 @@ import com.sushant.saveo.ui.components.GlossyButton
 import com.sushant.saveo.ui.components.MediaTile
 import com.sushant.saveo.ui.components.SaveState
 import com.sushant.saveo.ui.components.dpToPx
-import com.sushant.saveo.ui.theme.LocalSaveo
+import com.sushant.saveo.ui.theme.Overline
+import com.sushant.saveo.ui.components.ScreenTitle
+import com.sushant.saveo.ui.components.AppIcon
+import androidx.compose.material.icons.rounded.ArrowDropDown
 import kotlinx.coroutines.launch
 
 /**
@@ -171,30 +174,15 @@ fun HomeScreen(vm: MainViewModel, showTabs: Boolean, modifier: Modifier = Modifi
                 onClose = vm::clearSelection,
                 onSelectAll = { vm.selectAll((if (tab == 0) statuses else saved).map { it.key }) },
             ) else TitleBar(
-                title = if (showTabs) stringResource(R.string.app_name) else stringResource(if (tab == 0) R.string.tab_statuses else R.string.tab_saved),
+                title = stringResource(if (tab == 0) R.string.tab_statuses else R.string.tab_saved),
+                brand = tab == 0,
                 source = settings.sourceFilter,
                 onSource = { sheet = "source" },
                 onOpenWhatsApp = vm::openWhatsApp,
                 onSelect = { vm.startSelection() },
                 onRefresh = { vm.refresh(userAsked = true) },
-                onSettings = { vm.go(Screen.SETTINGS) },
             )
-            if (showTabs) {
-                TabRow(
-                    selectedTabIndex = pager.currentPage,
-                    containerColor = MaterialTheme.colorScheme.surface,
-                    indicator = { pos ->
-                        if (pager.currentPage < pos.size) TabRowDefaults.PrimaryIndicator(
-                            Modifier.tabIndicatorOffset(pos[pager.currentPage]), width = 64.dp, height = 3.dp, color = MaterialTheme.colorScheme.primary,
-                        )
-                    },
-                    divider = { Box(Modifier.fillMaxWidth().height(1.dp).background(MaterialTheme.colorScheme.outlineVariant)) },
-                ) {
-                    TabLabel(stringResource(R.string.tab_statuses), statuses.size, pager.currentPage == 0, "tab_statuses") { scope.launch { pager.animateScrollToPage(0) } }
-                    TabLabel(stringResource(R.string.tab_saved), savedTotal.size, pager.currentPage == 1, "tab_saved") { scope.launch { pager.animateScrollToPage(1) } }
-                }
-            }
-            HorizontalPager(pager, Modifier.weight(1f), key = { it }, userScrollEnabled = showTabs && !selecting, beyondViewportPageCount = 1) { page ->
+            HorizontalPager(pager, Modifier.weight(1f), key = { it }, userScrollEnabled = !selecting, beyondViewportPageCount = 1) { page ->
                 if (page == 0) StatusesPage(vm) else SavedPage(vm, onSort = { sheet = "sort" }, onDates = { sheet = "dates" })
             }
         }
@@ -270,44 +258,29 @@ fun HomeScreen(vm: MainViewModel, showTabs: Boolean, modifier: Modifier = Modifi
 }
 
 @Composable
-private fun TabLabel(text: String, count: Int, selected: Boolean, tag: String, onClick: () -> Unit) {
-    Tab(selected = selected, onClick = onClick, modifier = Modifier.testTag(tag).heightIn(min = 48.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(vertical = 12.dp)) {
-            Text(text, style = MaterialTheme.typography.titleSmall.copy(fontSize = 15.sp), color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
-            Spacer(Modifier.width(6.dp))
-            Text(
-                "$count", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSecondaryContainer,
-                modifier = Modifier.clip(RoundedCornerShape(9.dp)).background(MaterialTheme.colorScheme.secondaryContainer).padding(horizontal = 7.dp, vertical = 1.dp),
-            )
-        }
-    }
-}
-
-@Composable
 private fun TitleBar(
-    title: String, source: Source?, onSource: () -> Unit, onOpenWhatsApp: () -> Unit,
-    onSelect: () -> Unit, onRefresh: () -> Unit, onSettings: () -> Unit,
+    title: String, brand: Boolean, source: Source?, onSource: () -> Unit, onOpenWhatsApp: () -> Unit,
+    onSelect: () -> Unit, onRefresh: () -> Unit,
 ) {
     var menu by remember { mutableStateOf(false) }
-    Row(
-        Modifier.fillMaxWidth().statusBarsPadding().padding(start = 18.dp, end = 4.dp, top = 6.dp, bottom = 2.dp).heightIn(min = 56.dp),
-        verticalAlignment = Alignment.CenterVertically,
+    ScreenTitle(
+        title,
+        Modifier.statusBarsPadding().padding(start = 16.dp, end = 4.dp, top = 8.dp),
+        leading = if (brand) ({ AppIcon(34.dp) }) else null,
     ) {
-        Text(title, style = MaterialTheme.typography.headlineSmall, modifier = Modifier.weight(1f).widthIn(min = 72.dp).semantics { heading() }, maxLines = 1, softWrap = false)
         val shortLabel = stringResource(when (source) { null -> R.string.src_all_short; Source.WHATSAPP -> R.string.src_wa_short; Source.BUSINESS -> R.string.src_b_short; Source.DUAL -> R.string.src_dual_short })
-        Surface(onClick = onSource, shape = CircleShape, color = MaterialTheme.colorScheme.secondaryContainer, modifier = Modifier.heightIn(min = 40.dp).widthIn(max = 150.dp).testTag("source_chip")) {
-            Text(
-                "$shortLabel ▾", color = MaterialTheme.colorScheme.onSecondaryContainer,
-                style = MaterialTheme.typography.labelLarge, modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp), maxLines = 1, overflow = TextOverflow.Ellipsis,
-            )
+        Surface(onClick = onSource, shape = CircleShape, color = MaterialTheme.colorScheme.surfaceContainerHigh, modifier = Modifier.heightIn(min = 40.dp).widthIn(max = 150.dp).testTag("source_chip")) {
+            Row(Modifier.padding(start = 12.dp, end = 8.dp, top = 9.dp, bottom = 9.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text(shortLabel, color = MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.labelLarge, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
+                Icon(Icons.Rounded.ArrowDropDown, null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(20.dp))
+            }
         }
         IconButton(onClick = onOpenWhatsApp) { Icon(Icons.AutoMirrored.Rounded.OpenInNew, stringResource(R.string.open_whatsapp)) }
         Box {
             IconButton(onClick = { menu = true }, modifier = Modifier.testTag("overflow")) { Icon(Icons.Rounded.MoreVert, stringResource(R.string.more_options)) }
-            DropdownMenu(menu, onDismissRequest = { menu = false }) {
+            DropdownMenu(menu, onDismissRequest = { menu = false }, shape = MaterialTheme.shapes.medium) {
                 DropdownMenuItem(text = { Text(stringResource(R.string.select)) }, onClick = { menu = false; onSelect() })
                 DropdownMenuItem(text = { Text(stringResource(R.string.refresh)) }, onClick = { menu = false; onRefresh() })
-                DropdownMenuItem(text = { Text(stringResource(R.string.settings)) }, onClick = { menu = false; onSettings() }, modifier = Modifier.testTag("menu_settings"))
             }
         }
     }
@@ -341,19 +314,20 @@ private fun FilterRow(vm: MainViewModel, savedTab: Boolean = false, trailing: @C
 
 @Composable
 private fun GlossChip(text: String, selected: Boolean, icon: ImageVector? = null, onClick: () -> Unit) {
-    val ex = LocalSaveo.current
     FilterChip(
         selected = selected, onClick = onClick,
         label = { Text(text, style = MaterialTheme.typography.labelLarge) },
-        leadingIcon = icon?.let { ic -> { Icon(ic, null, Modifier.size(18.dp)) } },
-        shape = CircleShape, border = null,
+        leadingIcon = when {
+            selected -> ({ Icon(Icons.Rounded.Check, null, Modifier.size(18.dp)) })
+            icon != null -> ({ Icon(icon, null, Modifier.size(18.dp)) })
+            else -> null
+        },
+        shape = MaterialTheme.shapes.small,
         colors = FilterChipDefaults.filterChipColors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainer,
-            labelColor = MaterialTheme.colorScheme.onSurface,
-            selectedContainerColor = ex.glossBottom,
-            selectedLabelColor = ex.onGloss,
+            selectedContainerColor = MaterialTheme.colorScheme.secondaryContainer,
+            selectedLabelColor = MaterialTheme.colorScheme.onSecondaryContainer,
+            selectedLeadingIconColor = MaterialTheme.colorScheme.onSecondaryContainer,
             iconColor = MaterialTheme.colorScheme.primary,
-            selectedLeadingIconColor = ex.onGloss,
         ),
         modifier = Modifier.heightIn(min = 40.dp),
     )
@@ -535,7 +509,7 @@ private fun RoundAction(icon: ImageVector, desc: String, onClick: () -> Unit, ac
 @Composable
 private fun GroupHeader(text: String, action: String? = null, onAction: () -> Unit = {}, trailing: @Composable () -> Unit = {}) {
     Row(Modifier.fillMaxWidth().padding(start = 4.dp, top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-        Text(text, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1f).semantics { heading() })
+        Text(text.uppercase(), style = Overline, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1f).semantics { heading() })
         if (action != null) TextButton(onClick = onAction) { Text(action) }
         trailing()
     }

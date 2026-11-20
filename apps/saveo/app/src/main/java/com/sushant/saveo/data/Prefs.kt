@@ -19,6 +19,8 @@ data class Settings(
     val sourceFilter: Source? = null,
     /** false (default) = new saves stay hidden inside Saveo; true = they go straight to the Gallery. */
     val newSavesVisible: Boolean = false,
+    /** Dark mode with pure black backgrounds (OLED). */
+    val pureBlack: Boolean = false,
 )
 
 /**
@@ -46,6 +48,7 @@ class Prefs(ctx: Context) {
         sortNewest = sp.getBoolean("sortNewest", true),
         sourceFilter = sp.getString("source", null)?.let { s -> Source.entries.firstOrNull { it.name == s } },
         newSavesVisible = sp.getBoolean("newSavesVisible", false),
+        pureBlack = sp.getBoolean("pureBlack", false),
     )
 
     fun update(block: (Settings) -> Settings) {
@@ -60,6 +63,7 @@ class Prefs(ctx: Context) {
             .putBoolean("sortNewest", n.sortNewest)
             .putString("source", n.sourceFilter?.name)
             .putBoolean("newSavesVisible", n.newSavesVisible)
+            .putBoolean("pureBlack", n.pureBlack)
             .apply()
         _settings.value = n
     }

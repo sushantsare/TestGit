@@ -56,7 +56,6 @@
     <string name="viewer_visible_hint">Visible in Gallery · tap the eye to hide</string>
     <string name="viewer_hidden_hint">Only in Saveo · tap the eye to show in Gallery</string>
     <string name="set_new_saves">New saves go to</string>
-    <string name="new_saves_hidden">Hidden (only in Saveo)</string>
     <string name="new_saves_gallery">Gallery</string>
     <string name="set_show_all">Show all in gallery</string>
     <string name="set_show_all_d">Makes every saved item visible in Gallery</string>
@@ -80,6 +79,12 @@
         <item quantity="one">Show %d hidden item in Gallery?</item>
         <item quantity="other">Show %d hidden items in Gallery?</item>
     </plurals>
+    <string name="set_pure_black">Pure black</string>
+    <string name="set_pure_black_d">Darker dark mode for OLED screens</string>
+    <string name="new_saves_hidden_short">Only in Saveo</string>
+    <string name="new_saves_hidden_d">New saves stay private. Tap the eye on any item to show it in Gallery.</string>
+    <string name="new_saves_gallery_d">New saves go straight into your Gallery album Saveo.</string>
+    <string name="sec_data">WhatsApp &amp; data</string>
     <string name="pane_hint">Tap a status to see it here</string>
     <string name="clear_dates">Clear dates</string>
     <string name="saved_on">Saved %1$s</string>
@@ -123,7 +128,7 @@
 
     <!-- Viewer -->
     <string name="back">Back</string>
-    <string name="save_to_gallery">Save to gallery</string>
+    <string name="save_to_gallery">Save</string>
     <string name="saved_check">Saved</string>
     <string name="photo">Photo</string>
     <string name="video">Video</string>

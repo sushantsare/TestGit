@@ -27,6 +27,11 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Settings
+import androidx.compose.material.icons.outlined.GridView
+import androidx.compose.material.icons.outlined.Collections
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.consumeWindowInsets
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.material.icons.rounded.Collections
 import androidx.compose.material.icons.rounded.GridView
 import androidx.compose.material.icons.rounded.Settings
@@ -69,6 +74,7 @@ import com.sushant.saveo.ui.viewer.ViewerScreen
  * Root: screens, adaptive layout (bottom-free phone layout; navigation rail from 600dp; grid + viewer side by
  * side from 840dp), the viewer overlay, snackbars, lock screen and Back handling.
  */
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
 fun AppRoot(
     vm: MainViewModel,
@@ -121,6 +127,9 @@ fun AppRoot(
         val twoPane = maxWidth >= 840.dp && screen == Screen.HOME
         val shortWindow = maxHeight < 520.dp
         vm.twoPane = twoPane
+        val selection by vm.selection.collectAsStateWithLifecycle()
+        // Phones: bottom navigation bar on the two main screens (hidden while selecting or viewing)
+        val bottomBar = !rail && (screen == Screen.HOME || screen == Screen.SETTINGS) && selection == null && viewer == null
         val statuses by vm.statuses.collectAsStateWithLifecycle()
         val savedList by vm.saved.collectAsStateWithLifecycle()
         // Two panes: always show something on the right
@@ -128,7 +137,8 @@ fun AppRoot(
             if (twoPane && viewer == null) (if (tab == 0) statuses else savedList).firstOrNull()?.let { vm.openViewer(tab == 1, it.key) }
         }
         androidx.compose.runtime.CompositionLocalProvider(com.sushant.saveo.ui.home.LocalShortWindow provides shortWindow) {
-        Row(Modifier.fillMaxSize()) {
+        Column(Modifier.fillMaxSize()) {
+        Row(Modifier.weight(1f).fillMaxWidth().then(if (bottomBar) Modifier.consumeWindowInsets(WindowInsets.navigationBars) else Modifier)) {
             if (rail) SideRail(
                 current = if (screen == Screen.HOME) tab else 2,
                 onTab = { t -> vm.closeViewer(); if (t == 2) vm.go(Screen.SETTINGS) else { vm.go(Screen.HOME); vm.setTab(t) } },
@@ -161,8 +171,13 @@ fun AppRoot(
                 else PanePlaceholder()
             }
         }
+        if (bottomBar) BottomBar(
+            current = if (screen == Screen.HOME) tab else 2,
+            onTab = { t -> vm.closeViewer(); if (t == 2) vm.go(Screen.SETTINGS) else { vm.go(Screen.HOME); vm.setTab(t) } },
+        )
         }
-        SnackbarHost(snackHost, Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(bottom = if (viewer != null && !twoPane) 96.dp else if (screen == Screen.HOME) 112.dp else 8.dp).widthIn(max = 560.dp)) { d ->
+        }
+        SnackbarHost(snackHost, Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(bottom = (if (viewer != null && !twoPane) 96.dp else if (screen == Screen.HOME) 84.dp else 8.dp) + (if (bottomBar) 80.dp else 0.dp)).widthIn(max = 560.dp)) { d ->
             val ex = LocalSaveo.current
             Snackbar(d, containerColor = ex.snackBg, contentColor = androidx.compose.ui.graphics.Color.White, actionColor = ex.snackAction, shape = MaterialTheme.shapes.medium, modifier = Modifier.padding(horizontal = 16.dp))
         }
@@ -188,13 +203,39 @@ private fun PrivateInfoSheet(onDismiss: () -> Unit) {
     }
 }
 
+private data class NavDest(val label: Int, val filled: androidx.compose.ui.graphics.vector.ImageVector, val outlined: androidx.compose.ui.graphics.vector.ImageVector, val tag: String)
+
+private val NavDests = listOf(
+    NavDest(R.string.tab_statuses, Icons.Rounded.GridView, Icons.Outlined.GridView, "tab_statuses"),
+    NavDest(R.string.tab_saved, Icons.Rounded.Collections, Icons.Outlined.Collections, "tab_saved"),
+    NavDest(R.string.settings, Icons.Rounded.Settings, Icons.Outlined.Settings, "tab_settings"),
+)
+
+/** Selected = filled icon, unselected = outlined (Grabbit / Material 3). */
+@Composable
+private fun BottomBar(current: Int, onTab: (Int) -> Unit) {
+    androidx.compose.material3.NavigationBar(containerColor = MaterialTheme.colorScheme.surfaceContainerLow) {
+        NavDests.forEachIndexed { i, d ->
+            androidx.compose.material3.NavigationBarItem(
+                selected = current == i, onClick = { onTab(i) },
+                icon = { Icon(if (current == i) d.filled else d.outlined, null) },
+                label = { Text(stringResource(d.label), style = MaterialTheme.typography.labelMedium) },
+                modifier = Modifier.testTag(d.tag),
+            )
+        }
+    }
+}
+
 @Composable
 private fun SideRail(current: Int, onTab: (Int) -> Unit) {
     NavigationRail(Modifier.fillMaxHeight().statusBarsPadding(), containerColor = MaterialTheme.colorScheme.surfaceContainerLow) {
         Spacer(Modifier.height(20.dp))
-        NavigationRailItem(current == 0, { onTab(0) }, icon = { Icon(Icons.Rounded.GridView, null) }, label = { Text(stringResource(R.string.tab_statuses)) }, modifier = Modifier.testTag("rail_statuses"))
-        NavigationRailItem(current == 1, { onTab(1) }, icon = { Icon(Icons.Rounded.Collections, null) }, label = { Text(stringResource(R.string.tab_saved)) }, modifier = Modifier.testTag("rail_saved"))
-        NavigationRailItem(current == 2, { onTab(2) }, icon = { Icon(if (current == 2) Icons.Rounded.Settings else Icons.Outlined.Settings, null) }, label = { Text(stringResource(R.string.settings)) })
+        com.sushant.saveo.ui.components.AppIcon(40.dp)
+        Spacer(Modifier.height(20.dp))
+        NavDests.forEachIndexed { i, d ->
+            NavigationRailItem(current == i, { onTab(i) }, icon = { Icon(if (current == i) d.filled else d.outlined, null) },
+                label = { Text(stringResource(d.label), style = MaterialTheme.typography.labelMedium) }, modifier = Modifier.testTag(d.tag))
+        }
     }
 }
 

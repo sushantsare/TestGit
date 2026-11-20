@@ -50,6 +50,8 @@ import androidx.compose.material.icons.rounded.Palette
 import androidx.compose.material.icons.rounded.Restore
 import androidx.compose.material.icons.rounded.Share
 import androidx.compose.material.icons.rounded.Description
+import androidx.compose.material.icons.rounded.Contrast
+import com.sushant.saveo.ui.components.ScreenTitle
 import androidx.compose.material.icons.rounded.Visibility
 import androidx.compose.material.icons.rounded.VisibilityOff
 import kotlinx.coroutines.launch
@@ -114,7 +116,7 @@ import com.sushant.saveo.work.Notifier
 fun SubTopBar(title: String, onBack: () -> Unit, action: (@Composable () -> Unit)? = null) {
     Row(Modifier.fillMaxWidth().statusBarsPadding().padding(4.dp).heightIn(min = 56.dp), verticalAlignment = Alignment.CenterVertically) {
         IconButton(onClick = onBack, modifier = Modifier.testTag("back")) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, stringResource(R.string.back)) }
-        Text(title, style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f).semantics { heading() })
+        Text(title, style = MaterialTheme.typography.headlineSmall, modifier = Modifier.weight(1f).semantics { heading() }, maxLines = 1)
         action?.invoke()
     }
 }
@@ -127,9 +129,7 @@ fun SettingsScreen(vm: MainViewModel, authenticate: (onOk: () -> Unit) -> Unit, 
     val s by vm.settings.collectAsStateWithLifecycle()
     val status by vm.status.collectAsStateWithLifecycle()
     val bin by vm.bin.collectAsStateWithLifecycle()
-    var themeSheet by rememberSaveable { mutableStateOf(false) }
     var notifAsk by rememberSaveable { mutableStateOf(false) }
-    var newSavesSheet by rememberSaveable { mutableStateOf(false) }
     var showAllAsk by rememberSaveable { mutableStateOf(false) }
     var hiddenCount by rememberSaveable { mutableIntStateOf(0) }
     val scope = androidx.compose.runtime.rememberCoroutineScope()
@@ -153,98 +153,81 @@ fun SettingsScreen(vm: MainViewModel, authenticate: (onOk: () -> Unit) -> Unit, 
         else vm.updateSettings { it.copy(alerts = true) }
     }
 
-    Column(Modifier.fillMaxSize()) {
-        SubTopBar(stringResource(R.string.settings), onBack)
-        Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).navigationBarsPadding().padding(bottom = 24.dp).widthIn(max = 720.dp)) {
-            SectionLabel(stringResource(R.string.sec_saving))
-            ListCard {
-                SettingRow(Icons.Rounded.AutoAwesome, Color(0xFF187C51), stringResource(R.string.set_autosave), stringResource(R.string.set_autosave_d), checked = s.autoSave) {
-                    vm.updateSettings { it.copy(autoSave = !it.autoSave) }
-                }
-                ListDivider()
-                val blocked = s.alerts && !canNotify
-                SettingRow(
-                    Icons.Rounded.NotificationsActive, Color(0xFFB36A00), stringResource(R.string.set_alerts),
-                    stringResource(if (blocked) R.string.set_alerts_blocked else R.string.set_alerts_d),
-                    checked = s.alerts, subtitleColor = if (blocked) MaterialTheme.colorScheme.error else null,
-                ) { if (blocked) openNotifSettings() else toggleAlerts() }
-                ListDivider()
-                val connected = status.connected.joinToString(" · ") { it.label }.ifBlank { stringResource(R.string.not_connected) }
-                SettingRow(Icons.Rounded.Folder, Color(0xFF3D6FC9), stringResource(R.string.set_folders), connected) { vm.openSetup(true) }
+    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).navigationBarsPadding().padding(bottom = 24.dp).widthIn(max = 720.dp)) {
+        ScreenTitle(stringResource(R.string.settings), Modifier.statusBarsPadding().padding(start = 20.dp, end = 12.dp, top = 8.dp))
+
+        SectionLabel(stringResource(R.string.sec_appearance))
+        ListCard {
+            Column(Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
+                Text(stringResource(R.string.set_theme), style = MaterialTheme.typography.titleMedium)
+                Spacer(Modifier.height(10.dp))
+                Segmented(ThemeMode.entries.map { stringResource(themeLabel(it)) to it }, s.theme, Modifier.testTag("theme_row")) { m -> vm.updateSettings { it.copy(theme = m) } }
             }
-            SectionLabel(stringResource(R.string.sec_privacy))
-            ListCard {
-                SettingRow(
-                    if (s.newSavesVisible) Icons.Rounded.Visibility else Icons.Rounded.VisibilityOff, Color(0xFF33443A), stringResource(R.string.set_new_saves),
-                    stringResource(if (s.newSavesVisible) R.string.new_saves_gallery else R.string.new_saves_hidden),
-                ) { newSavesSheet = true }
-                ListDivider()
-                SettingRow(Icons.Rounded.Visibility, Color(0xFF187C51), stringResource(R.string.set_show_all), stringResource(R.string.set_show_all_d)) {
-                    scope.launch { hiddenCount = vm.repo.hiddenIds().size; if (hiddenCount == 0) vm.showSnack(ctx.getString(R.string.nothing_hidden)) else showAllAsk = true }
+            SettingRow(Icons.Rounded.Contrast, Color.Unspecified, stringResource(R.string.set_pure_black), stringResource(R.string.set_pure_black_d), checked = s.pureBlack) {
+                vm.updateSettings { it.copy(pureBlack = !it.pureBlack) }
+            }
+            if (Build.VERSION.SDK_INT >= 31) {
+                SettingRow(Icons.Rounded.Palette, Color.Unspecified, stringResource(R.string.set_dynamic), stringResource(R.string.set_dynamic_d), checked = s.dynamicColor) {
+                    vm.updateSettings { it.copy(dynamicColor = !it.dynamicColor) }
                 }
             }
-            Spacer(Modifier.height(10.dp))
-            ListCard {
-                SettingRow(
-                    Icons.Rounded.Lock, Color(0xFF6E4FC8), stringResource(R.string.set_lock),
-                    stringResource(if (lockAvailable) R.string.set_lock_d else R.string.set_lock_unavailable),
-                    checked = s.appLock, enabled = lockAvailable || s.appLock,
-                ) {
-                    if (s.appLock) vm.updateSettings { it.copy(appLock = false) }
-                    else authenticate { vm.updateSettings { it.copy(appLock = true) } }
-                }
-                ListDivider()
-                SettingRow(Icons.Rounded.DeleteOutline, Color(0xFFC6423D), stringResource(R.string.set_bin), pluralStringResource(R.plurals.set_bin_d, bin.size, bin.size)) { vm.go(Screen.BIN) }
+        }
+
+        SectionLabel(stringResource(R.string.sec_saving))
+        ListCard {
+            Column(Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
+                Text(stringResource(R.string.set_new_saves), style = MaterialTheme.typography.titleMedium)
+                Spacer(Modifier.height(10.dp))
+                Segmented(
+                    listOf(stringResource(R.string.new_saves_hidden_short) to false, stringResource(R.string.new_saves_gallery) to true),
+                    s.newSavesVisible, Modifier.testTag("new_saves_row"),
+                ) { v -> vm.updateSettings { it.copy(newSavesVisible = v) } }
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    stringResource(if (s.newSavesVisible) R.string.new_saves_gallery_d else R.string.new_saves_hidden_d),
+                    style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
-            SectionLabel(stringResource(R.string.sec_appearance))
-            ListCard {
-                SettingRow(Icons.Rounded.DarkMode, Color(0xFF3A4A41), stringResource(R.string.set_theme), stringResource(themeLabel(s.theme))) { themeSheet = true }
-                if (Build.VERSION.SDK_INT >= 31) {
-                    ListDivider()
-                    SettingRow(Icons.Rounded.Palette, Color(0xFF3D6373), stringResource(R.string.set_dynamic), stringResource(R.string.set_dynamic_d), checked = s.dynamicColor) {
-                        vm.updateSettings { it.copy(dynamicColor = !it.dynamicColor) }
-                    }
-                }
+            SettingRow(Icons.Rounded.Visibility, Color.Unspecified, stringResource(R.string.set_show_all), stringResource(R.string.set_show_all_d)) {
+                scope.launch { hiddenCount = vm.repo.hiddenIds().size; if (hiddenCount == 0) vm.showSnack(ctx.getString(R.string.nothing_hidden)) else showAllAsk = true }
             }
-            SectionLabel(stringResource(R.string.sec_more))
-            ListCard {
-                SettingRow(Icons.Rounded.BugReport, Color(0xFF55645B), stringResource(R.string.set_diag), stringResource(R.string.set_diag_d)) { vm.go(Screen.DIAG) }
-                ListDivider()
-                SettingRow(Icons.Rounded.Info, Color(0xFF187C51), stringResource(R.string.set_about), stringResource(R.string.version_x, BuildConfig.VERSION_NAME)) { vm.go(Screen.ABOUT) }
+            SettingRow(Icons.Rounded.AutoAwesome, Color.Unspecified, stringResource(R.string.set_autosave), stringResource(R.string.set_autosave_d), checked = s.autoSave) {
+                vm.updateSettings { it.copy(autoSave = !it.autoSave) }
             }
+            val blocked = s.alerts && !canNotify
+            SettingRow(
+                Icons.Rounded.NotificationsActive, Color.Unspecified, stringResource(R.string.set_alerts),
+                stringResource(if (blocked) R.string.set_alerts_blocked else R.string.set_alerts_d),
+                checked = s.alerts, subtitleColor = if (blocked) MaterialTheme.colorScheme.error else null,
+            ) { if (blocked) openNotifSettings() else toggleAlerts() }
+        }
+
+        SectionLabel(stringResource(R.string.sec_privacy))
+        ListCard {
+            SettingRow(
+                Icons.Rounded.Lock, Color.Unspecified, stringResource(R.string.set_lock),
+                stringResource(if (lockAvailable) R.string.set_lock_d else R.string.set_lock_unavailable),
+                checked = s.appLock, enabled = lockAvailable || s.appLock,
+            ) {
+                if (s.appLock) vm.updateSettings { it.copy(appLock = false) }
+                else authenticate { vm.updateSettings { it.copy(appLock = true) } }
+            }
+        }
+
+        SectionLabel(stringResource(R.string.sec_data))
+        ListCard {
+            val connected = status.connected.joinToString(" · ") { it.label }.ifBlank { stringResource(R.string.not_connected) }
+            SettingRow(Icons.Rounded.Folder, Color.Unspecified, stringResource(R.string.set_folders), connected) { vm.openSetup(true) }
+            SettingRow(Icons.Rounded.DeleteOutline, Color.Unspecified, stringResource(R.string.set_bin), pluralStringResource(R.plurals.set_bin_d, bin.size, bin.size)) { vm.go(Screen.BIN) }
+        }
+
+        SectionLabel(stringResource(R.string.sec_more))
+        ListCard {
+            SettingRow(Icons.Rounded.BugReport, Color.Unspecified, stringResource(R.string.set_diag), stringResource(R.string.set_diag_d)) { vm.go(Screen.DIAG) }
+            SettingRow(Icons.Rounded.Info, Color.Unspecified, stringResource(R.string.set_about), stringResource(R.string.version_x, BuildConfig.VERSION_NAME)) { vm.go(Screen.ABOUT) }
         }
     }
 
-    if (themeSheet) ModalBottomSheet(onDismissRequest = { themeSheet = false }) {
-        Text(stringResource(R.string.set_theme), style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp))
-        ThemeMode.entries.forEach { m ->
-            Row(
-                Modifier.fillMaxWidth().clickable(role = Role.RadioButton) { vm.updateSettings { it.copy(theme = m) }; themeSheet = false }
-                    .padding(horizontal = 16.dp).heightIn(min = 52.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                RadioButton(selected = s.theme == m, onClick = null)
-                Spacer(Modifier.width(12.dp))
-                Text(stringResource(themeLabel(m)), style = MaterialTheme.typography.bodyLarge)
-            }
-        }
-        Spacer(Modifier.height(24.dp))
-    }
-    if (newSavesSheet) ModalBottomSheet(onDismissRequest = { newSavesSheet = false }) {
-        Text(stringResource(R.string.set_new_saves), style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp))
-        listOf(false to R.string.new_saves_hidden, true to R.string.new_saves_gallery).forEach { (v, l) ->
-            Row(
-                Modifier.fillMaxWidth().clickable(role = Role.RadioButton) { vm.updateSettings { it.copy(newSavesVisible = v) }; newSavesSheet = false }
-                    .padding(horizontal = 16.dp).heightIn(min = 52.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                RadioButton(selected = s.newSavesVisible == v, onClick = null)
-                Spacer(Modifier.width(12.dp))
-                Text(stringResource(l), style = MaterialTheme.typography.bodyLarge)
-            }
-        }
-        Spacer(Modifier.height(24.dp))
-    }
     if (showAllAsk) AlertDialog(
         onDismissRequest = { showAllAsk = false },
         title = { Text(pluralStringResource(R.plurals.show_all_q, hiddenCount, hiddenCount)) },
@@ -308,9 +291,9 @@ fun BinScreen(vm: MainViewModel, onBack: () -> Unit) {
                                 .clickable(role = Role.Button) { vm.restore(listOf(it.id)) }.padding(horizontal = 12.dp),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            Icon(Icons.Rounded.Restore, null, tint = Color(0xFF14804F), modifier = Modifier.size(16.dp))
+                            Icon(Icons.Rounded.Restore, null, tint = Color(0xFFAD3600), modifier = Modifier.size(16.dp))
                             Spacer(Modifier.width(4.dp))
-                            Text(stringResource(R.string.restore), color = Color(0xFF14804F), style = MaterialTheme.typography.labelLarge)
+                            Text(stringResource(R.string.restore), color = Color(0xFFAD3600), style = MaterialTheme.typography.labelLarge)
                         }
                     }
                     val days = Formats.binDaysLeft(it.deletedAt ?: 0)
@@ -468,6 +451,21 @@ fun LockScreen(onUnlock: () -> Unit) {
                 Modifier.size(84.dp).clip(CircleShape).background(MaterialTheme.colorScheme.secondaryContainer).clickable(role = Role.Button, onClick = onUnlock),
                 contentAlignment = Alignment.Center,
             ) { Icon(Icons.Rounded.Fingerprint, stringResource(R.string.unlock), tint = MaterialTheme.colorScheme.onSecondaryContainer, modifier = Modifier.size(44.dp)) }
+        }
+    }
+}
+
+/** Material 3 segmented buttons (Grabbit's theme picker style). */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun <T> Segmented(options: List<Pair<String, T>>, selected: T, modifier: Modifier = Modifier, onPick: (T) -> Unit) {
+    androidx.compose.material3.SingleChoiceSegmentedButtonRow(modifier.fillMaxWidth()) {
+        options.forEachIndexed { i, (label, v) ->
+            androidx.compose.material3.SegmentedButton(
+                selected = v == selected, onClick = { onPick(v) },
+                shape = androidx.compose.material3.SegmentedButtonDefaults.itemShape(i, options.size),
+                modifier = Modifier.heightIn(min = 48.dp),
+            ) { Text(label, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis, style = MaterialTheme.typography.labelLarge) }
         }
     }
 }

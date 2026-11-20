@@ -423,7 +423,7 @@ private fun VideoControls(
                 value = if (duration > 0) (position.toFloat() / duration).coerceIn(0f, 1f) else 0f,
                 onValueChange = { if (duration > 0) onSeek((it * duration).toLong()) },
                 modifier = Modifier.weight(1f).padding(horizontal = 8.dp).testTag("seek"),
-                colors = SliderDefaults.colors(thumbColor = Color.White, activeTrackColor = Color(0xFF7EE2AE), inactiveTrackColor = Color.White.copy(alpha = 0.35f)),
+                colors = SliderDefaults.colors(thumbColor = Color.White, activeTrackColor = Color(0xFFFFB597), inactiveTrackColor = Color.White.copy(alpha = 0.35f)),
             )
             Text(Formats.duration(duration), color = Color.White, fontSize = 12.sp)
         }
@@ -432,8 +432,8 @@ private fun VideoControls(
             Box(
                 Modifier.size(52.dp).clip(CircleShape).background(Color.White).clickable(role = Role.Button, onClick = onPlayPause),
                 contentAlignment = Alignment.Center,
-            ) { Icon(if (playing) Icons.Rounded.Pause else Icons.Rounded.PlayArrow, stringResource(if (playing) R.string.pause else R.string.play), tint = Color(0xFF14804F)) }
-            CtlButton(Icons.Rounded.Repeat, stringResource(if (loop) R.string.loop_on else R.string.loop_off), if (loop) Color(0xFF7EE2AE) else Color.White, onLoop)
+            ) { Icon(if (playing) Icons.Rounded.Pause else Icons.Rounded.PlayArrow, stringResource(if (playing) R.string.pause else R.string.play), tint = Color(0xFFC2410C)) }
+            CtlButton(Icons.Rounded.Repeat, stringResource(if (loop) R.string.loop_on else R.string.loop_off), if (loop) Color(0xFFFFB597) else Color.White, onLoop)
             val label = if (speed % 1f == 0f) "${speed.toInt()}×" else "$speed×"
             val speedDesc = stringResource(R.string.cd_speed, label)
             Text(
@@ -457,7 +457,7 @@ private fun CtlButton(icon: ImageVector, desc: String, tint: Color, onClick: () 
 private fun FrostButton(icon: ImageVector, desc: String, modifier: Modifier = Modifier, big: Boolean = false, active: Boolean = false, onClick: () -> Unit) {
     Box(
         modifier.size(if (big) 56.dp else 48.dp).clip(CircleShape)
-            .then(if (active) Modifier.background(androidx.compose.ui.graphics.Brush.verticalGradient(listOf(Color(0xFF3CCB89), Color(0xFF148654)))) else Modifier.background(Frost))
+            .then(if (active) Modifier.background(Color(0xFFC2410C)) else Modifier.background(Frost))
             .clickable(role = Role.Button, onClick = onClick),
         contentAlignment = Alignment.Center,
     ) { Icon(icon, desc, tint = Color.White) }
@@ -465,9 +465,9 @@ private fun FrostButton(icon: ImageVector, desc: String, modifier: Modifier = Mo
 
 @Composable
 private fun BigPill(text: String, icon: ImageVector, done: Boolean, modifier: Modifier = Modifier, busy: Boolean = false, onClick: () -> Unit) {
-    val bg = if (done) androidx.compose.ui.graphics.Brush.verticalGradient(listOf(Color(0xFF3CCB89), Color(0xFF148654)))
-    else androidx.compose.ui.graphics.Brush.verticalGradient(listOf(Color.White, Color.White))
-    val fg = if (done) Color.White else Color(0xFF14804F)
+    val bg = if (done) androidx.compose.ui.graphics.SolidColor(Color(0xFF1B6D35))
+    else androidx.compose.ui.graphics.SolidColor(Color.White)
+    val fg = if (done) Color.White else Color(0xFFAD3600)
     Row(
         modifier.heightIn(min = 56.dp).shadow(8.dp, CircleShape).clip(CircleShape).background(bg)
             .clickable(role = Role.Button, onClick = onClick).padding(horizontal = 18.dp),

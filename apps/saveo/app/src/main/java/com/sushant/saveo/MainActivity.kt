@@ -59,7 +59,7 @@ class MainActivity : AppCompatActivity() {
                     navigationBarStyle = if (dark) SystemBarStyle.dark(android.graphics.Color.TRANSPARENT) else SystemBarStyle.light(android.graphics.Color.TRANSPARENT, android.graphics.Color.TRANSPARENT),
                 )
             }
-            SaveoTheme(s.theme, s.dynamicColor) {
+            SaveoTheme(s.theme, s.dynamicColor, s.pureBlack) {
                 AppRoot(
                     vm = vm,
                     authenticate = { ok -> authenticate(ok) },
