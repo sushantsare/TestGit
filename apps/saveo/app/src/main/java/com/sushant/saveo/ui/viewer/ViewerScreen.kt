@@ -70,6 +70,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
@@ -197,7 +198,7 @@ fun ViewerScreen(vm: MainViewModel, session: ViewerSession, inPane: Boolean, mod
     val settled = items.getOrNull(pager.settledPage)
 
     Box(
-        modifier.fillMaxSize().background(Color(0xFF111312))
+        modifier.fillMaxSize().clipToBounds().background(Color(0xFF111312))
             .focusRequester(focus).focusable()
             .onPreviewKeyEvent { e ->
                 if (e.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
