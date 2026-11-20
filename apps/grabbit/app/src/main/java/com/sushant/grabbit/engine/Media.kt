@@ -33,6 +33,13 @@ object Media {
     }
 
     suspend fun fetchInfo(ctx: Context, url: String): MediaInfo = withContext(Dispatchers.IO) {
+        if (InstaStory.isStory(url)) {
+            val st = InstaStory.resolve(url)
+            return@withContext MediaInfo(
+                url, "Story by @${st.user}", "@${st.user}", st.thumb, st.duration,
+                "Instagram", false, 1, emptyList(), emptyMap(), true,
+            )
+        }
         if (Threads.isThreads(url)) {
             val post = Threads.resolve(url)
             return@withContext MediaInfo(

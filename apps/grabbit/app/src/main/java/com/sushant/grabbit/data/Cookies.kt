@@ -38,6 +38,10 @@ object Cookies {
 
     fun isLoggedIn(site: LoginSite): Boolean = siteFile(site).let { it.exists() && it.length() > 0 }
 
+    /** True when the saved login includes the site's session cookie (a complete login). */
+    fun sessionSaved(site: LoginSite): Boolean =
+        siteFile(site).let { f -> f.exists() && f.readLines().any { it.split('\t').getOrNull(5) == site.session } }
+
     /** True once the WebView holds the site's session cookie, i.e. the login really finished. */
     fun hasSession(site: LoginSite): Boolean {
         val cm = CookieManager.getInstance()

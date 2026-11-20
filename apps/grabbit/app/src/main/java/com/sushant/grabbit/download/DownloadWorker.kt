@@ -14,6 +14,7 @@ import com.sushant.grabbit.data.Library
 import com.sushant.grabbit.data.Prefs
 import com.sushant.grabbit.engine.Engine
 import com.sushant.grabbit.engine.Errors
+import com.sushant.grabbit.engine.InstaStory
 import com.sushant.grabbit.engine.Threads
 import com.yausername.youtubedl_android.YoutubeDL
 import com.yausername.youtubedl_android.YoutubeDLRequest
@@ -108,11 +109,11 @@ class DownloadWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(c
 
         val tmp = File(ctx.cacheDir, "dl/$id").apply { deleteRecursively(); mkdirs() }
         // Threads: find the post's direct video file first (yt-dlp can't read Threads pages)
-        val source = if (Threads.isThreads(url)) {
+        val source = if (Threads.isThreads(url) || InstaStory.isStory(url)) {
             try {
-                Threads.resolve(url).videos.first()
+                if (InstaStory.isStory(url)) InstaStory.resolve(url).video else Threads.resolve(url).videos.first()
             } catch (e: com.sushant.grabbit.engine.FriendlyError) {
-                return fail(e.message ?: "Threads download failed", e.raw)
+                return fail(e.message ?: "Download failed", e.raw)
             } catch (e: Exception) {
                 val raw = e.message ?: e.toString()
                 return fail(Errors.friendly(raw), raw)

@@ -160,7 +160,12 @@ fun SettingsScreen(vm: MainViewModel, modifier: Modifier) {
                         var logged by remember { mutableStateOf(Cookies.isLoggedIn(site)) }
                         SettingsDivider()
                         SettingsItem(
-                            site.name, if (logged) "Logged in" else "Not logged in",
+                            site.name,
+                            when {
+                                !logged -> "Not logged in"
+                                Cookies.sessionSaved(site) -> "Logged in · session saved ✓"
+                                else -> "Login incomplete · log out and log in again"
+                            },
                             leading = { LetterAvatar(site.name.take(1)) },
                         ) {
                             if (logged) OutlinedButton(onClick = {
