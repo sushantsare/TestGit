@@ -104,6 +104,9 @@ class MainViewModel(private val app: Application) : AndroidViewModel(app) {
             Downloads.Job(info.url, info.title, info.thumbnail, info.site, quality, info.isPlaylist),
         )
         app.toast(if (info.isPlaylist) "Added ${info.count} videos to downloads" else "Download started")
+        // The job is queued: start the Grab tab fresh for the next link
+        url = ""
+        resetFetch()
         tab = 1
     }
 

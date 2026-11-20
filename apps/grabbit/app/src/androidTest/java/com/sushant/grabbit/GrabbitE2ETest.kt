@@ -153,6 +153,8 @@ class GrabbitE2ETest {
             Thread.sleep(1000)
         }
         val ok = Library.items.value.size > before
+        val vmCheck = ViewModelProvider(compose.activity)[MainViewModel::class.java]
+        log("[$name] grab tab cleared after download: ${vmCheck.url.isEmpty()}")
         if (ok) {
             val item = Library.items.value.first()
             log("[$name] OK  ${item.fileName}  ${item.size} bytes  ${item.mime}  in ${(System.currentTimeMillis() - start) / 1000}s")
