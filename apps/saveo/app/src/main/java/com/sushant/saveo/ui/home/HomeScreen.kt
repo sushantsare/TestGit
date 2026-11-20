@@ -140,6 +140,7 @@ fun HomeScreen(vm: MainViewModel, showTabs: Boolean, modifier: Modifier = Modifi
     val saved by vm.saved.collectAsStateWithLifecycle()
     val savedKeys by vm.savedKeys.collectAsStateWithLifecycle()
     val settings by vm.settings.collectAsStateWithLifecycle()
+    val savedTotal by vm.savedAll.collectAsStateWithLifecycle()
     val pager = rememberPagerState(initialPage = tab) { 2 }
     val scope = rememberCoroutineScope()
 
@@ -190,7 +191,7 @@ fun HomeScreen(vm: MainViewModel, showTabs: Boolean, modifier: Modifier = Modifi
                     divider = { Box(Modifier.fillMaxWidth().height(1.dp).background(MaterialTheme.colorScheme.outlineVariant)) },
                 ) {
                     TabLabel(stringResource(R.string.tab_statuses), statuses.size, pager.currentPage == 0, "tab_statuses") { scope.launch { pager.animateScrollToPage(0) } }
-                    TabLabel(stringResource(R.string.tab_saved), saved.size, pager.currentPage == 1, "tab_saved") { scope.launch { pager.animateScrollToPage(1) } }
+                    TabLabel(stringResource(R.string.tab_saved), savedTotal.size, pager.currentPage == 1, "tab_saved") { scope.launch { pager.animateScrollToPage(1) } }
                 }
             }
             HorizontalPager(pager, Modifier.weight(1f), key = { it }, userScrollEnabled = showTabs && !selecting, beyondViewportPageCount = 1) { page ->
@@ -351,6 +352,8 @@ private fun GlossChip(text: String, selected: Boolean, icon: ImageVector? = null
             labelColor = MaterialTheme.colorScheme.onSurface,
             selectedContainerColor = ex.glossBottom,
             selectedLabelColor = ex.onGloss,
+            iconColor = MaterialTheme.colorScheme.primary,
+            selectedLeadingIconColor = ex.onGloss,
         ),
         modifier = Modifier.heightIn(min = 40.dp),
     )
