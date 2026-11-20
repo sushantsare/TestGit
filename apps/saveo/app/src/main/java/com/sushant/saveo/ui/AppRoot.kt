@@ -128,7 +128,8 @@ fun AppRoot(
                 onTab = { t -> vm.closeViewer(); if (t == 2) vm.go(Screen.SETTINGS) else { vm.go(Screen.HOME); vm.setTab(t) } },
             )
             Box(Modifier.weight(1f).fillMaxHeight()) {
-                AnimatedContent(screen, transitionSpec = { fadeIn(tween(220)) togetherWith fadeOut(tween(160)) }, label = "screen") { s ->
+                // Crossfade (not AnimatedContent): children always get exactly this pane's size, even while the window resizes
+                androidx.compose.animation.Crossfade(screen, animationSpec = tween(200), label = "screen") { s ->
                     Box(Modifier.fillMaxSize().then(if (s == Screen.HOME) Modifier else Modifier.widthIn(max = 900.dp))) {
                         when (s) {
                             Screen.ONBOARD -> OnboardingScreen(onStart = { vm.openSetup(false) })

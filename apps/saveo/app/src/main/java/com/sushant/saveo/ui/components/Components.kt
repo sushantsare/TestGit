@@ -299,7 +299,7 @@ fun SettingRow(
     icon: ImageVector, iconBg: Color, title: String, subtitle: String? = null,
     checked: Boolean? = null, enabled: Boolean = true, subtitleColor: Color? = null, onClick: () -> Unit,
 ) {
-    val stateText = when (checked) { true -> stringResource(R.string.state_on); false -> stringResource(R.string.state_off); null -> null }
+    val stateText = when (checked) { true -> stringResource(R.string.saveo_on); false -> stringResource(R.string.saveo_off); null -> null }
     Row(
         Modifier.fillMaxWidth().heightIn(min = 64.dp)
             .clickable(enabled = enabled, role = if (checked != null) Role.Switch else Role.Button, onClick = onClick)
