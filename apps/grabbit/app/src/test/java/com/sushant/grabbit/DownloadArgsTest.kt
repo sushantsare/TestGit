@@ -59,7 +59,7 @@ class DownloadArgsTest {
     fun trimChaptersSponsorFaster(): Unit {
         val a = args("best", DlOpts(trimStart = 10, trimEnd = 70, splitChapters = true), GlobalOpts(sponsorCats = setOf("sponsor", "intro")), yt = true)
         assertEquals("*10-70", a.v("--download-sections"))
-        assertTrue(a.has("--force-keyframes-at-cuts"))
+        assertFalse(a.has("--force-keyframes-at-cuts"))
         assertTrue(a.has("--split-chapters"))
         assertTrue(a.any { it.second?.startsWith("chapter:/tmp/x/ch_") == true })
         assertEquals("intro,sponsor", a.v("--sponsorblock-remove"))

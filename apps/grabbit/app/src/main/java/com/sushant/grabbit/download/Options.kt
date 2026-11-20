@@ -105,8 +105,9 @@ object DownloadArgs {
             }
         }
         if (!playlist && opts.trimmed) {
+            // Downloads only the chosen section. (No --force-keyframes-at-cuts: it needs an H.264 encoder that
+            // the phone's bundled FFmpeg doesn't have, so the post-processing step fails.)
             o("--download-sections", "*${opts.trimStart}-${opts.trimEnd}")
-            o("--force-keyframes-at-cuts")
         }
         if (!playlist && opts.splitChapters) {
             o("--split-chapters")
