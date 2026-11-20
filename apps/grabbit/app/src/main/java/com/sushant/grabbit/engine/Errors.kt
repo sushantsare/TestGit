@@ -2,11 +2,17 @@ package com.sushant.grabbit.engine
 
 /** Turns raw yt-dlp errors into messages a normal person can act on. */
 object Errors {
+    /** yt-dlp stops the whole download when only the subtitle file fails (often HTTP 429 from YouTube). */
+    fun isSubtitleError(raw: String?): Boolean =
+        raw != null && Regex("(?i)unable to download (video )?subtitles|subtitles? .*http error|timedtext|embedsubtitle").containsMatchIn(raw)
+
     fun friendly(raw: String?): String {
         val m = raw?.trim().orEmpty()
         if (m.isEmpty()) return "Something went wrong. Please try again."
         val l = m.lowercase()
         return when {
+            isSubtitleError(m) ->
+                "The site refused the subtitles right now. Try again in a few minutes, or download without subtitles."
             "unable to resolve host" in l || "network is unreachable" in l || "failed to resolve" in l ||
                 "connection refused" in l || "timed out" in l || "no address associated" in l ->
                 "No internet connection (or it is too slow). Check your network and try again."

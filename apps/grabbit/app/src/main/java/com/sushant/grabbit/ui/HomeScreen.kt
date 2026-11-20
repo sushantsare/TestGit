@@ -415,13 +415,13 @@ internal fun MediaCard(info: MediaInfo, framed: Boolean = true, onDownload: (Str
                     SegmentedButton(
                         selected = !audio, onClick = { audio = false },
                         shape = SegmentedButtonDefaults.itemShape(0, 2),
-                        icon = { SegmentedButtonDefaults.Icon(!audio) { Icon(Icons.Rounded.Movie, null, Modifier.size(sz.iconSmall)) } },
-                    ) { Text("Video") }
+                        icon = { Icon(Icons.Rounded.Movie, null, Modifier.size(sz.iconSmall)) },
+                    ) { FitText("Video") }
                     SegmentedButton(
                         selected = audio, onClick = { audio = true },
                         shape = SegmentedButtonDefaults.itemShape(1, 2),
-                        icon = { SegmentedButtonDefaults.Icon(audio) { Icon(Icons.Rounded.MusicNote, null, Modifier.size(sz.iconSmall)) } },
-                    ) { Text("Audio") }
+                        icon = { Icon(Icons.Rounded.MusicNote, null, Modifier.size(sz.iconSmall)) },
+                    ) { FitText("Audio") }
                 }
             }
             Spacer(Modifier.height(sp.m))

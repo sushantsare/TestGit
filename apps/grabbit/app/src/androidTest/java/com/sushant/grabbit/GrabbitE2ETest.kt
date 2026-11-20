@@ -85,6 +85,12 @@ class GrabbitE2ETest {
         ctx.contentResolver.openOutputStream(uri)?.use { bmp.compress(Bitmap.CompressFormat.PNG, 100, it) }
     }
 
+    private fun Espresso_back() {
+        instr.uiAutomation.executeShellCommand("input keyevent KEYCODE_BACK").close()
+        Thread.sleep(800)
+        compose.waitForIdle()
+    }
+
     private fun saveBitmap(name: String, bmp: Bitmap) {
         val values = ContentValues().apply {
             put(MediaStore.Images.Media.DISPLAY_NAME, "$name.png")
@@ -404,6 +410,27 @@ class GrabbitE2ETest {
         shot("91_settings")
         compose.onNodeWithTag("settingsList").performScrollToNode(hasText("Developed by Sushant Kumar"))
         shot("91b_about")
+        // Subtitle mode pill: no tick, labels fit; then again with a large system font
+        runCatching {
+            compose.onNodeWithTag("settingsList").performScrollToNode(hasText("Subtitles"))
+            compose.onAllNodesWithText("Subtitles")[0].performClick()
+            shot("91c_subs_sheet")
+            Espresso_back()
+        }.onFailure { log("SUBS SHEET shot failed: ${it.message}") }
+        runCatching {
+            instr.uiAutomation.executeShellCommand("settings put system font_scale 1.4").close()
+            Thread.sleep(2500)
+            compose.waitForIdle()
+            compose.onNodeWithTag("nav_settings").performClick()
+            compose.onNodeWithTag("settingsList").performScrollToNode(hasText("Subtitles"))
+            compose.onAllNodesWithText("Subtitles")[0].performClick()
+            shot("91d_subs_sheet_bigfont")
+            Espresso_back()
+        }.onFailure { log("BIGFONT shot failed: ${it.message}") }
+        instr.uiAutomation.executeShellCommand("settings put system font_scale 1.0").close()
+        Thread.sleep(2500)
+        compose.waitForIdle()
+        compose.onNodeWithTag("nav_settings").performClick()
 
         val vm = ViewModelProvider(compose.activity)[MainViewModel::class.java]
 

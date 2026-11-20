@@ -98,16 +98,15 @@ class DownloadWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(c
                 return fail(Errors.friendly(raw), raw)
             }
         } else url
-        val opts = DlOpts.decode(inputData.getString(K_OPTS))
-        val req = buildRequest(ctx, source, quality, playlist, tmp, opts)
+        var opts = DlOpts.decode(inputData.getString(K_OPTS))
+        var subsDropped = false
         val nm = ctx.getSystemService(NotificationManager::class.java)
         var last = 0L
         var total = 0L
         var status = if (isAudioQuality(quality)) "Downloading audio…" else "Downloading…"
 
-        try {
-            withContext(Dispatchers.IO) {
-                YoutubeDL.getInstance().execute(req, processId = id.toString(), callback = { p, eta, line ->
+        suspend fun grab(o: DlOpts) = withContext(Dispatchers.IO) {
+                YoutubeDL.getInstance().execute(buildRequest(ctx, source, quality, playlist, tmp, o), processId = id.toString(), callback = { p, eta, line ->
                     when {
                         line.contains("[Merger]") -> status = "Merging video and audio…"
                         line.contains("[ExtractAudio]") -> status = "Converting audio…"
@@ -131,6 +130,19 @@ class DownloadWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(c
                         nm.notify(nid, Notifs.progress(ctx, title, text, pct.toInt(), p <= 0f, id))
                     }
                 })
+        }
+
+        try {
+            try {
+                grab(opts)
+            } catch (e: Exception) {
+                // Subtitles failed (e.g. YouTube refused them): don't lose the video — download it without subtitles
+                if (isStopped || opts.subLang.isEmpty() || !Errors.isSubtitleError(e.message ?: e.toString())) throw e
+                opts = opts.copy(subLang = "")
+                subsDropped = true
+                status = "Subtitles unavailable, downloading video…"
+                tmp.listFiles()?.forEach { it.deleteRecursively() }
+                grab(opts)
             }
         } catch (e: Exception) {
             if (isStopped) {
@@ -180,7 +192,8 @@ class DownloadWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(c
         Library.add(saved)
         val where = if (saved.first().isAudio) "Music/Grabbit" else "Movies/Grabbit"
         Notifs.done(ctx, nid + 1, title, true,
-            if (saved.size > 1) "${saved.size} files saved to $where" else "Saved to $where", saved.singleOrNull())
+            (if (saved.size > 1) "${saved.size} files saved to $where" else "Saved to $where") +
+                (if (subsDropped) " · without subtitles (the site refused them)" else ""), saved.singleOrNull())
         return Result.success()
     }
 }

@@ -128,8 +128,8 @@ fun SettingsScreen(vm: MainViewModel, modifier: Modifier) {
                         labels.forEachIndexed { i, l ->
                             SegmentedButton(
                                 selected = theme == i, onClick = { Prefs.theme = i },
-                                shape = SegmentedButtonDefaults.itemShape(i, labels.size),
-                            ) { Text(l) }
+                                shape = SegmentedButtonDefaults.itemShape(i, labels.size), icon = {},
+                            ) { FitText(l) }
                         }
                     }
                 }
@@ -354,8 +354,8 @@ private fun SubtitleDefaultsSheet(
             Spacer(Modifier.size(sp.m))
             SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth().padding(horizontal = sp.xl)) {
                 SUB_MODES.forEachIndexed { i, (k, l) ->
-                    SegmentedButton(selected = mode == k, onClick = { onMode(k) }, shape = SegmentedButtonDefaults.itemShape(i, SUB_MODES.size)) {
-                        Text(l.replace("Inside the video", "Inside video"), maxLines = 1)
+                    SegmentedButton(selected = mode == k, onClick = { onMode(k) }, shape = SegmentedButtonDefaults.itemShape(i, SUB_MODES.size), icon = {}) {
+                        FitText(l.replace("Inside the video", "Inside video"))
                     }
                 }
             }

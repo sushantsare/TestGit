@@ -166,7 +166,7 @@ private fun SubtitleSheet(info: MediaInfo, st: OptsState, onClose: () -> Unit) {
                     val modes = listOf("embed" to "Inside video", "file" to "Separate file", "both" to "Both")
                     modes.forEachIndexed { i, (k, l) ->
                         SegmentedButton(selected = st.subMode == k, onClick = { st.subMode = k },
-                            shape = SegmentedButtonDefaults.itemShape(i, modes.size)) { Text(l, maxLines = 1) }
+                            shape = SegmentedButtonDefaults.itemShape(i, modes.size), icon = {}) { FitText(l) }
                     }
                 }
                 Text("Separate files go to Download/Grabbit as .srt", style = MaterialTheme.typography.bodySmall,
