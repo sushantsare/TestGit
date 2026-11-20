@@ -355,7 +355,17 @@ class GrabbitE2ETest {
         val m4aOk = try { compose.waitUntil(180_000) { Library.items.value.size > before }; true } catch (e: Throwable) { false }
         val m4a = Library.items.value.maxByOrNull { it.time }
         log("OPTIONS m4a saved=$m4aOk mime=${m4a?.mime} name=${m4a?.fileName}")
-        return "trim=${trimOk && d in 2500..6500} m4a=${m4aOk && m4a?.mime == "audio/mp4"}"
+        // Trim on a real site (X video, 1:54): keep 10s..20s
+        val xInfo = runCatching { runBlocking { com.sushant.grabbit.engine.Media.fetchInfo(ctx, "https://x.com/SpaceX/status/1732824684683784516") } }.getOrNull()
+        var xd = -1L
+        if (xInfo != null) {
+            before = Library.items.value.size
+            compose.activity.runOnUiThread { vm.download(xInfo, "h360", com.sushant.grabbit.download.DlOpts(trimStart = 10, trimEnd = 20)) }
+            val ok = try { compose.waitUntil(240_000) { Library.items.value.size > before }; true } catch (e: Throwable) { false }
+            xd = if (ok) Library.items.value.maxByOrNull { it.time }?.let { durationMs(it.uri) } ?: -1 else -1
+            log("OPTIONS xtrim saved=$ok durationMs=$xd")
+        }
+        return "trim=${trimOk && d in 2500..6500} xtrim=${xd in 8500..12500} m4a=${m4aOk && m4a?.mime == "audio/mp4"}"
     }
 
     @Test

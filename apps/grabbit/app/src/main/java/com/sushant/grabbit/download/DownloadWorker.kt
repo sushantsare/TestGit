@@ -100,6 +100,7 @@ class DownloadWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(c
         } else url
         val opts = DlOpts.decode(inputData.getString(K_OPTS))
         val req = buildRequest(ctx, source, quality, playlist, tmp, opts)
+        if (opts.trimmed) req.addOption("--verbose")
         val nm = ctx.getSystemService(NotificationManager::class.java)
         var last = 0L
         var total = 0L
@@ -107,10 +108,11 @@ class DownloadWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(c
 
         try {
             withContext(Dispatchers.IO) {
-                YoutubeDL.getInstance().execute(req, processId = id.toString(), callback = { p, eta, line ->
+                val resp = YoutubeDL.getInstance().execute(req, processId = id.toString(), callback = { p, eta, line ->
+                    if (!line.startsWith("[download] ") || "Destination" in line || "section" in line) android.util.Log.i("GrabbitDL", line)
                     when {
                         line.contains("[Merger]") -> status = "Merging video and audio…"
-                        line.contains("[ExtractAudio]") -> status = "Converting to MP3…"
+                        line.contains("[ExtractAudio]") -> status = "Converting audio…"
                         line.contains("[EmbedThumbnail]") || line.contains("[Metadata]") -> status = "Finishing…"
                         else -> ITEM.find(line)?.let { status = "Downloading ${it.groupValues[1]} of ${it.groupValues[2]}…" }
                     }
@@ -131,6 +133,8 @@ class DownloadWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(c
                         nm.notify(nid, Notifs.progress(ctx, title, text, pct.toInt(), p <= 0f, id))
                     }
                 })
+                resp.err.lineSequence().filter { "ffmpeg" in it.lowercase() || "section" in it || "Invoking" in it }
+                    .take(20).forEach { android.util.Log.i("GrabbitDL", "err: ${it.take(900)}") }
             }
         } catch (e: Exception) {
             if (isStopped) {

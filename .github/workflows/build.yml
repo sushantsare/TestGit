@@ -80,6 +80,7 @@ jobs:
             if [ -f e2e.sh ]; then bash e2e.sh || true; fi
             adb logcat -d -t 3000 > /tmp/out/logcat.txt || true
             if [ ! -f e2e.sh ]; then adb logcat -d -s GrabbitE2E:I > /tmp/out/e2e-results.txt || true; fi
+            adb logcat -d -s GrabbitDL:I > /tmp/out/dl-log.txt || true
 
       - name: Real-world e2e on Android 14
         id: e2e34
