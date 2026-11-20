@@ -100,7 +100,6 @@ class DownloadWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(c
         } else url
         val opts = DlOpts.decode(inputData.getString(K_OPTS))
         val req = buildRequest(ctx, source, quality, playlist, tmp, opts)
-        if (opts.trimmed) req.addOption("--verbose")
         val nm = ctx.getSystemService(NotificationManager::class.java)
         var last = 0L
         var total = 0L
@@ -108,8 +107,7 @@ class DownloadWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(c
 
         try {
             withContext(Dispatchers.IO) {
-                val resp = YoutubeDL.getInstance().execute(req, processId = id.toString(), callback = { p, eta, line ->
-                    if (!line.startsWith("[download] ") || "Destination" in line || "section" in line) android.util.Log.i("GrabbitDL", line)
+                YoutubeDL.getInstance().execute(req, processId = id.toString(), callback = { p, eta, line ->
                     when {
                         line.contains("[Merger]") -> status = "Merging video and audio…"
                         line.contains("[ExtractAudio]") -> status = "Converting audio…"
@@ -133,11 +131,8 @@ class DownloadWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(c
                         nm.notify(nid, Notifs.progress(ctx, title, text, pct.toInt(), p <= 0f, id))
                     }
                 })
-                if (opts.trimmed) resp.err.lineSequence().filter { "command line" in it || "section" in it || "Invoking" in it }
-                    .take(12).forEach { l -> l.chunked(700).forEach { android.util.Log.i("GrabbitDL", "err: $it") } }
             }
         } catch (e: Exception) {
-            if (opts.trimmed) (e.message ?: e.toString()).takeLast(3000).chunked(700).forEach { android.util.Log.i("GrabbitDL", "fail: $it") }
             if (isStopped) {
                 tmp.deleteRecursively()
                 return Result.failure(workDataOf(K_ERROR to "Cancelled"))
@@ -154,6 +149,18 @@ class DownloadWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(c
         }
 
         setProgress(workDataOf(P_PCT to 100f, P_STATUS to "Saving to your phone…"))
+        // Trim: keep only the chosen part of each downloaded file
+        if (opts.trimmed && !playlist) {
+            setProgress(workDataOf(P_PCT to 100f, P_STATUS to "Trimming…"))
+            val media = tmp.walkTopDown().filter { it.isFile && Saver.mimeOf(it.extension).let { m -> m.startsWith("video") || m.startsWith("audio") } }.toList()
+            for (f in media) {
+                val err = withContext(Dispatchers.IO) { Trimmer.trim(ctx, f, opts.trimStart, opts.trimEnd) }
+                if (err != null) {
+                    tmp.deleteRecursively()
+                    return fail("Couldn't trim this file. Try again without trimming.", err)
+                }
+            }
+        }
         // Split by chapters: keep the chapter files, drop the full-length original
         if (opts.splitChapters) {
             val media = tmp.walkTopDown().filter { it.isFile && Saver.mimeOf(it.extension).let { m -> m.startsWith("video") || m.startsWith("audio") } }.toList()

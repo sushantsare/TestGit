@@ -104,11 +104,7 @@ object DownloadArgs {
                 if (opts.subMode != "file") o("--embed-subs")
             }
         }
-        if (!playlist && opts.trimmed) {
-            // Downloads only the chosen section. (No --force-keyframes-at-cuts: it needs an H.264 encoder that
-            // the phone's bundled FFmpeg doesn't have, so the post-processing step fails.)
-            o("--download-sections", "*${opts.trimStart}-${opts.trimEnd}")
-        }
+        // Trim is done after the download by Trimmer (yt-dlp's --download-sections fails on phones)
         if (!playlist && opts.splitChapters) {
             o("--split-chapters")
             o("-o", "chapter:$outDir/$CHAPTER_PREFIX%(section_number)03d - %(section_title).90B.%(ext)s")
