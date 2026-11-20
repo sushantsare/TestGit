@@ -257,7 +257,7 @@ fun ViewerScreen(vm: MainViewModel, session: ViewerSession, inPane: Boolean, mod
                                 )
                                 Box(Modifier.fillMaxSize().pointerInput(Unit) { detectTapGestures(onTap = { controls = !controls }) })
                                 if (!firstFrame) CircularProgressIndicator(Modifier.align(Alignment.Center).size(36.dp), color = Color.White, strokeWidth = 3.dp)
-                                AnimatedVisibility(controls, enter = fadeIn(), exit = fadeOut(), modifier = Modifier.align(Alignment.BottomCenter)) {
+                                androidx.compose.animation.AnimatedVisibility(controls, enter = fadeIn(), exit = fadeOut(), modifier = Modifier.align(Alignment.BottomCenter)) {
                                     VideoControls(
                                         position, duration, playing, muted, loop, speed,
                                         onSeek = { player.seekTo(it); position = it },

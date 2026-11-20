@@ -32,6 +32,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.foundation.lazy.grid.LazyGridItemScope
 import androidx.compose.foundation.lazy.grid.LazyGridScope
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
@@ -339,7 +340,7 @@ private fun groupLabel(g: Formats.DayGroup) = when (g) {
 private fun LazyGridScope.groupedTiles(
     items: List<Media>, timeOf: (Media) -> Long,
     header: @Composable (Formats.DayGroup, Int, Boolean) -> Unit,
-    tile: @Composable (Media) -> Unit,
+    tile: @Composable LazyGridItemScope.(Media) -> Unit,
 ) {
     val now = System.currentTimeMillis()
     val groups = items.groupBy { Formats.dayGroup(timeOf(it), now) }

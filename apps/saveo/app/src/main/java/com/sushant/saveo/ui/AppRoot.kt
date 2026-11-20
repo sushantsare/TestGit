@@ -131,7 +131,7 @@ fun AppRoot(
                     }
                 }
                 // Phone / medium: viewer covers the screen
-                if (!twoPane) AnimatedVisibility(viewer != null && screen == Screen.HOME, enter = fadeIn(tween(180)), exit = fadeOut(tween(160))) {
+                if (!twoPane) androidx.compose.animation.AnimatedVisibility(viewer != null && screen == Screen.HOME, enter = fadeIn(tween(180)), exit = fadeOut(tween(160))) {
                     viewer?.let { ViewerScreen(vm, it, inPane = false) }
                 }
             }
