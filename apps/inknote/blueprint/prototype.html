@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>InkNote — clickable prototype</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400..700&display=swap">
+<style>
+:root{
+  --p:#2B5BD7;--onp:#fff;--pc:#DCE5FB;--onpc:#0F2A73;
+  --bg:#FBF8F3;--card:#FFFFFF;--surf:#ECE8E1;--surf2:#F4F1EC;--div:#E4DED4;
+  --txt:#1C1B1F;--mut:#625D55;--paper:#FFFFFF;--line:#DCE6F7;--ink:#1F3F9A;--ink2:#2B5BD7;--red:#C0392B;--hl:#FFE066;
+  --scrim:rgba(20,18,14,.42);--sh:0 1px 3px rgba(60,50,30,.10);--sh2:0 6px 20px rgba(60,50,30,.18);
+}
+body.dark{
+  --p:#9DB6FF;--onp:#0B1D4D;--pc:#243A73;--onpc:#DCE5FB;
+  --bg:#141518;--card:#1E2024;--surf:#2A2C31;--surf2:#232529;--div:#34373D;
+  --txt:#ECE8E1;--mut:#ABA59B;--paper:#1E2024;--line:#2D3A52;--ink:#A9C1FF;--ink2:#8FB0FF;--red:#FF8A80;--hl:#7A6A1E;
+  --scrim:rgba(0,0,0,.6);--sh:0 1px 3px rgba(0,0,0,.4);--sh2:0 8px 24px rgba(0,0,0,.5);
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%}
+body{font-family:Inter,Roboto,system-ui,sans-serif;background:var(--bg);color:var(--txt);overflow:hidden;font-size:14px}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
+.disp{font-family:"Inter Display",Inter,sans-serif}
+#app{position:fixed;inset:0;display:flex}
+.pane{position:relative;height:100%;overflow:hidden;display:flex;flex-direction:column;background:var(--bg)}
+.scroll{flex:1;overflow:auto;padding-bottom:110px}
+.st{height:26px;flex:none;font-size:12px;display:flex;justify-content:space-between;padding:7px 20px 0;color:var(--mut)}
+.top{display:flex;align-items:center;gap:6px;padding:4px 8px;height:60px;flex:none}
+.tt{font-size:24px;font-weight:700;flex:1;padding-left:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ib{width:48px;height:48px;border-radius:50%;display:grid;place-items:center;flex:none}
+.ib:active,.ib.on{background:var(--surf)}
+.chips{display:flex;gap:8px;padding:2px 16px 12px;overflow-x:auto;scrollbar-width:none;flex:none}
+.chip{white-space:nowrap;padding:0 14px;height:34px;display:inline-flex;align-items:center;gap:6px;border-radius:12px;font-size:13.5px;background:var(--surf)}
+.chip.on{background:var(--p);color:var(--onp)}
+.g{display:grid;grid-template-columns:repeat(var(--cols,2),1fr);gap:12px;padding:2px 16px}
+.card{background:var(--card);border-radius:16px;overflow:hidden;box-shadow:var(--sh);text-align:left;position:relative}
+.card.sel{outline:2.5px solid var(--p)}
+.th{height:140px;position:relative;margin:6px 6px 0;border-radius:11px;overflow:hidden;border:1px solid var(--div);background:var(--paper)}
+.me{padding:8px 11px 11px;font-size:12px;color:var(--mut)}
+.me b{display:block;font-size:14px;color:var(--txt);font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:2px}
+.tag{color:var(--p)}
+.fab{position:absolute;right:16px;bottom:22px;width:60px;height:60px;border-radius:18px;background:var(--p);display:grid;place-items:center;box-shadow:0 6px 16px rgba(43,91,215,.35);z-index:5}
+.sbar{position:absolute;left:16px;right:92px;bottom:25px;height:56px;border-radius:16px;background:var(--card);display:flex;align-items:center;gap:10px;padding:0 16px;font-size:15px;color:var(--mut);box-shadow:var(--sh2);z-index:5;text-align:left}
+.badge{position:absolute;right:7px;bottom:7px;font-size:10px;font-weight:700;background:#d93025;color:#fff;padding:2px 6px;border-radius:5px}
+.rec{position:absolute;left:7px;bottom:7px;font-size:10.5px;font-weight:600;background:var(--p);color:var(--onp);padding:2px 8px;border-radius:9px}
+.pinm{position:absolute;right:7px;top:7px;width:24px;height:24px;border-radius:50%;background:var(--card);display:grid;place-items:center;box-shadow:var(--sh)}
+.lk{position:absolute;inset:0;display:grid;place-items:center;background:var(--surf2)}
+.sec{padding:16px 20px 6px;font-size:13px;font-weight:600;color:var(--p)}
+.li{display:flex;align-items:center;gap:16px;padding:0 20px;min-height:56px;width:100%;text-align:left}
+.li .t{flex:1;font-size:15.5px}.li .t small{display:block;color:var(--mut);font-size:12.5px;margin-top:2px}
+.li .c{color:var(--mut);font-size:13px}
+.dot{width:12px;height:12px;border-radius:50%;flex:none}
+.sw{width:52px;height:32px;border-radius:16px;background:var(--surf);position:relative;flex:none;border:2px solid var(--mut)}
+.sw::after{content:"";position:absolute;width:16px;height:16px;border-radius:50%;background:var(--mut);left:6px;top:6px;transition:.2s}
+.sw.on{background:var(--p);border-color:var(--p)}.sw.on::after{left:24px;background:var(--onp);width:22px;height:22px;top:3px}
+.btn{height:44px;padding:0 22px;border-radius:12px;background:var(--p);color:var(--onp);font-weight:600;display:inline-flex;align-items:center;gap:8px}
+.btn.t{background:transparent;color:var(--p)}.btn.o{background:transparent;color:var(--p);border:1.5px solid var(--p)}.btn.s{background:var(--pc);color:var(--onpc)}
+/* editor */
+.recbar{display:flex;align-items:center;gap:10px;background:var(--card);border:1px solid var(--div);border-radius:14px;padding:7px 12px;margin:0 12px 8px;flex:none}
+.recbar .pl{width:34px;height:34px;border-radius:50%;background:var(--p);display:grid;place-items:center}
+.prog{flex:1;height:4px;background:var(--surf);border-radius:2px;position:relative}.prog i{position:absolute;left:0;top:0;height:4px;width:38%;background:var(--p);border-radius:2px}
+.canvas{flex:1;overflow:auto;padding:4px 12px 190px}
+.page{container-type:inline-size;background:var(--paper);border-radius:6px;box-shadow:var(--sh);position:relative;margin:0 auto 14px;overflow:hidden}
+.page.port{width:100%;max-width:820px;aspect-ratio:210/297}
+.page.land{width:100%;max-width:1100px;aspect-ratio:297/210}
+.pnum{position:absolute;right:10px;bottom:8px;font-size:11px;color:var(--mut)}
+.tools{position:absolute;left:0;right:0;bottom:0;background:var(--card);border-top:1px solid var(--div);padding:8px 8px 14px;z-index:6}
+.trow{display:flex;justify-content:space-around;max-width:620px;margin:0 auto}
+.tb{width:46px;height:46px;border-radius:13px;display:grid;place-items:center}
+.tb.on{background:color-mix(in srgb,var(--p) 16%,transparent)}
+.crow{display:flex;gap:12px;align-items:center;padding:2px 10px 10px;max-width:620px;margin:0 auto}
+.cc{width:26px;height:26px;border-radius:50%;flex:none}
+.cc{box-shadow:inset 0 0 0 1px rgba(127,127,127,.45)}.cc.on{outline:2.5px solid var(--p);outline-offset:2.5px}
+.size{display:flex;align-items:center;gap:8px;margin-left:auto;font-size:12px;color:var(--mut)}
+.size i{display:block;width:80px;height:4px;border-radius:2px;background:linear-gradient(90deg,var(--p) 40%,var(--surf) 40%)}
+.fmt{display:flex;gap:4px;align-items:center;padding:0 6px 8px;overflow-x:auto;max-width:620px;margin:0 auto}
+.fmt .tb{width:42px;height:40px;font-weight:700;font-size:16px}
+/* sheets & dialogs */
+.scrim{position:absolute;inset:0;background:var(--scrim);z-index:20;animation:fade .2s}
+.sheet{position:absolute;left:0;right:0;bottom:0;background:var(--card);border-radius:24px 24px 0 0;z-index:21;max-height:88%;overflow:auto;padding:8px 0 22px;animation:up .25s ease-out}
+.sheet .h{width:36px;height:4px;border-radius:2px;background:var(--div);margin:6px auto 12px}
+.sheet h3{font-size:19px;font-weight:700;padding:0 20px 4px}
+.sheet p.sub{color:var(--mut);font-size:13px;padding:0 20px 10px}
+.dlg{position:absolute;left:24px;right:24px;top:50%;transform:translateY(-50%);background:var(--card);border-radius:28px;z-index:21;padding:24px;animation:fade .2s}
+.menu{position:absolute;right:10px;top:70px;background:var(--card);border-radius:14px;box-shadow:var(--sh2);z-index:21;min-width:240px;padding:6px 0;animation:fade .15s}
+.menu .li{min-height:48px;font-size:15px;gap:14px;padding:0 16px}
+.drawer{position:absolute;left:0;top:0;bottom:0;width:300px;max-width:85%;background:var(--card);z-index:21;border-radius:0 24px 24px 0;overflow:auto;animation:slide .25s ease-out;padding-bottom:20px}
+.navp{width:280px;flex:none;border-right:1px solid var(--div);background:var(--card);overflow:auto;height:100%}
+.nv{display:flex;align-items:center;gap:14px;height:52px;margin:0 12px;padding:0 14px;border-radius:26px;width:calc(100% - 24px);text-align:left;font-size:15px}
+.nv.on{background:var(--pc);color:var(--onpc);font-weight:600}
+.nv .c{margin-left:auto;font-size:13px;color:var(--mut)}
+.tpl{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;padding:4px 20px 12px}
+.tpl button{display:flex;flex-direction:column;align-items:center;gap:6px;font-size:12px}
+.tpl .pv{width:100%;aspect-ratio:3/4;border-radius:8px;border:1px solid var(--div);background:var(--paper);overflow:hidden;position:relative}
+.tpl button.on .pv{outline:2.5px solid var(--p);outline-offset:1px}
+.seg{display:flex;margin:4px 20px 12px;border:1px solid var(--mut);border-radius:20px;overflow:hidden}
+.seg button{flex:1;height:44px;display:flex;align-items:center;justify-content:center;gap:8px;font-size:14px;font-weight:500}
+.seg button+button{border-left:1px solid var(--mut)}
+.seg button.on{background:var(--pc);color:var(--onpc)}
+.pinpad{display:grid;grid-template-columns:repeat(3,72px);gap:14px;justify-content:center;margin-top:18px}
+.pinpad button{width:72px;height:72px;border-radius:50%;background:var(--surf);font-size:26px;font-weight:500}
+.toast{position:absolute;left:16px;right:16px;bottom:100px;background:#2F3033;color:#F2EFEA;border-radius:10px;padding:14px 16px;z-index:30;display:flex;gap:10px;align-items:center;font-size:14px;animation:fade .2s}
+.toast b{margin-left:auto;color:#A9C1FF}
+.lasso-act{position:absolute;display:flex;gap:2px;background:var(--card);border-radius:14px;box-shadow:var(--sh2);padding:4px;z-index:7}
+.lasso-act button{display:flex;flex-direction:column;align-items:center;font-size:10.5px;gap:2px;padding:6px 9px;border-radius:10px;color:var(--txt)}
+.hlm{background:color-mix(in srgb,var(--hl) 80%,transparent);border-radius:3px;padding:0 2px}
+.res{background:var(--card);border-radius:16px;box-shadow:var(--sh);margin:0 16px 10px;padding:12px;display:flex;gap:12px;text-align:left;width:calc(100% - 32px)}
+.res .th{height:76px;width:62px;margin:0;flex:none}
+.res .k{font-size:11px;font-weight:600;color:var(--p);display:flex;align-items:center;gap:4px;margin-top:4px}
+.empty{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:24px 32px 120px}
+.empty h2{font-size:22px;margin:18px 0 8px}.empty p{color:var(--mut);line-height:1.5;margin-bottom:22px}
+.proto{position:fixed;left:50%;top:6px;transform:translateX(-50%);z-index:99;display:flex;gap:6px;background:rgba(30,30,30,.82);color:#fff;border-radius:20px;padding:4px 6px;font-size:12px;backdrop-filter:blur(6px)}
+.proto button{color:#fff;padding:5px 10px;border-radius:14px}.proto button.on{background:rgba(255,255,255,.22)}
+body.shot .proto{display:none}
+@keyframes up{from{transform:translateY(40%);opacity:.4}}@keyframes fade{from{opacity:0}}@keyframes slide{from{transform:translateX(-60%)}}
+.split{display:flex;flex:1;min-height:0}.split>.pane{flex:1;border-left:1px solid var(--div)}
+.mw{max-width:1040px;margin:0 auto;width:100%}
+.pg{display:grid;grid-template-columns:repeat(var(--pc2,2),1fr);gap:14px;padding:6px 16px}
+.pgc{display:flex;flex-direction:column;align-items:center;gap:6px;font-size:12.5px;color:var(--mut)}
+.pgc .page{width:100%;margin:0}
+.pgc.on .page{outline:2.5px solid var(--p);outline-offset:2px}
+</style>
+</head>
+<body>
+<div class="proto"><button id="pTheme">Dark</button><button id="pStates">States</button><button id="pReset">Restart</button></div>
+<div id="app"></div>
+<script>
+/* ================= data ================= */
+const FOLDERS=[{id:'stet',n:'STET',c:'#2B5BD7',k:14},{id:'bed',n:'B.Ed',c:'#0E8A6B',k:11},{id:'eng',n:'English Hons',c:'#B4561F',k:9},{id:'per',n:'Personal',c:'#8A3FB8',k:8}];
+const TAGS=['English','STET','B.Ed','PYQ','Lecture'];
+let NOTES=[
+ {id:1,t:'Hamlet – Act III',k:'hw',d:'Today',tags:['English'],f:'eng',seed:3,pin:true,rec:true,pages:['port','port','land'],fav:true},
+ {id:2,t:'Hostel shopping',k:'check',d:'Yesterday',tags:[],f:'per',pages:['port']},
+ {id:3,t:'STET Paper 2 – 2024',k:'pdf',d:'18 Nov · 24 pages',tags:['STET','PYQ'],f:'stet',pin:true,pages:['port','port','port']},
+ {id:4,t:'Romantic Poets lecture',k:'rec',d:'15 Nov',tags:['STET','Lecture'],f:'stet',seed:9,rec:true,pages:['port','port']},
+ {id:5,t:'Class timetable',k:'land',d:'12 Nov · Landscape',tags:[],f:'bed',pages:['land']},
+ {id:6,t:'Exam form details',k:'lock',d:'10 Nov · Locked',tags:[],f:'per',lock:true,pages:['port']},
+ {id:7,t:'Pedagogy – Unit 2',k:'hw',d:'10 Nov',tags:['B.Ed'],f:'bed',seed:11,pages:['port','port']},
+ {id:8,t:'Daily study plan',k:'text',d:'8 Nov',tags:['STET'],f:'stet',pages:['port']},
+];
+const TRASH=[{t:'Old timetable',d:'27 days left',k:'land'},{t:'Rough work – Grammar',d:'12 days left',k:'hw',seed:4},{t:'Sample PDF',d:'3 days left',k:'pdf'}];
+/* ================= state ================= */
+const Q=new URLSearchParams(location.search);
+let S={screen:Q.get('screen')||'home',note:+(Q.get('note')||1),note2:null,overlay:Q.get('overlay')||null,tool:Q.get('tool')||'pen',
+  filter:'all',view:'grid',empty:Q.get('state')==='empty',select:Q.get('state')==='select',pin:'',unlocked:{},sel:[3],orient:'port',tpl:'lined',
+  pagesel:2,searchQ:Q.get('q')||'',stylus:true,shape:true,toast:null,lasso:Q.get('state')==='lasso',drawer:false,showStates:false};
+if(Q.get('theme')==='dark')document.body.classList.add('dark');
+if(Q.get('shot'))document.body.classList.add('shot');
+/* ================= helpers ================= */
+const IC={
+menu:'<path d="M4 7h16M4 12h16M4 17h16"/>',more:'<circle cx="12" cy="5" r="1.3" fill="C"/><circle cx="12" cy="12" r="1.3" fill="C"/><circle cx="12" cy="19" r="1.3" fill="C"/>',
+search:'<circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/>',back:'<path d="M15 5l-7 7 7 7"/>',close:'<path d="M6 6l12 12M18 6L6 18"/>',
+undo:'<path d="M9 8H5V4"/><path d="M5 8a8 8 0 1 1-1 7"/>',redo:'<path d="M15 8h4V4"/><path d="M19 8a8 8 0 1 0 1 7"/>',
+pen:'<path d="M4 20l1-5L16 4l4 4L9 19z"/><path d="M14 6l4 4"/>',hl:'<path d="M6 15l9-9 4 4-9 9H6z"/><path d="M4 21h9"/>',
+eraser:'<path d="M8 20h12"/><path d="M4 15l9-9 6 6-7 7H8z"/>',lasso:'<ellipse cx="12" cy="9" rx="8" ry="5" stroke-dasharray="3 2.4"/><path d="M8 13c-1 3 1 6 3 7"/>',
+text:'<path d="M5 6V4h14v2M12 4v16M9 20h6"/>',image:'<rect x="3.5" y="4.5" width="17" height="15" rx="2"/><circle cx="9" cy="10" r="1.6"/><path d="M4 18l5-5 4 4 3-3 4 4"/>',
+mic:'<rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21"/>',shape:'<circle cx="8" cy="8" r="4.2"/><rect x="11.5" y="11.5" width="9" height="9" rx="1"/>',
+grid:'<rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><rect x="13" y="13" width="7" height="7" rx="1.5"/>',
+list:'<path d="M9 6h11M9 12h11M9 18h11"/><circle cx="5" cy="6" r="1" fill="C"/><circle cx="5" cy="12" r="1" fill="C"/><circle cx="5" cy="18" r="1" fill="C"/>',
+plus:'<path d="M12 5v14M5 12h14"/>',pin:'<path d="M9 4h6l-1 6 3 3H7l3-3z"/><path d="M12 13v7"/>',
+page:'<rect x="5" y="3.5" width="14" height="17" rx="2"/><path d="M8.5 8h7M8.5 12h7M8.5 16h4"/>',
+pages:'<rect x="3.5" y="5.5" width="11" height="15" rx="1.5"/><path d="M8 3.5h10.5a2 2 0 0 1 2 2V17"/>',
+rotate:'<rect x="3.5" y="9" width="12" height="11" rx="1.5"/><path d="M13 3.5h2.5a5 5 0 0 1 5 5V11"/><path d="M18.5 9l2 2 2-2"/>',
+play:'<path d="M8 5l11 7-11 7z" fill="C"/>',pause:'<path d="M8 5v14M16 5v14"/>',folder:'<path d="M3.5 7a2 2 0 0 1 2-2h4l2 2h7a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z"/>',
+star:'<path d="M12 4l2.4 5 5.4.6-4 3.7 1.1 5.4L12 16l-4.9 2.7 1.1-5.4-4-3.7 5.4-.6z"/>',lock:'<rect x="5" y="10.5" width="14" height="10" rx="2"/><path d="M8 10.5V8a4 4 0 0 1 8 0v2.5"/>',
+split:'<rect x="3.5" y="4.5" width="17" height="15" rx="2"/><path d="M12 4.5v15"/>',trash:'<path d="M4 7h16M9 7V4.5h6V7M6 7l1 13h10l1-13"/>',
+gear:'<circle cx="12" cy="12" r="3"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M5.3 18.7l2.1-2.1M16.6 7.4l2.1-2.1"/>',
+tag:'<path d="M3.5 12V4.5h7.5l9 9-7.5 7.5z"/><circle cx="8" cy="9" r="1.4"/>',share:'<circle cx="18" cy="5.5" r="2.5"/><circle cx="6" cy="12" r="2.5"/><circle cx="18" cy="18.5" r="2.5"/><path d="M8.2 10.8l7.6-4M8.2 13.2l7.6 4"/>',
+export:'<path d="M12 15V3.5M7.5 8L12 3.5 16.5 8"/><path d="M4.5 13v6a1.5 1.5 0 0 0 1.5 1.5h12a1.5 1.5 0 0 0 1.5-1.5v-6"/>',
+pdf:'<path d="M6 3.5h8l4.5 4.5v12.5H6z"/><path d="M14 3.5V8h4.5"/>',finger:'<path d="M12 11v4M8.5 9.5a3.5 3.5 0 0 1 7 0v3a7 7 0 0 1-1 4M6 11a6 6 0 0 1 12 0v1.5M5.5 15c.4-1 .5-2 .5-4M10 21c1.5-2 2-4.5 2-7M15 20.5c.5-1 1-2.3 1.2-3.5"/>',
+check:'<path d="M5 12.5l4.5 4.5L19 7"/>',restore:'<path d="M4 12a8 8 0 1 0 2.4-5.7L4 8.5"/><path d="M4 4v4.5h4.5"/>',
+bold:'<path d="M7 5h6a3.5 3.5 0 0 1 0 7H7zM7 12h7a3.5 3.5 0 0 1 0 7H7z"/>',ital:'<path d="M10 5h8M6 19h8M14 5l-4 14"/>',und:'<path d="M7 4.5V11a5 5 0 0 0 10 0V4.5M5.5 20h13"/>',
+blist:'<path d="M10 6h10M10 12h10M10 18h10"/><circle cx="5" cy="6" r="1.3" fill="C"/><circle cx="5" cy="12" r="1.3" fill="C"/><circle cx="5" cy="18" r="1.3" fill="C"/>',
+chk:'<rect x="3.5" y="4" width="6" height="6" rx="1.2"/><path d="M5 7l1.2 1.2L8.5 5.8M12.5 7h8M3.5 14h6v6h-6zM12.5 17h8"/>',
+palette:'<path d="M12 3.5a8.5 8.5 0 0 0 0 17c1 0 1.5-.7 1.5-1.5 0-1-.8-1.4-.8-2.3 0-1 .8-1.7 1.8-1.7h2a4 4 0 0 0 4-4c0-4.2-3.8-7.5-8.5-7.5z"/><circle cx="7.5" cy="11" r="1.2" fill="C"/><circle cx="10.5" cy="7.5" r="1.2" fill="C"/><circle cx="15" cy="8" r="1.2" fill="C"/>',
+convert:'<path d="M4 7c2-3 4 3 6 0s4 3 6 0"/><path d="M4 17h9M4 13h6"/><path d="M16 13l4 4-4 4"/>',dup:'<rect x="8" y="8" width="12" height="12" rx="2"/><path d="M5 15.5H4.5a1 1 0 0 1-1-1V5a1.5 1.5 0 0 1 1.5-1.5h9.5a1 1 0 0 1 1 1V5"/>',
+resize:'<path d="M14 4h6v6M10 20H4v-6M20 4l-7 7M4 20l7-7"/>',move:'<path d="M12 3v18M3 12h18M9 6l3-3 3 3M9 18l3 3 3-3M6 9l-3 3 3 3M18 9l3 3-3 3"/>',
+info:'<circle cx="12" cy="12" r="8.5"/><path d="M12 11v5M12 7.5v.5"/>',backup:'<path d="M7 18.5h10.5a4 4 0 0 0 .5-8 6 6 0 0 0-11.6-1.6A4.5 4.5 0 0 0 7 18.5z"/><path d="M12 15.5v-6M9.5 12l2.5-2.5 2.5 2.5"/>',
+stylus:'<path d="M5 19l2-6 9-9 3 3-9 9z"/><path d="M5 19l3-1"/><path d="M14 6l3 3"/>',moon:'<path d="M19 14.5A7.5 7.5 0 0 1 9.5 5a7.5 7.5 0 1 0 9.5 9.5z"/>',
+sort:'<path d="M7 4v16M3.5 16.5L7 20l3.5-3.5M14 6h7M14 12h5M14 18h3"/>',land:'<rect x="3" y="6" width="18" height="12" rx="1.5"/>',port:'<rect x="6" y="3" width="12" height="18" rx="1.5"/>',
+camera:'<path d="M4 8h3l1.5-2.5h7L17 8h3v11H4z"/><circle cx="12" cy="13" r="3.5"/>',scan:'<path d="M4 8V5.5A1.5 1.5 0 0 1 5.5 4H8M16 4h2.5A1.5 1.5 0 0 1 20 5.5V8M20 16v2.5a1.5 1.5 0 0 1-1.5 1.5H16M8 20H5.5A1.5 1.5 0 0 1 4 18.5V16M4 12h16"/>',
+endless:'<path d="M6 3.5h12v17H6z"/><path d="M9 21v1M12 21v1M15 21v1"/>',chev:'<path d="M9 6l6 6-6 6"/>',drop:'<path d="M8 10l4 4 4-4"/>',
+heading:'<path d="M5 5v14M14 5v14M5 12h9M18 19v-7l-2 1.5"/>',align:'<path d="M4 6h16M4 10h10M4 14h16M4 18h10"/>',fcolor:'<path d="M7 16L12 4l5 12M9 11.5h6"/><path d="M4 20h16" stroke-width="3" stroke="#C0392B"/>',
+audio:'<path d="M9 18V6l10-2v12"/><circle cx="6.5" cy="18" r="2.5"/><circle cx="16.5" cy="16" r="2.5"/>',recdot:'<circle cx="12" cy="12" r="6" fill="C"/>',doc:'<path d="M6 3.5h8l4.5 4.5v12.5H6z"/><path d="M9 12h6M9 16h6"/>'};
+function ic(n,s=24,c='currentColor',w=1.8){return `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="${c}" stroke-width="${w}" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${(IC[n]||'').replaceAll('"C"',`"${c}"`)}</svg>`}
+function rnd(seed){let x=seed*9301+49297;return()=>{x=(x*9301+49297)%233280;return x/233280}}
+function scrib(w,h,color,lines,seed,sw=1.6,top=18,gap=14){const r=rnd(seed);let out='';for(let i=0;i<lines;i++){let y=top+i*gap,x=8,end=w-10-r()*40,p=`M${x},${y}`;while(x<end){let nx=x+6+r()*6;p+=` Q${x+3},${y-3-r()*4} ${nx},${(y+(r()*3-1.5)).toFixed(1)}`;x=nx;if(r()<.16){x+=6;p+=` M${x},${y}`}}out+=`<path d="${p}" fill="none" stroke="${color}" stroke-width="${sw}" stroke-linecap="round"/>`}return `<svg width="100%" height="100%" viewBox="0 0 ${w} ${h}" preserveAspectRatio="xMinYMin meet" style="position:absolute;inset:0">${out}</svg>`}
+const lined=(g=13)=>`background-image:repeating-linear-gradient(transparent 0 ${g}px,var(--line) ${g}px ${g+1}px)`;
+const gridbg=(g=12)=>`background-image:linear-gradient(var(--line) 1px,transparent 1px),linear-gradient(90deg,var(--line) 1px,transparent 1px);background-size:${g}px ${g}px`;
+const dotbg=(g=14)=>`background-image:radial-gradient(var(--line) 1.4px,transparent 1.6px);background-size:${g}px ${g}px`;
+function thumb(n,st=''){const k=n.k;
+ if(k==='hw')return `<div class="th" style="${lined()};${st}">${scrib(150,110,'var(--ink)',6,n.seed||1)}</div>`;
+ if(k==='check')return `<div class="th" style="padding:10px 12px;font-size:11px;line-height:1.6;${st}"><b style="font-size:12px">Hostel shopping</b><div>☑ Pens (blue, 3)</div><div>☑ A4 file</div><div>☐ Highlighter</div><div>☐ Maggi ×4</div></div>`;
+ if(k==='text')return `<div class="th" style="padding:10px 12px;font-size:10.5px;line-height:1.55;${st}"><b style="font-size:12px">Daily study plan</b><div>6–8 AM · English Lit</div><div>10–12 · Pedagogy</div><div>4–6 PM · PYQ practice</div><div style="color:var(--mut)">Revise Romantic poets…</div></div>`;
+ if(k==='pdf')return `<div class="th" style="padding:12px;${st}"><div style="height:10px;width:60%;background:#bfbfbf;border-radius:2px;margin-bottom:9px"></div>${[['#d6d6d6','100%'],['#d6d6d6','70%'],['var(--hl)','82%'],['#d6d6d6','100%'],['#d6d6d6','64%']].map(([c,w])=>`<div style="height:5px;background:${c};margin:7px 0;border-radius:2px;width:${w}"></div>`).join('')}<span class="badge">PDF</span></div>`;
+ if(k==='rec')return `<div class="th" style="${gridbg()};${st}">${scrib(150,90,'var(--ink2)',3,n.seed||9,1.6,18,18)}<span class="rec">● 12:40</span></div>`;
+ if(k==='land')return `<div class="th" style="display:grid;place-items:center;background:var(--surf2);${st}"><div style="width:88%;height:60%;background:var(--paper);border:1px solid var(--div);border-radius:4px;${gridbg()};position:relative">${scrib(130,60,'var(--ink)',2,5,1.6,20,20)}</div></div>`;
+ if(k==='lock')return `<div class="th" style="${st}"><div class="lk">${ic('lock',30,'var(--mut)')}</div></div>`;}
+function vis(){let l=NOTES.filter(n=>!n.trash);if(S.filter==='pin')l=l.filter(n=>n.pin);else if(S.filter==='fav')l=l.filter(n=>n.fav);else if(S.filter==='lock')l=l.filter(n=>n.lock);else if(S.filter.startsWith('f:'))l=l.filter(n=>n.f===S.filter.slice(2));else if(S.filter.startsWith('t:'))l=l.filter(n=>n.tags.includes(S.filter.slice(2)));return l.sort((a,b)=>(b.pin?1:0)-(a.pin?1:0))}
+const W=()=>innerWidth, isTab=()=>W()>=840, isMed=()=>W()>=600&&W()<840;
+function go(o){Object.assign(S,o);render()}
+function toast(m){S.toast=m;render();clearTimeout(toast._t);toast._t=setTimeout(()=>{S.toast=null;render()},2200)}
+function noteById(id){return NOTES.find(n=>n.id===id)}
+function title(){if(S.filter==='all')return 'All notes';if(S.filter==='pin')return 'Pinned';if(S.filter==='fav')return 'Favourites';if(S.filter==='lock')return 'Locked notes';if(S.filter.startsWith('f:'))return FOLDERS.find(f=>f.id===S.filter.slice(2)).n;return '#'+S.filter.slice(2)}
+/* ================= nav (drawer / panel) ================= */
+function navList(){const it=(id,i,l,c)=>`<button class="nv ${S.filter===id&&S.screen==='home'?'on':''}" onclick="go({filter:'${id}',screen:'home',drawer:false,select:false})">${i}<span>${l}</span><span class="c">${c??''}</span></button>`;
+ return `<div style="padding:20px 26px 14px;display:flex;align-items:center;gap:12px"><span style="width:40px;height:40px;border-radius:12px;background:var(--p);display:grid;place-items:center">${ic('pen',22,'var(--onp)',2)}</span><span class="disp" style="font-size:22px;font-weight:700">InkNote</span></div>
+ ${it('all',ic('doc',22),'All notes',42)}${it('fav',ic('star',22),'Favourites',5)}${it('pin',ic('pin',22),'Pinned',2)}${it('lock',ic('lock',22),'Locked notes',1)}
+ <div class="sec" style="padding-left:26px;display:flex;align-items:center">Folders<button class="ib" style="margin-left:auto;width:40px;height:40px" onclick="go({overlay:'newfolder',drawer:false})" aria-label="New folder">${ic('plus',20,'var(--p)')}</button></div>
+ ${FOLDERS.map(f=>it('f:'+f.id,`<span class="dot" style="background:${f.c};margin:0 5px"></span>`,f.n,f.k)).join('')}
+ <div class="sec" style="padding-left:26px">Tags</div>
+ <div style="display:flex;flex-wrap:wrap;gap:8px;padding:4px 24px 10px">${TAGS.map(t=>`<button class="chip ${S.filter==='t:'+t?'on':''}" onclick="go({filter:'t:${t}',screen:'home',drawer:false})">#${t}</button>`).join('')}</div>
+ <div style="height:1px;background:var(--div);margin:8px 24px"></div>
+ <button class="nv ${S.screen==='trash'?'on':''}" onclick="go({screen:'trash',drawer:false})">${ic('trash',22)}<span>Trash</span><span class="c">3</span></button>
+ <button class="nv ${S.screen==='settings'?'on':''}" onclick="go({screen:'settings',drawer:false})">${ic('gear',22)}<span>Settings</span></button>`}
+/* ================= screens ================= */
+function stbar(){return isTab()?'':`<div class="st"><span>9:41</span><span>▮▮▮ 86%</span></div>`}
+function home(){
+ const notes=vis(); const cols=isTab()?(S.screen==='home'&&!S.split?4:2):isMed()?3:2;
+ const top=S.select?`<div class="top"><button class="ib" onclick="go({select:false})" aria-label="Cancel selection">${ic('close')}</button><span class="tt" style="font-size:20px">${S.sel.length} selected</span>
+   <button class="ib" aria-label="Pin" onclick="toast('Pinned')">${ic('pin')}</button><button class="ib" aria-label="Move to folder" onclick="go({overlay:'move'})">${ic('folder')}</button><button class="ib" aria-label="Lock" onclick="toast('Locked')">${ic('lock')}</button><button class="ib" aria-label="Delete" onclick="go({select:false});toast('Moved to Trash · 1 note')">${ic('trash')}</button></div>`
+  :`<div class="top">${isTab()?'':`<button class="ib" aria-label="Open menu" onclick="go({drawer:true})">${ic('menu')}</button>`}<span class="tt disp">${title()}</span>
+   <button class="ib" aria-label="Switch view" onclick="go({view:S.view==='grid'?'list':'grid'})">${ic(S.view==='grid'?'list':'grid')}</button><button class="ib" aria-label="More" onclick="go({overlay:'homemenu'})">${ic('more')}</button></div>`;
+ const chips=`<div class="chips">${[['all','All 42'],['pin','Pinned']].concat(FOLDERS.map(f=>['f:'+f.id,f.n])).map(([id,l])=>`<button class="chip ${S.filter===id?'on':''}" onclick="go({filter:'${id}'})">${l}</button>`).join('')}</div>`;
+ let body;
+ if(S.empty) body=`<div class="empty"><svg width="150" height="120" viewBox="0 0 150 120"><rect x="30" y="14" width="78" height="96" rx="8" fill="var(--card)" stroke="var(--div)" stroke-width="2"/><g stroke="var(--line)" stroke-width="2">${[36,50,64,78,92].map(y=>`<path d="M42 ${y}h54"/>`).join('')}</g><path d="M46 50q8-8 16 0t16 0" stroke="var(--ink2)" stroke-width="3" fill="none" stroke-linecap="round"/><g transform="rotate(35 112 40)"><rect x="104" y="6" width="14" height="62" rx="4" fill="var(--p)"/><path d="M104 68l7 14 7-14z" fill="var(--txt)"/></g></svg>
+  <h2 class="disp">Your notebook is empty</h2><p>Write by hand, type, record a lecture or open a PDF to mark it up. Everything stays on this phone.</p>
+  <button class="btn" onclick="go({overlay:'new',empty:false})">${ic('plus',20,'var(--onp)',2.2)}Create a note</button><button class="btn t" style="margin-top:8px" onclick="go({screen:'pdf',empty:false})">Import a PDF</button></div>`;
+ else if(S.view==='grid') body=`<div class="scroll">${chips}<div class="g" style="--cols:${cols}">${notes.map(n=>`<button class="card ${S.select&&S.sel.includes(n.id)?'sel':''}" onclick="openNote(${n.id})" aria-label="${n.t}">${thumb(n)}${n.pin?`<span class="pinm">${ic('pin',14,'var(--p)',2)}</span>`:''}${S.select?`<span class="pinm" style="left:7px;right:auto;background:${S.sel.includes(n.id)?'var(--p)':'var(--card)'}">${S.sel.includes(n.id)?ic('check',14,'var(--onp)',2.6):''}</span>`:''}<div class="me"><b>${n.t}</b>${n.d}${n.tags[0]?` · <span class="tag">#${n.tags[0]}</span>`:''}</div></button>`).join('')}</div></div>`;
+ else body=`<div class="scroll">${chips}${notes.map(n=>`<button class="li" style="padding:8px 16px;border-bottom:1px solid var(--div)" onclick="openNote(${n.id})"><div style="width:58px;height:70px;flex:none;position:relative">${thumb(n,'height:70px;margin:0').replace('class="th"','class="th" ')}</div><span class="t" style="min-width:0"><span style="font-weight:600">${n.t}</span><small>${n.d}${n.tags.length?' · '+n.tags.map(t=>'#'+t).join(' '):''}</small></span>${n.pin?ic('pin',18,'var(--p)'):''}</button>`).join('')}</div>`;
+ const bottom=S.empty||S.select?'':`<button class="sbar" onclick="go({screen:'search'})">${ic('search',22,'var(--mut)')}Search notes, PDFs, photos</button><button class="fab" aria-label="New note" onclick="go({overlay:'new'})">${ic('plus',28,'var(--onp)',2.2)}</button>`;
+ return `<div class="pane" style="flex:1">${stbar()}${top}${body}${bottom}</div>`}
+function openNote(id){if(S.select){S.sel=S.sel.includes(id)?S.sel.filter(x=>x!==id):[...S.sel,id];return render()}const n=noteById(id);if(n.lock&&!S.unlocked[id])return go({overlay:'lock',lockId:id,pin:''});go({screen:n.k==='pdf'?'pdf':'editor',note:id,lasso:false})}
+function pageHTML(n,o,i,big){const land=o==='land';
+ const hw=scrib(land?520:360,land?340:500,'var(--ink)',land?9:13,(n.seed||3)+i,big?2.2:1.6,land?34:46,land?32:34);
+ const extra=i===0&&n.id===1?`<div style="position:absolute;left:6%;top:3.5%;right:6%"><div class="disp" style="font-size:clamp(7px,5.6cqi,26px);font-weight:700">Hamlet – Act III, Scene 1</div><div style="font-size:clamp(5px,3.2cqi,13px);color:var(--mut);margin-top:3px">Themes of action &amp; doubt · Prof. Sinha's lecture</div></div>
+  <div style="position:absolute;left:5%;top:18.6%;width:42%;height:2.6%;background:var(--hl);opacity:.65;border-radius:3px"></div>
+  <svg style="position:absolute;right:6%;top:46%;width:30%" viewBox="0 0 110 80"><ellipse cx="55" cy="40" rx="50" ry="32" fill="none" stroke="var(--red)" stroke-width="2.4"/><text x="55" y="45" font-size="14" text-anchor="middle" fill="var(--red)" font-family="Inter" font-weight="600">To be?</text></svg>`:'';
+ const off=i===0&&n.id===1?'top:12%;':'';
+ return `<div class="page ${land?'land':'port'}" style="${land?gridbg(18):lined(25)}">${extra}<div style="position:absolute;left:3%;right:3%;bottom:0;${off}${off?'':'top:0;'}">${hw}</div>${S.lasso&&i===0?`<div style="position:absolute;left:4%;top:40%;width:60%;height:17%;border:2px dashed var(--p);border-radius:10px;background:color-mix(in srgb,var(--p) 8%,transparent)"></div>${['0,0','100%,0','0,100%','100%,100%'].map(()=>'').join('')}`:''}<span class="pnum">${i+1} / ${n.pages.length}${land?' · Landscape':''}</span></div>`}
+function toolsBar(){const T=[['pen','Pen'],['hl','Highlighter'],['eraser','Eraser'],['lasso','Select'],['shape','Shapes'],['text','Type text'],['plus','Insert']];
+ const cols=['#1F3F9A','#1C1B1F','#C0392B','#0E8A6B','#E67E22'];
+ const top=S.tool==='text'?`<div class="fmt">${['bold','ital','und','heading','blist','chk','fcolor','align'].map((b,i)=>`<button class="tb ${i==0?'on':''}" aria-label="${b}">${ic(b,21)}</button>`).join('')}</div>`
+  :S.tool==='eraser'?`<div class="crow"><button class="chip on">Stroke eraser</button><button class="chip">Area eraser</button><span class="size">Size<i></i></span></div>`
+  :S.tool==='lasso'?`<div class="crow" style="color:var(--mut);font-size:13px">Draw a loop around writing to select it</div>`
+  :S.tool==='shape'?`<div class="crow" style="color:var(--mut);font-size:13px">${ic('shape',18,'var(--mut)')} Draw a shape and hold — it becomes perfect</div>`
+  :`<div class="crow">${cols.map((c,i)=>`<button class="cc ${i==0?'on':''}" style="background:${c}" aria-label="Colour ${c}"></button>`).join('')}<button class="cc" style="background:conic-gradient(red,orange,yellow,green,blue,violet,red)" onclick="go({overlay:'pen'})" aria-label="More colours"></button><span class="size">Size<i></i></span></div>`;
+ return `<div class="tools">${top}<div class="trow">${T.map(([t,l])=>`<button class="tb ${S.tool===t?'on':''}" aria-label="${l}" onclick="${t==='plus'?"go({overlay:'image'})":`if(S.tool==='${t}'&&'${t}'==='pen')go({overlay:'pen'});else go({tool:'${t}',lasso:'${t}'==='lasso'})`}">${ic(t,24,S.tool===t?'var(--p)':'currentColor')}</button>`).join('')}</div></div>`}
+function editorPane(id,second){const n=noteById(id)||NOTES[0];
+ const top=`<div class="top">${second?`<button class="ib" aria-label="Close this note" onclick="go({split:false,note2:null})">${ic('close')}</button>`:`<button class="ib" aria-label="Back" onclick="go({screen:'home',split:false,overlay:null,tool:'pen',lasso:false})">${ic('back')}</button>`}<span style="flex:1;font-weight:600;font-size:16.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding-left:4px">${n.t}</span>
+  <button class="ib" aria-label="Undo">${ic('undo',22)}</button><button class="ib" aria-label="Redo">${ic('redo',22)}</button><button class="ib" aria-label="More options" onclick="go({overlay:'edmenu'})">${ic('more')}</button></div>`;
+ const live=S.recording&&!second?`<div class="recbar" style="border-color:#C0392B"><span style="width:12px;height:12px;border-radius:50%;background:#D93025;margin:0 6px;animation:fade 1s infinite alternate"></span><span style="font-weight:600;color:#D93025">Recording · 00:42</span><span style="flex:1"></span><button class="btn" style="height:36px;background:#D93025;color:#fff;padding:0 14px" onclick="go({recording:false});toast('Recording saved · synced to your writing')">Stop</button></div>`:'';
+ const rec=live?live:n.rec?`<div class="recbar"><button class="pl" aria-label="Play recording">${ic('play',15,'var(--onp)')}</button><div class="prog"><i></i></div><span style="font-size:12px;color:var(--mut)">04:51 / 12:40</span></div>`:'';
+ const tip=n.rec&&!second?`<div style="margin:-2px 12px 8px;font-size:12px;color:var(--mut);display:flex;gap:6px;align-items:center">${ic('info',15,'var(--mut)')} Tap any writing to hear what was said at that moment</div>`:'';
+ const la=S.lasso&&!second?`<div class="lasso-act" style="left:50%;transform:translateX(-50%);top:${n.rec?'44%':'38%'}">${[['move','Move'],['resize','Resize'],['palette','Colour'],['convert','To text'],['dup','Duplicate'],['trash','Delete']].map(([i,l])=>`<button onclick="${i==='convert'?"go({overlay:'convert'})":`toast('${l}')`}">${ic(i,20)}${l}</button>`).join('')}</div>`:'';
+ return `<div class="pane" style="flex:1">${second||isTab()?'':stbar()}${top}${rec}${tip}<div class="canvas"><div class="mw">${n.pages.map((o,i)=>pageHTML(n,o,i,true)).join('')}</div></div>${la}${second?'':toolsBar()}</div>`}
+function editor(){if(S.split&&S.note2)return `<div class="split" style="flex-direction:row">${editorPane(S.note)}${editorPane(S.note2,true)}</div>`;return editorPane(S.note)}
+function pdf(){const n=noteById(3);
+ const pg=(i)=>`<div class="page port" style="padding:7% 8%;font-size:clamp(6px,3.3cqi,13px);line-height:1.6;color:#333;background:#fff">
+  <div style="font-weight:700;font-size:1.25em;text-align:center;color:#111">BSEB STET 2024 · Paper II · English</div><div style="text-align:center;color:#666;margin-bottom:1.2em">Section A — Literature</div>
+  <p><b>1.</b> Who wrote <i>'Ode to a Nightingale'</i>?<br>(A) Shelley &nbsp;(B) Byron &nbsp;<span style="background:#FFE06699;border-radius:2px">(C) John Keats</span> &nbsp;(D) Wordsworth</p><br>
+  <p><b>2.</b> 'To be, or not to be' appears in which play?<br>(A) Macbeth &nbsp;<span style="background:#FFE06699">(B) Hamlet</span> &nbsp;(C) Othello &nbsp;(D) King Lear</p><br>
+  <p><b>3.</b> The term 'negative capability' was coined by —<br>(A) Coleridge &nbsp;(B) Keats &nbsp;(C) Arnold &nbsp;(D) Eliot</p><br><p><b>4.</b> 'The Waste Land' was published in —<br>(A) 1915 (B) 1922 (C) 1925 (D) 1930</p>
+  <svg style="position:absolute;left:34%;top:66%;width:44%" viewBox="0 0 150 50"><path d="M5 30 Q20 5 40 28 T80 26 T115 20" fill="none" stroke="#C0392B" stroke-width="2.2"/><text x="10" y="48" font-size="13" fill="#C0392B" font-family="Inter" font-weight="600">Keats ✓ (1817 letter)</text></svg>
+  <svg style="position:absolute;left:22.5%;top:45.8%;width:20%" viewBox="0 0 60 30"><ellipse cx="30" cy="15" rx="27" ry="12" fill="none" stroke="#1F3F9A" stroke-width="2"/></svg>
+  <span class="pnum">${i+1} / 24</span></div>`;
+ return `<div class="pane" style="flex:1">${isTab()?'':stbar()}<div class="top"><button class="ib" aria-label="Back" onclick="go({screen:'home'})">${ic('back')}</button><span style="flex:1;font-weight:600;font-size:16.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding-left:4px">${n.t}</span><button class="ib" aria-label="Search in PDF" onclick="go({screen:'search',searchQ:'Keats'})">${ic('search',22)}</button><button class="ib" aria-label="Undo">${ic('undo',22)}</button><button class="ib" aria-label="More" onclick="go({overlay:'edmenu'})">${ic('more')}</button></div>
+  <div style="display:flex;gap:8px;padding:0 12px 8px;overflow-x:auto;flex:none">${Array.from({length:8},(_,i)=>`<div style="flex:none;width:44px;height:60px;border-radius:5px;background:#fff;border:${i==0?'2.5px solid var(--p)':'1px solid var(--div)'};padding:6px 5px">${'<div style="height:3px;background:#ddd;margin:3px 0;border-radius:2px"></div>'.repeat(5)}</div>`).join('')}</div>
+  <div class="canvas"><div class="mw">${pg(0)}${pg(1)}</div></div>${toolsBar()}</div>`}
+function search(){const q=S.searchQ||'Keats';
+ const R=[{n:NOTES[2],k:'In PDF text · page 1',s:`Who wrote 'Ode to a Nightingale'? (C) John <mark class="hlm">${q}</mark>`},
+  {n:NOTES[3],k:'In handwriting · page 2',s:`“<mark class="hlm">${q}</mark> — beauty is truth, truth beauty…”`},
+  {n:{...NOTES[6],t:'Board photo – 14 Nov',k:'hw',seed:6},k:'In a photo',s:`Romantic poets: Wordsworth, Shelley, <mark class="hlm">${q}</mark>…`,ph:1},
+  {n:NOTES[7],k:'In typed text',s:`4–6 PM · PYQ practice — revise <mark class="hlm">${q}</mark> odes`},
+  {n:NOTES[3],k:'In recording · 07:12',s:`Lecture moment where the note mentions <mark class="hlm">${q}</mark>`,rc:1}];
+ return `<div class="pane" style="flex:1">${stbar()}<div class="top"><button class="ib" aria-label="Back" onclick="go({screen:'home'})">${ic('back')}</button>
+  <div style="flex:1;height:48px;border-radius:24px;background:var(--surf);display:flex;align-items:center;padding:0 16px;font-size:16px;gap:8px">${q}<span style="width:2px;height:22px;background:var(--p)"></span><span style="margin-left:auto">${ic('close',20,'var(--mut)')}</span></div></div>
+  <div class="chips">${['All 5','Typed','Handwriting','PDFs','Photos','Recordings'].map((c,i)=>`<button class="chip ${i==0?'on':''}">${c}</button>`).join('')}</div>
+  <div class="scroll"><div style="padding:2px 20px 10px;color:var(--mut);font-size:13px">5 results in 4 notes</div>
+  ${R.map(r=>`<button class="res" onclick="openNote(${r.n.id})"><div style="position:relative">${thumb(r.n,'height:76px;width:62px;margin:0')}</div><div style="min-width:0;flex:1"><div style="font-weight:600;font-size:15px">${r.n.t}</div><div style="font-size:13.5px;margin-top:3px;line-height:1.4">${r.s}</div><div class="k">${ic(r.ph?'camera':r.rc?'mic':r.k.includes('PDF')?'pdf':r.k.includes('hand')?'pen':'text',14,'var(--p)')}${r.k}</div></div></button>`).join('')}</div></div>`}
+function trash(){return `<div class="pane" style="flex:1">${stbar()}<div class="top">${isTab()?'':`<button class="ib" aria-label="Back" onclick="go({screen:'home'})">${ic('back')}</button>`}<span class="tt disp">Trash</span><button class="btn t" onclick="go({overlay:'emptytrash'})">Empty</button></div>
+ <div style="margin:0 16px 12px;padding:12px 14px;border-radius:14px;background:var(--surf2);display:flex;gap:10px;font-size:13.5px;color:var(--mut);line-height:1.45">${ic('info',20,'var(--mut)')}Deleted notes stay here for 30 days, then they're removed for good.</div>
+ <div class="scroll"><div class="g" style="--cols:${isTab()?4:2}">${TRASH.map(n=>`<div class="card">${thumb(n)}<div class="me"><b>${n.t}</b>${n.d}</div><div style="display:flex;border-top:1px solid var(--div)"><button style="flex:1;height:44px;display:flex;align-items:center;justify-content:center;gap:6px;color:var(--p);font-weight:600;font-size:13px" onclick="toast('Restored to All notes')">${ic('restore',18,'var(--p)')}Restore</button></div></div>`).join('')}</div></div></div>`}
+function settings(){const sw=(on,k)=>`<span class="sw ${on?'on':''}" role="switch" aria-checked="${on}" ${k?`onclick="event.stopPropagation();S.${k}=!S.${k};render()"`:''}></span>`;
+ const row=(i,t,s,r='')=>`<div class="li">${ic(i,22,'var(--mut)')}<span class="t">${t}${s?`<small>${s}</small>`:''}</span>${r}</div>`;
+ return `<div class="pane" style="flex:1">${stbar()}<div class="top">${isTab()?'':`<button class="ib" aria-label="Back" onclick="go({screen:'home'})">${ic('back')}</button>`}<span class="tt disp">Settings</span></div><div class="scroll"><div style="max-width:720px;margin:0 auto">
+ <div class="sec">Writing</div>${row('stylus','Stylus-only writing','Finger scrolls and zooms; only the stylus writes',sw(S.stylus,'stylus'))}${row('shape','Shape auto-correct','Draw a shape and hold to make it neat',sw(S.shape,'shape'))}
+ ${row('page','Default page','Lined · Portrait · Pages',ic('chev',20,'var(--mut)'))}${row('convert','Handwriting language','English · downloaded (19 MB)',ic('chev',20,'var(--mut)'))}
+ <div class="sec">Notes</div>${row('sort','Sort notes by','Date modified',ic('chev',20,'var(--mut)'))}${row('trash','Empty Trash automatically','After 30 days',sw(true))}
+ <div class="sec">Privacy</div>${row('finger','Unlock with fingerprint','PIN works as backup',sw(true))}${row('lock','Change PIN','',ic('chev',20,'var(--mut)'))}
+ <div class="sec">Backup</div><button class="li" onclick="go({overlay:'backup'})">${ic('backup',22,'var(--mut)')}<span class="t">Back up all notes<small>Last backup: 17 Nov, 9:20 PM · 214 MB</small></span>${ic('chev',20,'var(--mut)')}</button>${row('restore','Restore from a backup file','Pick an .inkbackup file',ic('chev',20,'var(--mut)'))}
+ <div class="sec">Appearance</div>${row('moon','Theme','System default',ic('chev',20,'var(--mut)'))}
+ <div class="sec">About</div><button class="li" onclick="go({screen:'about'})">${ic('info',22,'var(--mut)')}<span class="t">About InkNote<small>Version 1.0</small></span>${ic('chev',20,'var(--mut)')}</button>
+ </div></div></div>`}
+function about(){return `<div class="pane" style="flex:1">${stbar()}<div class="top"><button class="ib" aria-label="Back" onclick="go({screen:'settings'})">${ic('back')}</button><span class="tt disp">About</span></div>
+ <div class="scroll" style="text-align:center;padding:20px 24px"><span style="width:88px;height:88px;border-radius:24px;background:var(--p);display:inline-grid;place-items:center;margin-top:20px">${ic('pen',46,'var(--onp)',1.8)}</span>
+ <div class="disp" style="font-size:26px;font-weight:700;margin-top:16px">InkNote</div><div style="color:var(--mut);margin-top:4px">Version 1.0 (1)</div>
+ <p style="color:var(--mut);line-height:1.5;margin:18px auto;max-width:340px">Write, draw, record and mark up PDFs. Works fully offline — your notes never leave this device unless you share or back them up.</p>
+ <div style="background:var(--card);border-radius:16px;box-shadow:var(--sh);text-align:left;max-width:420px;margin:0 auto;padding:6px 0">
+ <div class="li"><span class="t"><small style="margin:0 0 2px">Developer</small>Sushant Kumar</span></div><div class="li"><span class="t"><small style="margin:0 0 2px">Email</small>sushant.sare@gmail.com</span></div></div>
+ <button class="btn t" style="margin-top:14px">Open-source licences</button></div></div>`}
+function pagesScr(){const n=noteById(S.note)||NOTES[0];
+ return `<div class="pane" style="flex:1">${stbar()}<div class="top"><button class="ib" aria-label="Back" onclick="go({screen:'editor'})">${ic('back')}</button><span class="tt" style="font-size:20px">Pages · ${n.pages.length}</span><button class="ib" aria-label="Add page" onclick="NOTES[0].pages.push(S.orient);render();toast('Page added')">${ic('plus')}</button></div>
+ <div class="scroll"><div style="padding:0 16px 10px;color:var(--mut);font-size:13px">Tap a page to choose it. Hold and drag to reorder.</div><div class="pg" style="--pc2:${isTab()?4:2}">
+ ${n.pages.map((o,i)=>`<button class="pgc ${S.pagesel===i?'on':''}" onclick="go({pagesel:${i}})"><div style="width:100%;${o==='port'?'':'padding-top:18%'}">${pageHTML(n,o,i,false).replace('class="pnum"','class="pnum" style="display:none"')}</div>Page ${i+1} · ${o==='port'?'Vertical':'Horizontal'}</button>`).join('')}</div></div>
+ <div class="tools" style="padding:10px 12px 18px"><div class="trow" style="justify-content:space-around">
+ ${[['rotate',`Make ${n.pages[S.pagesel]==='port'?'horizontal':'vertical'}`,`NOTES.find(x=>x.id===S.note).pages[S.pagesel]=NOTES.find(x=>x.id===S.note).pages[S.pagesel]==='port'?'land':'port';render();toast('Page turned')`],['page','Paper style',"go({overlay:'new',paperOnly:true})"],['dup','Duplicate',"toast('Page duplicated')"],['trash','Delete',"toast('Page deleted')"]].map(([i,l,a])=>`<button style="display:flex;flex-direction:column;align-items:center;gap:4px;font-size:12px;min-width:72px" onclick="${a}">${ic(i,24)}${l}</button>`).join('')}</div></div></div>`}
+/* ================= overlays ================= */
+function overlay(){const o=S.overlay;if(!o)return '';const close=`onclick="go({overlay:null,paperOnly:false})"`;let h='';
+ if(o==='new'){const T=[['plain','Plain',''],['lined','Lined',lined(9)],['grid','Grid',gridbg(9)],['dots','Dotted',dotbg(9)],['cornell','Cornell','cornell'],['todo','To-do','todo'],['planner','Weekly plan','planner'],['timetable','Timetable','tt']];
+  const pv=(s)=>s==='cornell'?`<div style="position:absolute;left:28%;top:12%;bottom:22%;width:1.5px;background:var(--line)"></div><div style="position:absolute;left:0;right:0;top:12%;height:1.5px;background:var(--line)"></div><div style="position:absolute;left:0;right:0;bottom:22%;height:1.5px;background:var(--line)"></div>`
+   :s==='todo'?Array.from({length:6},(_,i)=>`<div style="position:absolute;left:14%;top:${14+i*13}%;width:9px;height:9px;border:1.5px solid var(--mut);border-radius:2px"></div><div style="position:absolute;left:32%;right:12%;top:${17+i*13}%;height:1.5px;background:var(--line)"></div>`).join('')
+   :s==='planner'?Array.from({length:7},(_,i)=>`<div style="position:absolute;left:8%;right:8%;top:${8+i*13}%;height:11%;border:1.2px solid var(--line);border-radius:3px"></div>`).join('')
+   :s==='tt'?`<div style="position:absolute;inset:10%;${gridbg(10)};border:1.2px solid var(--line)"></div>`:'';
+  h=`<div class="sheet" role="dialog" aria-label="New note"><div class="h"></div><h3 class="disp">${S.paperOnly?'Paper style':'New note'}</h3>
+  ${S.paperOnly?'':`<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;padding:8px 16px 6px">${[['pen','Handwrite'],['text','Type'],['pdf','Open PDF'],['mic','Voice note']].map(([i,l],k)=>`<button style="display:flex;flex-direction:column;align-items:center;gap:6px;padding:12px 4px;border-radius:16px;background:${k==0?'var(--pc)':'var(--surf2)'};color:${k==0?'var(--onpc)':'inherit'};font-size:12.5px;font-weight:500" onclick="${i==='pdf'?"go({overlay:null,screen:'pdf'})":''}">${ic(i,24)}${l}</button>`).join('')}</div>`}
+  <div class="sec">Page direction</div><div class="seg"><button class="${S.orient==='port'?'on':''}" onclick="go({orient:'port'})">${ic('port',20)}Vertical</button><button class="${S.orient==='land'?'on':''}" onclick="go({orient:'land'})">${ic('land',20)}Horizontal</button></div>
+  <div class="sec">Paper</div><div class="tpl">${T.map(([id,l,s])=>`<button class="${S.tpl===id?'on':''}" onclick="go({tpl:'${id}'})"><div class="pv" style="${s.includes(':')?s:''};${S.orient==='land'?'aspect-ratio:4/3':''}">${pv(s)}</div>${l}</button>`).join('')}</div>
+  <div class="sec">Page type</div><div class="seg"><button class="on">${ic('pages',20)}Pages</button><button>${ic('endless',20)}One long page</button></div>
+  <div style="display:flex;justify-content:flex-end;gap:8px;padding:6px 20px 0"><button class="btn t" ${close}>Cancel</button><button class="btn" onclick="${S.paperOnly?"go({overlay:null,paperOnly:false});toast('Paper changed')":"NOTES[0].pages=[S.orient];go({overlay:null,screen:'editor',note:1})"}">${S.paperOnly?'Apply':'Create'}</button></div></div>`}
+ if(o==='pen'){h=`<div class="sheet" role="dialog" aria-label="Pen settings"><div class="h"></div><h3 class="disp">Pen</h3>
+  <div style="display:flex;gap:10px;padding:10px 20px 4px">${['Ballpoint','Fountain','Pencil','Brush'].map((p,i)=>`<button style="flex:1;display:flex;flex-direction:column;align-items:center;gap:8px;padding:12px 0;border-radius:14px;background:${i==0?'var(--pc)':'var(--surf2)'};color:${i==0?'var(--onpc)':'inherit'};font-size:12.5px"><svg width="40" height="18" viewBox="0 0 40 18"><path d="M3 12 Q12 2 20 10 T37 6" fill="none" stroke="currentColor" stroke-width="${[2,3.2,1.4,5][i]}" stroke-linecap="round" ${i==2?'stroke-dasharray="1 1.5"':''}/></svg>${p}</button>`).join('')}</div>
+  <div class="sec">Colour</div><div style="display:grid;grid-template-columns:repeat(8,1fr);gap:12px;padding:6px 20px">${['#1F3F9A','#1C1B1F','#C0392B','#0E8A6B','#E67E22','#8A3FB8','#2B5BD7','#D81B60','#795548','#607D8B','#00897B','#F9A825','#5E35B1','#43A047','#039BE5','#FFFFFF'].map((c,i)=>`<button class="cc ${i==0?'on':''}" style="width:30px;height:30px;background:${c};border:1px solid var(--div)" aria-label="${c}"></button>`).join('')}</div>
+  <div class="sec">Thickness</div><div style="display:flex;align-items:center;gap:14px;padding:6px 20px"><span style="width:6px;height:6px;border-radius:50%;background:var(--txt)"></span><div class="prog" style="height:6px"><i style="width:30%;height:6px"></i><span style="position:absolute;left:30%;top:50%;width:22px;height:22px;border-radius:50%;background:var(--p);transform:translate(-50%,-50%)"></span></div><span style="width:16px;height:16px;border-radius:50%;background:var(--txt)"></span></div>
+  <div class="sec">Opacity</div><div style="display:flex;align-items:center;gap:14px;padding:6px 20px 10px"><div class="prog" style="height:6px"><i style="width:100%;height:6px"></i></div><span style="font-size:13px;color:var(--mut)">100%</span></div>
+  <div class="sec">Saved pens</div><div style="display:flex;gap:10px;padding:6px 20px">${[['#1F3F9A',2],['#C0392B',3],['#1C1B1F',1.4]].map(([c,w])=>`<button style="width:48px;height:48px;border-radius:14px;background:var(--surf2);display:grid;place-items:center"><svg width="30" height="14"><path d="M2 10 Q10 1 15 8 T28 5" fill="none" stroke="${c}" stroke-width="${w}" stroke-linecap="round"/></svg></button>`).join('')}<button style="width:48px;height:48px;border-radius:14px;border:1.5px dashed var(--mut);display:grid;place-items:center" aria-label="Save this pen">${ic('plus',20,'var(--mut)')}</button></div></div>`}
+ if(o==='edmenu'){const it=(i,l,a)=>`<button class="li" onclick="${a}">${ic(i,22,'var(--mut)')}<span class="t">${l}</span></button>`;
+  h=`<div class="menu" role="menu">${it('pages','Pages & page direction',"go({overlay:null,screen:'pages',pagesel:0})")}${it('rotate','Turn this page',"NOTES[0].pages[0]=NOTES[0].pages[0]==='port'?'land':'port';go({overlay:null});toast('Page turned to '+(NOTES[0].pages[0]==='land'?'horizontal':'vertical'))")}${it('split','Open another note beside',"go({overlay:'pick'})")}${it('convert','Convert handwriting to text',"go({overlay:'convert'})")}${it('tag','Tags & folder',"go({overlay:'move'})")}${it('lock','Lock note',"go({overlay:null});toast('Note locked')")}${it('export','Export / share',"go({overlay:'export'})")}${it('star','Add to favourites',"go({overlay:null});toast('Added to favourites')")}${it('trash','Move to Trash',"go({overlay:null,screen:'home'});toast('Moved to Trash')")}</div>`;
+  return `<div class="scrim" style="background:transparent" ${close}></div>${h}`}
+ if(o==='homemenu'){const it=(i,l,a)=>`<button class="li" onclick="${a}">${ic(i,22,'var(--mut)')}<span class="t">${l}</span></button>`;
+  h=`<div class="menu">${it('check','Select notes',"go({overlay:null,select:true})")}${it('sort','Sort by · Date modified',"go({overlay:null})")}${it('pdf','Import PDF',"go({overlay:null,screen:'pdf'})")}${it('scan','Scan document with camera',"go({overlay:null});toast('Camera opens — pages become a note')")}${it('gear','Settings',"go({overlay:null,screen:'settings'})")}</div>`;
+  return `<div class="scrim" style="background:transparent" ${close}></div>${h}`}
+ if(o==='export'){h=`<div class="sheet"><div class="h"></div><h3 class="disp">Export “${(noteById(S.note)||NOTES[0]).t}”</h3><p class="sub">Choose a format, then share or save</p>
+  ${[['pdf','PDF document','All pages, with handwriting, PDFs and images'],['image','Images (PNG)','One picture per page'],['doc','Text file','Typed text and converted handwriting'],['pages','InkNote file','Full note with recording — open in InkNote']].map(([i,t,s],k)=>`<button class="li" style="${k==0?'background:var(--surf2)':''}">${ic(i,24,'var(--p)')}<span class="t">${t}<small>${s}</small></span>${k==0?ic('check',22,'var(--p)'):''}</button>`).join('')}
+  <div class="sec">Pages</div><div class="seg"><button class="on">All 3 pages</button><button>This page</button></div>
+  <div style="display:flex;justify-content:flex-end;gap:8px;padding:6px 20px 0"><button class="btn o" onclick="go({overlay:null});toast('Saved to Downloads/InkNote')">Save</button><button class="btn" onclick="go({overlay:null});toast('Share sheet opens')">${ic('share',18,'var(--onp)')}Share</button></div></div>`}
+ if(o==='lock'){const n=noteById(S.lockId||6);const dots=S.pin.length;
+  return `<div class="pane" style="position:absolute;inset:0;z-index:25;align-items:center;justify-content:center;text-align:center;padding:24px">
+  <button class="ib" style="position:absolute;left:8px;top:${isTab()?8:30}px" aria-label="Back" ${close}>${ic('back')}</button>
+  ${ic('lock',40,'var(--p)')}<div class="disp" style="font-size:22px;font-weight:700;margin-top:14px">${n.t}</div><div style="color:var(--mut);margin-top:6px">This note is locked</div>
+  <button style="margin-top:28px;width:84px;height:84px;border-radius:50%;background:var(--pc);display:grid;place-items:center" aria-label="Unlock with fingerprint" onclick="S.unlocked[${n.id}]=1;go({overlay:null,screen:'editor',note:1})">${ic('finger',44,'var(--onpc)',1.6)}</button>
+  <div style="color:var(--mut);font-size:13px;margin-top:10px">Touch the sensor, or enter your PIN</div>
+  <div style="display:flex;gap:14px;margin-top:18px">${[0,1,2,3].map(i=>`<span style="width:14px;height:14px;border-radius:50%;${i<dots?'background:var(--p)':'border:2px solid var(--mut)'}"></span>`).join('')}</div>
+  <div class="pinpad">${[1,2,3,4,5,6,7,8,9,'',0,'⌫'].map(k=>k===''?'<span></span>':`<button onclick="${k==='⌫'?"S.pin=S.pin.slice(0,-1);render()":`S.pin+='${k}';if(S.pin.length>=4){S.unlocked[${n.id}]=1;go({overlay:null,screen:'editor',note:1,pin:''})}else render()`}">${k}</button>`).join('')}</div></div>`}
+ if(o==='convert'){h=`<div class="sheet"><div class="h"></div><h3 class="disp">Handwriting → text</h3><p class="sub">Converted on this phone · no internet needed</p>
+  <div style="margin:4px 20px 12px;border-radius:14px;border:1px solid var(--div);padding:12px;position:relative;height:70px;background:var(--paper);${lined(18)}">${scrib(320,60,'var(--ink)',2,25,2,22,22)}</div>
+  <div style="text-align:center">${ic('drop',22,'var(--mut)')}</div>
+  <div style="margin:6px 20px 14px;border-radius:14px;background:var(--surf2);padding:14px;font-size:15px;line-height:1.55">Hamlet's soliloquy shows his doubt between action and inaction — “to be, or not to be”.</div>
+  <div style="display:flex;justify-content:flex-end;gap:8px;padding:0 20px"><button class="btn t" ${close}>Cancel</button><button class="btn o" onclick="go({overlay:null,lasso:false});toast('Text added below writing')">Add below</button><button class="btn" onclick="go({overlay:null,lasso:false});toast('Writing replaced with text')">Replace</button></div></div>`}
+ if(o==='pick'){h=`<div class="sheet"><div class="h"></div><h3 class="disp">Open beside this note</h3><p class="sub">${isTab()||W()>700?'Both notes stay open side by side':'Turn your phone sideways or use a tablet for side by side'}</p>
+  ${NOTES.filter(n=>n.id!==S.note&&!n.lock).slice(0,5).map(n=>`<button class="li" onclick="go({overlay:null,split:true,note2:${n.id}})"><div style="width:44px;height:54px;flex:none;position:relative">${thumb(n,'height:54px;margin:0')}</div><span class="t">${n.t}<small>${n.d}</small></span></button>`).join('')}</div>`}
+ if(o==='move'){h=`<div class="sheet"><div class="h"></div><h3 class="disp">Folder & tags</h3><div class="sec">Folder</div>
+  ${FOLDERS.map((f,i)=>`<button class="li"><span class="dot" style="background:${f.c};margin:0 6px"></span><span class="t">${f.n}</span>${i==2?ic('check',22,'var(--p)'):''}</button>`).join('')}
+  <div class="sec">Tags</div><div style="display:flex;flex-wrap:wrap;gap:8px;padding:4px 20px 10px">${TAGS.map((t,i)=>`<button class="chip ${i==0?'on':''}">#${t}</button>`).join('')}<button class="chip" style="border:1.5px dashed var(--mut);background:none">${ic('plus',16)}New tag</button></div>
+  <div style="display:flex;justify-content:flex-end;padding:6px 20px 0"><button class="btn" onclick="go({overlay:null,select:false});toast('Saved')">Done</button></div></div>`}
+ if(o==='newfolder'){h=`<div class="dlg"><h3 class="disp" style="font-size:22px;margin-bottom:16px">New folder</h3><div style="border:1.5px solid var(--p);border-radius:8px;padding:14px;font-size:16px">Grammar practice<span style="display:inline-block;width:2px;height:18px;background:var(--p);vertical-align:middle;margin-left:1px"></span></div>
+  <div style="display:flex;gap:12px;margin:18px 0">${['#2B5BD7','#0E8A6B','#B4561F','#8A3FB8','#C0392B','#F9A825'].map((c,i)=>`<span class="cc ${i==4?'on':''}" style="background:${c}"></span>`).join('')}</div>
+  <div style="display:flex;justify-content:flex-end;gap:8px"><button class="btn t" ${close}>Cancel</button><button class="btn" onclick="go({overlay:null});toast('Folder created')">Create</button></div></div>`}
+ if(o==='emptytrash'){h=`<div class="dlg"><h3 class="disp" style="font-size:22px">Empty Trash?</h3><p style="color:var(--mut);margin:12px 0 20px;line-height:1.5">3 notes will be deleted for good. This can't be undone.</p><div style="display:flex;justify-content:flex-end;gap:8px"><button class="btn t" ${close}>Cancel</button><button class="btn" style="background:#B3261E;color:#fff" onclick="go({overlay:null});toast('Trash emptied')">Delete all</button></div></div>`}
+ if(o==='backup'){h=`<div class="sheet"><div class="h"></div><h3 class="disp">Back up all notes</h3><p class="sub">Creates one file with every note, PDF, image and recording. Save it to Google Drive, a pen drive or anywhere you like.</p>
+  <div style="margin:6px 20px 14px;padding:14px;border-radius:14px;background:var(--surf2);display:flex;gap:12px;align-items:center">${ic('backup',28,'var(--p)')}<div><b>InkNote-backup-20-Nov-2026.inkbackup</b><div style="color:var(--mut);font-size:13px;margin-top:2px">42 notes · about 214 MB</div></div></div>
+  <div style="display:flex;justify-content:flex-end;gap:8px;padding:0 20px"><button class="btn t" ${close}>Cancel</button><button class="btn" onclick="go({overlay:null});toast('Backup saved')">Choose where to save</button></div></div>`}
+ if(o==='image'){h=`<div class="sheet" role="dialog" aria-label="Insert"><div class="h"></div><h3 class="disp">Insert</h3><div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;padding:10px 16px 6px">${[['image','Image','From gallery'],['camera','Camera','Take a photo'],['scan','Scan','Paper document'],['mic','Voice recording','Synced to writing'],['audio','Audio file','Song or clip'],['pdf','PDF','Add its pages']].map(([i,l,s])=>`<button style="display:flex;flex-direction:column;align-items:center;gap:6px;padding:14px 4px;border-radius:16px;background:var(--surf2);font-size:13px;font-weight:600" onclick="${i==='mic'?"go({overlay:null,recording:true})":`go({overlay:null});toast('${l}')`}"><span style="width:46px;height:46px;border-radius:14px;background:var(--pc);display:grid;place-items:center">${ic(i,24,'var(--onpc)')}</span>${l}<small style="font-weight:400;color:var(--mut);font-size:11px">${s}</small></button>`).join('')}</div></div>`}
+ return `<div class="scrim" ${close}></div>${h}`}
+/* ================= render ================= */
+function render(){const a=document.getElementById('app');let main;
+ const scr={home,editor,pdf,search,trash,settings,about,pages:pagesScr}[S.screen]||home;
+ if(isTab()){
+   if(S.screen==='editor'||S.screen==='pdf'){ main=`<div class="navp" style="width:340px;position:relative">${listMini()}</div>${scr()}`}
+   else main=`<div class="navp">${navList()}</div>${scr()}`;
+ } else main=scr();
+ a.innerHTML=main+(S.drawer&&!isTab()?`<div class="scrim" onclick="go({drawer:false})"></div><div class="drawer">${navList()}</div>`:'')+overlay()+(S.toast?`<div class="toast">${S.toast}</div>`:'');
+ document.getElementById('pTheme').textContent=document.body.classList.contains('dark')?'Light':'Dark';}
+function listMini(){return `<div class="top"><span class="tt disp" style="font-size:20px">All notes</span><button class="ib" aria-label="Search" onclick="go({screen:'search'})">${ic('search')}</button></div>
+ ${vis().map(n=>`<button class="li" style="padding:8px 16px;${n.id===S.note?'background:var(--pc);':''}" onclick="openNote(${n.id})"><div style="width:48px;height:58px;flex:none;position:relative">${thumb(n,'height:58px;margin:0')}</div><span class="t" style="min-width:0;font-size:14.5px"><span style="font-weight:600">${n.t}</span><small>${n.d}</small></span></button>`).join('')}`}
+document.getElementById('pTheme').onclick=()=>{document.body.classList.toggle('dark');render()};
+document.getElementById('pStates').onclick=()=>{S.empty=!S.empty;S.screen='home';render()};
+document.getElementById('pReset').onclick=()=>location.href=location.pathname;
+addEventListener('resize',render);
+if(Q.get('rec'))S.recording=true;
+if(Q.get('split'))S.split=true,S.note2=+Q.get('split');
+if(Q.get('overlay')==='lock')S.lockId=6;
+render();
+</script>
+</body>
+</html>
