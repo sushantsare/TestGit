@@ -49,17 +49,21 @@ class Recorder(private val context: Context, private val repo: Repository, priva
     suspend fun start(noteId: Long): Boolean {
         if (_state.value != null) return false
         val name = "rec_${Ids.next()}.m4a"
-        val f = repo.files.audio(noteId, name).also { it.parentFile?.mkdirs() }
+        val f = repo.files.audio(noteId, name)
         val label = context.getString(com.sushant.inknote.R.string.recording_label, SimpleDateFormat("d MMM, h:mm a", Locale.getDefault()).format(Date()))
         val recId = repo.addRecording(RecordingEntity(noteId = noteId, file = name, name = label, durationMs = 0, createdAt = System.currentTimeMillis()))
         val r = (if (Build.VERSION.SDK_INT >= 31) MediaRecorder(context) else @Suppress("DEPRECATION") MediaRecorder())
         return try {
+            // file and recorder setup touch the disk: keep them off the main thread
+            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            f.parentFile?.mkdirs()
             r.setAudioSource(MediaRecorder.AudioSource.MIC)
             r.setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
             r.setAudioEncoder(MediaRecorder.AudioEncoder.AAC)
             r.setAudioEncodingBitRate(96_000); r.setAudioSamplingRate(44_100)
             r.setOutputFile(f.absolutePath)
             r.prepare(); r.start()
+            }
             mr = r
             _state.value = RecState(noteId, recId, f, SystemClock.elapsedRealtime())
             ContextCompat.startForegroundService(context, Intent(context, RecordingService::class.java))
@@ -74,10 +78,11 @@ class Recorder(private val context: Context, private val repo: Repository, priva
     fun stop() {
         val s = _state.value ?: return
         val dur = SystemClock.elapsedRealtime() - s.startedAt
-        runCatching { mr?.stop() }; mr?.release(); mr = null
+        val rec = mr; mr = null
         _state.value = null
         context.stopService(Intent(context, RecordingService::class.java))
         scope.launch {
+            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { runCatching { rec?.stop() }; rec?.release() }
             val r = repo.recordings(s.noteId).firstOrNull { it.id == s.recId } ?: return@launch
             if (!s.file.exists() || s.file.length() == 0L) repo.deleteRecording(r)
             else { repo.db.recordings().update(r.copy(durationMs = durationOf(s.file).takeIf { it > 0 } ?: dur)); repo.secureIfLocked(s.noteId) }
@@ -94,7 +99,7 @@ class Recorder(private val context: Context, private val repo: Repository, priva
             val display = repo.displayName(uri)
             val ext = display.substringAfterLast('.', "m4a").take(5)
             val name = "file_${Ids.next()}.$ext"
-            val f = repo.files.audio(noteId, name).also { it.parentFile?.mkdirs() }
+            val f = repo.files.audio(noteId, name)
             val ok = runCatching { context.contentResolver.openInputStream(uri)?.use { i -> f.outputStream().use { i.copyTo(it) } } != null }.getOrDefault(false)
             if (!ok || f.length() == 0L) { f.delete(); return false }
             repo.addRecording(RecordingEntity(noteId = noteId, file = name, name = display, durationMs = durationOf(f), createdAt = System.currentTimeMillis(), kind = AudioKind.FILE))

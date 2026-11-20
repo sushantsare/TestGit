@@ -228,6 +228,7 @@ fun SettingsScreen(st: AppSettings, update: ((AppSettings) -> AppSettings) -> Un
                 NavRow(Icons.Outlined.Translate, stringResource(R.string.hw_language), when (packReady) { true -> stringResource(R.string.pack_ready); false -> stringResource(R.string.pack_missing); null -> "…" }, "row_pack") {
                     if (packReady == false) { busy = ctx.getString(R.string.downloading_pack); scope.launch { val e = Handwriting.download(); busy = null; packReady = Handwriting.isDownloaded(); ctx.toast(e ?: ctx.getString(R.string.pack_ready)); IndexWorker.schedule(ctx, 1) } }
                 }
+                Text(stringResource(R.string.shortcuts_hint), style = MaterialTheme.typography.bodySmall, color = ink.muted, modifier = Modifier.padding(horizontal = 20.dp, vertical = 6.dp))
                 Section(stringResource(R.string.s_notes))
                 NavRow(Icons.Outlined.Sort, stringResource(R.string.sort_by), stringResource(when (st.sortBy) { SortBy.CREATED -> R.string.sort_created; SortBy.TITLE -> R.string.sort_title; else -> R.string.sort_modified }), "row_sort") { dialog = SDialog.SORT }
                 SwitchRow(Icons.Outlined.AutoFixHigh, stringResource(R.string.auto_empty), stringResource(R.string.auto_empty_sub), st.autoEmptyTrash, "sw_autoempty") { v -> update { it.copy(autoEmptyTrash = v) } }

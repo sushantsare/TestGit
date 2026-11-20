@@ -345,6 +345,5 @@
     <string name="f_align">Alignment</string>
     <string name="position">Recording position</string>
     <string name="unlock_fingerprint">Unlock with fingerprint</string>
-    <string name="page_heading">Page %1$d</string>
     <string name="shortcuts_hint">Keyboard: Ctrl+N new note · Ctrl+F search · Ctrl+Z undo · Ctrl+Y redo</string>
 </resources>
