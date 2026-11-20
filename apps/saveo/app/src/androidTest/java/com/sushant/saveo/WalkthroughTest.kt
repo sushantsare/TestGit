@@ -20,6 +20,8 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipeLeft
 import androidx.compose.ui.test.swipeRight
+import androidx.compose.ui.test.swipeUp
+import androidx.compose.ui.test.swipeDown
 import androidx.test.core.app.ActivityScenario
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
@@ -96,6 +98,12 @@ class WalkthroughTest {
             tag("continue").performClick(); waitTag("tile", 15000)
         }
         step("home") { Thread.sleep(1500); shot("03_home_statuses") }
+        step("home_scroll_baseline") {
+            shell("dumpsys gfxinfo ${ctx.packageName} reset")
+            repeat(4) { tag("status_grid").performTouchInput { swipeUp() }; Thread.sleep(300); tag("status_grid").performTouchInput { swipeDown() }; Thread.sleep(300) }
+            val g = shell("dumpsys gfxinfo ${ctx.packageName}")
+            Log.i("SaveoWalk", "T7 home scroll (debug build): ${g.lines().firstOrNull { it.contains("Janky frames") }?.trim()}")
+        }
         step("save_one") {
             compose.onAllNodesWithContentDescription("Save to gallery", useUnmergedTree = true).onFirst().performClick()
             waitText("saved to gallery"); shot("04_saved_snackbar")

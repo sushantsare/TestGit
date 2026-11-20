@@ -178,7 +178,7 @@ fun SettingsScreen(vm: MainViewModel, authenticate: (onOk: () -> Unit) -> Unit, 
                     else authenticate { vm.updateSettings { it.copy(appLock = true) } }
                 }
                 ListDivider()
-                SettingRow(Icons.Rounded.DeleteOutline, Color(0xFFC6423D), stringResource(R.string.set_bin), stringResource(R.string.set_bin_d, bin.size)) { vm.go(Screen.BIN) }
+                SettingRow(Icons.Rounded.DeleteOutline, Color(0xFFC6423D), stringResource(R.string.set_bin), pluralStringResource(R.plurals.set_bin_d, bin.size, bin.size)) { vm.go(Screen.BIN) }
             }
             SectionLabel(stringResource(R.string.sec_appearance))
             ListCard {
@@ -282,7 +282,7 @@ fun BinScreen(vm: MainViewModel, onBack: () -> Unit) {
     }
     if (confirmEmpty) AlertDialog(
         onDismissRequest = { confirmEmpty = false },
-        title = { Text(stringResource(R.string.empty_bin_q, bin.size)) },
+        title = { Text(pluralStringResource(R.plurals.empty_bin_q, bin.size, bin.size)) },
         text = { Text(stringResource(R.string.empty_bin_body)) },
         confirmButton = { TextButton(onClick = { confirmEmpty = false; vm.emptyBin() }) { Text(stringResource(R.string.delete_forever), color = MaterialTheme.colorScheme.error) } },
         dismissButton = { TextButton(onClick = { confirmEmpty = false }) { Text(stringResource(R.string.cancel)) } },

@@ -93,6 +93,7 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.heading
@@ -295,7 +296,7 @@ private fun SelectionBar(count: Int, onClose: () -> Unit, onSelectAll: () -> Uni
         verticalAlignment = Alignment.CenterVertically,
     ) {
         IconButton(onClick = onClose) { Icon(Icons.Rounded.Close, stringResource(R.string.close_selection)) }
-        Text(stringResource(R.string.n_selected, count), style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
+        Text(pluralStringResource(R.plurals.n_selected, count, count), style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
         IconButton(onClick = onSelectAll, modifier = Modifier.testTag("select_all")) { Icon(Icons.Rounded.DoneAll, stringResource(R.string.select_all)) }
     }
 }
@@ -368,7 +369,7 @@ private fun StatusesPage(vm: MainViewModel) {
 
     PullToRefreshBox(isRefreshing = refreshing, onRefresh = { refreshing = true }, modifier = Modifier.fillMaxSize()) {
         LazyVerticalGrid(
-            columns = GridCells.Adaptive(160.dp), state = grid,
+            columns = GridCells.Adaptive(tileMin()), state = grid,
             contentPadding = PaddingValues(start = 14.dp, end = 14.dp, bottom = 120.dp),
             horizontalArrangement = Arrangement.spacedBy(10.dp), verticalArrangement = Arrangement.spacedBy(10.dp),
             modifier = Modifier.fillMaxSize().testTag("status_grid"),
@@ -428,7 +429,7 @@ private fun SavedPage(vm: MainViewModel, onSort: () -> Unit, onDates: () -> Unit
     val grid = rememberLazyGridState()
     val px = dpToPx(190.dp)
     LazyVerticalGrid(
-        columns = GridCells.Adaptive(160.dp), state = grid,
+        columns = GridCells.Adaptive(tileMin()), state = grid,
         contentPadding = PaddingValues(start = 14.dp, end = 14.dp, bottom = 120.dp),
         horizontalArrangement = Arrangement.spacedBy(10.dp), verticalArrangement = Arrangement.spacedBy(10.dp),
         modifier = Modifier.fillMaxSize().testTag("saved_grid"),
@@ -569,3 +570,7 @@ private fun <T> OptionSheet(title: String, options: List<Pair<String, T>>, selec
         Spacer(Modifier.height(24.dp))
     }
 }
+
+/** Smaller tiles when the screen is short (phone landscape), so several rows fit. */
+@Composable
+private fun tileMin() = if (androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp < 520) 128.dp else 160.dp

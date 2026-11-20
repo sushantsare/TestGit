@@ -103,12 +103,22 @@ fun AppRoot(
         }
     }
 
+    LaunchedEffect(screen) { snackHost.currentSnackbarData?.dismiss() }
+
     BackHandler(enabled = !locked) { if (!vm.back()) onExit() }
     BackHandler(enabled = locked) { onExit() }
 
-    BoxWithConstraints(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+    androidx.compose.material3.Surface(color = MaterialTheme.colorScheme.background, contentColor = MaterialTheme.colorScheme.onBackground) {
+    BoxWithConstraints(Modifier.fillMaxSize()) {
         val rail = maxWidth >= 600.dp && screen != Screen.ONBOARD && screen != Screen.SETUP
         val twoPane = maxWidth >= 840.dp && screen == Screen.HOME
+        vm.twoPane = twoPane
+        val statuses by vm.statuses.collectAsStateWithLifecycle()
+        val savedList by vm.saved.collectAsStateWithLifecycle()
+        // Two panes: always show something on the right
+        LaunchedEffect(twoPane, viewer == null, tab, statuses.isEmpty(), savedList.isEmpty()) {
+            if (twoPane && viewer == null) (if (tab == 0) statuses else savedList).firstOrNull()?.let { vm.openViewer(tab == 1, it.key) }
+        }
         Row(Modifier.fillMaxSize()) {
             if (rail) SideRail(
                 current = if (screen == Screen.HOME) tab else 2,
@@ -141,11 +151,12 @@ fun AppRoot(
                 else PanePlaceholder()
             }
         }
-        SnackbarHost(snackHost, Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(bottom = if (viewer != null) 96.dp else 8.dp).widthIn(max = 560.dp)) { d ->
+        SnackbarHost(snackHost, Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(bottom = if (viewer != null && !twoPane) 96.dp else if (screen == Screen.HOME) 92.dp else 8.dp).widthIn(max = 560.dp)) { d ->
             val ex = LocalSaveo.current
             Snackbar(d, containerColor = ex.snackBg, contentColor = androidx.compose.ui.graphics.Color.White, actionColor = ex.snackAction, shape = MaterialTheme.shapes.medium, modifier = Modifier.padding(horizontal = 16.dp))
         }
         if (locked && settings.appLock) LockScreen(onUnlock = onUnlockRequest)
+    }
     }
 }
 

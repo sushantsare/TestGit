@@ -37,7 +37,9 @@ class SaveoApp : Application(), ImageLoaderFactory {
 
     override fun onCreate() {
         super.onCreate()
+        // Small one-time reads of settings at startup happen before StrictMode is armed
         diagnostics.install()
+        prefs.settings.value
         if (BuildConfig.DEBUG) {
             StrictMode.setThreadPolicy(StrictMode.ThreadPolicy.Builder().detectAll().penaltyLog().build())
             StrictMode.setVmPolicy(StrictMode.VmPolicy.Builder().detectLeakedClosableObjects().detectLeakedSqlLiteObjects().detectActivityLeaks().penaltyLog().build())

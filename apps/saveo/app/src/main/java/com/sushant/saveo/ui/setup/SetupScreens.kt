@@ -55,6 +55,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
@@ -180,7 +181,7 @@ fun SetupScreen(vm: MainViewModel, onContinue: () -> Unit, onBack: () -> Unit) {
                     val count = status.items.count { it.source == s }
                     val installed = s.pkg == null || vm.isInstalled(s.pkg)
                     val sub = when {
-                        connected -> stringResource(R.string.connected_n, count)
+                        connected -> pluralStringResource(R.plurals.connected_n, count, count)
                         s == Source.DUAL -> stringResource(R.string.dual_hint)
                         !installed && s != Source.DUAL -> stringResource(R.string.not_found)
                         s in status.lost -> stringResource(R.string.lost_title)

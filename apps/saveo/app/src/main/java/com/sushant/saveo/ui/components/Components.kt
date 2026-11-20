@@ -87,14 +87,15 @@ enum class SaveState { IDLE, SAVING, SAVED }
 
 /** Thumbnail / full image via Coil. Videos show a frame from 1 s in. */
 @Composable
-fun MediaImage(uri: Uri, kind: MediaKind, modifier: Modifier = Modifier, sizePx: Int? = null, contentScale: ContentScale = ContentScale.Crop, crossfade: Boolean = true, placeholderSizePx: Int? = null) {
+fun MediaImage(uri: Uri, kind: MediaKind, modifier: Modifier = Modifier, sizePx: Int? = null, contentScale: ContentScale = ContentScale.Crop, crossfade: Boolean = true, placeholderSizePx: Int? = null, blurred: Boolean = false) {
     val ctx = LocalContext.current
-    val req = remember(uri, kind, sizePx, placeholderSizePx) {
+    val req = remember(uri, kind, sizePx, placeholderSizePx, blurred) {
         ImageRequest.Builder(ctx).data(uri).apply {
             if (sizePx != null) size(sizePx)
             if (kind == MediaKind.VIDEO) { decoderFactory(VideoFrameDecoder.Factory()); videoFrameMillis(1000) }
             crossfade(crossfade)
-            memoryCacheKey(uri.toString() + "@" + (sizePx ?: 0))
+            memoryCacheKey(uri.toString() + "@" + (sizePx ?: 0) + if (blurred) "b" else "")
+            if (blurred) transformations(BlurTransformation())
             // Show the already-decoded grid thumbnail instantly while the big image loads (no blank frame on swipe)
             if (placeholderSizePx != null) placeholderMemoryCacheKey(MemoryCache.Key(uri.toString() + "@" + placeholderSizePx))
         }.build()
@@ -169,7 +170,7 @@ fun MediaTile(
     sizePx: Int = 360,
 ) {
     val known = media.saved?.durationMs?.takeIf { it > 0 }
-    val duration by produceState(known ?: -1L, media.uri) { if (media.kind == MediaKind.VIDEO && value <= 0) value = durationOf(media.uri) }
+    val duration by produceState(known ?: -1L, media.uri) { value = if (media.kind == MediaKind.VIDEO && known == null) durationOf(media.uri) else (known ?: -1L) }
     val durText = if (media.kind == MediaKind.VIDEO && duration > 0) Formats.duration(duration) else null
     val desc = if (media.kind == MediaKind.VIDEO) stringResource(R.string.cd_video_status, durText ?: "") else stringResource(R.string.cd_photo_status)
     val selDesc = if (selecting) stringResource(if (selected) R.string.cd_selected else R.string.cd_not_selected) else null
@@ -323,3 +324,37 @@ fun ListDivider() {
 /** Converts dp to px for image request sizes. */
 @Composable
 fun dpToPx(dp: Dp): Int = with(LocalDensity.current) { dp.roundToPx() }
+
+/** Cheap 3-pass box blur on a tiny bitmap (used for the viewer background). */
+class BlurTransformation(private val radius: Int = 3) : coil.transform.Transformation {
+    override val cacheKey: String = "box-blur-$radius"
+    override suspend fun transform(input: android.graphics.Bitmap, size: coil.size.Size): android.graphics.Bitmap {
+        val w = input.width; val h = input.height
+        val src = input.copy(android.graphics.Bitmap.Config.ARGB_8888, true)
+        val px = IntArray(w * h); src.getPixels(px, 0, w, 0, 0, w, h)
+        val tmp = IntArray(w * h)
+        repeat(3) {
+            boxPass(px, tmp, w, h, radius, horizontal = true)
+            boxPass(tmp, px, w, h, radius, horizontal = false)
+        }
+        src.setPixels(px, 0, w, 0, 0, w, h)
+        return src
+    }
+
+    private fun boxPass(inp: IntArray, out: IntArray, w: Int, h: Int, r: Int, horizontal: Boolean) {
+        val lines = if (horizontal) h else w
+        val len = if (horizontal) w else h
+        for (l in 0 until lines) {
+            for (i in 0 until len) {
+                var a = 0; var rr = 0; var g = 0; var b = 0; var n = 0
+                for (k in -r..r) {
+                    val j = (i + k).coerceIn(0, len - 1)
+                    val p = if (horizontal) inp[l * w + j] else inp[j * w + l]
+                    a += p ushr 24; rr += (p shr 16) and 0xFF; g += (p shr 8) and 0xFF; b += p and 0xFF; n++
+                }
+                val v = ((a / n) shl 24) or ((rr / n) shl 16) or ((g / n) shl 8) or (b / n)
+                if (horizontal) out[l * w + i] = v else out[i * w + l] = v
+            }
+        }
+    }
+}

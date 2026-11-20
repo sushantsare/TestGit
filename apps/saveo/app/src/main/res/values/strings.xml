@@ -20,7 +20,6 @@
     <string name="settings">Settings</string>
     <string name="refresh">Refresh</string>
     <string name="save_all_n">Save all · %1$d</string>
-    <string name="n_selected">%1$d selected</string>
     <string name="close_selection">Close selection</string>
     <string name="save_n">Save %1$d</string>
     <string name="share">Share</string>
@@ -39,7 +38,6 @@
     <string name="dates_pick">Pick dates…</string>
     <string name="pane_hint">Tap a status to see it here</string>
     <string name="clear_dates">Clear dates</string>
-    <string name="saved_count_today">Saved today</string>
     <string name="saved_on">Saved %1$s</string>
 
     <!-- Tiles -->
@@ -50,7 +48,6 @@
     <string name="cd_photo_status">Photo</string>
     <string name="cd_selected">Selected</string>
     <string name="cd_not_selected">Not selected</string>
-    <string name="business_badge">WhatsApp Business</string>
 
     <!-- Empty / errors -->
     <string name="empty_title">No statuses yet</string>
@@ -71,9 +68,7 @@
     <string name="snack_video_saved">Video saved to gallery</string>
     <string name="snack_already">Already saved · it is in Saved</string>
     <string name="snack_failed">Could not save: %1$s</string>
-    <string name="snack_n_saved">%1$d saved to gallery</string>
     <string name="snack_all_already">All of these are already saved</string>
-    <string name="snack_moved_bin">%1$d moved to Recycle bin</string>
     <string name="snack_restored">Restored to Saved</string>
     <string name="snack_undo">Undo</string>
     <string name="snack_no_whatsapp">WhatsApp is not installed</string>
@@ -95,10 +90,8 @@
     <string name="unmute">Unmute</string>
     <string name="loop_on">Loop on</string>
     <string name="loop_off">Loop off</string>
-    <string name="speed">Playback speed %1$s</string>
     <string name="details">Details</string>
     <string name="from_source">From %1$s</string>
-    <string name="size_kb">%1$s</string>
     <string name="video_error">This video cannot be played. You can still save or share it.</string>
 
     <!-- Onboarding / setup -->
@@ -114,8 +107,6 @@
     <string name="setup_title">Connect WhatsApp</string>
     <string name="setup_body">Android keeps statuses in a protected folder. Allow it once and Saveo will find new statuses by itself.</string>
     <string name="setup_body_legacy">Saveo needs access to your photos and files to read WhatsApp statuses and save them to your gallery.</string>
-    <string name="connected_n">Connected · %1$d statuses</string>
-    <string name="connected">Connected</string>
     <string name="not_connected">Not connected</string>
     <string name="not_found">Not installed on this phone</string>
     <string name="dual_hint">Works only if your phone allows it</string>
@@ -126,8 +117,6 @@
     <string name="next_screen_hint">On the next screen tap USE THIS FOLDER, then ALLOW.</string>
     <string name="wrong_folder">That folder has no WhatsApp statuses. Please choose the .Statuses folder.</string>
     <string name="allow_access">Allow access</string>
-    <string name="access_denied">Saveo cannot read statuses without access.</string>
-    <string name="open_settings">Open settings</string>
     <string name="disconnect">Disconnect</string>
 
     <!-- Settings -->
@@ -145,7 +134,6 @@
     <string name="set_lock_d">Fingerprint or phone PIN</string>
     <string name="set_lock_unavailable">Set a screen lock on your phone first</string>
     <string name="set_bin">Recycle bin</string>
-    <string name="set_bin_d">%1$d items · removed after 30 days</string>
     <string name="set_theme">Theme</string>
     <string name="theme_system">Follow phone</string>
     <string name="theme_light">Light</string>
@@ -170,7 +158,6 @@
     <string name="empty_bin">Empty</string>
     <string name="restore">Restore</string>
     <string name="delete_forever">Delete forever</string>
-    <string name="empty_bin_q">Delete %1$d items forever?</string>
     <string name="empty_bin_body">They will be removed from this phone and cannot be restored.</string>
     <plurals name="days_left">
         <item quantity="one">%d day left</item>
@@ -220,5 +207,29 @@
     <plurals name="notif_autosaved">
         <item quantity="one">%d saved to your gallery automatically</item>
         <item quantity="other">%d saved to your gallery automatically</item>
+    </plurals>
+    <plurals name="n_selected">
+        <item quantity="one">%d selected</item>
+        <item quantity="other">%d selected</item>
+    </plurals>
+    <plurals name="snack_n_saved">
+        <item quantity="one">%d saved to gallery</item>
+        <item quantity="other">%d saved to gallery</item>
+    </plurals>
+    <plurals name="snack_moved_bin">
+        <item quantity="one">%d item moved to Recycle bin</item>
+        <item quantity="other">%d items moved to Recycle bin</item>
+    </plurals>
+    <plurals name="connected_n">
+        <item quantity="one">Connected · %d status</item>
+        <item quantity="other">Connected · %d statuses</item>
+    </plurals>
+    <plurals name="set_bin_d">
+        <item quantity="one">%d item · removed after 30 days</item>
+        <item quantity="other">%d items · removed after 30 days</item>
+    </plurals>
+    <plurals name="empty_bin_q">
+        <item quantity="one">Delete %d item forever?</item>
+        <item quantity="other">Delete %d items forever?</item>
     </plurals>
 </resources>

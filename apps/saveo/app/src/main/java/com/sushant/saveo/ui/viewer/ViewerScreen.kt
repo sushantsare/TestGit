@@ -216,11 +216,11 @@ fun ViewerScreen(vm: MainViewModel, session: ViewerSession, inPane: Boolean, mod
         Crossfade(current?.key, animationSpec = tween(350), label = "bg") { key ->
             val m = items.firstOrNull { it.key == key }
             if (m != null) {
-                val blurMod = if (Build.VERSION.SDK_INT >= 31) Modifier.blur(48.dp) else Modifier
-                MediaImage(m.uri, m.kind, Modifier.fillMaxSize().then(blurMod).graphicsLayer { alpha = 0.9f; scaleX = 1.2f; scaleY = 1.2f }, sizePx = 48, placeholderSizePx = thumbPx)
+                // Pre-blurred once into a tiny bitmap: no per-frame blur cost while swiping
+                MediaImage(m.uri, m.kind, Modifier.fillMaxSize().graphicsLayer { scaleX = 1.15f; scaleY = 1.15f }, sizePx = 40, blurred = true)
             }
         }
-        Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = if (Build.VERSION.SDK_INT >= 31) 0.12f else 0.35f)))
+        Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.18f)))
 
         Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding()) {
             // Top bar
@@ -251,7 +251,7 @@ fun ViewerScreen(vm: MainViewModel, session: ViewerSession, inPane: Boolean, mod
                             MediaImage(m.uri, m.kind, Modifier.fillMaxSize(), sizePx = fullPx, contentScale = ContentScale.Fit, placeholderSizePx = thumbPx)
                             if (page == pager.settledPage && !videoError) {
                                 AndroidView(
-                                    factory = { c -> (LayoutInflater.from(c).inflate(R.layout.player_texture, null) as PlayerView).also { it.player = player } },
+                                    factory = { c -> (LayoutInflater.from(c).inflate(R.layout.player_texture, android.widget.FrameLayout(c), false) as PlayerView).also { it.player = player } },
                                     modifier = Modifier.fillMaxSize().graphicsLayer { alpha = if (firstFrame) 1f else 0f },
                                     onRelease = { it.player = null },
                                 )

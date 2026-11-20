@@ -65,7 +65,6 @@ object Notifier {
     const val EXTRA_OPEN_STATUSES = "open_statuses"
 
     fun createChannel(ctx: Context) {
-        if (Build.VERSION.SDK_INT < 26) return
         val ch = NotificationChannel(CHANNEL, ctx.getString(R.string.channel_name), NotificationManager.IMPORTANCE_DEFAULT).apply {
             description = ctx.getString(R.string.channel_desc)
         }

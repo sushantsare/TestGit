@@ -113,6 +113,7 @@ class MainViewModel(app: Application, private val handle: SavedStateHandle) : An
     }
 
     private fun str(id: Int, vararg args: Any) = getApplication<Application>().getString(id, *args)
+    private fun plural(id: Int, n: Int) = getApplication<Application>().resources.getQuantityString(id, n, n)
     private fun snack(text: String, action: String? = null, onAction: (() -> Unit)? = null) { _events.tryEmit(UiEvent.Snack(text, action, onAction)) }
 
     fun rangeFor(dk: DateRangeKind, custom: LongArray?, now: Long = System.currentTimeMillis()): Pair<Long, Long> {
@@ -128,7 +129,7 @@ class MainViewModel(app: Application, private val handle: SavedStateHandle) : An
 
     // ---- navigation ---------------------------------------------------------
     fun go(s: Screen) { handle["screen"] = s }
-    fun setTab(t: Int) { if (tab.value != t) { handle["tab"] = t; clearSelection() } }
+    fun setTab(t: Int) { if (tab.value != t) { handle["tab"] = t; clearSelection(); if (twoPane) closeViewer() } }
     fun setFilter(f: MediaFilter) { handle["filter"] = f }
     fun setDates(kind: DateRangeKind, from: Long? = null, to: Long? = null) {
         handle["dateKind"] = kind
@@ -136,10 +137,13 @@ class MainViewModel(app: Application, private val handle: SavedStateHandle) : An
     }
     val customRangeValue: LongArray? get() = customRange.value
 
+    /** Set by the UI: grid and viewer are side by side. */
+    var twoPane = false
+
     /** Handles Back. Returns false when the app should close. */
     fun back(): Boolean {
         when {
-            _viewer.value != null -> closeViewer()
+            _viewer.value != null && !twoPane -> closeViewer()
             selection.value != null -> clearSelection()
             screen.value in setOf(Screen.BIN, Screen.DIAG, Screen.ABOUT) -> go(Screen.SETTINGS)
             screen.value == Screen.SETTINGS -> go(Screen.HOME)
@@ -185,7 +189,7 @@ class MainViewModel(app: Application, private val handle: SavedStateHandle) : An
         viewModelScope.launch {
             val (ok, dup, fail) = repo.saveAll(list)
             when {
-                ok > 0 -> snack(str(R.string.snack_n_saved, ok))
+                ok > 0 -> snack(plural(R.plurals.snack_n_saved, ok))
                 fail > 0 -> snack(str(R.string.snack_failed, "$fail"))
                 dup > 0 -> snack(str(R.string.snack_all_already))
             }
@@ -216,7 +220,7 @@ class MainViewModel(app: Application, private val handle: SavedStateHandle) : An
         clearSelection()
         viewModelScope.launch {
             when (val r = repo.moveToBin(ids)) {
-                is DeleteResult.Done -> if (r.ids.isNotEmpty()) snack(str(R.string.snack_moved_bin, r.ids.size), str(R.string.snack_undo)) { restore(r.ids, quiet = true) }
+                is DeleteResult.Done -> if (r.ids.isNotEmpty()) snack(plural(R.plurals.snack_moved_bin, r.ids.size), str(R.string.snack_undo)) { restore(r.ids, quiet = true) }
                 is DeleteResult.NeedsConfirm -> _events.tryEmit(UiEvent.ConfirmDelete(r.sender, r.ids))
             }
         }
@@ -225,7 +229,7 @@ class MainViewModel(app: Application, private val handle: SavedStateHandle) : An
     fun deleteConfirmed(ids: List<Long>) {
         viewModelScope.launch {
             repo.confirmDeleted(ids)
-            snack(str(R.string.snack_moved_bin, ids.size), str(R.string.snack_undo)) { restore(ids, quiet = true) }
+            snack(plural(R.plurals.snack_moved_bin, ids.size), str(R.string.snack_undo)) { restore(ids, quiet = true) }
         }
     }
 
