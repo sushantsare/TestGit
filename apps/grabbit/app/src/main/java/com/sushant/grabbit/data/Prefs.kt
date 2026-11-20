@@ -26,6 +26,11 @@ object Prefs {
         get() = p.getInt("theme", 0)
         set(v) { p.edit().putInt("theme", v).apply(); themeFlow.value = v }
 
+    /** Browser identity used during the last login; the engine reuses it so the session stays valid */
+    var loginUserAgent: String
+        get() = p.getString("login_ua", "") ?: ""
+        set(v) = p.edit().putString("login_ua", v).apply()
+
     var amoled: Boolean
         get() = p.getBoolean("amoled", false)
         set(v) { p.edit().putBoolean("amoled", v).apply(); amoledFlow.value = v }

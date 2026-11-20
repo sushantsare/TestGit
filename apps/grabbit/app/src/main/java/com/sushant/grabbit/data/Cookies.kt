@@ -6,17 +6,50 @@ import com.yausername.youtubedl_android.YoutubeDLRequest
 import java.io.File
 
 /**
- * Logins are captured from the in-app WebView and written as a Netscape cookies.txt
- * that yt-dlp reads with --cookies. Everything stays on the phone.
+ * Logins are captured from the in-app WebView and written as Netscape cookie files that yt-dlp reads
+ * with --cookies. They live in noBackupFilesDir, so they never go into Android backups or device transfer.
+ * The engine also sends the same browser identity (user agent) the login used, so sites like Instagram
+ * accept the session instead of treating it as a different device.
  */
 object Cookies {
-    private fun file(ctx: Context) = File(ctx.filesDir, "cookies.txt")
-    private fun key(site: LoginSite) = "ck_${site.key}"
+    private lateinit var app: Context
 
-    fun isLoggedIn(site: LoginSite): Boolean = Prefs.p.getString(key(site), null) != null
+    private fun dir() = File(app.noBackupFilesDir, "logins").apply { mkdirs() }
+    private fun siteFile(site: LoginSite) = File(dir(), "${site.key}.txt")
+    private fun combined() = File(app.noBackupFilesDir, "cookies.txt")
+
+    fun init(ctx: Context) {
+        app = ctx.applicationContext
+        // Move logins saved by older versions (settings file + filesDir) out of anything that is backed up
+        val edit = Prefs.p.edit()
+        var moved = false
+        Sites.logins.forEach { s ->
+            val old = Prefs.p.getString("ck_${s.key}", null)
+            if (old != null) {
+                siteFile(s).writeText(old)
+                edit.remove("ck_${s.key}")
+                moved = true
+            }
+        }
+        edit.apply()
+        File(app.filesDir, "cookies.txt").delete()
+        if (moved) rebuild()
+    }
+
+    fun isLoggedIn(site: LoginSite): Boolean = siteFile(site).let { it.exists() && it.length() > 0 }
+
+    /** True once the WebView holds the site's session cookie, i.e. the login really finished. */
+    fun hasSession(site: LoginSite): Boolean {
+        val cm = CookieManager.getInstance()
+        return site.domains.any { d ->
+            listOf("https://www.$d", "https://$d", "https://m.$d").any { u ->
+                cm.getCookie(u)?.split(";")?.any { it.trim().startsWith("${site.session}=") } == true
+            }
+        }
+    }
 
     /** Saves the WebView's cookies for this site. Returns how many cookies were found. */
-    fun save(ctx: Context, site: LoginSite): Int {
+    fun save(site: LoginSite, userAgent: String): Int {
         val cm = CookieManager.getInstance()
         cm.flush()
         val expiry = System.currentTimeMillis() / 1000 + 60L * 60 * 24 * 365
@@ -40,15 +73,16 @@ object Cookies {
             }
         }
         if (count > 0) {
-            Prefs.p.edit().putString(key(site), sb.toString()).apply()
-            rebuild(ctx)
+            siteFile(site).writeText(sb.toString())
+            if (userAgent.isNotBlank()) Prefs.loginUserAgent = userAgent
+            rebuild()
         }
         return count
     }
 
-    fun logout(ctx: Context, site: LoginSite) {
-        Prefs.p.edit().remove(key(site)).apply()
-        rebuild(ctx)
+    fun logout(site: LoginSite) {
+        siteFile(site).delete()
+        rebuild()
         val cm = CookieManager.getInstance()
         for (d in site.domains) {
             for (u in listOf("https://www.$d", "https://$d", "https://m.$d")) {
@@ -64,14 +98,42 @@ object Cookies {
         cm.flush()
     }
 
-    private fun rebuild(ctx: Context) {
-        val all = Sites.logins.mapNotNull { Prefs.p.getString(key(it), null) }.joinToString("")
-        val f = file(ctx)
+    private fun rebuild() {
+        val all = Sites.logins.mapNotNull { s -> siteFile(s).takeIf { it.exists() }?.readText() }.joinToString("")
+        val f = combined()
         if (all.isBlank()) f.delete() else f.writeText("# Netscape HTTP Cookie File\n$all")
     }
 
-    fun apply(ctx: Context, req: YoutubeDLRequest) {
-        val f = file(ctx)
-        if (f.exists() && f.length() > 0) req.addOption("--cookies", f.absolutePath)
+    fun hasAny(): Boolean = combined().let { it.exists() && it.length() > 0 }
+
+    /** Cookie header for a plain HTTP request to [host] (used by the Threads reader). */
+    fun headerFor(host: String): String =
+        if (!hasAny()) "" else CookieText.header(combined().readText(), host)
+
+    fun apply(@Suppress("UNUSED_PARAMETER") ctx: Context, req: YoutubeDLRequest) {
+        val f = combined()
+        if (f.exists() && f.length() > 0) {
+            req.addOption("--cookies", f.absolutePath)
+            val ua = Prefs.loginUserAgent
+            if (ua.isNotBlank()) req.addOption("--user-agent", ua)
+        }
+    }
+}
+
+/** Pure helpers for Netscape cookie text (unit-tested). */
+object CookieText {
+    /** Builds "a=1; b=2" from cookie lines whose domain matches [host]. */
+    fun header(text: String, host: String): String {
+        val h = host.lowercase().removePrefix("www.")
+        return text.lineSequence()
+            .filter { it.isNotBlank() && !it.startsWith("#") }
+            .mapNotNull { line ->
+                val p = line.split('\t')
+                if (p.size < 7) return@mapNotNull null
+                val d = p[0].trimStart('.').lowercase()
+                if (h == d || h.endsWith(".$d")) "${p[5]}=${p[6]}" else null
+            }
+            .distinct()
+            .joinToString("; ")
     }
 }

@@ -21,7 +21,7 @@ object Errors {
             "sign in to confirm" in l || "use --cookies" in l || "login required" in l ||
                 "requires login" in l || "log in" in l && "required" in l || "authentication" in l ||
                 "private video" in l || "this content isn't available" in l ->
-                "This content needs a login. Open Settings → Accounts, log in to the site, then try again."
+                "This content needs a login. Log in to the site in Settings → Accounts. Already logged in? Log out and log in again (logins expire), then try again."
             "429" in l || "rate-limit" in l || "rate limit" in l || "too many requests" in l ->
                 "The site is limiting requests right now. Wait a few minutes, or log in to the site in Settings → Accounts."
             "requested format is not available" in l || "format is not available" in l ->

@@ -18,6 +18,7 @@ import com.sushant.grabbit.ui.MainViewModel
 class MainActivity : ComponentActivity() {
     companion object {
         const val EXTRA_TAB = "tab"
+        const val EXTRA_URL = "url"
     }
 
     private val vm: MainViewModel by viewModels()
@@ -50,6 +51,8 @@ class MainActivity : ComponentActivity() {
             val text = intent.getStringExtra(Intent.EXTRA_TEXT)
                 ?: intent.getCharSequenceExtra(Intent.EXTRA_TEXT)?.toString()
             if (!text.isNullOrBlank()) vm.onShared(text)
+        } else if (intent.hasExtra(EXTRA_URL)) {
+            intent.getStringExtra(EXTRA_URL)?.let { vm.onShared(it) }
         } else if (intent.hasExtra(EXTRA_TAB)) {
             vm.tab = intent.getIntExtra(EXTRA_TAB, 0)
         }

@@ -7,18 +7,21 @@ data class LoginSite(
     val name: String,
     val loginUrl: String,
     val domains: List<String>,
+    /** Cookie that only exists once the user is really logged in (used to auto-detect a finished login). */
+    val session: String,
 )
 
 object Sites {
     val logins = listOf(
-        LoginSite("instagram", "Instagram", "https://www.instagram.com/accounts/login/", listOf("instagram.com")),
-        LoginSite("facebook", "Facebook", "https://m.facebook.com/login/", listOf("facebook.com")),
-        LoginSite("x", "X (Twitter)", "https://x.com/i/flow/login", listOf("x.com", "twitter.com")),
-        LoginSite("youtube", "YouTube", "https://accounts.google.com/ServiceLogin?service=youtube&continue=https://m.youtube.com/", listOf("youtube.com", "google.com")),
-        LoginSite("reddit", "Reddit", "https://www.reddit.com/login/", listOf("reddit.com")),
-        LoginSite("tiktok", "TikTok", "https://www.tiktok.com/login", listOf("tiktok.com")),
-        LoginSite("pinterest", "Pinterest", "https://www.pinterest.com/login/", listOf("pinterest.com")),
-        LoginSite("vimeo", "Vimeo", "https://vimeo.com/log_in", listOf("vimeo.com")),
+        LoginSite("instagram", "Instagram", "https://www.instagram.com/accounts/login/", listOf("instagram.com"), "sessionid"),
+        LoginSite("threads", "Threads", "https://www.threads.com/login", listOf("threads.com", "threads.net"), "sessionid"),
+        LoginSite("facebook", "Facebook", "https://m.facebook.com/login/", listOf("facebook.com"), "c_user"),
+        LoginSite("x", "X (Twitter)", "https://x.com/i/flow/login", listOf("x.com", "twitter.com"), "auth_token"),
+        LoginSite("youtube", "YouTube", "https://accounts.google.com/ServiceLogin?service=youtube&continue=https://m.youtube.com/", listOf("youtube.com", "google.com"), "LOGIN_INFO"),
+        LoginSite("reddit", "Reddit", "https://www.reddit.com/login/", listOf("reddit.com"), "reddit_session"),
+        LoginSite("tiktok", "TikTok", "https://www.tiktok.com/login", listOf("tiktok.com"), "sessionid"),
+        LoginSite("pinterest", "Pinterest", "https://www.pinterest.com/login/", listOf("pinterest.com"), "_pinterest_sess"),
+        LoginSite("vimeo", "Vimeo", "https://vimeo.com/log_in", listOf("vimeo.com"), "vimeo"),
     )
 
     private val URL_RE = Regex("""https?://[^\s<>"']+""")

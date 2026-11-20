@@ -1,6 +1,7 @@
 package com.sushant.grabbit
 
 import android.app.Application
+import com.sushant.grabbit.data.Cookies
 import com.sushant.grabbit.data.Library
 import com.sushant.grabbit.data.Prefs
 import com.sushant.grabbit.download.Notifs
@@ -10,6 +11,7 @@ class GrabbitApp : Application() {
     override fun onCreate() {
         super.onCreate()
         Prefs.init(this)
+        Cookies.init(this)
         Library.init(this)
         Notifs.createChannels(this)
         Engine.start(this)

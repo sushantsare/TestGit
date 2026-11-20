@@ -164,7 +164,7 @@ fun SettingsScreen(vm: MainViewModel, modifier: Modifier) {
                             leading = { LetterAvatar(site.name.take(1)) },
                         ) {
                             if (logged) OutlinedButton(onClick = {
-                                Cookies.logout(ctx, site); logged = false; UiMessages.say("Logged out of ${site.name}")
+                                Cookies.logout(site); logged = false; UiMessages.say("Logged out of ${site.name}")
                             }) { Text("Log out") }
                             else RowButton("Log in", onClick = { vm.loginSite = site })
                         }

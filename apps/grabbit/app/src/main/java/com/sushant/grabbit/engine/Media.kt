@@ -33,6 +33,13 @@ object Media {
     }
 
     suspend fun fetchInfo(ctx: Context, url: String): MediaInfo = withContext(Dispatchers.IO) {
+        if (Threads.isThreads(url)) {
+            val post = Threads.resolve(url)
+            return@withContext MediaInfo(
+                url, ThreadsParser.title(post), post.user.let { if (it.isEmpty()) "" else "@$it" }, post.thumb, 0,
+                "Threads", false, 1, emptyList(), emptyMap(), true,
+            )
+        }
         if (!Engine.awaitReady()) throw IllegalStateException(Engine.failMessage())
         val req = YoutubeDLRequest(url).apply {
             addOption("-J")

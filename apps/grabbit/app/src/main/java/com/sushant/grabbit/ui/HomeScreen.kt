@@ -190,7 +190,7 @@ private fun Hero() {
         Text("Paste a link.\nGet the video.", style = MaterialTheme.typography.headlineLarge)
         Spacer(Modifier.height(sp.s))
         Text(
-            "YouTube, Instagram, X, Facebook and 1,000+ more sites",
+            "YouTube, Instagram, Threads, X, Facebook and 1,000+ more sites",
             style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
@@ -336,7 +336,7 @@ private fun defaultVideoChoice(opts: List<QOpt>): String {
 
 @OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class)
 @Composable
-private fun MediaCard(info: MediaInfo, onDownload: (String) -> Unit) {
+internal fun MediaCard(info: MediaInfo, framed: Boolean = true, onDownload: (String) -> Unit) {
     val sp = LocalSpacing.current
     val sz = LocalSizes.current
     val opts = remember(info) { videoOptions(info) }
@@ -345,7 +345,7 @@ private fun MediaCard(info: MediaInfo, onDownload: (String) -> Unit) {
     var video by rememberSaveable(info.url) { mutableStateOf(defaultVideoChoice(opts)) }
     val chosen = opts.firstOrNull { it.key == video }
 
-    AppCard(padding = sp.m) {
+    val body: @Composable () -> Unit = {
         Box(Modifier.fillMaxWidth().aspectRatio(16f / 9f).clip(MaterialTheme.shapes.large)
             .background(MaterialTheme.colorScheme.surfaceContainerHighest)) {
             AsyncImage(info.thumbnail.ifBlank { null }, null, contentScale = androidx.compose.ui.layout.ContentScale.Crop,
@@ -423,10 +423,11 @@ private fun MediaCard(info: MediaInfo, onDownload: (String) -> Unit) {
             }
         }
     }
+    if (framed) AppCard(padding = sp.m) { body() } else Column { body() }
 }
 
 /** Permissions still needed before a download: notifications (asked once, optional) and storage on Android 9 and older. */
-private fun neededPermissions(ctx: android.content.Context): List<String> = buildList {
+internal fun neededPermissions(ctx: android.content.Context): List<String> = buildList {
     fun granted(p: String) = ctx.checkSelfPermission(p) == PackageManager.PERMISSION_GRANTED
     if (Build.VERSION.SDK_INT >= 33 && !Prefs.notifAsked && !granted(Manifest.permission.POST_NOTIFICATIONS))
         add(Manifest.permission.POST_NOTIFICATIONS)
@@ -435,7 +436,7 @@ private fun neededPermissions(ctx: android.content.Context): List<String> = buil
 }
 
 @Composable
-private fun PermissionExplainDialog(need: List<String>, onContinue: () -> Unit, onSkip: () -> Unit) {
+internal fun PermissionExplainDialog(need: List<String>, onContinue: () -> Unit, onSkip: () -> Unit) {
     val storage = Manifest.permission.WRITE_EXTERNAL_STORAGE in need
     AlertDialog(
         onDismissRequest = onSkip,
@@ -454,7 +455,7 @@ private fun PermissionExplainDialog(need: List<String>, onContinue: () -> Unit, 
 }
 
 @Composable
-private fun StorageBlockedDialog(ctx: android.content.Context, onClose: () -> Unit) {
+internal fun StorageBlockedDialog(ctx: android.content.Context, onClose: () -> Unit) {
     val permanently = (ctx as? Activity)?.let {
         !ActivityCompat.shouldShowRequestPermissionRationale(it, Manifest.permission.WRITE_EXTERNAL_STORAGE)
     } ?: false

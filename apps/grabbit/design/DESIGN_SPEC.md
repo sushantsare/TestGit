@@ -47,3 +47,10 @@ One filled button per state. Touch targets ≥ 48dp. About shows name + email on
 ## Mockups
 `mockups/` — rendered at 360×800 from `mock.html` (light, dark, pure black). Emulator screenshots are compared
 against these before delivery.
+
+## v2.1 — Share sheet
+`Share → Grabbit` opens `ShareActivity` (transparent window) with a Material 3 modal bottom sheet over the app the
+user is in. The sheet sizes to its content (skipPartiallyExpanded) and scrolls if taller than the screen.
+States: loading (skeleton), loaded (the same MediaCard as Home, unframed), error (ErrorCard + "Open in Grabbit").
+Download → sheet slides away → toast "Download started" (a toast is the only feedback possible once the window is
+gone) → progress and "Saved" notifications with Watch/Play and Share actions. Mockups: `mockups/mock_sheet_*.png`.

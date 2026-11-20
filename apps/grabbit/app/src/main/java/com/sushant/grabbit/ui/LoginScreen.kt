@@ -44,11 +44,22 @@ fun LoginScreen(site: LoginSite, onClose: () -> Unit) {
     var webView by remember { mutableStateOf<WebView?>(null) }
     var progress by remember { mutableIntStateOf(0) }
 
-    val done = {
-        val n = Cookies.save(ctx, site)
-        ctx.toast(if (n > 0) "Saved login for ${site.name}" else "No login found. Finish logging in first, then tap Done.")
-        if (n > 0) onClose()
+    var finished by remember { mutableStateOf(false) }
+    // Saves only a complete login (the site's session cookie exists), with the browser identity used
+    fun finish(auto: Boolean) {
+        if (finished) return
+        if (!Cookies.hasSession(site)) {
+            if (!auto) ctx.toast("You're not logged in yet. Finish logging in to ${site.name}, then tap Done.")
+            return
+        }
+        val n = Cookies.save(site, webView?.settings?.userAgentString.orEmpty())
+        if (n > 0) {
+            finished = true
+            ctx.toast("Logged in to ${site.name}")
+            onClose()
+        }
     }
+    val done = { finish(auto = false) }
 
     BackHandler {
         val w = webView
@@ -70,7 +81,7 @@ fun LoginScreen(site: LoginSite, onClose: () -> Unit) {
     ) { pad ->
         Column(Modifier.padding(pad).fillMaxSize()) {
             Text(
-                "Log in normally below. When you see your feed, tap Done.",
+                "Log in normally below. Grabbit saves the login automatically when it's done.",
                 style = MaterialTheme.typography.bodySmall,
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
             )
@@ -99,6 +110,11 @@ fun LoginScreen(site: LoginSite, onClose: () -> Unit) {
                         webViewClient = object : WebViewClient() {
                             override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
                                 progress = 5
+                            }
+
+                            override fun onPageFinished(view: WebView?, url: String?) {
+                                // Login finished? Save it automatically, no need to find the Done button
+                                finish(auto = true)
                             }
                         }
                         loadUrl(site.loginUrl)

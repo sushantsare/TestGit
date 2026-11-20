@@ -14,6 +14,7 @@ import com.sushant.grabbit.data.Library
 import com.sushant.grabbit.data.Prefs
 import com.sushant.grabbit.engine.Engine
 import com.sushant.grabbit.engine.Errors
+import com.sushant.grabbit.engine.Threads
 import com.yausername.youtubedl_android.YoutubeDL
 import com.yausername.youtubedl_android.YoutubeDLRequest
 import kotlinx.coroutines.Dispatchers
@@ -106,7 +107,16 @@ class DownloadWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(c
         if (!Engine.awaitReady()) return fail(Engine.failMessage(), "")
 
         val tmp = File(ctx.cacheDir, "dl/$id").apply { deleteRecursively(); mkdirs() }
-        val req = buildRequest(ctx, url, quality, playlist, tmp)
+        // Threads: find the post's direct video file first (yt-dlp can't read Threads pages)
+        val source = if (Threads.isThreads(url)) {
+            try {
+                Threads.resolve(url).videos.first()
+            } catch (e: Exception) {
+                val raw = e.message ?: e.toString()
+                return fail(Errors.friendly(raw), raw)
+            }
+        } else url
+        val req = buildRequest(ctx, source, quality, playlist, tmp)
         val nm = ctx.getSystemService(NotificationManager::class.java)
         var last = 0L
         var total = 0L
@@ -168,7 +178,7 @@ class DownloadWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(c
         Library.add(saved)
         val where = if (saved.first().isAudio) "Music/Grabbit" else "Movies/Grabbit"
         Notifs.done(ctx, nid + 1, title, true,
-            if (saved.size > 1) "${saved.size} files saved to $where" else "Saved to $where")
+            if (saved.size > 1) "${saved.size} files saved to $where" else "Saved to $where", saved.singleOrNull())
         return Result.success()
     }
 }

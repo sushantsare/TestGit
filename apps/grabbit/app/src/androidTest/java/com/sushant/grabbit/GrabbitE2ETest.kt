@@ -1,6 +1,14 @@
 package com.sushant.grabbit
 
 import android.Manifest
+import android.app.Notification
+import android.app.NotificationManager
+import android.content.Intent
+import androidx.lifecycle.Lifecycle
+import androidx.test.core.app.ActivityScenario
+import com.sushant.grabbit.engine.Threads
+import java.net.HttpURLConnection
+import java.net.URL
 import android.content.ContentValues
 import android.graphics.Bitmap
 import android.provider.MediaStore
@@ -163,6 +171,108 @@ class GrabbitE2ETest {
         }
     }
 
+
+    // ---------- Share sheet ("Share → Grabbit" from another app) ----------
+
+    private fun launchShare(text: String): ActivityScenario<ShareActivity> = ActivityScenario.launch(
+        Intent(ctx, ShareActivity::class.java).setAction(Intent.ACTION_SEND).setType("text/plain")
+            .putExtra(Intent.EXTRA_TEXT, text).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+    )
+
+    private fun clearMainScreen() {
+        val vm = ViewModelProvider(compose.activity)[MainViewModel::class.java]
+        compose.activity.runOnUiThread { vm.url = ""; vm.resetFetch() }
+        compose.waitForIdle()
+    }
+
+    private fun waitSheet(): Boolean = try {
+        compose.waitUntil(150_000) { exists("downloadBtn") || exists("fetchError") }
+        true
+    } catch (e: Throwable) { false }
+
+    private fun shareFlow(): Boolean {
+        clearMainScreen()
+        val before = Library.items.value.size
+        val sc = launchShare("Check this out https://www.w3schools.com/html/mov_bbb.mp4")
+        if (!waitSheet() || !exists("downloadBtn")) {
+            shot("s1_sheet_failed"); log("SHARE fetch failed"); sc.close(); return false
+        }
+        shot("s1_sheet_light")
+        compose.onNodeWithTag("downloadBtn").performClick()
+        val closed = try {
+            compose.waitUntil(20_000) { sc.state == Lifecycle.State.DESTROYED }; true
+        } catch (e: Throwable) { false }
+        val saved = try {
+            compose.waitUntil(180_000) { Library.items.value.size > before }; true
+        } catch (e: Throwable) { false }
+        Thread.sleep(1500)
+        val nm = ctx.getSystemService(NotificationManager::class.java)
+        val notif = nm.activeNotifications.any {
+            it.notification.extras.getCharSequence(Notification.EXTRA_TITLE)?.toString().orEmpty().startsWith("Saved")
+        }
+        log("SHARE sheetClosed=$closed saved=$saved savedNotification=$notif")
+
+        // Dark theme + a real site
+        Prefs.theme = 2
+        val sc2 = launchShare("https://x.com/SpaceX/status/1732824684683784516")
+        waitSheet()
+        shot("s2_sheet_dark")
+        sc2.close()
+        Prefs.theme = 0
+
+        // Error state: a page with no video
+        val sc3 = launchShare("https://example.com/")
+        waitSheet()
+        shot("s3_sheet_error")
+        sc3.close()
+        return closed && saved
+    }
+
+    // ---------- Threads ----------
+
+    private fun httpGet(url: String, ua: String): String {
+        val c = (URL(url).openConnection() as HttpURLConnection).apply {
+            connectTimeout = 15_000; readTimeout = 20_000
+            setRequestProperty("User-Agent", ua)
+            setRequestProperty("Accept-Language", "en-US,en;q=0.9")
+        }
+        return try { "HTTP ${c.responseCode}\n" + (runCatching { c.inputStream.bufferedReader().use { it.readText() } }.getOrDefault("")) }
+        finally { c.disconnect() }
+    }
+
+    /** Finds a public Threads video post (from public profiles) so the Threads reader is tested on a real page. */
+    private fun findThreadsVideo(): String? = runBlocking {
+        val chrome = "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Mobile Safari/537.36"
+        for (profile in listOf("nasa", "natgeo", "netflix", "instagram", "zuck")) {
+            val html = runCatching { httpGet("https://www.threads.com/@$profile", chrome) }.getOrElse { "ERR $it" }
+            val posts = Regex("""/@$profile/post/([A-Za-z0-9_-]+)""").findAll(html)
+                .map { "https://www.threads.com/@$profile/post/${it.groupValues[1]}" }.distinct().take(8).toList()
+            log("THREADS profile @$profile ${html.lineSequence().first()} len=${html.length} posts=${posts.size} " +
+                "video_versions=${"video_versions" in html} ogvideo=${"og:video" in html}")
+            for (u in posts) {
+                val r = runCatching { Threads.resolve(u) }
+                log("THREADS try $u -> ${r.getOrNull()?.videos?.size ?: ("error " + r.exceptionOrNull()?.message)}")
+                if (r.getOrNull()?.videos?.isNotEmpty() == true) return@runBlocking u
+            }
+            if (posts.isNotEmpty()) {
+                // Leave a sample of a post page in the log for diagnosis
+                val page = runCatching { httpGet(posts.first(), chrome) }.getOrDefault("")
+                val at = page.indexOf("video").coerceAtLeast(0)
+                log("THREADS sample len=${page.length} ${page.substring(at, minOf(page.length, at + 1500)).replace("\n", " ")}")
+            }
+        }
+        null
+    }
+
+    private fun threadsFlow(): String {
+        val u = findThreadsVideo() ?: return "no-public-video-found"
+        compose.activity.startActivity(
+            Intent(ctx, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT or Intent.FLAG_ACTIVITY_NEW_TASK)
+        )
+        Thread.sleep(1500)
+        return if (grab("threads", u)) "ok" else "failed"
+    }
+
     @Test
     fun endToEnd() {
         shot("00_home_start")
@@ -255,8 +365,12 @@ class GrabbitE2ETest {
         Prefs.amoled = false
         Prefs.theme = 0
 
-        log("SUMMARY direct=$direct x=$x dailymotion=$dm facebook=$fb youtube=$youtube")
+        val share = shareFlow()
+        val threads = threadsFlow()
+
+        log("SUMMARY direct=$direct x=$x dailymotion=$dm facebook=$fb youtube=$youtube share=$share threads=$threads")
         results.forEach { Log.i("GrabbitE2E", "RESULT $it") }
         assertTrue("Downloads failed", direct && x)
+        assertTrue("Share sheet download failed", share)
     }
 }
