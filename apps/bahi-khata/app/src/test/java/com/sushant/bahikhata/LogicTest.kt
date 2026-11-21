@@ -16,6 +16,14 @@ class LogicTest {
         bad.forEach { assertTrue(it, !com.sushant.bahikhata.ui.SAFE_ROUTE.matches(it)) }
     }
 
+    @Test fun keypadAndKeyboardTyping() {
+        var e = ""
+        listOf("7", "5", "0", "+", "+", "2", "5", ".", "5", "0", "9", "=").forEach { e = com.sushant.bahikhata.ui.screens.keyApply(e, it) }
+        assertEquals("775.5", e)
+        assertEquals("7", com.sushant.bahikhata.ui.screens.keyFromKeyboard(android.view.KeyEvent.KEYCODE_7))
+        assertEquals("⌫", com.sushant.bahikhata.ui.screens.keyFromKeyboard(android.view.KeyEvent.KEYCODE_DEL))
+    }
+
     @Test fun budgetCycleStartsOnChosenDay() {
         assertEquals(java.time.LocalDate.of(2026, 10, 25), Dates.cycleStart(java.time.LocalDate.of(2026, 11, 21), 25))
         assertEquals(java.time.LocalDate.of(2026, 11, 25), Dates.cycleStart(java.time.LocalDate.of(2026, 11, 25), 25))

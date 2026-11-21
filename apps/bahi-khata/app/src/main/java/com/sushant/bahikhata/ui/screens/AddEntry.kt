@@ -30,6 +30,11 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.testTag
+import androidx.compose.foundation.focusable
+import androidx.compose.ui.input.key.type
+import androidx.compose.ui.input.key.onKeyEvent
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.LiveRegionMode
@@ -242,14 +247,47 @@ private fun AmountStep(
         Keypad(expr, onExpr, compact = short)
         Button(onClick = onNext, enabled = amount > 0, modifier = Modifier.fillMaxWidth().padding(16.dp).height(52.dp).testTag("next")) { Text("Next") }
     }
-    if (short) Row(Modifier.fillMaxSize()) {
+    // a physical keyboard types the amount straight away (Enter goes to the next step)
+    val focus = remember { androidx.compose.ui.focus.FocusRequester() }
+    LaunchedEffect(Unit) { runCatching { focus.requestFocus() } }
+    val keys = Modifier.onKeyEvent { e ->
+        if (e.type != androidx.compose.ui.input.key.KeyEventType.KeyDown) return@onKeyEvent false
+        val code = e.nativeKeyEvent.keyCode
+        if ((code == android.view.KeyEvent.KEYCODE_ENTER || code == android.view.KeyEvent.KEYCODE_NUMPAD_ENTER) && amount > 0) { onNext(); return@onKeyEvent true }
+        keyFromKeyboard(code)?.let { onExpr(keyApply(expr, it)); true } ?: false
+    }
+    // a tiny focus holder (hidden from TalkBack) so key presses reach this screen without a text field
+    val holder: @Composable () -> Unit = { Box(Modifier.size(1.dp).focusRequester(focus).focusable().clearAndSetSemantics { }) }
+    if (short) Row(Modifier.fillMaxSize().then(keys)) {
+        holder()
         Column(Modifier.weight(1f).fillMaxHeight(), content = top)
         Column(Modifier.weight(1f).fillMaxHeight().verticalScroll(rememberScrollState()).padding(top = 8.dp), content = pad)
-    } else Column(Modifier.fillMaxSize()) { top(); pad() }
+    } else Column(Modifier.fillMaxSize().then(keys)) { holder(); top(); pad() }
 }
 
 @Composable
 fun Modifier.horizontalScrollSafe(): Modifier = this.horizontalScroll(rememberScrollState())
+
+/** What one keypad key (or keyboard key) does to the amount expression. */
+fun keyApply(expr: String, k: String): String = when (k) {
+    "⌫" -> expr.dropLast(1)
+    "=" -> Calc.eval(expr)?.let { Money.input(it) } ?: expr
+    "+", "−" -> if (expr.isEmpty() || expr.last() in "+−") expr else expr + k
+    "." -> { val last = expr.split('+', '−').last(); if (last.contains('.')) expr else expr + (if (last.isEmpty()) "0." else ".") }
+    else -> { val last = expr.split('+', '−').last(); if (last.substringAfter('.', "").length >= 2 && last.contains('.') || expr.length > 14) expr else expr + k }
+}
+
+/** Physical keyboard (Chromebook, tablet keyboard): digits, . + - Backspace, Enter = Next. */
+fun keyFromKeyboard(code: Int): String? = when (code) {
+    in android.view.KeyEvent.KEYCODE_0..android.view.KeyEvent.KEYCODE_9 -> (code - android.view.KeyEvent.KEYCODE_0).toString()
+    in android.view.KeyEvent.KEYCODE_NUMPAD_0..android.view.KeyEvent.KEYCODE_NUMPAD_9 -> (code - android.view.KeyEvent.KEYCODE_NUMPAD_0).toString()
+    android.view.KeyEvent.KEYCODE_PERIOD, android.view.KeyEvent.KEYCODE_NUMPAD_DOT -> "."
+    android.view.KeyEvent.KEYCODE_PLUS, android.view.KeyEvent.KEYCODE_NUMPAD_ADD -> "+"
+    android.view.KeyEvent.KEYCODE_MINUS, android.view.KeyEvent.KEYCODE_NUMPAD_SUBTRACT -> "−"
+    android.view.KeyEvent.KEYCODE_DEL -> "⌫"
+    android.view.KeyEvent.KEYCODE_EQUALS, android.view.KeyEvent.KEYCODE_NUMPAD_EQUALS -> "="
+    else -> null
+}
 
 @Composable
 fun Keypad(expr: String, onExpr: (String) -> Unit, compact: Boolean = false) {
@@ -263,15 +301,7 @@ fun Keypad(expr: String, onExpr: (String) -> Unit, compact: Boolean = false) {
                         Modifier.weight(1f).heightIn(min = if (compact) 48.dp else 56.dp).clip(RoundedCornerShape(14.dp))
                             .background(if (op) MaterialTheme.colorScheme.surfaceVariant else LocalBk.current.card)
                             .border(1.dp, LocalBk.current.cardBorder, RoundedCornerShape(14.dp))
-                            .clickable {
-                                onExpr(when (k) {
-                                    "⌫" -> expr.dropLast(1)
-                                    "=" -> Calc.eval(expr)?.let { Money.input(it) } ?: expr
-                                    "+", "−" -> if (expr.isEmpty() || expr.last() in "+−") expr else expr + k
-                                    "." -> { val last = expr.split('+', '−').last(); if (last.contains('.')) expr else expr + (if (last.isEmpty()) "0." else ".") }
-                                    else -> { val last = expr.split('+', '−').last(); if (last.substringAfter('.', "").length >= 2 && last.contains('.') || expr.length > 14) expr else expr + k }
-                                })
-                            }.testTag("key_$k")
+                            .clickable { onExpr(keyApply(expr, k)) }.testTag("key_$k")
                             .semantics { contentDescription = when (k) { "⌫" -> "Delete digit"; "−" -> "Minus"; "+" -> "Plus"; "=" -> "Work out total"; "." -> "Point"; "00" -> "Double zero"; else -> k } },
                         contentAlignment = Alignment.Center,
                     ) { Text(k, style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(vertical = 8.dp)) }
