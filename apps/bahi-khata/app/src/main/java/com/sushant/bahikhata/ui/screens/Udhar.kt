@@ -94,9 +94,11 @@ fun PersonDialog(existing: Person?, onSave: (Person) -> Unit, onDismiss: () -> U
     var opening by rememberSaveable { mutableStateOf(existing?.let { if (it.openingPaise != 0L) Money.input(kotlin.math.abs(it.openingPaise)) else "" } ?: "") }
     var theyOwe by rememberSaveable { mutableStateOf((existing?.openingPaise ?: 0L) >= 0) }
     // pick from the phone-number list: the picked row is shared with us, so no contacts permission is needed
-    val pick = rememberLauncherForActivityResult(object : ActivityResultContracts.PickContact() {
-        override fun createIntent(context: android.content.Context, input: Void?) =
+    val pick = rememberLauncherForActivityResult(object : androidx.activity.result.contract.ActivityResultContract<Unit, android.net.Uri?>() {
+        override fun createIntent(context: android.content.Context, input: Unit) =
             android.content.Intent(android.content.Intent.ACTION_PICK).setType(ContactsContract.CommonDataKinds.Phone.CONTENT_TYPE)
+        override fun parseResult(resultCode: Int, intent: android.content.Intent?): android.net.Uri? =
+            intent?.data.takeIf { resultCode == android.app.Activity.RESULT_OK }
     }) { uri ->
         if (uri != null) runCatching {
             ctx.contentResolver.query(uri, arrayOf(ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME, ContactsContract.CommonDataKinds.Phone.NUMBER), null, null, null)?.use { c ->
@@ -108,14 +110,14 @@ fun PersonDialog(existing: Person?, onSave: (Person) -> Unit, onDismiss: () -> U
         Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             TextIn(name, { name = it }, "Name *", tag = "pname")
             TextIn(phone, { v -> phone = v.filter { it.isDigit() || it == '+' || it == ' ' } }, "Phone (optional, for WhatsApp)", tag = "pphone", kb = KeyboardType.Phone)
-            TextButton(onClick = { runCatching { pick.launch(null) } }) { Icon(Icons.Outlined.Contacts, null); Spacer(Modifier.width(6.dp)); Text("Pick from contacts") }
+            TextButton(onClick = { runCatching { pick.launch(Unit) } }) { Icon(Icons.Outlined.Contacts, null); Spacer(Modifier.width(6.dp)); Text("Pick from contacts") }
             if (existing == null) {
                 MoneyField(opening, { opening = it }, "Existing udhar (optional)", tag = "popening")
                 Segments(listOf("They owe me", "I owe them"), if (theyOwe) 0 else 1, { theyOwe = it == 0 })
             }
         }
     }, confirmButton = {
-        TextButton(enabled = name.isNotBlank(), onClick = {
+        TextButton(onClick = {
             if (name.isBlank()) return@TextButton
             val op = Money.parse(opening) ?: 0L
             onSave((existing ?: Person(name = "")).copy(name = name.trim(), phone = phone.trim(), openingPaise = if (existing != null) existing.openingPaise else if (theyOwe) op else -op))
