@@ -126,7 +126,7 @@ class WalkthroughTest {
         step("delete_and_bin") {
             firstCell().performTouchInput { longClick() }; waitTag("selbar")
             tag("sel_delete").performClick(); waitText("Moved to Recycle Bin"); shot("deleted_snackbar")
-            tag("tab_albums").performClick(); waitTag("pin_bin"); tag("pin_bin").performClick(); waitTag("cell"); shot("recycle_bin")
+            tag("tab_albums").performClick(); waitTag("pin_bin"); compose.waitForIdle(); Thread.sleep(800); tag("pin_bin").performClick(); waitTag("cell"); shot("recycle_bin")
             firstCell().performClick(); waitTag("bin_restore"); shot("bin_item_sheet"); tag("bin_restore").performClick(); Thread.sleep(2500)
             assertTrue("bin empty after restore", app.repo.trash.value.isEmpty())
         }
@@ -157,9 +157,10 @@ class WalkthroughTest {
         }
         step("dark") {
             tag("more").performClick(); waitTag("menu_settings"); tag("menu_settings").performClick(); waitTag("theme_seg")
-            compose.onNodeWithText("Dark", useUnmergedTree = true).performClick(); Thread.sleep(800); shot("settings_dark"); back(); waitTag("cell"); shot("photos_dark")
+            compose.onNodeWithText("Dark", useUnmergedTree = true).performClick(); Thread.sleep(1500); shot("settings_dark"); back(); waitTag("cell"); shot("photos_dark")
             tag("tab_albums").performClick(); waitTag("album_card"); shot("albums_dark")
-            tag("pin_bin").performClick(); Thread.sleep(1000); shot("bin_dark"); back()
+            compose.waitForIdle(); Thread.sleep(800)
+            tag("pin_bin").performClick(); compose.waitUntil(15000) { has("empty") || has("cell") }; Thread.sleep(600); shot("bin_dark"); back(); waitTag("tab_photos")
             tag("tab_photos").performClick(); waitTag("cell")
             firstCell().performClick(); waitTag("viewer"); Thread.sleep(800)
             tag("viewer").performTouchInput {

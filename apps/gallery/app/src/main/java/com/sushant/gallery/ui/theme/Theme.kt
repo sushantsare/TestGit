@@ -2,6 +2,7 @@ package com.sushant.gallery.ui.theme
 
 import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
@@ -28,6 +29,9 @@ fun GalleryTheme(mode: ThemeMode = ThemeMode.SYSTEM, dynamicColor: Boolean = fal
         else -> LightColors
     }
     CompositionLocalProvider(LocalSpacing provides Spacing(), LocalFixedColors provides FixedColors()) {
-        MaterialTheme(colorScheme = scheme, typography = AppTypography, shapes = AppShapes, content = content)
+        MaterialTheme(colorScheme = scheme, typography = AppTypography, shapes = AppShapes) {
+            // Screens draw on the background directly (no Surface), so set the default text/icon colour here.
+            CompositionLocalProvider(LocalContentColor provides scheme.onBackground, content = content)
+        }
     }
 }
