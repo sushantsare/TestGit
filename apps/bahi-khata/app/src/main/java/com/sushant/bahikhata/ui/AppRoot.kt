@@ -58,6 +58,12 @@ fun NavHostController.tab(route: String) = navigate(route) {
     popUpTo(graph.findStartDestination().id) { saveState = true }
     launchSingleTop = true; restoreState = true
 }
+/** From a notification/shortcut: show the tab's top screen, not whatever was stacked on it before. */
+fun NavHostController.root(route: String) {
+    val start = graph.findStartDestination()
+    popBackStack(start.id, false)
+    if (start.route != route) navigate(route) { launchSingleTop = true }
+}
 private fun androidx.navigation.NavGraph.findStartDestination(): androidx.navigation.NavDestination {
     var d: androidx.navigation.NavDestination = this
     while (d is androidx.navigation.NavGraph) d = d.findNode(d.startDestinationId) ?: break
@@ -89,7 +95,7 @@ fun AppRoot(vm: AppVm, locked: Boolean, onUnlock: () -> Unit, onLockBack: () -> 
         if (back == null) return@LaunchedEffect
         onRouteConsumed()
         if (!s.setupDone) return@LaunchedEffect
-        when (r) { "home", "entries", "accounts", "udhar", "reports" -> nav.tab(r); "add" -> nav.go("add?type=EXPENSE"); else -> nav.go(r) }
+        when (r) { "home", "entries", "accounts", "udhar", "reports" -> nav.root(r); "add" -> nav.go("add?type=EXPENSE"); else -> nav.go(r) }
     }
 
     CompositionLocalProvider(LocalSnack provides snack, LocalNav provides nav, LocalHide provides s.hideAmounts, LocalWide provides wide) {
@@ -111,7 +117,7 @@ fun AppRoot(vm: AppVm, locked: Boolean, onUnlock: () -> Unit, onLockBack: () -> 
                 Scaffold(
                     modifier = Modifier.weight(1f),
                     containerColor = MaterialTheme.colorScheme.background,
-                    snackbarHost = { SnackbarHost(host, Modifier.padding(bottom = if (top) 0.dp else 80.dp)) }, // keep clear of bottom action buttons (Next / Save)
+                    snackbarHost = { SnackbarHost(host, Modifier.padding(bottom = if (top && rail) 0.dp else 80.dp)) }, // stay above the FAB on tabs and above Next / Save buttons elsewhere
                     bottomBar = {
                         if (!rail && top) NavigationBar(containerColor = MaterialTheme.colorScheme.surfaceContainerLow, tonalElevation = 0.dp) {
                             tabs.forEach { t ->
