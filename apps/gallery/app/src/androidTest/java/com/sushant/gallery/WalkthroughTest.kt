@@ -127,8 +127,8 @@ class WalkthroughTest {
             firstCell().performTouchInput { longClick() }; waitTag("selbar")
             tag("sel_delete").performClick(); waitText("Moved to Recycle Bin"); shot("deleted_snackbar")
             tag("tab_albums").performClick(); waitTag("pin_bin"); tag("pin_bin").performClick(); waitTag("cell"); shot("recycle_bin")
-            firstCell().performClick(); waitTag("bin_restore"); shot("bin_item_sheet"); tag("bin_restore").performClick(); Thread.sleep(1500)
-            back(); tag("tab_photos").performClick(); waitTag("cell")
+            firstCell().performClick(); waitTag("bin_restore"); shot("bin_item_sheet"); tag("bin_restore").performClick(); Thread.sleep(2500)
+            assertTrue("bin empty after restore", app.repo.trash.value.isEmpty())
         }
         step("hidden_album") {
             tag("tab_albums").performClick(); waitTag("pin_hidden"); tag("pin_hidden").performClick(); waitTag("lock_screen"); shot("hidden_create_pin")
@@ -143,7 +143,7 @@ class WalkthroughTest {
         step("editor") {
             firstCell().performClick(); waitTag("viewer"); tag("v_edit").performClick(); waitTag("editor"); Thread.sleep(2000); shot("editor_adjust")
             tag("etab_2").performClick(); Thread.sleep(800); tag("filter_1").performClick(); Thread.sleep(500); shot("editor_filters")
-            tag("etab_0").performClick(); Thread.sleep(600); shot("editor_crop")
+            tag("etab_0").performClick(); waitTag("crop"); Thread.sleep(600); shot("editor_crop")
             back(); waitTag("viewer"); back(); waitTag("cell")
         }
         step("search") {
@@ -156,6 +156,7 @@ class WalkthroughTest {
             tag("row_about").performScrollTo().performClick(); waitTag("developer"); shot("about"); back()
         }
         step("dark") {
+            tag("more").performClick(); waitTag("menu_settings"); tag("menu_settings").performClick(); waitTag("theme_seg")
             compose.onNodeWithText("Dark", useUnmergedTree = true).performClick(); Thread.sleep(800); shot("settings_dark"); back(); waitTag("cell"); shot("photos_dark")
             tag("tab_albums").performClick(); waitTag("album_card"); shot("albums_dark")
             tag("pin_bin").performClick(); Thread.sleep(1000); shot("bin_dark"); back()
