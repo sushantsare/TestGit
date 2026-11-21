@@ -213,8 +213,8 @@ private fun PhotoPager(
                 }
             },
     ) {
-        HorizontalPager(pager, key = { list[it].key }, beyondViewportPageCount = 1, modifier = Modifier.fillMaxSize()) { page ->
-            val m = list[page]
+        HorizontalPager(pager, key = { list.getOrNull(it)?.key ?: "gone-$it" }, beyondViewportPageCount = 1, modifier = Modifier.fillMaxSize()) { page ->
+            val m = list.getOrNull(page) ?: return@HorizontalPager
             if (m.isVideo && playing == m.key) {
                 val uri: Uri? = remember(m.key) {
                     when {

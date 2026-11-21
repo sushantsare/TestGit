@@ -70,11 +70,14 @@ class RepositoryTest {
         val target = File(dir, "Sub")
         assertEquals(1, app.repo.transfer(listOf(item), target, copy = false))
         val moved = File(target, "move_me.jpg")
-        assertTrue(moved.exists()); assertFalse(f.exists())
-        delay(500)
-        assertTrue(moved.path in app.repo.favourites.value)
+        assertTrue("moved file exists", moved.exists()); assertFalse("old gone", f.exists())
+        delay(2000)
+        assertTrue("moved file still exists after media update", moved.exists())
+        assertTrue("favourite follows the move", moved.path in app.repo.favourites.value)
         assertEquals(1, app.repo.transfer(listOf(waitItem(moved.path)!!), dir, copy = true))
-        assertTrue(File(dir, "move_me.jpg").exists() && moved.exists())
+        delay(1000)
+        assertTrue("copy exists", File(dir, "move_me.jpg").exists())
+        assertTrue("source of copy kept", moved.exists())
     }
 
     @Test fun hiddenAlbumRoundTrip(): Unit = runBlocking {

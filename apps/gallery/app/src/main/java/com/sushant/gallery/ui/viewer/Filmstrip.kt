@@ -187,7 +187,7 @@ fun Filmstrip(
 
             HorizontalPager(
                 state = pager,
-                key = { list[it].key },
+                key = { list.getOrNull(it)?.key ?: "gone-$it" },
                 pageSize = PageSize.Fixed(cardW),
                 pageSpacing = sp.filmCardGap,
                 contentPadding = PaddingValues(horizontal = sidePad),
@@ -210,7 +210,7 @@ fun Filmstrip(
                     },
                 verticalAlignment = Alignment.CenterVertically,
             ) { page ->
-                val m = list[page]
+                val m = list.getOrNull(page) ?: return@HorizontalPager
                 val current = page == pager.currentPage
                 val off = abs((pager.currentPage - page) + pager.currentPageOffsetFraction).coerceIn(0f, 1f)
                 val deleteLabel = stringResource(R.string.delete)

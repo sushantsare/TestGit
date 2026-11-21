@@ -1,13 +1,11 @@
 package com.sushant.gallery.data
 
-import android.content.ContentUris
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Matrix
 import android.net.Uri
 import android.os.Environment
-import android.provider.MediaStore
 import androidx.core.content.FileProvider
 import androidx.exifinterface.media.ExifInterface
 import java.io.File
@@ -31,8 +29,9 @@ class FileOps(private val ctx: Context, private val media: MediaSource) {
         if (!src.exists()) return null
         val dest = File(trashDir, "${now}_${src.name}")
         if (!moveFile(src, dest)) return null
-        forgetFromMediaStore(item)
-        media.scan(listOf(item.path))
+        // No MediaStore delete here: on Android 11+ the rename already moved the row to the new path,
+        // and deleting it would delete the moved file. Scanning both paths drops the row (the bin folder has .nomedia).
+        media.scan(listOf(item.path, dest.path))
         return TrashEntity(
             originalPath = item.path, trashPath = dest.path, name = item.name, mime = item.mime, isVideo = item.isVideo,
             size = item.size, dateTaken = item.dateTaken, durationMs = item.durationMs, wasFavourite = wasFav, deletedAt = now,
@@ -68,7 +67,6 @@ class FileOps(private val ctx: Context, private val media: MediaSource) {
         val dest = File(folder, name)
         val ok = if (copy) copyFile(src, dest) else moveFile(src, dest)
         if (!ok) return null
-        if (!copy) forgetFromMediaStore(item)
         media.scan(if (copy) listOf(dest.path) else listOf(item.path, dest.path))
         return dest.path
     }
@@ -118,14 +116,6 @@ class FileOps(private val ctx: Context, private val media: MediaSource) {
     fun clearShareCache() { File(ctx.cacheDir, "share").deleteRecursively() }
 
     private fun hasExif(item: MediaItem) = item.mime in setOf("image/jpeg", "image/png", "image/webp", "image/heic", "image/heif")
-
-    private fun forgetFromMediaStore(item: MediaItem) {
-        if (item.id <= 0) return
-        runCatching {
-            val base = if (item.isVideo) MediaStore.Video.Media.EXTERNAL_CONTENT_URI else MediaStore.Images.Media.EXTERNAL_CONTENT_URI
-            cr.delete(ContentUris.withAppendedId(base, item.id), null, null)
-        }
-    }
 
     companion object {
         const val TRASH_DIR = ".gallery_trash"
