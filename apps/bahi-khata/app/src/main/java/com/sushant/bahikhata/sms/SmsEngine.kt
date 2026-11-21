@@ -113,7 +113,14 @@ class SmsEngine(private val context: Context, private val repo: Repo, private va
     private suspend fun processCore(sender: String, body: String, time: Long, st: Stats): SmsItem? {
         val key = key(sender, body, time)
         if ((-1..1).any { dao.seen(key(sender, body, time, it)) }) return SEEN
+        // "seen" is written only after the SMS is fully handled: if the phone kills or freezes the app half-way,
+        // the next scan handles it again (the suggestion's unique key stops any double)
+        val r = handle(sender, body, time, st, key)
         dao.markSeen(SmsSeen(key, System.currentTimeMillis()))
+        return r
+    }
+
+    private suspend fun handle(sender: String, body: String, time: Long, st: Stats, key: String): SmsItem? {
         var p = SmsParser.parse(sender, body)
         if (p.kind == SmsKind.NOT_FINANCIAL || p.kind == SmsKind.OTP || p.kind == SmsKind.PROMO) { st.ignored++; return null }
 
