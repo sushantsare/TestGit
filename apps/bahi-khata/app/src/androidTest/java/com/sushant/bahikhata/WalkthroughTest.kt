@@ -40,7 +40,15 @@ class WalkthroughTest {
     private fun waitTag(tag: String, ms: Long = 8_000) = compose.waitUntil(ms) { compose.onAllNodesWithTag(tag, useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty() }
     private fun waitText(t: String, ms: Long = 8_000) = compose.waitUntil(ms) { compose.onAllNodesWithText(t, substring = true, useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty() }
     private fun click(tag: String) { log("click $tag"); waitTag(tag); compose.onAllNodesWithTag(tag, useUnmergedTree = true).onFirst().performClick(); compose.waitForIdle() }
-    private fun type(tag: String, text: String) { waitTag(tag); compose.onNodeWithTag(tag).performTextClearance(); compose.onNodeWithTag(tag).performTextInput(text); runCatching { androidx.test.espresso.Espresso.closeSoftKeyboard() }; compose.waitForIdle() }
+    private fun type(tag: String, text: String) { waitTag(tag); compose.onNodeWithTag(tag).performTextClearance(); compose.onNodeWithTag(tag).performTextInput(text); hideKeyboard() }
+
+    private fun hideKeyboard() {
+        scenario.onActivity { a ->
+            val v = a.currentFocus ?: a.window.decorView
+            (a.getSystemService(android.content.Context.INPUT_METHOD_SERVICE) as android.view.inputmethod.InputMethodManager).hideSoftInputFromWindow(v.windowToken, 0)
+        }
+        compose.waitForIdle()
+    }
 
     private fun go(route: String, waitFor: String? = null) {
         scenario.onActivity { a -> a.startActivity(Intent(a, MainActivity::class.java).putExtra(MainActivity.EXTRA_ROUTE, route).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP)) }
@@ -65,6 +73,14 @@ class WalkthroughTest {
     }
 
     @Test fun walkthroughEveryScreen() {
+        try { walk() } catch (t: Throwable) {
+            runCatching { shot("FAILED_here") }
+            runCatching { compose.onRoot(useUnmergedTree = true).printToLog("WalkTree") }
+            throw t
+        }
+    }
+
+    private fun walk() {
         runBlocking { app.repo.wipeAll() }
         app.prefs.update { Settings(secureScreens = false) }
         scenario = ActivityScenario.launch(MainActivity::class.java)
@@ -76,7 +92,7 @@ class WalkthroughTest {
         type("f_name", "SBI Savings"); type("f_opening", "18450"); type("f_last4", "4417")
         click("upi_GPay"); shot("account_add_bank")
         click("save_account"); waitTag("setup_acc_SBI Savings"); shot("setup_accounts_added")
-        click("setup_next"); waitTag("btn_setup_person"); shot("setup_udhar")
+        hideKeyboard(); click("setup_next"); waitText("Any udhar"); waitTag("btn_setup_person"); shot("setup_udhar")
         click("setup_next"); waitTag("sw_setup_lock"); shot("setup_lock_sms")
         click("setup_next"); waitTag("tab_home")
 
