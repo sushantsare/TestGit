@@ -34,8 +34,8 @@ class Repo(private val context: Context, val db: AppDb, val prefs: Prefs) {
     fun attachments(entryId: Long) = dao.attachments(entryId)
     fun entryFlow(id: Long) = dao.entryFlow(id)
 
-    suspend fun ensureCategories() {
-        if (dao.categoriesNow().isNotEmpty()) return
+    suspend fun ensureCategories() = db.withTransaction {   // check + insert in one transaction: never twice
+        if (dao.categoriesNow().isNotEmpty()) return@withTransaction
         DefaultData.categories().forEach { dao.upsertCategory(it) }
     }
 

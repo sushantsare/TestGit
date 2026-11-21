@@ -49,7 +49,7 @@ if [ -f "$DBG" ]; then
   prefs_ready
   adb shell am start -W -n $ACT >/dev/null 2>&1; sleep 4
   adb shell input keyevent KEYCODE_HOME; sleep 1
-  adb logcat -c
+  adb logcat -G 16M 2>/dev/null; adb logcat -c   # big buffer: the debug build logs a lot, counts must not roll off
   P() { adb logcat -d -s BahiSms:I | grep -c "processed via=.* status=$1"; }
   # 1) app in background (receiver or live observer)
   adb emu sms send 5554 "Rs.412.00 spent on HDFC Bank Card 8812 at ZOMATO on 21-11-26. Not you? Call 18002586161"; sleep 12

@@ -8,6 +8,7 @@ import java.time.YearMonth
 object Seed {
     suspend fun fill(repo: Repo) {
         repo.wipeAll()
+        repo.ensureCategories()   // a fresh install creates them in the background; do not race it
         val cats = repo.dao.categoriesNow()
         fun cat(n: String, k: String = "EXPENSE") = cats.first { it.name == n && it.kind == k }.id
         val sbi = repo.saveAccount(Account(type = AccType.BANK, name = "SBI Savings", bank = "SBI", last4 = "4417", upiApps = "GPay,PhonePe", openingPaise = 18_450_00))
