@@ -71,11 +71,12 @@ if [ -f "$DBG" ]; then
   adb shell cmd statusbar expand-notifications 2>/dev/null; sleep 2; adb exec-out screencap -p > $OUT/screens/e2e_${TAG}_sms_notification.png; adb shell cmd statusbar collapse 2>/dev/null
   # 5) user force-stopped the app (Android blocks all broadcasts): the catch-up scan on open must pick up the
   #    missed SMS exactly once, and must not process anything already handled again
-  adb shell am force-stop $PKG; sleep 1
+  adb shell am force-stop $PKG; sleep 1; adb logcat -c
   adb emu sms send 5554 "INR 999.00 debited from A/c XX4417 on 21-11-26 to VPA blinkit@ybl. Ref 611234567890. -SBI"; sleep 5
-  adb logcat -c; adb shell am start -W -n $ACT >/dev/null 2>&1; sleep 6
+  adb shell am start -W -n $ACT >/dev/null 2>&1; sleep 6
   adb shell am start -n $ACT --es route sms >/dev/null 2>&1; sleep 3; adb exec-out screencap -p > $OUT/screens/e2e_${TAG}_sms_inbox.png
-  CATCH=$(adb logcat -d -s BahiSms:I | grep -c "processed via=scan status=PENDING")
+  # the missed SMS must be handled exactly once (receiver on Androids that still deliver, else the scan on open)
+  CATCH=$(adb logcat -d -s BahiSms:I | grep -c "processed via=.* status=PENDING")
   DUP=$(( $(adb logcat -d -s BahiSms:I | grep -c "processed via=") - CATCH ))
   adb logcat -d -s BahiSms:I > $OUT/audit/sms_e2e_$TAG.txt
   echo "sms_pending=$PEND first_sms=$R1 sms_otp_ignored=$R2 sms_by_receiver_after_kill=$R3 sms_needs_look=$R4 processed_total=$TOTAL notifications=$NOTIF missed_caught_on_open=$CATCH reprocessed_on_open=$DUP" >> $LOG

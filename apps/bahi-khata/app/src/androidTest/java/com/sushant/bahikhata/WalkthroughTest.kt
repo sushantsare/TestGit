@@ -42,6 +42,13 @@ class WalkthroughTest {
     private fun click(tag: String) { log("click $tag"); waitTag(tag); compose.onAllNodesWithTag(tag, useUnmergedTree = true).onFirst().performClick(); compose.waitForIdle() }
     private fun type(tag: String, text: String) { waitTag(tag); compose.onNodeWithTag(tag).performTextClearance(); compose.onNodeWithTag(tag).performTextInput(text); hideKeyboard() }
 
+    /** Click and wait for the next screen; one retry (logged) if the first tap was swallowed by a recomposition. */
+    private fun clickTo(tag: String, expect: String) {
+        click(tag)
+        val ok = runCatching { waitTag(expect, 4_000) }.isSuccess
+        if (!ok) { log("RETRY $tag -> $expect"); click(tag); waitTag(expect) }
+    }
+
     private fun hideKeyboard() {
         scenario.onActivity { a ->
             val v = a.currentFocus ?: a.window.decorView
@@ -99,10 +106,10 @@ class WalkthroughTest {
         // ---- realistic data
         runBlocking { Seed.fill(app.repo) }
         app.prefs.update { it.copy(setupDone = true) }
-        waitTag("net"); waitText("Swiggy"); shot("home")
+        waitTag("net"); waitText("Swiggy"); compose.waitForIdle(); Thread.sleep(1500); shot("home")
 
         // ---- add an expense: amount -> category -> account, with the keypad
-        click("fab_add"); waitTag("key_4")
+        clickTo("fab_add", "key_4")
         click("key_1"); click("key_2"); click("key_0"); click("key_+"); click("key_8"); click("key_0")
         type("f_merchant", "Chai point"); shot("add_amount_keypad")
         click("next"); waitTag("cat_Food"); shot("add_category")

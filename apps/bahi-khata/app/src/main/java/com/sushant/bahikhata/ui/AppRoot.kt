@@ -53,7 +53,7 @@ val tabs = listOf(
     Tab("reports", "Reports", Icons.Outlined.BarChart, Icons.Filled.BarChart),
 )
 
-fun NavHostController.go(route: String) = navigate(route) { launchSingleTop = true }
+fun NavHostController.go(route: String) { android.util.Log.d("BahiNav", "go $route"); navigate(route) { launchSingleTop = true } }
 fun NavHostController.tab(route: String) = navigate(route) {
     popUpTo(graph.findStartDestination().id) { saveState = true }
     launchSingleTop = true; restoreState = true
