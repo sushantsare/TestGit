@@ -65,6 +65,7 @@ if [ -f "$DBG" ]; then
   adb emu sms send 5554 "Your acct 99887766 has a txn Rs 450.00 on 21/11. Bal Rs 1,000."; sleep 12
   R4=$(P LOOK)
   TOTAL=$(adb logcat -d -s BahiSms:I | grep -c "processed via=")
+  PEND=$(P PENDING)
   NOTIF=$(adb shell dumpsys notification --noredact | grep -c "pkg=$PKG")
   adb shell cmd statusbar expand-notifications 2>/dev/null; sleep 2; adb exec-out screencap -p > $OUT/screens/e2e_${TAG}_sms_notification.png; adb shell cmd statusbar collapse 2>/dev/null
   # 5) opening the app re-scans the inbox: nothing may be processed twice
@@ -72,8 +73,8 @@ if [ -f "$DBG" ]; then
   adb shell am start -n $ACT --es route sms >/dev/null 2>&1; sleep 3; adb exec-out screencap -p > $OUT/screens/e2e_${TAG}_sms_inbox.png
   DUP=$(adb logcat -d -s BahiSms:I | grep -c "processed via=")
   adb logcat -d -s BahiSms:I > $OUT/audit/sms_e2e_$TAG.txt
-  echo "sms_pending=$R1 sms_otp_ignored=$R2 sms_by_receiver_after_kill=$R3 sms_needs_look=$R4 processed_total=$TOTAL notifications=$NOTIF reprocessed_on_open=$DUP" >> $LOG
-  if [ "$R1" -ge 2 ] && [ "$R2" -ge 1 ] && [ "$R3" -ge 1 ] && [ "$R4" -ge 1 ] && [ "$TOTAL" = "4" ] && [ "$DUP" = "0" ]; then SMSOK=PASSED; else SMSOK=FAILED; fi
+  echo "sms_pending=$PEND first_sms=$R1 sms_otp_ignored=$R2 sms_by_receiver_after_kill=$R3 sms_needs_look=$R4 processed_total=$TOTAL notifications=$NOTIF reprocessed_on_open=$DUP" >> $LOG
+  if [ "$PEND" -ge 2 ] && [ "$R1" -ge 1 ] && [ "$R2" -ge 1 ] && [ "$R3" -ge 1 ] && [ "$R4" -ge 1 ] && [ "$TOTAL" = "4" ] && [ "$DUP" = "0" ]; then SMSOK=PASSED; else SMSOK=FAILED; fi
   echo "sms_e2e=$SMSOK" >> $LOG
   echo $SMSOK > $OUT/SMS_E2E_$TAG
 fi
