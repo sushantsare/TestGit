@@ -131,7 +131,9 @@ private fun ViewerBody(vm: MainViewModel, nav: Nav, source: Source, startIndex: 
     val loaded by vm.loaded.collectAsStateWithLifecycle()
 
     if (list.isEmpty()) {
-        LaunchedEffect(loaded, source) { if (loaded || source == Source.External || source == Source.Vault) { delay(300); nav.back() } }
+        // Last photo deleted (or nothing to show): leave the viewer. Wait only for the very first library load.
+        val canLeave = loaded || source == Source.External || source == Source.Vault
+        if (canLeave) LaunchedEffect(Unit) { nav.back() }
         Box(Modifier.fillMaxSize().background(LocalFixedColors.current.viewerBg))
         return
     }

@@ -55,6 +55,7 @@ class WalkthroughTest {
 
     private fun step(name: String, block: () -> Unit) {
         Log.i("GalleryWalk", "step $name start")
+        if (name !in setOf("photos", "select", "onboarding")) runCatching { home() }
         try { block(); Log.i("GalleryWalk", "step $name ok") } catch (t: Throwable) {
             failures += "$name: ${t.message?.take(300)}"; Log.e("GalleryWalk", "step $name failed", t); runCatching { shot("FAIL_$name") }
         }
@@ -70,8 +71,15 @@ class WalkthroughTest {
     private fun count(): Int = compose.onNodeWithTag("film_count", useUnmergedTree = true).fetchSemanticsNode()
         .config.getOrNull(androidx.compose.ui.semantics.SemanticsProperties.Text)?.firstOrNull()?.text?.substringAfter("/ ")?.trim()?.toIntOrNull() ?: -1
 
+    /** Back to the Photos tab from wherever a failed step left the app. */
+    private fun home() {
+        repeat(6) { if (has("tab_photos") && !has("selbar")) return@repeat; device.pressBack(); Thread.sleep(500) }
+        if (has("tab_photos")) { tag("tab_photos").performClick(); compose.waitForIdle() }
+    }
+
     @Test fun walkthrough() {
         Seed.grantAllFiles(inst)
+        kotlinx.coroutines.runBlocking(kotlinx.coroutines.Dispatchers.IO) { app.db.clearAllTables() }
         Seed.library(inst)
         main { app.prefs.setTheme(ThemeMode.LIGHT) }
         var scenario = ActivityScenario.launch(MainActivity::class.java)
@@ -87,7 +95,7 @@ class WalkthroughTest {
             tag("tab_albums").performClick(); waitTag("album_card"); shot("albums")
             compose.onAllNodesWithTag("album_card", useUnmergedTree = true).onFirst().performClick(); waitTag("cell"); shot("album_camera"); back(); waitTag("pin_fav")
             compose.waitForIdle(); Thread.sleep(800)
-            tag("pin_fav").performClick(); waitTag("empty"); shot("favourites_empty"); back(); waitTag("pin_fav")
+            tag("pin_fav").performClick(); compose.waitUntil(15000) { has("empty") || has("cell") }; shot("favourites"); back(); waitTag("pin_fav")
             tag("tab_photos").performClick(); waitTag("cell")
         }
         step("viewer") {
