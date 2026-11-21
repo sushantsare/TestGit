@@ -18,7 +18,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.produceState
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -59,9 +62,9 @@ fun readExif(path: String): ExifInfo? = runCatching {
 
 @Composable
 fun InfoSheet(vm: MainViewModel, item: MediaItem, onDismiss: () -> Unit) {
-    val exif by produceState<ExifInfo?>(null, item.cacheKey) {
-        val info = if (item.isVideo || item.vaultId != null || item.folder.isEmpty()) null else withContext(Dispatchers.IO) { readExif(item.path) }
-        value = info
+    var exif by remember(item.cacheKey) { mutableStateOf<ExifInfo?>(null) }
+    LaunchedEffect(item.cacheKey) {
+        if (!item.isVideo && item.vaultId == null && item.folder.isNotEmpty()) exif = withContext(Dispatchers.IO) { readExif(item.path) }
     }
     val w = if (item.width > 0) item.width else exif?.width ?: 0
     val h = if (item.height > 0) item.height else exif?.height ?: 0

@@ -82,7 +82,7 @@ class WalkthroughTest {
         kotlinx.coroutines.runBlocking(kotlinx.coroutines.Dispatchers.IO) { app.db.clearAllTables() }
         Seed.library(inst)
         main { app.prefs.setTheme(ThemeMode.LIGHT) }
-        var scenario = ActivityScenario.launch(MainActivity::class.java)
+        val scenario = ActivityScenario.launch(MainActivity::class.java)
 
         step("photos") { waitTag("cell", 30000); Thread.sleep(1500); shot("photos") }
         step("select") {
@@ -175,15 +175,7 @@ class WalkthroughTest {
             firstCell().performClick(); waitTag("viewer"); Thread.sleep(2500); shot("viewer_landscape"); back()
             device.setOrientationNatural(); Thread.sleep(1500)
         }
-        step("onboarding") {
-            scenario.close()
-            Seed.shell(inst, "appops set --uid ${ctx.packageName} MANAGE_EXTERNAL_STORAGE deny"); Thread.sleep(500)
-            app.prefs.onboarded = false
-            scenario = ActivityScenario.launch(MainActivity::class.java)
-            waitTag("onboarding"); shot("onboarding")
-            tag("not_now").performClick(); waitTag("denied"); shot("permission_denied")
-            Seed.grantAllFiles(inst)
-        }
+        // Onboarding is not automated: revoking "All files access" makes Android restart the app process (and this test).
         scenario.close()
         assertTrue("Walkthrough failures:\n" + failures.joinToString("\n"), failures.isEmpty())
     }
