@@ -55,7 +55,10 @@ class WalkthroughTest {
 
     /** Go to a top-level tab the way a user would: press back until the tab bar shows, then tap the tab. */
     private fun tab(r: String) {
-        repeat(4) { if (compose.onAllNodesWithTag("tab_$r", useUnmergedTree = true).fetchSemanticsNodes().isEmpty()) back() }
+        repeat(5) {
+            if (has("tab_$r")) return@repeat
+            if (has("confirm")) { problem("unexpected discard prompt before tab $r"); click("confirm") } else back()
+        }
         click("tab_$r")
     }
 

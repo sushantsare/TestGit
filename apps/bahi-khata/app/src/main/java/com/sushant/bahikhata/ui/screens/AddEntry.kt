@@ -126,7 +126,7 @@ fun AddEntryScreen(vm: AppVm, initialType: String, editId: Long, smsId: Long) {
     var askDiscard by rememberSaveable { mutableStateOf(false) }
     val dirty = existing?.let { e ->
         amount != e.amountPaise || merchant != e.merchant.orEmpty() || catId != (e.categoryId ?: 0L) || accId != e.accountId ||
-            note != e.note.orEmpty() || time != e.time || files.isNotEmpty() || tags != e.tags.orEmpty() || upi != e.upiApp.orEmpty() ||
+            note != e.note.orEmpty() || time != e.time || files.isNotEmpty() || Ledger.tags(tags) != Ledger.tags(e.tags) || upi != e.upiApp.orEmpty() ||
             rule != null || splitsTouched
     } ?: if (smsId > 0) false else (expr.isNotBlank() || merchant.isNotBlank() || note.isNotBlank() || tags.isNotBlank() || files.isNotEmpty() || splits.isNotEmpty())
     fun close() { if (dirty && !saving) askDiscard = true else nav.popBackStack() }
