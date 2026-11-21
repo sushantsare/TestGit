@@ -247,17 +247,17 @@ private fun AmountStep(
         Keypad(expr, onExpr, compact = short)
         Button(onClick = onNext, enabled = amount > 0, modifier = Modifier.fillMaxWidth().padding(16.dp).height(52.dp).testTag("next")) { Text("Next") }
     }
-    // a physical keyboard types the amount straight away (Enter goes to the next step)
-    val focus = remember { androidx.compose.ui.focus.FocusRequester() }
-    LaunchedEffect(Unit) { runCatching { focus.requestFocus() } }
-    val keys = Modifier.onKeyEvent { e ->
-        if (e.type != androidx.compose.ui.input.key.KeyEventType.KeyDown) return@onKeyEvent false
-        val code = e.nativeKeyEvent.keyCode
-        if ((code == android.view.KeyEvent.KEYCODE_ENTER || code == android.view.KeyEvent.KEYCODE_NUMPAD_ENTER) && amount > 0) { onNext(); return@onKeyEvent true }
-        keyFromKeyboard(code)?.let { onExpr(keyApply(expr, it)); true } ?: false
+    // a physical keyboard types the amount straight away (Enter goes to the next step); keys no text field
+    // used arrive from the activity through KeyBus
+    val latestExpr by rememberUpdatedState(expr); val latestAmount by rememberUpdatedState(amount)
+    LaunchedEffect(Unit) {
+        com.sushant.bahikhata.KeyBus.keys.collect { code ->
+            if ((code == android.view.KeyEvent.KEYCODE_ENTER || code == android.view.KeyEvent.KEYCODE_NUMPAD_ENTER) && latestAmount > 0) onNext()
+            else keyFromKeyboard(code)?.let { onExpr(keyApply(latestExpr, it)) }
+        }
     }
-    // a tiny focus holder (hidden from TalkBack) so key presses reach this screen without a text field
-    val holder: @Composable () -> Unit = { Box(Modifier.size(1.dp).focusRequester(focus).focusable().clearAndSetSemantics { }) }
+    val keys = Modifier
+    val holder: @Composable () -> Unit = { }
     if (short) Row(Modifier.fillMaxSize().then(keys)) {
         holder()
         Column(Modifier.weight(1f).fillMaxHeight(), content = top)

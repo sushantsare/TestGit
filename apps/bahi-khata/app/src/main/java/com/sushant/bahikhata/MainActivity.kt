@@ -97,7 +97,10 @@ class MainActivity : AppCompatActivity() {
                 event.keyCode == android.view.KeyEvent.KEYCODE_ESCAPE -> { onBackPressedDispatcher.onBackPressed(); return true }
             }
         }
-        return super.dispatchKeyEvent(event)
+        val handled = super.dispatchKeyEvent(event)
+        // keys nobody used (no text field focused) go to the screen that wants them, e.g. typing an amount
+        if (!handled && event.action == android.view.KeyEvent.ACTION_DOWN) return KeyBus.keys.tryEmit(event.keyCode) && KeyBus.wanted(event.keyCode)
+        return handled
     }
 
     override fun onNewIntent(intent: Intent) { super.onNewIntent(intent); routeFrom(intent)?.let { pendingRoute = it } }
@@ -144,4 +147,11 @@ class MainActivity : AppCompatActivity() {
         const val ACTION_ADD_INCOME = "com.sushant.bahikhata.ADD_INCOME"
         const val ACTION_UDHAR = "com.sushant.bahikhata.UDHAR"
     }
+}
+
+/** Hardware keys not used by any focused field, for screens that accept typing (the amount keypad). */
+object KeyBus {
+    val keys = kotlinx.coroutines.flow.MutableSharedFlow<Int>(extraBufferCapacity = 16)
+    fun wanted(code: Int) = code in android.view.KeyEvent.KEYCODE_0..android.view.KeyEvent.KEYCODE_9 ||
+        code in android.view.KeyEvent.KEYCODE_NUMPAD_0..android.view.KeyEvent.KEYCODE_NUMPAD_9 || code == android.view.KeyEvent.KEYCODE_DEL
 }
