@@ -102,7 +102,7 @@ fun HomeScreen(vm: AppVm) {
                     if (prevSpent > 0 && ym == YearMonth.now()) {
                         Spacer(Modifier.height(8.dp))
                         val pct = ((spent - prevSpent) * 100 / prevSpent)
-                        Text(if (pct <= 0) "${-pct}% less than last month so far" else "$pct% more than last month",
+                        Text(if (pct <= 0) "${-pct}% less than last month so far" else if (pct > 200) "${Money.fmt(spent - prevSpent)} more than last month" else "$pct% more than last month",
                             style = MaterialTheme.typography.labelSmall, color = if (pct <= 0) bk.income else bk.expense)
                     }
                 }
@@ -124,7 +124,7 @@ fun HomeScreen(vm: AppVm) {
                     BkCard(Modifier.padding(horizontal = 16.dp).fillMaxWidth()) {
                         dueCards.forEach { (c, b, d) ->
                             ListRow(c.name, "Bill ${if (LocalHide.current) "₹ ••••" else Money.fmt(b.bill)} · due ${Dates.dayMonth(b.due!!)}", Modifier.testTag("due_${c.id}"),
-                                leading = { Box(Modifier.size(46.dp, 30.dp).clip(RoundedCornerShape(6.dp)).background(bk.cardFaces[c.colorIdx.mod(bk.cardFaces.size)])) },
+                                leading = { Box(Modifier.size(46.dp, 30.dp).clip(RoundedCornerShape(6.dp)).background(bk.cardFaces[c.colorIdx.mod(bk.cardFaces.size)]), contentAlignment = Alignment.BottomEnd) { Text(c.last4.split(',').firstOrNull { it.isNotBlank() }.orEmpty(), color = androidx.compose.ui.graphics.Color.White, style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(end = 4.dp, bottom = 2.dp)) } },
                                 trailing = { Text(when { d < 0 -> "overdue"; d == 0L -> "today"; d == 1L -> "tomorrow"; else -> "in $d days" }, style = MaterialTheme.typography.labelLarge, color = if (d <= 5) bk.expense else MaterialTheme.colorScheme.onSurfaceVariant) },
                                 onClick = { nav.go("account/${c.id}") })
                         }
