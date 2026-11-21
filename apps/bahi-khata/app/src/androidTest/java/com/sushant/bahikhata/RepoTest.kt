@@ -25,6 +25,18 @@ class RepoTest {
 
     private suspend fun nets() = Ledger.nets(repo.dao.accountsNow(), repo.dao.entriesNow())
 
+    @Test fun editingToNoSplitRemovesShares() = runBlocking {
+        val acc = repo.saveAccount(Account(type = AccType.CASH, name = "Cash", openingPaise = 1_000_00))
+        val p = repo.savePerson(Person(name = "Rahul"))
+        val id = repo.saveEntry(Repo.SaveRequest(Entry(type = EType.EXPENSE, amountPaise = 400_00, accountId = acc, merchant = "Swiggy"), splits = listOf(p to 200_00)))
+        assertEquals(1, repo.dao.udharOfEntry(id).size)
+        val e = repo.dao.entry(id)!!
+        repo.saveEntry(Repo.SaveRequest(e.copy(amountPaise = 500_00), splits = emptyList()))
+        assertEquals(0, repo.dao.udharOfEntry(id).size)
+        repo.saveEntry(Repo.SaveRequest(e.copy(amountPaise = 501_00), splits = Ledger.splitShares(501_00, listOf(p), true)))
+        assertEquals(250_50L, repo.dao.udharOfEntry(id).single().amountPaise)
+    }
+
     @Test fun openingBalanceIsNotIncome() = runBlocking {
         repo.saveAccount(Account(type = AccType.BANK, name = "SBI", openingPaise = 10_000_00))
         assertEquals(0L, Ledger.received(repo.dao.entriesNow(), 0L..Long.MAX_VALUE))

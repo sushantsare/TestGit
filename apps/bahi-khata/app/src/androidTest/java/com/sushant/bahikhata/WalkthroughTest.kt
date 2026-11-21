@@ -44,7 +44,7 @@ class WalkthroughTest {
     private fun has(tag: String) = compose.onAllNodesWithTag(tag, useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty()
     private fun waitTag(tag: String, ms: Long = 8_000): Boolean = runCatching { compose.waitUntil(ms) { has(tag) } }.isSuccess.also { if (!it && ms >= 8_000) problem("missing $tag") }
     private fun waitText(t: String, ms: Long = 8_000): Boolean = runCatching { compose.waitUntil(ms) { compose.onAllNodesWithText(t, substring = true, useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty() } }.isSuccess.also { if (!it) problem("missing text $t") }
-    private fun click(tag: String) { log("click $tag"); if (!waitTag(tag)) return; runCatching { compose.onAllNodesWithTag(tag, useUnmergedTree = true).onFirst().performClick() }.onFailure { problem("click $tag: ${it.message?.take(60)}") }; compose.waitForIdle() }
+    private fun click(tag: String) { log("click $tag"); if (!waitTag(tag)) return; runCatching { compose.onAllNodesWithTag(tag, useUnmergedTree = true).onFirst().also { n -> runCatching { n.performScrollTo() } }.performClick() }.onFailure { problem("click $tag: ${it.message?.take(60)}") }; compose.waitForIdle() }
     private fun type(tag: String, text: String) { if (!waitTag(tag)) return; compose.onNodeWithTag(tag).performTextClearance(); compose.onNodeWithTag(tag).performTextInput(text); hideKeyboard() }
 
     /** Click and wait for the next screen; one retry (logged) if the first tap was swallowed by a recomposition. */
@@ -72,6 +72,14 @@ class WalkthroughTest {
         compose.waitForIdle()
         waitFor?.let { waitTag(it) }
         log("opened $route")
+    }
+
+    /** Back on a form with typing shows "Discard?" — confirm it (screenshotting it once). */
+    private var discardShot = false
+    private fun backDiscard() {
+        back()
+        if (waitTag("confirm", 3_000)) { if (!discardShot) { shot("discard_prompt"); discardShot = true }; click("confirm") }
+        else problem("no discard prompt after typing")
     }
 
     private fun back() { InstrumentationRegistry.getInstrumentation().uiAutomation.performGlobalAction(android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_BACK); Thread.sleep(500); compose.waitForIdle() }
@@ -131,7 +139,7 @@ class WalkthroughTest {
         click("save"); waitTag("fab_add"); waitText("Chai point"); shot("home_after_add")
 
         // ---- income + transfer chips
-        go("add?type=INCOME", "key_5"); click("key_5"); click("key_0"); click("key_0"); shot("add_income"); back(); compose.waitForIdle()
+        go("add?type=INCOME", "key_5"); click("key_5"); click("key_0"); click("key_0"); shot("add_income"); backDiscard(); compose.waitForIdle()
 
         // ---- entries list, calendar, search, detail
         click("tab_entries"); waitTag("entries_list"); shot("entries")
@@ -149,9 +157,10 @@ class WalkthroughTest {
         go("account/${sbi.id}", "account_detail"); shot("account_bank")
         click("btn_adjust"); waitTag("dlg_field"); shot("adjust_balance_dialog"); back()
         go("account/${hdfc.id}", "pay_bill"); shot("card_detail")
+        click("bill_row"); if (waitTag("dlg_field", 3_000)) { shot("card_min_due_dialog"); back() }
         click("pay_bill"); waitTag("do_transfer"); shot("pay_card_bill")
         click("do_transfer"); waitTag("pay_bill"); shot("card_after_payment")
-        go("transfer/withdraw?acc=${sbi.id}", "do_transfer"); type("f_amount", "1000"); shot("withdraw_cash"); back()
+        go("transfer/withdraw?acc=${sbi.id}", "do_transfer"); type("f_amount", "1000"); shot("withdraw_cash"); backDiscard()
         go("account_edit/${hdfc.id}?type=CARD", "save_account"); shot("account_edit_card"); back()
         go("account_edit/0?type=WALLET", "save_account"); shot("account_add_wallet"); back()
 
@@ -164,10 +173,13 @@ class WalkthroughTest {
 
         // ---- reports, budgets, goals
         tab("reports"); waitTag("reports"); shot("reports")
+        click("period_CUSTOM"); if (waitTag("range_ok", 4_000)) { shot("reports_custom_range"); click("range_ok") }; waitTag("reports"); shot("reports_custom"); click("period_MONTH")
         go("budgets", "budgets"); shot("budgets_goals")
 
         // ---- SMS
+        app.prefs.batteryTipDue = true; app.prefs.batteryTipShown = false
         go("sms", "sms_list"); shot("sms_suggestions")
+        if (waitTag("battery_fix", 3_000)) { click("battery_fix"); waitTag("battery_open"); shot("sms_battery_guide"); back() }
         click("tab_look"); waitText("Fix & teach"); shot("sms_needs_look")
         click("teach_" + runBlocking { app.repo.dao.smsNow().first { it.key == "s4" }.id }); waitTag("teach_ok"); shot("sms_teach_dialog"); back()
         click("tab_missed"); waitText("Bring back"); shot("sms_missed")
@@ -176,6 +188,7 @@ class WalkthroughTest {
 
         // ---- settings and sub pages
         go("settings", "settings_list"); shot("settings")
+        click("nav_Budget month starts on"); compose.waitForIdle(); Thread.sleep(600); shot("settings_budget_start"); back()
         go("categories"); waitTag("catrow_Food"); shot("categories")
         click("catrow_Food"); waitTag("cat_ok"); shot("category_edit"); back()
         go("recurring"); waitText("Hostel rent"); shot("recurring")
@@ -187,7 +200,7 @@ class WalkthroughTest {
         // ---- dark theme: main screens again
         app.prefs.update { it.copy(theme = ThemeMode.DARK) }
         go("home", "net"); shot("dark_home")
-        go("add?type=EXPENSE", "key_1"); click("key_7"); click("key_5"); shot("dark_add"); back()
+        go("add?type=EXPENSE", "key_1"); click("key_7"); click("key_5"); shot("dark_add"); backDiscard()
         go("entries", "entries_list"); shot("dark_entries")
         go("accounts", "accounts_list"); shot("dark_accounts")
         go("account/${hdfc.id}", "pay_bill"); shot("dark_card")

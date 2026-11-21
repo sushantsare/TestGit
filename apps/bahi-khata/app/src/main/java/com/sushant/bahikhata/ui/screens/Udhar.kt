@@ -36,7 +36,7 @@ fun UdharScreen(vm: AppVm) {
     val wide = LocalWide.current
     val people by vm.people.collectAsStateWithLifecycle()
     val udhar by vm.udhar.collectAsStateWithLifecycle()
-    var adding by remember { mutableStateOf(false) }
+    var adding by rememberSaveable { mutableStateOf(false) }
     var q by rememberSaveable { mutableStateOf("") }
     var selected by rememberSaveable { mutableLongStateOf(0L) }
     val bal = people.associate { it.id to Ledger.personBalance(it, udhar) }
@@ -88,24 +88,25 @@ fun UdharScreen(vm: AppVm) {
 @Composable
 fun PersonDialog(existing: Person?, onSave: (Person) -> Unit, onDismiss: () -> Unit) {
     val ctx = LocalContext.current
-    var name by remember { mutableStateOf(existing?.name.orEmpty()) }
-    var phone by remember { mutableStateOf(existing?.phone.orEmpty()) }
-    var opening by remember { mutableStateOf(existing?.let { if (it.openingPaise != 0L) Money.input(kotlin.math.abs(it.openingPaise)) else "" } ?: "") }
-    var theyOwe by remember { mutableStateOf((existing?.openingPaise ?: 0L) >= 0) }
-    val pick = rememberLauncherForActivityResult(ActivityResultContracts.PickContact()) { uri ->
+    val snack = LocalSnack.current
+    var name by rememberSaveable { mutableStateOf(existing?.name.orEmpty()) }
+    var phone by rememberSaveable { mutableStateOf(existing?.phone.orEmpty()) }
+    var opening by rememberSaveable { mutableStateOf(existing?.let { if (it.openingPaise != 0L) Money.input(kotlin.math.abs(it.openingPaise)) else "" } ?: "") }
+    var theyOwe by rememberSaveable { mutableStateOf((existing?.openingPaise ?: 0L) >= 0) }
+    // pick from the phone-number list: the picked row is shared with us, so no contacts permission is needed
+    val pick = rememberLauncherForActivityResult(object : ActivityResultContracts.PickContact() {
+        override fun createIntent(context: android.content.Context, input: Void?) =
+            android.content.Intent(android.content.Intent.ACTION_PICK).setType(ContactsContract.CommonDataKinds.Phone.CONTENT_TYPE)
+    }) { uri ->
         if (uri != null) runCatching {
-            ctx.contentResolver.query(uri, arrayOf(ContactsContract.Contacts._ID, ContactsContract.Contacts.DISPLAY_NAME), null, null, null)?.use { c ->
-                if (c.moveToFirst()) { name = c.getString(1) ?: name
-                    val id = c.getString(0)
-                    ctx.contentResolver.query(ContactsContract.CommonDataKinds.Phone.CONTENT_URI, arrayOf(ContactsContract.CommonDataKinds.Phone.NUMBER),
-                        ContactsContract.CommonDataKinds.Phone.CONTACT_ID + "=?", arrayOf(id), null)?.use { p -> if (p.moveToFirst()) phone = p.getString(0) ?: "" }
-                }
+            ctx.contentResolver.query(uri, arrayOf(ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME, ContactsContract.CommonDataKinds.Phone.NUMBER), null, null, null)?.use { c ->
+                if (c.moveToFirst()) { name = c.getString(0) ?: name; phone = c.getString(1)?.filter { it.isDigit() || it == '+' } ?: phone }
             }
-        }
+        }.onFailure { snack.show("Couldn't read that contact. Type the name and number instead.") }
     }
     AlertDialog(onDismissRequest = onDismiss, title = { Text(if (existing == null) "Add person" else "Edit person") }, text = {
         Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            TextIn(name, { name = it }, "Name", tag = "pname")
+            TextIn(name, { name = it }, "Name *", tag = "pname")
             TextIn(phone, { v -> phone = v.filter { it.isDigit() || it == '+' || it == ' ' } }, "Phone (optional, for WhatsApp)", tag = "pphone", kb = KeyboardType.Phone)
             TextButton(onClick = { runCatching { pick.launch(null) } }) { Icon(Icons.Outlined.Contacts, null); Spacer(Modifier.width(6.dp)); Text("Pick from contacts") }
             if (existing == null) {
@@ -114,7 +115,7 @@ fun PersonDialog(existing: Person?, onSave: (Person) -> Unit, onDismiss: () -> U
             }
         }
     }, confirmButton = {
-        TextButton(onClick = {
+        TextButton(enabled = name.isNotBlank(), onClick = {
             if (name.isBlank()) return@TextButton
             val op = Money.parse(opening) ?: 0L
             onSave((existing ?: Person(name = "")).copy(name = name.trim(), phone = phone.trim(), openingPaise = if (existing != null) existing.openingPaise else if (theyOwe) op else -op))
@@ -137,12 +138,13 @@ fun PersonContent(vm: AppVm, id: Long, embedded: Boolean, onGone: () -> Unit) {
     val accounts by vm.accounts.collectAsStateWithLifecycle()
     val s by vm.settings.collectAsStateWithLifecycle()
     val p = people.firstOrNull { it.id == id }
-    var entryDlg by remember { mutableStateOf<Boolean?>(null) }
-    var editing by remember { mutableStateOf(false) }
-    var confirmDel by remember { mutableStateOf(false) }
-    var confirmSettle by remember { mutableStateOf(false) }
-    var langPick by remember { mutableStateOf(false) }
-    if (p == null) { Box(Modifier.fillMaxSize()); return }
+    var entryDlg by rememberSaveable { mutableStateOf<Boolean?>(null) }
+    var editing by rememberSaveable { mutableStateOf(false) }
+    var confirmDel by rememberSaveable { mutableStateOf(false) }
+    var removeLine by rememberSaveable(stateSaver = recordSaver<Udhar>()) { mutableStateOf<Udhar?>(null) }
+    var confirmSettle by rememberSaveable { mutableStateOf(false) }
+    var langPick by rememberSaveable { mutableStateOf(false) }
+    if (p == null) { MissingRecord(vm.loaded.collectAsStateWithLifecycle().value, "person"); return }
     val bal = Ledger.personBalance(p, udhar)
     val mine = udhar.filter { it.personId == p.id }
 
@@ -194,12 +196,12 @@ fun PersonContent(vm: AppVm, id: Long, embedded: Boolean, onGone: () -> Unit) {
                                 } },
                                 onClick = {
                                     if (u.entryId != null && u.accountId == null) nav.go("entry/${u.entryId}")
-                                    else vm.launch { vm.repo.deleteUdhar(u); snack.show("Removed", "Undo") { vm.launch { vm.repo.addUdhar(u.personId, u.gave, u.amountPaise, u.accountId, u.note, u.time) } } }
+                                    else removeLine = u   // asks first; undo is offered after
                                 })
                         }
                         if (p.openingPaise != 0L) ListRow("Opening balance", if (p.openingPaise > 0) "They owed you" else "You owed them", trailing = { MoneyText(kotlin.math.abs(p.openingPaise)) })
                     }
-                    Text("Tap a line to remove it (you can undo).", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(18.dp, 6.dp))
+                    Text("Tap a line to remove it.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(18.dp, 6.dp))
                 }
             }
             Row(Modifier.padding(16.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -213,6 +215,11 @@ fun PersonContent(vm: AppVm, id: Long, embedded: Boolean, onGone: () -> Unit) {
         vm.launch { vm.repo.addUdhar(p.id, gave, amt, acc, note); snack.show((if (gave) "You gave " else "You got ") + Money.fmt(amt)) }
     }) { entryDlg = null } }
     if (editing) PersonDialog(p, { vm.launch { vm.repo.savePerson(it) } }) { editing = false }
+    removeLine?.let { u ->
+        ConfirmDialog("Remove this line?", "${if (u.gave) "You gave" else "You got"} ${Money.fmt(u.amountPaise)}" + (if (u.note.isNotBlank()) " · ${u.note}" else "") + ". The balance is worked out again.", "Remove",
+            onConfirm = { vm.launch { vm.repo.deleteUdhar(u); snack.show("Removed", "Undo") { vm.launch { vm.repo.addUdhar(u.personId, u.gave, u.amountPaise, u.accountId, u.note, u.time) } } } },
+            onDismiss = { removeLine = null })
+    }
     if (confirmDel) ConfirmDialog("Delete ${p.name}?", "Their udhar history is deleted too. Split expenses stay in your entries.", "Delete", onConfirm = { vm.launch { vm.repo.deletePerson(p) }; onGone() }, onDismiss = { confirmDel = false })
     if (confirmSettle) ConfirmDialog("Settle up with ${p.name}?", "Adds a ${if (bal > 0) "You got" else "You gave"} entry of ${Money.fmt(kotlin.math.abs(bal))} so the balance becomes zero.", "Settle",
         onConfirm = { vm.launch { vm.repo.addUdhar(p.id, bal < 0, kotlin.math.abs(bal), null, "Settled up"); snack.show("Settled with ${p.name}") } }, onDismiss = { confirmSettle = false }, danger = false)
@@ -222,12 +229,12 @@ fun PersonContent(vm: AppVm, id: Long, embedded: Boolean, onGone: () -> Unit) {
 
 @Composable
 private fun UdharDialog(gave: Boolean, name: String, accounts: List<Account>, onSave: (Long, Long?, String) -> Unit, onDismiss: () -> Unit) {
-    var amt by remember { mutableStateOf("") }
-    var note by remember { mutableStateOf("") }
-    var acc by remember { mutableStateOf<Long?>(null) }
+    var amt by rememberSaveable { mutableStateOf("") }
+    var note by rememberSaveable { mutableStateOf("") }
+    var acc by rememberSaveable { mutableStateOf<Long?>(null) }
     AlertDialog(onDismissRequest = onDismiss, title = { Text(if (gave) "You gave $name" else "You got from $name") }, text = {
         Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            MoneyField(amt, { amt = it }, "Amount", tag = "uamount")
+            MoneyField(amt, { amt = it }, "Amount *", tag = "uamount")
             TextIn(note, { note = it }, "Note (optional)", tag = "unote")
             Text(if (gave) "Money left from (optional)" else "Money came into (optional)", style = MaterialTheme.typography.labelLarge)
             Text("Pick an account to also update its balance. It isn't counted as spending or income.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -236,6 +243,6 @@ private fun UdharDialog(gave: Boolean, name: String, accounts: List<Account>, on
                 accounts.forEach { a -> Pill(a.name, acc == a.id, { acc = a.id }) }
             }
         }
-    }, confirmButton = { TextButton(onClick = { Money.parse(amt)?.takeIf { it > 0 }?.let { onSave(it, acc, note.trim()); onDismiss() } }, modifier = Modifier.testTag("udhar_save")) { Text("Save") } },
+    }, confirmButton = { TextButton(enabled = (Money.parse(amt) ?: 0L) > 0, onClick = { Money.parse(amt)?.takeIf { it > 0 }?.let { onSave(it, acc, note.trim()); onDismiss() } }, modifier = Modifier.testTag("udhar_save")) { Text("Save") } },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } })
 }

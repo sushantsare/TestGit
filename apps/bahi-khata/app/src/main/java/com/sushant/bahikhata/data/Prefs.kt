@@ -93,6 +93,10 @@ class Prefs(context: Context) {
     var askedNotif: Boolean
         get() = local.getBoolean("askedNotif", false)
         set(v) = local.edit().putBoolean("askedNotif", v).apply()
+    var batteryTipDue: Boolean
+        get() = local.getBoolean("batteryTipDue", false)
+        set(v) = local.edit().putBoolean("batteryTipDue", v).apply()
+
     var batteryTipShown: Boolean
         get() = local.getBoolean("batteryTipShown", false)
         set(v) = local.edit().putBoolean("batteryTipShown", v).apply()
@@ -118,6 +122,6 @@ class Prefs(context: Context) {
                 else -> e.putString(k, value)
             }
         }
-        e.commit(); reload()
+        e.apply(); reload()
     }
 }

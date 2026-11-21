@@ -67,7 +67,11 @@ class SmsEngine(private val context: Context, private val repo: Repo, private va
                     val addr = c.getString(0) ?: continue
                     val body = c.getString(1) ?: continue
                     val date = c.getLong(2)
-                    processInternal(addr, body, date, st, "scan")
+                    val got = processInternal(addr, body, date, st, "scan")
+                    // a money SMS first found by a catch-up scan minutes after it arrived means the phone held back
+                    // the instant receiver (battery saver): offer the battery guide once
+                    if (since == null && repo.prefs.lastSmsScan > 0 && got != null && got !== SEEN && got.status != SmsStatus.INFO &&
+                        date < System.currentTimeMillis() - 5 * 60_000L && !repo.prefs.batteryTipShown) repo.prefs.batteryTipDue = true
                     if (date > newest) newest = date
                 }
             }
@@ -218,6 +222,7 @@ class SmsReceiver : BroadcastReceiver() {
         val body = msgs.joinToString("") { it.displayMessageBody ?: it.messageBody ?: "" }
         val time = msgs[0].timestampMillis.takeIf { it > 0 } ?: System.currentTimeMillis()
         val app = context.applicationContext as App
+        if (!app.ready) return   // the SMS stays in the inbox; the catch-up scan picks it up later
         val pending = goAsync()
         app.appScope.launch {
             try { app.sms.onReceived(sender, body, time) } finally { pending.finish() }

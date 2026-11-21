@@ -99,6 +99,7 @@ data class Merchant(
     val accountId: Long?,
     val uses: Int = 1,
     val lastUsed: Long = System.currentTimeMillis(),
+    val kind: String = "EXPENSE",   // EXPENSE shops vs INCOME payers, so each step suggests the right names
 )
 
 @Serializable
@@ -312,7 +313,7 @@ data class EntryCount(val entryId: Long, val n: Int)
     entities = [Account::class, Category::class, Entry::class, Attachment::class, Merchant::class, Recurring::class,
         Person::class, Udhar::class, Budget::class, Goal::class, SmsItem::class, SmsSeen::class, Learned::class],
     version = 1,
-    exportSchema = false,
+    exportSchema = true,
 )
 abstract class AppDb : RoomDatabase() {
     abstract fun dao(): MainDao
@@ -322,12 +323,10 @@ abstract class AppDb : RoomDatabase() {
 
         /** Encrypted with SQLCipher; the key is random and wrapped by an Android Keystore key. */
         fun open(context: Context, key: ByteArray? = DbKey.get(context)): AppDb {
-            val b = Room.databaseBuilder(context, AppDb::class.java, NAME)
-            if (key != null) {
-                System.loadLibrary("sqlcipher")
-                b.openHelperFactory(SupportOpenHelperFactory(key))
-            }
-            return b.build()
+            // never fall back to a plain database: no key means no database
+            checkNotNull(key) { "database key unavailable" }
+            System.loadLibrary("sqlcipher")
+            return Room.databaseBuilder(context, AppDb::class.java, NAME).openHelperFactory(SupportOpenHelperFactory(key)).build()
         }
 
         fun inMemory(context: Context): AppDb =

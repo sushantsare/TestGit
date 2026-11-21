@@ -104,28 +104,69 @@ if [ -f "$DBG" ]; then
   echo "T5 app_leaks=$(grep -oE '[0-9]+ APPLICATION LEAKS' $A/T3_logcat_debug.txt | awk '{s+=$1} END {print s+0}')" >> $A/summary.txt
   grep -A30 "APPLICATION LEAKS" $A/T3_logcat_debug.txt | head -120 > $A/T5_leaks.txt
 fi
+# T7 / T9 / T13 / T14 on the debug build filled with realistic data ("Block screenshots" off, so captures work)
+if [ -f "$DBG" ]; then
+  adb uninstall $PKG >/dev/null 2>&1; adb install -r -t $DBG >> $LOG 2>&1
+  INSTR=$(adb shell pm list instrumentation | tr -d '\r' | grep "(target=$PKG)" | head -1 | sed 's/^instrumentation:\([^ ]*\) .*/\1/')
+  seed() { adb shell am instrument -w -e class com.sushant.bahikhata.AuditSeed -e auditSeed $1 "$INSTR" > $A/seed_$1.txt 2>&1; }
+  tapid() {   # tap a Compose element by its test tag (exposed as resource-id in debug builds)
+    adb shell uiautomator dump /sdcard/ui.xml >/dev/null 2>&1; adb shell cat /sdcard/ui.xml > /tmp/ui.xml
+    local b=$(grep -o "resource-id=\"$1\"[^>]*bounds=\"\[[0-9]*,[0-9]*\]\[[0-9]*,[0-9]*\]\"" /tmp/ui.xml | head -1 | grep -o '\[[0-9]*,[0-9]*\]\[[0-9]*,[0-9]*\]' | tr -d '[]' | tr ',' ' ')
+    [ -z "$b" ] && b=$(grep -o "bounds=\"\[[0-9]*,[0-9]*\]\[[0-9]*,[0-9]*\]\"[^>]*resource-id=\"$1\"" /tmp/ui.xml | head -1 | grep -o '\[[0-9]*,[0-9]*\]\[[0-9]*,[0-9]*\]' | tr -d '[]' | tr ',' ' ')
+    set -- $b; [ -n "$4" ] && adb shell input tap $(( ($1 + $3) / 2 )) $(( ($2 + $4) / 2 ))
+  }
+  seed 0
+  # T7 jank: scroll the Entries list
+  adb shell am force-stop $PKG; adb shell am start -W -n $ACT --es route entries >/dev/null 2>&1; sleep 4
+  adb shell dumpsys gfxinfo $PKG reset >/dev/null
+  for i in 1 2 3 4 5; do adb shell input swipe 540 1800 540 700 300; sleep 0.4; adb shell input swipe 540 700 540 1800 300; sleep 0.4; done
+  adb shell dumpsys gfxinfo $PKG > $A/T7_gfxinfo.txt
+  echo "T7 frames=$(grep -m1 'Total frames rendered' $A/T7_gfxinfo.txt | awk '{print $4}') $(grep -m1 'Janky frames' $A/T7_gfxinfo.txt)" >> $A/summary.txt
+  # T9 process death mid-form: type an amount, leave, let the system kill the process, come back
+  adb logcat -c; adb shell am start -n $ACT --es route add >/dev/null 2>&1; sleep 3
+  tapid key_7; tapid key_5; tapid key_0; sleep 1
+  adb shell input keyevent KEYCODE_HOME; sleep 1; adb shell am kill $PKG; sleep 1
+  adb shell am start -a android.intent.action.MAIN -c android.intent.category.LAUNCHER -n $ACT >/dev/null 2>&1; sleep 4   # like tapping it in Recents
+  adb exec-out screencap -p > $OUT/screens/audit_T9_after_kill.png
+  adb shell uiautomator dump /sdcard/ui.xml >/dev/null 2>&1; adb shell cat /sdcard/ui.xml > /tmp/ui.xml
+  echo "T9 crash_after_kill=$(mycrash) amount_kept=$(grep -c '₹750' /tmp/ui.xml)" >> $A/summary.txt
+  # T14 config stress with real content
+  adb logcat -c; adb shell am force-stop $PKG; adb shell am start -W -n $ACT --es route home >/dev/null 2>&1; sleep 3
+  adb shell settings put system accelerometer_rotation 0
+  for r in 1 0 1 0 1 0; do adb shell settings put system user_rotation $r; sleep 1.2; done
+  adb shell settings put system user_rotation 1; sleep 2; adb exec-out screencap -p > $OUT/screens/audit_T14_landscape_home.png
+  adb shell am start -n $ACT --es route add >/dev/null 2>&1; sleep 2; adb exec-out screencap -p > $OUT/screens/audit_T14_landscape_add.png
+  adb shell input keyevent KEYCODE_BACK; adb shell settings put system user_rotation 0; sleep 2
+  adb shell cmd uimode night yes; sleep 2; adb exec-out screencap -p > $OUT/screens/audit_T14_night.png; adb shell cmd uimode night no; sleep 1
+  adb shell settings put system font_scale 2.0; sleep 3; adb exec-out screencap -p > $OUT/screens/audit_T14_font200.png
+  adb shell am start -n $ACT --es route add >/dev/null 2>&1; sleep 2; adb exec-out screencap -p > $OUT/screens/audit_T14_font200_add.png; adb shell input keyevent KEYCODE_BACK
+  adb shell settings put system font_scale 1.0
+  adb shell wm size 1600x2560; adb shell wm density 320; sleep 3; adb shell am start -n $ACT --es route entries >/dev/null 2>&1; sleep 3
+  adb exec-out screencap -p > $OUT/screens/audit_T14_tablet.png
+  adb shell wm size 2560x1600; sleep 3; adb exec-out screencap -p > $OUT/screens/audit_T14_tablet_landscape.png
+  adb shell wm size reset; adb shell wm density reset; sleep 2
+  echo "T14 crashes=$(mycrash)" >> $A/summary.txt
+  adb logcat -d | grep -B2 -A25 "FATAL EXCEPTION" | head -60 > $A/T14_crash.txt
+  # T13 large data: 5,000 extra entries, then open lists, search and reports
+  seed 5000; adb logcat -c
+  T13=$(adb shell am start -W -n $ACT --es route entries | grep TotalTime | awk '{print $2}'); sleep 3
+  for i in 1 2 3; do adb shell input swipe 540 1800 540 500 200; done
+  adb shell am start -n $ACT --es route search >/dev/null 2>&1; sleep 2; adb shell input text swig; sleep 3
+  adb exec-out screencap -p > $OUT/screens/audit_T13_search.png
+  adb shell am start -n $ACT --es route reports >/dev/null 2>&1; sleep 3
+  echo "T13 rows=5000 open_entries_ms=$T13 crashes=$(mycrash) anrs=$(adb logcat -d | grep -c "ANR in $PKG")" >> $A/summary.txt
+fi
 # release build for the rest
 adb uninstall $PKG >/dev/null 2>&1; adb install -r $REL >> $LOG 2>&1
 # T6 startup
 for i in $(seq 1 10); do adb shell am force-stop $PKG; sleep 1; adb shell am start -W -n $ACT | grep TotalTime | awk '{print $2}'; done > $A/T6_cold.txt
 for i in $(seq 1 5); do adb shell input keyevent KEYCODE_HOME; sleep 1; adb shell am start -W -n $ACT | grep TotalTime | awk '{print $2}'; done > $A/T6_warm.txt
 echo "T6 cold_median=$(sort -n $A/T6_cold.txt | sed -n 5p) warm_median=$(sort -n $A/T6_warm.txt | sed -n 3p)" >> $A/summary.txt
-# T7 jank
-adb shell dumpsys gfxinfo $PKG reset >/dev/null
-for i in 1 2 3 4 5; do adb shell input swipe 540 1700 540 600 250; adb shell input swipe 540 600 540 1700 250; done
-adb shell dumpsys gfxinfo $PKG > $A/T7_gfxinfo.txt
-echo "T7 $(grep -m1 'Janky frames' $A/T7_gfxinfo.txt)" >> $A/summary.txt
 # T8 memory
 adb shell dumpsys meminfo $PKG | grep -E "TOTAL PSS|TOTAL:" | head -2 > $A/T8_mem1.txt
 for i in 1 2 3; do adb shell input keyevent KEYCODE_BACK; adb shell am start -n $ACT >/dev/null; sleep 2; done
 adb shell dumpsys meminfo $PKG | grep -E "TOTAL PSS|TOTAL:" | head -2 > $A/T8_mem2.txt
 echo "T8 before=$(head -1 $A/T8_mem1.txt | tr -s ' ') after=$(head -1 $A/T8_mem2.txt | tr -s ' ')" >> $A/summary.txt
-# T9 process death
-adb logcat -c; adb shell am start -n $ACT >/dev/null; sleep 2
-adb shell input keyevent KEYCODE_HOME; sleep 1; adb shell am kill $PKG; sleep 1
-adb shell am start -n $ACT >/dev/null; sleep 3
-adb exec-out screencap -p > $OUT/screens/audit_T9_after_kill.png
-echo "T9 crash_after_kill=$(mycrash)" >> $A/summary.txt
 # T10 offline (Drive backup is the only network feature)
 adb shell svc wifi disable; adb shell svc data disable; sleep 1; adb logcat -c
 adb shell am force-stop $PKG; adb shell am start -W -n $ACT >/dev/null; sleep 3
@@ -137,17 +178,6 @@ adb logcat -c; adb shell dumpsys deviceidle force-idle >/dev/null; adb shell am 
 adb shell am start -W -n $ACT >/dev/null; sleep 3
 adb shell dumpsys deviceidle unforce >/dev/null; adb shell am set-inactive $PKG false
 echo "T11 crashes=$(mycrash)" >> $A/summary.txt
-# T14 config stress
-adb logcat -c
-adb shell settings put system accelerometer_rotation 0
-for r in 1 0 1 0 1 0; do adb shell settings put system user_rotation $r; sleep 1.2; done
-adb shell cmd uimode night yes; sleep 2; adb exec-out screencap -p > $OUT/screens/audit_T14_night.png; adb shell cmd uimode night no; sleep 1
-adb shell settings put system font_scale 2.0; sleep 2; adb exec-out screencap -p > $OUT/screens/audit_T14_font200.png
-adb shell settings put system font_scale 1.0
-adb shell wm size 1600x2560; adb shell wm density 320; sleep 3; adb exec-out screencap -p > $OUT/screens/audit_T14_tablet.png
-adb shell wm size reset; adb shell wm density reset; sleep 2
-echo "T14 crashes=$(mycrash)" >> $A/summary.txt
-adb logcat -d | grep -B2 -A25 "FATAL EXCEPTION" | head -60 > $A/T14_crash.txt
 # T15 apk checks
 BT=$(ls -d $ANDROID_HOME/build-tools/* 2>/dev/null | sort -V | tail -1)
 $BT/apksigner verify -v --print-certs $REL > $A/T15_apksigner.txt 2>&1

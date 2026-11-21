@@ -19,6 +19,7 @@ import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ProcessLifecycleOwner
 import androidx.lifecycle.lifecycleScope
 import com.sushant.bahikhata.data.Diagnostics
+import com.sushant.bahikhata.data.ThemeMode
 import com.sushant.bahikhata.ui.AppRoot
 import com.sushant.bahikhata.ui.AppVm
 import com.sushant.bahikhata.ui.theme.BahiTheme
@@ -34,6 +35,10 @@ class MainActivity : AppCompatActivity() {
     private val processObserver = object : DefaultLifecycleObserver {
         override fun onStop(owner: LifecycleOwner) { backgroundAt = SystemClock.elapsedRealtime() }
         override fun onStart(owner: LifecycleOwner) {
+            if (!(application as App).ready) return
+            // decrypted copies handed to a viewer app are removed as soon as the user is back
+            val app = application as App
+            app.appScope.launch { java.io.File(cacheDir, "open").deleteRecursively() }
             val s = vm.prefs.now
             if (s.lockOn && backgroundAt > 0 && SystemClock.elapsedRealtime() - backgroundAt >= s.lockAfterSec * 1000L) locked = true
         }
@@ -42,6 +47,11 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         val splash = installSplashScreen()
         super.onCreate(savedInstanceState)
+        if (!(application as App).ready) {
+            enableEdgeToEdge()
+            setContent { BahiTheme(ThemeMode.SYSTEM) { com.sushant.bahikhata.ui.StorageLocked { finish() } } }
+            return
+        }
         splash.setKeepOnScreenCondition { !vm.loaded.value }
         enableEdgeToEdge()
         if (savedInstanceState == null) locked = vm.prefs.now.lockOn
@@ -56,6 +66,16 @@ class MainActivity : AppCompatActivity() {
         }
         setContent {
             val s by vm.settings.collectAsState()
+            val dark = com.sushant.bahikhata.ui.theme.isDark(s.theme)
+            androidx.compose.runtime.DisposableEffect(dark) {
+                // status/navigation bar icons follow the app's own theme, not only the phone's
+                val t = android.graphics.Color.TRANSPARENT
+                enableEdgeToEdge(
+                    statusBarStyle = if (dark) androidx.activity.SystemBarStyle.dark(t) else androidx.activity.SystemBarStyle.light(t, t),
+                    navigationBarStyle = if (dark) androidx.activity.SystemBarStyle.dark(t) else androidx.activity.SystemBarStyle.light(t, t),
+                )
+                onDispose { }
+            }
             BahiTheme(s.theme) {
                 AppRoot(vm = vm, locked = locked, onUnlock = { unlock() }, onLockBack = { finish() },
                     pendingRoute = pendingRoute, onRouteConsumed = { pendingRoute = null })
@@ -66,17 +86,30 @@ class MainActivity : AppCompatActivity() {
 
     override fun onSaveInstanceState(outState: Bundle) { super.onSaveInstanceState(outState); outState.putBoolean("locked", locked) }
 
+    /** Keyboard / Chromebook shortcuts: Ctrl+N new entry, Ctrl+F search, Esc back. */
+    override fun dispatchKeyEvent(event: android.view.KeyEvent): Boolean {
+        if ((application as App).ready && !locked && event.action == android.view.KeyEvent.ACTION_DOWN) {
+            when {
+                event.isCtrlPressed && event.keyCode == android.view.KeyEvent.KEYCODE_N -> { pendingRoute = "add"; return true }
+                event.isCtrlPressed && event.keyCode == android.view.KeyEvent.KEYCODE_F -> { pendingRoute = "search"; return true }
+                event.keyCode == android.view.KeyEvent.KEYCODE_ESCAPE -> { onBackPressedDispatcher.onBackPressed(); return true }
+            }
+        }
+        return super.dispatchKeyEvent(event)
+    }
+
     override fun onNewIntent(intent: Intent) { super.onNewIntent(intent); routeFrom(intent)?.let { pendingRoute = it } }
 
     override fun onResume() {
         super.onResume()
         val app = application as App
+        if (!app.ready) return
         app.sms.startObserver()
         app.appScope.launch { app.sms.scanSince(null, notify = false); app.repo.runRecurring() }
         if (locked) unlock()
     }
 
-    override fun onDestroy() { ProcessLifecycleOwner.get().lifecycle.removeObserver(processObserver); super.onDestroy() }
+    override fun onDestroy() { if (!(application as App).ready) { super.onDestroy(); return }; ProcessLifecycleOwner.get().lifecycle.removeObserver(processObserver); super.onDestroy() }
 
     private fun routeFrom(i: Intent?): String? = i?.getStringExtra(EXTRA_ROUTE) ?: when (i?.action) {
         ACTION_ADD_EXPENSE -> "add?type=EXPENSE"; ACTION_ADD_INCOME -> "add?type=INCOME"; ACTION_UDHAR -> "udhar"; else -> null

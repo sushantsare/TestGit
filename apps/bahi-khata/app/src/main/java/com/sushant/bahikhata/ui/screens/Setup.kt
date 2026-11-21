@@ -40,15 +40,16 @@ fun SetupScreen(vm: AppVm) {
     val udhar by vm.udhar.collectAsStateWithLifecycle()
     val nets by vm.nets.collectAsStateWithLifecycle()
     val s by vm.settings.collectAsStateWithLifecycle()
-    var addPerson by remember { mutableStateOf(false) }
+    var addPerson by rememberSaveable { mutableStateOf(false) }
 
     fun finish() {
         vm.prefs.update { it.copy(setupDone = true) }
         nav.navigate("home") { popUpTo("setup") { inclusive = true } }
     }
 
+    androidx.activity.compose.BackHandler(step > 1) { step-- }   // system Back goes to the previous step, not out of the app
     Scaffold(containerColor = MaterialTheme.colorScheme.background, contentWindowInsets = WindowInsets(0)) { pad ->
-        Column(Modifier.padding(pad).statusBarsPadding().fillMaxSize()) {
+        Column(Modifier.padding(pad).statusBarsPadding().navigationBarsPadding().imePadding().fillMaxSize()) {
             if (step > 1) {
                 Row(Modifier.padding(start = 4.dp, end = 16.dp, top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                     IconButton(onClick = { step-- }, modifier = Modifier.testTag("back")) { Icon(Icons.Outlined.ArrowBack, "Back") }

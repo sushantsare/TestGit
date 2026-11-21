@@ -22,7 +22,11 @@ object DbKey {
     @Volatile private var cached: ByteArray? = null
 
     fun get(context: Context): ByteArray? = cached ?: synchronized(this) {
-        cached ?: runCatching { load(context) }.getOrNull().also { cached = it }
+        // the key file is ~100 bytes; reading it on the main thread at start-up is allowed explicitly
+        cached ?: run {
+            val old = android.os.StrictMode.allowThreadDiskReads()
+            try { (1..3).firstNotNullOfOrNull { runCatching { load(context) }.getOrNull() } } finally { android.os.StrictMode.setThreadPolicy(old) }
+        }.also { cached = it }
     }
 
     private fun master(): SecretKey {
@@ -89,7 +93,7 @@ object PassCrypto {
 /** Attachments are stored encrypted in app-private storage with the database key. */
 object FileCrypto {
     fun encrypt(context: Context, plain: ByteArray): ByteArray {
-        val key = DbKey.get(context) ?: return plain
+        val key = checkNotNull(DbKey.get(context)) { "key unavailable" }   // never store a receipt unencrypted
         val iv = ByteArray(12).also { SecureRandom().nextBytes(it) }
         val c = Cipher.getInstance("AES/GCM/NoPadding")
         c.init(Cipher.ENCRYPT_MODE, SecretKeySpec(key, "AES"), GCMParameterSpec(128, iv))
@@ -98,7 +102,7 @@ object FileCrypto {
 
     fun decrypt(context: Context, data: ByteArray): ByteArray {
         if (data.size < 30 || data[0] != 0x42.toByte() || data[1] != 0x4B.toByte()) return data
-        val key = DbKey.get(context) ?: return data
+        val key = checkNotNull(DbKey.get(context)) { "key unavailable" }
         val c = Cipher.getInstance("AES/GCM/NoPadding")
         c.init(Cipher.DECRYPT_MODE, SecretKeySpec(key, "AES"), GCMParameterSpec(128, data.copyOfRange(2, 14)))
         return c.doFinal(data, 14, data.size - 14)

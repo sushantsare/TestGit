@@ -30,6 +30,12 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.testTag
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -73,9 +79,10 @@ fun AddEntryScreen(vm: AppVm, initialType: String, editId: Long, smsId: Long) {
     var tags by rememberSaveable { mutableStateOf("") }
     var files by rememberSaveable { mutableStateOf(listOf<String>()) }
     var splits by rememberSaveable { mutableStateOf(listOf<String>()) }   // "personId:paise"
+    var splitMode by rememberSaveable { mutableStateOf("eq1") }            // eq1 = equal incl. me, eq0 = equal without me, amt = by amounts
     var rule by rememberSaveable { mutableStateOf<String?>(null) }
     var loadedOnce by rememberSaveable { mutableStateOf(false) }
-    var saving by remember { mutableStateOf(false) }
+    var saving by rememberSaveable { mutableStateOf(false) }
     var existing by remember { mutableStateOf<Entry?>(null) }
     var smsItem by remember { mutableStateOf<SmsItem?>(null) }
 
@@ -85,7 +92,10 @@ fun AddEntryScreen(vm: AppVm, initialType: String, editId: Long, smsId: Long) {
             if (!loadedOnce) {
                 type = e.type; expr = Money.input(e.amountPaise); merchant = e.merchant.orEmpty(); catId = e.categoryId ?: 0; accId = e.accountId
                 upi = e.upiApp.orEmpty(); time = e.time; note = e.note.orEmpty(); tags = Ledger.tags(e.tags).joinToString(" ") { "#$it" }
-                splits = vm.repo.dao.udharOfEntry(e.id).map { "${it.personId}:${it.amountPaise}" }; step = 3; loadedOnce = true
+                val old = vm.repo.dao.udharOfEntry(e.id).map { it.personId to it.amountPaise }
+                splits = old.map { "${it.first}:${it.second}" }
+                splitMode = when (old) { Ledger.splitShares(e.amountPaise, old.map { it.first }, true) -> "eq1"; Ledger.splitShares(e.amountPaise, old.map { it.first }, false) -> "eq0"; else -> "amt" }
+                step = 3; loadedOnce = true
             }
         }
         if (smsId > 0) vm.repo.dao.smsItem(smsId)?.let { m ->
@@ -107,7 +117,16 @@ fun AddEntryScreen(vm: AppVm, initialType: String, editId: Long, smsId: Long) {
     val cats = categories.filter { it.kind == (if (type == EType.INCOME) "INCOME" else "EXPENSE") && !it.archived }
     val cat = categories.firstOrNull { it.id == catId }
 
+    var askDiscard by rememberSaveable { mutableStateOf(false) }
+    val dirty = existing?.let { e ->
+        amount != e.amountPaise || merchant != e.merchant.orEmpty() || catId != (e.categoryId ?: 0L) || accId != e.accountId ||
+            note != e.note.orEmpty() || time != e.time || files.isNotEmpty()
+    } ?: if (smsId > 0) false else (expr.isNotBlank() || merchant.isNotBlank() || note.isNotBlank() || tags.isNotBlank() || files.isNotEmpty())
+    fun close() { if (dirty && !saving) askDiscard = true else nav.popBackStack() }
     BackHandler(step > 1 && editId == 0L && smsId == 0L) { step-- }
+    BackHandler(!(step > 1 && editId == 0L && smsId == 0L) && dirty) { askDiscard = true }
+    if (askDiscard) ConfirmDialog(if (existing != null) "Discard your changes?" else "Discard this entry?", "What you typed will be lost.", "Discard",
+        onConfirm = { nav.popBackStack() }, onDismiss = { askDiscard = false })
 
     fun save() {
         if (amount <= 0 || accId == 0L || saving) return
@@ -117,12 +136,16 @@ fun AddEntryScreen(vm: AppVm, initialType: String, editId: Long, smsId: Long) {
             upiApp = upi.ifBlank { null }, note = note.trim().ifBlank { null }, tags = Ledger.tags(tags).joinToString(","), time = time,
             smsKey = existing?.smsKey ?: smsItem?.key,
         )
-        val sp = splits.mapNotNull { t -> t.split(':').takeIf { it.size == 2 }?.let { it[0].toLong() to it[1].toLong() } }
+        val chosen = splits.mapNotNull { t -> t.split(':').takeIf { it.size == 2 }?.let { it[0].toLong() to it[1].toLong() } }
+        // equal splits follow the saved amount, so editing the amount re-shares it
+        val sp = if (splitMode == "amt") chosen else Ledger.splitShares(amount, chosen.map { it.first }, splitMode == "eq1")
         vm.launch {
             val id = vm.repo.saveEntry(Repo.SaveRequest(e, files.map { Uri.parse(it) }, sp, rule))
             smsItem?.let { vm.repo.linkSms(it, id, accId) }
             Diagnostics.count(ctx, if (editId > 0) "entry_edited" else "entry_added")
-            snack.show(if (editId > 0) "Entry updated" else "${if (type == EType.INCOME) "Income" else "Expense"} saved · ${Money.fmt(amount)}")
+            val failed = vm.repo.lastAttachFailures
+            snack.show(if (failed > 0) "Saved, but $failed ${if (failed == 1) "file" else "files"} couldn't be attached. Try adding again."
+                else if (editId > 0) "Entry updated" else "${if (type == EType.INCOME) "Income" else "Expense"} saved · ${Money.fmt(amount)}")
             nav.popBackStack()
         }
     }
@@ -139,7 +162,7 @@ fun AddEntryScreen(vm: AppVm, initialType: String, editId: Long, smsId: Long) {
                     }, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 },
                 navigationIcon = {
-                    IconButton(onClick = { if (step > 1 && editId == 0L && smsId == 0L) step-- else nav.popBackStack() }, modifier = Modifier.testTag("back")) {
+                    IconButton(onClick = { if (step > 1 && editId == 0L && smsId == 0L) step-- else close() }, modifier = Modifier.testTag("back")) {
                         Icon(if (step == 1 || editId > 0 || smsId > 0) Icons.Outlined.Close else Icons.Outlined.ArrowBack, if (step == 1) "Close" else "Back")
                     }
                 },
@@ -168,7 +191,7 @@ fun AddEntryScreen(vm: AppVm, initialType: String, editId: Long, smsId: Long) {
                 else -> DetailsStep(
                     vm, type, accounts.filter { !it.archived || it.id == accId }, accId, { accId = it; if (accounts.firstOrNull { a -> a.id == it }?.type != AccType.BANK) upi = "" },
                     upi, { upi = it }, time, { time = it }, note, { note = it }, tags, { tags = it }, files, { files = it },
-                    existing?.id ?: 0L, splits, { splits = it }, people, amount, rule, { rule = it }, editId == 0L,
+                    existing?.id ?: 0L, splits, { l, m -> splits = l; splitMode = m }, splitMode, people, amount, rule, { rule = it }, editId == 0L,
                     amountText = expr, onAmount = { expr = it }, merchant = merchant, onMerchant = { merchant = it },
                     cat = cat, onChangeCat = { step = 2 }, smsBody = smsItem?.body,
                     onSave = { save() }, saving = saving,
@@ -184,24 +207,29 @@ private fun AmountStep(
     merchants: List<Merchant>, onPickMerchant: (Merchant) -> Unit, onNext: () -> Unit, amount: Long, onTransfer: (String) -> Unit,
 ) {
     val bk = LocalBk.current
-    Column(Modifier.fillMaxSize()) {
+    // short screens (phone landscape) put the keypad beside the amount so Next is never cut off
+    val short = androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp < 480
+    val top: @Composable ColumnScope.() -> Unit = {
         Segments(listOf("Expense", "Income"), if (type == EType.INCOME) 1 else 0, { onType(if (it == 1) EType.INCOME else EType.EXPENSE) },
             colors = listOf(bk.expense, bk.income), modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp))
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
-            Text(if (expr.isBlank()) "₹0" else if (expr.any { it in "+−×÷" }) expr else "₹" + expr,
-                style = MaterialTheme.typography.displayMedium, textAlign = TextAlign.Center, maxLines = 1, softWrap = false,
-                modifier = Modifier.fillMaxWidth().padding(top = 14.dp).testTag("amount_display"))
+            val shown = if (expr.isBlank()) "₹0" else if (expr.any { it in "+−×÷" }) expr else "₹" + expr
+            Text(shown, style = if (shown.length > 11) MaterialTheme.typography.headlineLarge else MaterialTheme.typography.displayMedium,
+                textAlign = TextAlign.Center, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.fillMaxWidth().padding(top = 14.dp, start = 16.dp, end = 16.dp).testTag("amount_display")
+                    .semantics { liveRegion = LiveRegionMode.Polite })
             if (expr.any { it in "+−×÷" }) Text("= " + Money.fmt(amount), textAlign = TextAlign.Center, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.fillMaxWidth())
-            Spacer(Modifier.height(10.dp))
-            var showSug by remember { mutableStateOf(false) }
+            Spacer(Modifier.height(12.dp))
+            var showSug by rememberSaveable { mutableStateOf(false) }
             OutlinedTextField(merchant, { onMerchant(it); showSug = true }, label = { Text(if (type == EType.INCOME) "From (optional)" else "Shop or person (optional)") },
                 leadingIcon = { Icon(Icons.Outlined.Storefront, null) }, singleLine = true,
+                keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(capitalization = androidx.compose.ui.text.input.KeyboardCapitalization.Words, imeAction = androidx.compose.ui.text.input.ImeAction.Done),
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).testTag("f_merchant"))
-            val sug = merchants.filter { merchant.isNotBlank() && it.display.contains(merchant.trim(), true) && !it.display.equals(merchant.trim(), true) }.take(4)
-            val top = if (merchant.isBlank()) merchants.take(6) else sug
-            if (top.isNotEmpty() && (showSug || merchant.isBlank())) {
-                Row(Modifier.fillMaxWidth().horizontalScrollSafe().padding(horizontal = 16.dp, vertical = 6.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    top.forEach { m -> AssistChip(onClick = { onPickMerchant(m); showSug = false }, label = { Text(m.display, maxLines = 1) }, modifier = Modifier.testTag("sug_${m.display}")) }
+            val sug = merchants.filter { it.kind == type && merchant.isNotBlank() && it.display.contains(merchant.trim(), true) && !it.display.equals(merchant.trim(), true) }.take(4)
+            val topM = if (merchant.isBlank()) merchants.filter { it.kind == type }.take(6) else sug
+            if (topM.isNotEmpty() && (showSug || merchant.isBlank())) {
+                Row(Modifier.fillMaxWidth().horizontalScrollSafe().padding(horizontal = 16.dp, vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    topM.forEach { m -> AssistChip(onClick = { onPickMerchant(m); showSug = false }, label = { Text(m.display, maxLines = 1) }, modifier = Modifier.testTag("sug_${m.display}")) }
                 }
             }
             if (type == EType.EXPENSE) Row(Modifier.padding(horizontal = 16.dp, vertical = 4.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -209,16 +237,22 @@ private fun AmountStep(
                 OutlinedPillButton("Withdraw cash", Icons.Outlined.LocalAtm, { onTransfer("withdraw") })
             }
         }
-        Keypad(expr, onExpr)
+    }
+    val pad: @Composable ColumnScope.() -> Unit = {
+        Keypad(expr, onExpr, compact = short)
         Button(onClick = onNext, enabled = amount > 0, modifier = Modifier.fillMaxWidth().padding(16.dp).height(52.dp).testTag("next")) { Text("Next") }
     }
+    if (short) Row(Modifier.fillMaxSize()) {
+        Column(Modifier.weight(1f).fillMaxHeight(), content = top)
+        Column(Modifier.weight(1f).fillMaxHeight().verticalScroll(rememberScrollState()).padding(top = 8.dp), content = pad)
+    } else Column(Modifier.fillMaxSize()) { top(); pad() }
 }
 
 @Composable
 fun Modifier.horizontalScrollSafe(): Modifier = this.horizontalScroll(rememberScrollState())
 
 @Composable
-fun Keypad(expr: String, onExpr: (String) -> Unit) {
+fun Keypad(expr: String, onExpr: (String) -> Unit, compact: Boolean = false) {
     val keys = listOf("1", "2", "3", "⌫", "4", "5", "6", "+", "7", "8", "9", "−", ".", "0", "00", "=")
     Column(Modifier.padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         keys.chunked(4).forEach { row ->
@@ -226,7 +260,7 @@ fun Keypad(expr: String, onExpr: (String) -> Unit) {
                 row.forEach { k ->
                     val op = k in listOf("⌫", "+", "−", "=")
                     Box(
-                        Modifier.weight(1f).height(54.dp).clip(RoundedCornerShape(14.dp))
+                        Modifier.weight(1f).heightIn(min = if (compact) 48.dp else 56.dp).clip(RoundedCornerShape(14.dp))
                             .background(if (op) MaterialTheme.colorScheme.surfaceVariant else LocalBk.current.card)
                             .border(1.dp, LocalBk.current.cardBorder, RoundedCornerShape(14.dp))
                             .clickable {
@@ -237,9 +271,10 @@ fun Keypad(expr: String, onExpr: (String) -> Unit) {
                                     "." -> { val last = expr.split('+', '−').last(); if (last.contains('.')) expr else expr + (if (last.isEmpty()) "0." else ".") }
                                     else -> { val last = expr.split('+', '−').last(); if (last.substringAfter('.', "").length >= 2 && last.contains('.') || expr.length > 14) expr else expr + k }
                                 })
-                            }.testTag("key_$k"),
+                            }.testTag("key_$k")
+                            .semantics { contentDescription = when (k) { "⌫" -> "Delete digit"; "−" -> "Minus"; "+" -> "Plus"; "=" -> "Work out total"; "." -> "Point"; "00" -> "Double zero"; else -> k } },
                         contentAlignment = Alignment.Center,
-                    ) { Text(k, style = MaterialTheme.typography.titleLarge) }
+                    ) { Text(k, style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(vertical = 8.dp)) }
                 }
             }
         }
@@ -280,7 +315,7 @@ private fun CategoryStep(cats: List<Category>, selected: Long, onPick: (Long) ->
 private fun DetailsStep(
     vm: AppVm, type: String, accounts: List<Account>, accId: Long, onAcc: (Long) -> Unit, upi: String, onUpi: (String) -> Unit,
     time: Long, onTime: (Long) -> Unit, note: String, onNote: (String) -> Unit, tags: String, onTags: (String) -> Unit,
-    files: List<String>, onFiles: (List<String>) -> Unit, entryId: Long, splits: List<String>, onSplits: (List<String>) -> Unit,
+    files: List<String>, onFiles: (List<String>) -> Unit, entryId: Long, splits: List<String>, onSplits: (List<String>, String) -> Unit, splitMode: String,
     people: List<Person>, amount: Long, rule: String?, onRule: (String?) -> Unit, canRepeat: Boolean,
     amountText: String, onAmount: (String) -> Unit, merchant: String, onMerchant: (String) -> Unit, cat: Category?, onChangeCat: () -> Unit,
     smsBody: String?, onSave: () -> Unit, saving: Boolean,
@@ -288,12 +323,12 @@ private fun DetailsStep(
     val nav = LocalNav.current
     val ctx = LocalContext.current
     val bk = LocalBk.current
-    var showDate by remember { mutableStateOf(false) }
-    var showTime by remember { mutableStateOf(false) }
-    var showNote by remember { mutableStateOf(false) }
-    var showTags by remember { mutableStateOf(false) }
-    var showSplit by remember { mutableStateOf(false) }
-    var showRule by remember { mutableStateOf(false) }
+    var showDate by rememberSaveable { mutableStateOf(false) }
+    var showTime by rememberSaveable { mutableStateOf(false) }
+    var showNote by rememberSaveable { mutableStateOf(false) }
+    var showTags by rememberSaveable { mutableStateOf(false) }
+    var showSplit by rememberSaveable { mutableStateOf(false) }
+    var showRule by rememberSaveable { mutableStateOf(false) }
     var cameraUri by rememberSaveable { mutableStateOf<String?>(null) }
     val attFlow = remember(entryId) { if (entryId > 0) vm.repo.attachments(entryId) else kotlinx.coroutines.flow.flowOf(emptyList()) }
     val existingAtts by attFlow.collectAsState(emptyList())
@@ -421,14 +456,14 @@ private fun DetailsStep(
     if (showNote) TextDialog("Note", note, { onNote(it) }, { showNote = false }, single = false)
     if (showTags) TextDialog("Tags", tags, { onTags(it) }, { showTags = false }, hint = "Example: #trip #office")
     if (showRule) PickSheet("Repeat", RULES, { it.first }, { if (it.second == null) "Only this time" else "Added automatically" }, onPick = { onRule(it.second) }, onDismiss = { showRule = false })
-    if (showSplit) SplitDialog(vm, people, amount, splits, onSplits) { showSplit = false }
+    if (showSplit) SplitDialog(vm, people, amount, splits, splitMode, onSplits) { showSplit = false }
 }
 
 private fun kotlinx.coroutines.CoroutineScope.launchSafe(block: suspend () -> Unit) = launch { runCatching { block() } }
 
 @Composable
 fun TextDialog(title: String, value: String, onDone: (String) -> Unit, onDismiss: () -> Unit, single: Boolean = true, hint: String? = null, kb: androidx.compose.ui.text.input.KeyboardType = androidx.compose.ui.text.input.KeyboardType.Text) {
-    var t by remember { mutableStateOf(value) }
+    var t by rememberSaveable { mutableStateOf(value) }
     AlertDialog(onDismissRequest = onDismiss, title = { Text(title) },
         text = { OutlinedTextField(t, { t = it }, singleLine = single, minLines = if (single) 1 else 3, supportingText = hint?.let { { Text(it) } },
             keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = kb), modifier = Modifier.fillMaxWidth().testTag("dlg_field")) },
@@ -437,27 +472,50 @@ fun TextDialog(title: String, value: String, onDone: (String) -> Unit, onDismiss
 }
 
 @Composable
-private fun SplitDialog(vm: AppVm, people: List<Person>, amount: Long, splits: List<String>, onSplits: (List<String>) -> Unit, onDismiss: () -> Unit) {
-    var chosen by remember { mutableStateOf(splits.mapNotNull { it.substringBefore(':').toLongOrNull() }.toSet()) }
-    var includeMe by remember { mutableStateOf(true) }
-    var newName by remember { mutableStateOf("") }
-    val share = if (chosen.isEmpty()) 0L else amount / (chosen.size + if (includeMe) 1 else 0)
+private fun SplitDialog(vm: AppVm, people: List<Person>, amount: Long, splits: List<String>, mode: String, onSplits: (List<String>, String) -> Unit, onDismiss: () -> Unit) {
+    val start = splits.mapNotNull { t -> t.split(':').takeIf { it.size == 2 }?.let { it[0].toLongOrNull()?.let { id -> id to (it[1].toLongOrNull() ?: 0L) } } }
+    var chosen by rememberSaveable { mutableStateOf(start.map { it.first }) }
+    var byAmount by rememberSaveable { mutableStateOf(mode == "amt") }
+    var includeMe by rememberSaveable { mutableStateOf(mode != "eq0") }
+    var typed by rememberSaveable { mutableStateOf(start.associate { it.first.toString() to Money.input(it.second) }) }
+    var newName by rememberSaveable { mutableStateOf("") }
+    val equal = Ledger.splitShares(amount, chosen, includeMe).toMap()
+    val custom = chosen.associateWith { Money.parse(typed[it.toString()].orEmpty()) ?: 0L }
+    val customTotal = custom.values.sum()
+    val tooMuch = byAmount && customTotal > amount
     AlertDialog(onDismissRequest = onDismiss, title = { Text("Split ${Money.fmt(amount)}") }, text = {
         Column(Modifier.verticalScroll(rememberScrollState())) {
             Text("Each person's share goes to Udhar as money they owe you.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.clickable { includeMe = !includeMe }) { Checkbox(includeMe, { includeMe = it }); Text("Include my share") }
-            people.forEach { p ->
-                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().clickable { chosen = if (p.id in chosen) chosen - p.id else chosen + p.id }.testTag("split_${p.name}")) {
-                    Checkbox(p.id in chosen, { chosen = if (it) chosen + p.id else chosen - p.id })
-                    Text(p.name, Modifier.weight(1f))
-                    if (p.id in chosen) Text(Money.fmt(share), style = MaterialTheme.typography.labelLarge)
-                }
+            Spacer(Modifier.height(8.dp))
+            Segments(listOf("Equally", "By amounts"), if (byAmount) 1 else 0, { byAmount = it == 1 })
+            if (!byAmount) Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().toggleable(includeMe, role = Role.Checkbox) { includeMe = it }) {
+                Checkbox(includeMe, null); Text("Include my share")
             }
+            people.forEach { p ->
+                val on = p.id in chosen
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)
+                    .toggleable(on, role = Role.Checkbox) { chosen = if (it) chosen + p.id else chosen - p.id }.testTag("split_${p.name}")) {
+                    Checkbox(on, null)
+                    Text(p.name, Modifier.weight(1f))
+                    if (on && !byAmount) Text(Money.fmt(equal[p.id] ?: 0L), style = MaterialTheme.typography.labelLarge)
+                }
+                if (on && byAmount) MoneyField(typed[p.id.toString()].orEmpty(), { typed = typed + (p.id.toString() to it) }, "${p.name}'s share", Modifier.padding(start = 48.dp, bottom = 6.dp), tag = "share_${p.name}")
+            }
+            if (byAmount && chosen.isNotEmpty()) Text(
+                if (tooMuch) "Shares add up to ${Money.fmt(customTotal)}, more than ${Money.fmt(amount)}" else "Your share: ${Money.fmt(amount - customTotal)}",
+                color = if (tooMuch) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite })
             Row(verticalAlignment = Alignment.CenterVertically) {
-                OutlinedTextField(newName, { newName = it }, label = { Text("New person") }, singleLine = true, modifier = Modifier.weight(1f).testTag("f_newperson"))
+                OutlinedTextField(newName, { newName = it }, label = { Text("New person") }, singleLine = true, modifier = Modifier.weight(1f).testTag("f_newperson"),
+                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(capitalization = androidx.compose.ui.text.input.KeyboardCapitalization.Words))
                 IconButton(onClick = { val n = newName.trim(); if (n.isNotEmpty()) vm.launch { val id = vm.repo.savePerson(Person(name = n)); chosen = chosen + id; newName = "" } }) { Icon(Icons.Outlined.PersonAdd, "Add person") }
             }
         }
-    }, confirmButton = { TextButton(onClick = { onSplits(chosen.map { "$it:$share" }); onDismiss() }, modifier = Modifier.testTag("split_ok")) { Text("Done") } },
-        dismissButton = { TextButton(onClick = { onSplits(emptyList()); onDismiss() }) { Text("No split") } })
+    }, confirmButton = {
+        TextButton(enabled = !tooMuch, onClick = {
+            if (byAmount) onSplits(custom.filter { it.value > 0 }.map { "${it.key}:${it.value}" }, "amt")
+            else onSplits(chosen.map { "$it:${equal[it] ?: 0L}" }, if (includeMe) "eq1" else "eq0")
+            onDismiss()
+        }, modifier = Modifier.testTag("split_ok")) { Text("Done") }
+    }, dismissButton = { TextButton(onClick = { onSplits(emptyList(), "eq1"); onDismiss() }) { Text("No split") } })
 }

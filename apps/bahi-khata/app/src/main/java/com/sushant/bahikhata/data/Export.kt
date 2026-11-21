@@ -33,8 +33,10 @@ object Export {
     private fun rupees(p: Long) = java.math.BigDecimal(p).movePointLeft(2).toPlainString()
 
     fun csv(rows: List<Row>): ByteArray {
-        fun q(s: String) = if (s.any { it == ',' || it == '"' || it == '\n' }) "\"" + s.replace("\"", "\"\"") + "\"" else s
-        val sb = StringBuilder("﻿").append(header.joinToString(",")).append("\n")
+        // text from SMS/shops is never run as a spreadsheet formula (=, +, -, @ at the start get a leading quote)
+        fun safe(s: String) = if (s.isNotEmpty() && s[0] in "=+-@\t\r") "'$s" else s
+        fun q(raw: String): String { val s = safe(raw); return if (s.any { it == ',' || it == '"' || it == '\n' }) "\"" + s.replace("\"", "\"\"") + "\"" else s }
+        val sb = StringBuilder("\uFEFF").append(header.joinToString(",")).append("\n")
         rows.forEach { r -> sb.append(listOf(r.date, r.type, rupees(r.amount), r.account, r.category, r.merchant, r.upi, r.note, r.tags).joinToString(",") { q(it) }).append("\n") }
         return sb.toString().toByteArray()
     }

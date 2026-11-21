@@ -12,6 +12,8 @@ Dependency wiring: manual container in `App` (decided instead of Hilt to keep th
 | USE_BIOMETRIC (+ USE_FINGERPRINT added by the biometric library for Android 8–8.1) | App lock with fingerprint / phone PIN | Not a prompt; system sheet on unlock | Phone PIN works; lock can't be turned on without a phone screen lock |
 | INTERNET | Only the optional Google Drive backup | Not a prompt | — |
 | WAKE_LOCK, RECEIVE_BOOT_COMPLETED, ACCESS_NETWORK_STATE | Added by WorkManager: repeating entries, reminders, SMS catch-up after reboot, Drive backup on Wi-Fi | Not prompts | — |
+| com.sushant.bahikhata.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION | Added by androidx.core: a signature-level permission that keeps the app's own runtime receivers private | Not a prompt | — |
+| (none) Contacts | "Pick from contacts" opens the phone-number picker; Android shares only the picked number, so no contacts permission is declared | — | Type the name and number by hand |
 Removed: FOREGROUND_SERVICE, VIBRATE. Camera / gallery / files use system pickers (no permission).
 
 ## Notes

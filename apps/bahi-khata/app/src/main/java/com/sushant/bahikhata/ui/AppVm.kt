@@ -40,7 +40,21 @@ class AppVm(app: Application) : AndroidViewModel(app) {
     val accMap = accounts.map { l -> l.associateBy { it.id } }.st(emptyMap())
     val personMap = people.map { l -> l.associateBy { it.id } }.st(emptyMap())
 
-    fun launch(block: suspend () -> Unit) = viewModelScope.launch { block() }
+    /** Problems from background work, shown as a snackbar by AppRoot (never a crash, never raw exception text). */
+    val errors = MutableSharedFlow<String>(extraBufferCapacity = 4)
+
+    private fun guarded(block: suspend () -> Unit): suspend () -> Unit = {
+        try { block() } catch (c: kotlinx.coroutines.CancellationException) { throw c } catch (t: Throwable) {
+            android.util.Log.w("Bahi", "action failed", t); Diagnostics.count(a, "action_failed")
+            errors.tryEmit("That didn't work. Nothing was changed — please try again.")
+        }
+    }
+
+    /** Screen actions (saves, deletes). */
+    fun launch(block: suspend () -> Unit) = viewModelScope.launch { guarded(block)() }
+
+    /** Long jobs that must finish even if the user leaves the screen (backup, restore, scans, PDFs). */
+    fun background(block: suspend () -> Unit) = a.appScope.launch { guarded(block)() }
 
     fun setTheme(t: ThemeMode) = prefs.update { it.copy(theme = t) }
     fun toggleHide() = prefs.update { it.copy(hideAmounts = !it.hideAmounts) }

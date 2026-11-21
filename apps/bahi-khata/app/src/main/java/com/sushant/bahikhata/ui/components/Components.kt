@@ -8,6 +8,9 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -17,6 +20,8 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
@@ -28,6 +33,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -156,7 +162,9 @@ fun EmptyState(icon: ImageVector, title: String, body: String, action: String? =
 @Composable
 fun Bar(fraction: Float, color: Color, modifier: Modifier = Modifier, height: Dp = 8.dp) {
     val f by animateFloatAsState(fraction.coerceIn(0f, 1f), label = "bar")
-    Box(modifier.fillMaxWidth().height(height).clip(RoundedCornerShape(height)).background(MaterialTheme.colorScheme.surfaceVariant)) {
+    // the outline keeps the bar's edge at ≥3:1 against the card, whatever the fill colour
+    Box(modifier.fillMaxWidth().height(height).clip(RoundedCornerShape(height)).background(MaterialTheme.colorScheme.surfaceVariant)
+        .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(height))) {
         Box(Modifier.fillMaxWidth(f).fillMaxHeight().clip(RoundedCornerShape(height)).background(color))
     }
 }
@@ -183,12 +191,12 @@ fun Pill(text: String, selected: Boolean, onClick: () -> Unit, icon: ImageVector
 /** Two equal-width segments, no tick (design rule). */
 @Composable
 fun Segments(options: List<String>, selected: Int, onSelect: (Int) -> Unit, colors: List<Color>? = null, modifier: Modifier = Modifier) {
-    Row(modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(MaterialTheme.colorScheme.surfaceVariant).padding(4.dp)) {
+    Row(modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(MaterialTheme.colorScheme.surfaceVariant).padding(4.dp).selectableGroup()) {
         options.forEachIndexed { i, o ->
             val sel = i == selected
             Box(
                 Modifier.weight(1f).heightIn(min = 44.dp).clip(RoundedCornerShape(9.dp))
-                    .background(if (sel) LocalBk.current.card else Color.Transparent).clickable { onSelect(i) }.testTag("seg_$o"),
+                    .background(if (sel) LocalBk.current.card else Color.Transparent).selectable(sel, role = Role.Tab) { onSelect(i) }.testTag("seg_$o"),
                 contentAlignment = Alignment.Center,
             ) {
                 Text(o, style = MaterialTheme.typography.labelLarge, color = if (sel) colors?.getOrNull(i) ?: MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
@@ -199,8 +207,10 @@ fun Segments(options: List<String>, selected: Int, onSelect: (Int) -> Unit, colo
 
 @Composable
 fun SettingSwitch(icon: ImageVector, title: String, subtitle: String?, checked: Boolean, onChange: (Boolean) -> Unit, tag: String = title) {
-    ListRow(title, subtitle, Modifier.testTag("sw_$tag"), leading = { Icon(icon, null, tint = MaterialTheme.colorScheme.onSurfaceVariant) },
-        trailing = { Switch(checked = checked, onCheckedChange = onChange) }, onClick = { onChange(!checked) })
+    // one focus stop for TalkBack: the whole row is the switch and announces on/off
+    ListRow(title, subtitle, Modifier.testTag("sw_$tag").toggleable(checked, role = Role.Switch, onValueChange = onChange),
+        leading = { Icon(icon, null, tint = MaterialTheme.colorScheme.onSurfaceVariant) },
+        trailing = { Switch(checked = checked, onCheckedChange = null) })
 }
 
 @Composable
@@ -210,7 +220,12 @@ fun SettingNav(icon: ImageVector, title: String, subtitle: String? = null, onCli
 
 @Composable
 fun ConfirmDialog(title: String, text: String, confirm: String, onConfirm: () -> Unit, onDismiss: () -> Unit, danger: Boolean = true) {
-    AlertDialog(onDismissRequest = onDismiss, title = { Text(title) }, text = { Text(text) },
+    AlertDialog(onDismissRequest = onDismiss, title = { Text(title) }, text = {
+            // tapjacking guard: taps are ignored while another app draws over this dialog
+            val v = androidx.compose.ui.platform.LocalView.current
+            SideEffect { v.filterTouchesWhenObscured = true }
+            Text(text)
+        },
         confirmButton = { TextButton(onClick = { onConfirm(); onDismiss() }, modifier = Modifier.testTag("confirm")) { Text(confirm, color = if (danger) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary) } },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } })
 }
@@ -282,9 +297,15 @@ fun CardFace(a: Account, modifier: Modifier = Modifier, height: Dp = 170.dp) {
     }
 }
 
+/** Amount for use inside sentences; respects "Hide amounts". */
+@Composable
+fun hm(paise: Long): String = if (LocalHide.current) "₹ ••••" else Money.fmt(paise)
+
 @Composable
 fun Hideable(content: @Composable () -> Unit) {
-    if (LocalHide.current) Box(Modifier.blur(6.dp)) { content() } else content()
+    // blur only works on Android 12+; older phones get the content fully hidden instead
+    if (LocalHide.current) Box(Modifier.clearAndSetSemantics { contentDescription = "Amount hidden" }
+        .then(if (android.os.Build.VERSION.SDK_INT >= 31) Modifier.blur(6.dp) else Modifier.alpha(0f))) { content() } else content()
 }
 
 @Composable
@@ -301,3 +322,11 @@ fun OutlinedPillButton(text: String, icon: ImageVector?, onClick: () -> Unit, mo
 }
 
 @Suppress("unused") private val unusedTu: TextUnit = 0.sp
+
+private val stateJson = kotlinx.serialization.json.Json { ignoreUnknownKeys = true }
+
+/** Lets dialogs that edit a record keep it across rotation and process death (records are @Serializable). */
+inline fun <reified T> recordSaver(): androidx.compose.runtime.saveable.Saver<T?, String> = recordSaverOf(kotlinx.serialization.serializer<T>())
+
+fun <T> recordSaverOf(ser: kotlinx.serialization.KSerializer<T>): androidx.compose.runtime.saveable.Saver<T?, String> =
+    androidx.compose.runtime.saveable.Saver(save = { v -> v?.let { stateJson.encodeToString(ser, it) } }, restore = { stateJson.decodeFromString(ser, it) })

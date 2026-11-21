@@ -59,15 +59,15 @@ fun EntriesScreen(vm: AppVm) {
     var catF by rememberSaveable { mutableLongStateOf(0L) }
     var day by rememberSaveable { mutableIntStateOf(0) }
     var selected by rememberSaveable { mutableLongStateOf(0L) }
-    var pick by remember { mutableStateOf<String?>(null) }
+    var pick by rememberSaveable { mutableStateOf<String?>(null) }
     var limit by rememberSaveable { mutableIntStateOf(200) }
 
     val r = Dates.monthRange(ym)
-    val filtered = entries.filter { e ->
+    val filtered = remember(entries, r, typeF, accF, catF, calendar, day) { entries.filter { e ->
         e.time in r && (typeF == "ALL" || (typeF == "EXP" && e.type == EType.EXPENSE) || (typeF == "INC" && e.type == EType.INCOME) || (typeF == "OTHER" && e.type != EType.EXPENSE && e.type != EType.INCOME)) &&
             (accF == 0L || e.accountId == accF || e.toAccountId == accF) && (catF == 0L || e.categoryId == catF) &&
             (!calendar || day == 0 || Dates.date(e.time).dayOfMonth == day)
-    }
+    } }
     val open: (Long) -> Unit = { id -> if (wide) selected = id else nav.go("entry/$id") }
 
     val list: @Composable (Modifier) -> Unit = { mod ->
@@ -250,9 +250,9 @@ fun EntryDetailContent(vm: AppVm, id: Long, embedded: Boolean, onGone: () -> Uni
     val accs by vm.accMap.collectAsStateWithLifecycle()
     val people by vm.personMap.collectAsStateWithLifecycle()
     val udhar by vm.udhar.collectAsStateWithLifecycle()
-    var confirm by remember { mutableStateOf(false) }
+    var confirm by rememberSaveable { mutableStateOf(false) }
     var viewing by remember { mutableStateOf<android.graphics.Bitmap?>(null) }
-    var seen by remember { mutableStateOf(false) }
+    var seen by rememberSaveable { mutableStateOf(false) }
     val entry = e
     LaunchedEffect(entry) { if (entry != null) seen = true else if (seen) onGone() }
 
@@ -271,7 +271,14 @@ fun EntryDetailContent(vm: AppVm, id: Long, embedded: Boolean, onGone: () -> Uni
             }
         }
     }, contentWindowInsets = WindowInsets(0)) { pad ->
-        if (entry == null) { Box(Modifier.padding(pad).fillMaxSize()) ; return@Scaffold }
+        if (entry == null) {
+            val loaded by vm.loaded.collectAsStateWithLifecycle()
+            Box(Modifier.padding(pad).fillMaxSize(), contentAlignment = Alignment.Center) {
+                if (!loaded) CircularProgressIndicator()
+                else EmptyState(Icons.Outlined.SearchOff, "This entry isn't here", "It may have been deleted.", "Go back", { nav.popBackStack() })
+            }
+            return@Scaffold
+        }
         val cat = entry.categoryId?.let { cats[it] }
         val v = signed(entry)
         Column(Modifier.padding(pad).fillMaxSize().verticalScroll(rememberScrollState()).testTag("entry_detail")) {
@@ -306,7 +313,7 @@ fun EntryDetailContent(vm: AppVm, id: Long, embedded: Boolean, onGone: () -> Uni
                 BkCard(Modifier.padding(horizontal = 16.dp).fillMaxWidth()) {
                     splits.forEach { u ->
                         val p = people[u.personId]
-                        ListRow("${p?.name ?: "Someone"} owes you ${Money.fmt(u.amountPaise)}", "Added to Udhar", leading = { Initials(p?.name ?: "?") },
+                        ListRow("${p?.name ?: "Someone"} owes you ${hm(u.amountPaise)}", "Added to Udhar", leading = { Initials(p?.name ?: "?") },
                             trailing = { MoneyText(u.amountPaise, color = bk.income, sign = true) }, onClick = { nav.go("person/${u.personId}") })
                     }
                 }
@@ -340,6 +347,7 @@ private fun AttachmentTile(vm: AppVm, a: Attachment, onImage: (android.graphics.
     val ctx = LocalContext.current
     val bk = LocalBk.current
     val scope = rememberCoroutineScope()
+    val snack = LocalSnack.current
     val isPdf = a.mime.contains("pdf")
     val isImage = a.mime.startsWith("image")
     var thumb by remember(a.id) { mutableStateOf<android.graphics.Bitmap?>(null) }
@@ -356,8 +364,12 @@ private fun AttachmentTile(vm: AppVm, a: Attachment, onImage: (android.graphics.
         Modifier.size(110.dp).clip(RoundedCornerShape(14.dp)).background(bk.card).border(1.dp, bk.cardBorder, RoundedCornerShape(14.dp))
             .clickable {
                 scope.launch {
-                    val f = vm.repo.openAttachment(a)
-                    if (isImage) withContext(Dispatchers.IO) { BitmapFactory.decodeFile(f.absolutePath) }?.let(onImage) else viewFile(ctx, f, a.mime)
+                    val ok = runCatching {
+                        val f = withContext(Dispatchers.IO) { vm.repo.openAttachment(a) }
+                        if (isImage) withContext(Dispatchers.IO) { decodeForScreen(f).also { f.delete() } }?.let(onImage) ?: error("unreadable")   // plain copy removed at once
+                        else viewFile(ctx, f, a.mime)
+                    }.isSuccess
+                    if (!ok) snack.show("Couldn't open this file. It may be damaged.")
                 }
             }.testTag("att_${a.id}"),
         horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center,
@@ -369,4 +381,14 @@ private fun AttachmentTile(vm: AppVm, a: Attachment, onImage: (android.graphics.
             Text(a.displayName, style = MaterialTheme.typography.labelSmall, maxLines = 2, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center, modifier = Modifier.padding(6.dp))
         }
     }
+}
+
+/** Decode a photo no larger than ~2 screen widths, so big camera photos can't run the phone out of memory. */
+private fun decodeForScreen(f: java.io.File): android.graphics.Bitmap? {
+    val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+    BitmapFactory.decodeFile(f.absolutePath, bounds)
+    val target = 2048
+    var sample = 1
+    while (bounds.outWidth / (sample * 2) >= target || bounds.outHeight / (sample * 2) >= target) sample *= 2
+    return BitmapFactory.decodeFile(f.absolutePath, BitmapFactory.Options().apply { inSampleSize = sample })
 }

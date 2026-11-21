@@ -16,6 +16,11 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.Role
+import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -40,7 +45,7 @@ fun AccountsScreen(vm: AppVm) {
     val entries by vm.entries.collectAsStateWithLifecycle()
     val nets by vm.nets.collectAsStateWithLifecycle()
     var selected by rememberSaveable { mutableLongStateOf(0L) }
-    var addPick by remember { mutableStateOf(false) }
+    var addPick by rememberSaveable { mutableStateOf(false) }
     val active = accounts.filter { !it.archived }
     val have = active.filter { it.type != AccType.CARD }.sumOf { nets[it.id] ?: 0L }
     val owe = active.filter { it.type == AccType.CARD }.sumOf { -(nets[it.id] ?: 0L) }.coerceAtLeast(0L)
@@ -134,10 +139,11 @@ fun AccountDetailContent(vm: AppVm, id: Long, embedded: Boolean) {
     val entries by vm.entries.collectAsStateWithLifecycle()
     val nets by vm.nets.collectAsStateWithLifecycle()
     val a = accounts.firstOrNull { it.id == id }
-    var adjust by remember { mutableStateOf(false) }
-    var confirmDelete by remember { mutableStateOf(false) }
-    var limit by remember { mutableIntStateOf(50) }
-    if (a == null) { Box(Modifier.fillMaxSize()); return }
+    var adjust by rememberSaveable { mutableStateOf(false) }
+    var confirmDelete by rememberSaveable { mutableStateOf(false) }
+    var editMin by rememberSaveable { mutableStateOf(false) }
+    var limit by rememberSaveable { mutableIntStateOf(50) }
+    if (a == null) { MissingRecord(vm.loaded.collectAsStateWithLifecycle().value, "account"); return }
     val net = nets[a.id] ?: 0L
     val mine = entries.filter { it.accountId == a.id || it.toAccountId == a.id }
 
@@ -170,7 +176,9 @@ fun AccountDetailContent(vm: AppVm, id: Long, embedded: Boolean) {
                     BkCard(Modifier.padding(16.dp, 10.dp).fillMaxWidth()) {
                         if (a.statementDay <= 0) ListRow("Add bill date and due date", "So the app can show the bill and remind you", leading = { Icon(Icons.Outlined.Event, null) }, trailing = { Chev() }, onClick = { nav.go("account_edit/${a.id}?type=CARD") })
                         else {
-                            ListRow("Bill ${if (LocalHide.current) "₹ ••••" else Money.fmt(b.bill)}", "Bill date ${a.statementDay} · minimum due ${if (LocalHide.current) "₹ ••••" else Money.fmt(b.minDue)}", leading = { Icon(Icons.Outlined.ReceiptLong, null) })
+                            ListRow("Bill ${if (LocalHide.current) "₹ ••••" else Money.fmt(b.bill)}", "Bill date ${a.statementDay} · minimum due ${if (LocalHide.current) "₹ ••••" else Money.fmt(b.minDue)}",
+                                Modifier.testTag("bill_row"), leading = { Icon(Icons.Outlined.ReceiptLong, null) }, trailing = { if (b.bill > 0) Icon(Icons.Outlined.Edit, "Edit minimum due", tint = MaterialTheme.colorScheme.onSurfaceVariant) },
+                                onClick = if (b.bill > 0) ({ editMin = true }) else null)
                             b.due?.let { due ->
                                 val d = java.time.temporal.ChronoUnit.DAYS.between(Dates.today(), due)
                                 ListRow("Due ${Dates.dayMonth(due)}", if (b.bill <= 0) "Nothing to pay right now" else if (d < 0) "Overdue by ${-d} days" else "in $d days",
@@ -217,6 +225,16 @@ fun AccountDetailContent(vm: AppVm, id: Long, embedded: Boolean) {
         }
     }
 
+    // minimum due is a 5% estimate until the statement (or an SMS) says otherwise; he can type the real one
+    if (editMin && a.type == AccType.CARD) {
+        val b = Ledger.cardBill(a, net, entries)
+        TextDialog("Minimum due on your statement", Money.input(b.minDue), { t ->
+            Money.parse(t)?.let { v -> vm.launch {
+                vm.repo.saveAccount(a.copy(minDuePaise = minOf(v, b.bill), billPaise = b.bill, billDueEpochDay = (b.due ?: Dates.today()).toEpochDay()))
+                snack.show("Minimum due set to ${Money.fmt(minOf(v, b.bill))}")
+            } }
+        }, { editMin = false }, hint = "The app estimated ${Money.fmt(b.minDue)} (5% of the bill, at least ₹200)", kb = KeyboardType.Decimal)
+    }
     if (adjust) TextDialog("Real balance today", Money.input(maxOf(0L, if (a.type == AccType.CARD) -net else net)), { t ->
         Money.parse(t)?.let { p -> vm.launch { vm.repo.adjustBalance(a, p); snack.show("Balance updated to ${Money.fmt(p)}") } }
     }, { adjust = false }, hint = "Type what your bank app shows. The difference is saved as an adjustment.", kb = KeyboardType.Decimal)
@@ -252,17 +270,21 @@ fun AccountEditScreen(vm: AppVm, id: Long, type: String) {
             color = existing.colorIdx; upis = existing.upiApps; loaded = true
         }
     }
+    val snap = listOf(t, name, bank, last4, opening, limit, st, due, color, upis).joinToString("|")
+    var initial by rememberSaveable { mutableStateOf<String?>(null) }
+    LaunchedEffect(loaded, existing) { if (initial == null && (id == 0L || loaded)) initial = snap }
+    val close = rememberDiscardGuard(initial != null && snap != initial, if (id > 0) "Discard your changes?" else "Discard this account?")
     val stOk = st.isBlank() || st.toIntOrNull() in 1..31
     val dueOk = due.isBlank() || due.toIntOrNull() in 1..31
     val nameOk = name.isNotBlank()
 
-    Scaffold(containerColor = MaterialTheme.colorScheme.background, topBar = { BackBar(if (id > 0) "Edit account" else "Add " + typeLabel(t).lowercase(), close = true) }, contentWindowInsets = WindowInsets(0)) { pad ->
+    Scaffold(containerColor = MaterialTheme.colorScheme.background, topBar = { BackBar(if (id > 0) "Edit account" else "Add " + typeLabel(t).lowercase(), close = true, onBack = close) }, contentWindowInsets = WindowInsets(0)) { pad ->
         Column(Modifier.padding(pad).fillMaxSize()) {
             Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(16.dp).widthIn(max = 640.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 if (id == 0L) Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     listOf(AccType.BANK, AccType.CARD, AccType.CASH, AccType.WALLET).forEach { k -> Pill(typeLabel(k), t == k, { t = k }, Ico.account(k), Modifier.testTag("type_$k")) }
                 }
-                TextIn(name, { name = it }, when (t) { AccType.CARD -> "Card name (e.g. HDFC Millennia)"; AccType.CASH -> "Name (e.g. Cash in hand)"; AccType.WALLET -> "Wallet (e.g. Paytm Wallet)"; else -> "Account name (e.g. SBI Savings)" },
+                TextIn(name, { name = it }, when (t) { AccType.CARD -> "Card name (e.g. HDFC Millennia)"; AccType.CASH -> "Name (e.g. Cash in hand)"; AccType.WALLET -> "Wallet (e.g. Paytm Wallet)"; else -> "Account name (e.g. SBI Savings)" } + " *",
                     tag = "name", error = tried && !nameOk, supporting = if (tried && !nameOk) "Give it a name" else null)
                 if (t == AccType.BANK || t == AccType.CARD) TextIn(bank, { bank = it }, "Bank (optional)", tag = "bank")
                 if (t != AccType.CASH) TextIn(last4, { v -> last4 = v.filter { it.isDigit() || it == ',' }.take(30) }, "Last 4 digits (optional)", tag = "last4", kb = KeyboardType.Number,
@@ -277,10 +299,12 @@ fun AccountEditScreen(vm: AppVm, id: Long, type: String) {
                         TextIn(due, { v -> due = v.filter { it.isDigit() }.take(2) }, "Due date (day)", Modifier.weight(1f), "due", KeyboardType.Number, error = !dueOk, supporting = if (!dueOk) "1 to 31" else "e.g. 25")
                     }
                     Text("Card colour", style = MaterialTheme.typography.labelLarge)
-                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.selectableGroup()) {
+                        val names = listOf("Black", "Blue", "Red", "Green", "Brown", "Purple", "Teal", "Gold")
                         bk.cardFaces.forEachIndexed { i, c ->
-                            Box(Modifier.size(40.dp).clip(CircleShape).background(c).border(if (color == i) 3.dp else 0.dp, bk.saffron, CircleShape).clickable { color = i }
-                                .semanticsLabel("Colour ${i + 1}"))
+                            Box(Modifier.size(48.dp).clip(CircleShape).background(c).border(if (color == i) 3.dp else 0.dp, bk.saffron, CircleShape)
+                                .selectable(color == i, role = Role.RadioButton) { color = i }
+                                .semantics { contentDescription = "Card colour " + names.getOrElse(i) { "${i + 1}" } }.testTag("Colour ${i + 1}"))
                         }
                     }
                 }
@@ -309,7 +333,6 @@ fun AccountEditScreen(vm: AppVm, id: Long, type: String) {
     }
 }
 
-private fun Modifier.semanticsLabel(s: String) = this.then(Modifier.testTag(s))
 
 /** Pay card bill (bank/cash -> card) or withdraw cash (bank -> cash). Neither is counted as spending. */
 @Composable
@@ -334,8 +357,9 @@ fun TransferScreen(vm: AppVm, kind: String, accId: Long) {
     }
     val amount = Money.parse(amt) ?: 0L
     val cash = active.firstOrNull { it.type == AccType.CASH }
+    val close = rememberDiscardGuard(choice == "OTHER" && amt.isNotBlank(), "Discard this ${if (pay) "payment" else "withdrawal"}?")
 
-    Scaffold(containerColor = MaterialTheme.colorScheme.background, topBar = { BackBar(if (pay) "Pay card bill" else "Withdraw cash", close = true) }, contentWindowInsets = WindowInsets(0)) { pad ->
+    Scaffold(containerColor = MaterialTheme.colorScheme.background, topBar = { BackBar(if (pay) "Pay card bill" else "Withdraw cash", close = true, onBack = close) }, contentWindowInsets = WindowInsets(0)) { pad ->
         Column(Modifier.padding(pad).fillMaxSize()) {
             Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).widthIn(max = 640.dp)) {
                 if (pay && cards.isEmpty()) { EmptyState(Icons.Outlined.CreditCard, "No credit card yet", "Add a credit card first.", "Add card", { nav.go("account_edit/0?type=CARD") }); return@Column }
@@ -345,7 +369,7 @@ fun TransferScreen(vm: AppVm, kind: String, accId: Long) {
                     Row(Modifier.horizontalScroll(rememberScrollState()).padding(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         cards.forEach { c -> Pill(c.name, c.id == cardId, { cardId = c.id }, Icons.Outlined.CreditCard, Modifier.testTag("card_${c.name}")) }
                     }
-                    bill?.let { b -> Text("Bill ${Money.fmt(b.bill)} · outstanding ${Money.fmt(b.outstanding)}" + (b.due?.let { " · due ${Dates.dayMonth(it)}" } ?: ""), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(18.dp, 8.dp)) }
+                    bill?.let { b -> Text("Bill ${hm(b.bill)} · outstanding ${hm(b.outstanding)}" + (b.due?.let { " · due ${Dates.dayMonth(it)}" } ?: ""), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(18.dp, 8.dp)) }
                 }
                 Text(if (amount > 0) Money.fmt(amount) else "₹0", style = MaterialTheme.typography.displayMedium, modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp), textAlign = androidx.compose.ui.text.style.TextAlign.Center)
                 if (pay) Row(Modifier.horizontalScroll(rememberScrollState()).padding(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -356,7 +380,7 @@ fun TransferScreen(vm: AppVm, kind: String, accId: Long) {
                 BkCard(Modifier.padding(horizontal = 16.dp).fillMaxWidth()) {
                     sources.forEach { s ->
                         val bal = nets[s.id] ?: 0L
-                        ListRow(s.name, if (s.id == fromId && amount > 0) "${Money.fmt(bal)} → ${Money.fmt(bal - amount)}" else Money.fmt(bal), Modifier.testTag("from_${s.name}"),
+                        ListRow(s.name, if (s.id == fromId && amount > 0) "${hm(bal)} → ${hm(bal - amount)}" else hm(bal), Modifier.testTag("from_${s.name}"),
                             leading = { Icon(Ico.account(s.type), null) }, trailing = { RadioButton(s.id == fromId, { fromId = s.id }) }, onClick = { fromId = s.id })
                     }
                 }

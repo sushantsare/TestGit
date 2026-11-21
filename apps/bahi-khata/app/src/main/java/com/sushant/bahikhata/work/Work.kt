@@ -29,7 +29,6 @@ object Notify {
     private const val GROUP_SMS = "sms_group"
 
     fun channels(c: Context) {
-        if (Build.VERSION.SDK_INT < 26) return
         val nm = c.getSystemService(NotificationManager::class.java)
         nm.createNotificationChannels(listOf(
             NotificationChannel(CH_SMS, "Entries from SMS", NotificationManager.IMPORTANCE_HIGH).apply { description = "Bank SMS that are ready to save with one tap" },
@@ -56,13 +55,21 @@ object Notify {
 
     fun cancel(c: Context, id: Int) = NotificationManagerCompat.from(c).cancel(id)
 
+    /** On the lock screen only a neutral line shows; amounts and shops appear after the phone is unlocked. */
     private fun base(c: Context, ch: String) = NotificationCompat.Builder(c, ch).setSmallIcon(R.drawable.ic_notification)
         .setColor(ContextCompat.getColor(c, R.color.brand)).setAutoCancel(true)
+        .setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
+        .setPublicVersion(NotificationCompat.Builder(c, ch).setSmallIcon(R.drawable.ic_notification).setColor(ContextCompat.getColor(c, R.color.brand))
+            .setContentTitle("Bahi Khata").setContentText("New update — unlock to see it").build())
+
+    /** Amount text that respects "Hide amounts". */
+    private fun amt(c: Context, paise: Long): String =
+        if ((c.applicationContext as? com.sushant.bahikhata.App)?.prefs?.now?.hideAmounts == true) "₹ ••••" else Money.fmt(paise)
 
     fun smsId(item: SmsItem) = 10_000 + (item.id % 50_000).toInt()
 
     fun smsItem(c: Context, item: SmsItem) {
-        val amount = Money.fmt(item.amountPaise)
+        val amount = amt(c, item.amountPaise)
         val title = when {
             item.status == SmsStatus.LOOK -> "New money SMS — needs a look"
             item.debit -> "Spent $amount" + (item.merchant.takeIf { it.isNotBlank() }?.let { " · $it" } ?: "")
@@ -90,11 +97,11 @@ object Notify {
 
     fun due(c: Context, card: Account, bill: Long, due: LocalDate, days: Long) = post(c, 9100 + card.id.toInt() % 800,
         base(c, CH_DUE).setContentTitle(if (days == 0L) "${card.name} bill is due today" else "${card.name} bill due in $days ${if (days == 1L) "day" else "days"}")
-            .setContentText("Bill ${Money.fmt(bill)} · due ${Dates.dayMonth(due)}").setContentIntent(open(c, "account/${card.id}", 9100 + card.id.toInt() % 800)))
+            .setContentText("Bill ${amt(c, bill)} · due ${Dates.dayMonth(due)}").setContentIntent(open(c, "account/${card.id}", 9100 + card.id.toInt() % 800)))
 
     fun budget(c: Context, name: String, spent: Long, limit: Long) = post(c, 9300 + name.hashCode() % 500, base(c, CH_BUDGET)
         .setContentTitle(if (spent >= limit) "$name budget crossed" else "$name budget at ${spent * 100 / limit}%")
-        .setContentText("${Money.fmt(spent)} of ${Money.fmt(limit)} this month").setContentIntent(open(c, "budgets", 9300)))
+        .setContentText("${amt(c, spent)} of ${amt(c, limit)} this month").setContentIntent(open(c, "budgets", 9300)))
 
     fun recurringAdded(c: Context, n: Int) = post(c, 9004, base(c, CH_REMIND).setContentTitle("$n repeating ${if (n == 1) "entry" else "entries"} added")
         .setContentText("Rent, EMI or subscriptions were added for today").setContentIntent(open(c, "entries", 9004)))
@@ -106,6 +113,7 @@ object Notify {
 class SmsActionReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         val app = context.applicationContext as App
+        if (!app.ready) return
         val id = intent.getLongExtra("id", -1)
         val pending = goAsync()
         app.appScope.launch {
@@ -163,6 +171,7 @@ object Workers {
 class DailyWorker(ctx: Context, p: WorkerParameters) : CoroutineWorker(ctx, p) {
     override suspend fun doWork(): Result {
         val app = applicationContext as App
+        if (!app.ready) return Result.retry()
         val repo = app.repo
         val s = app.prefs.now
         runCatching { val n = repo.runRecurring(); if (n > 0) Notify.recurringAdded(applicationContext, n) }
@@ -184,7 +193,7 @@ class DailyWorker(ctx: Context, p: WorkerParameters) : CoroutineWorker(ctx, p) {
             app.prefs.dueNotified = done
         }
         if (s.budgetAlertsOn) runCatching {
-            val ym = YearMonth.now(); val r = Dates.monthRange(ym)
+            val r = Dates.cycleRange(Dates.today(), s.monthStartDay); val ym = Dates.cycleStart(Dates.today(), s.monthStartDay)
             val cats = repo.dao.categoriesNow().associateBy { it.id }
             val byCat = Ledger.byCategory(entries, r)
             var alerted = app.prefs.budgetAlerted
@@ -208,6 +217,7 @@ class DailyWorker(ctx: Context, p: WorkerParameters) : CoroutineWorker(ctx, p) {
 class ReminderWorker(ctx: Context, p: WorkerParameters) : CoroutineWorker(ctx, p) {
     override suspend fun doWork(): Result {
         val app = applicationContext as App
+        if (!app.ready) return Result.retry()
         if (app.prefs.now.dailyReminderOn) {
             val r = Dates.startOf(Dates.today())..Dates.endOf(Dates.today())
             val any = app.repo.dao.entriesNow().any { it.createdAt in r || it.time in r }
@@ -221,6 +231,7 @@ class ReminderWorker(ctx: Context, p: WorkerParameters) : CoroutineWorker(ctx, p
 class DriveWorker(ctx: Context, p: WorkerParameters) : CoroutineWorker(ctx, p) {
     override suspend fun doWork(): Result {
         val app = applicationContext as App
+        if (!app.ready) return Result.retry()
         if (!app.prefs.now.driveOn) return Result.success()
         return when (val r = Drive.backup(applicationContext)) {
             is Drive.Res.Ok -> Result.success()

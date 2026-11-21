@@ -16,6 +16,10 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.testTagsAsResourceId
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
@@ -58,6 +62,10 @@ fun NavHostController.tab(route: String) = navigate(route) {
     popUpTo(graph.findStartDestination().id) { saveState = true }
     launchSingleTop = true; restoreState = true
 }
+val SAFE_ROUTE = Regex("^(home|entries|accounts|udhar|reports|search|budgets|sms|sms_setup|settings|categories|recurring|backup|export|diagnostics|about|" +
+    "add(\\?(type=(EXPENSE|INCOME)|id=\\d+|sms=\\d+)(&(type=(EXPENSE|INCOME)|id=\\d+|sms=\\d+))*)?|entry/\\d+|account/\\d+|account_edit/\\d+(\\?type=[A-Z]+)?|" +
+    "transfer/(paybill|withdraw|transfer)(\\?acc=\\d+)?|person/\\d+)$")
+
 /** From a notification/shortcut: show the tab's top screen, not whatever was stacked on it before. */
 fun NavHostController.root(route: String) {
     val start = graph.findStartDestination()
@@ -71,6 +79,7 @@ private fun androidx.navigation.NavGraph.findStartDestination(): androidx.naviga
 }
 
 @Composable
+@OptIn(androidx.compose.ui.ExperimentalComposeUiApi::class)
 fun AppRoot(vm: AppVm, locked: Boolean, onUnlock: () -> Unit, onLockBack: () -> Unit, pendingRoute: String?, onRouteConsumed: () -> Unit) {
     val nav = rememberNavController()
     val host = remember { SnackbarHostState() }
@@ -83,6 +92,7 @@ fun AppRoot(vm: AppVm, locked: Boolean, onUnlock: () -> Unit, onLockBack: () -> 
     }
     val scope = rememberCoroutineScope()
     val snack = remember { Snack(host, scope) }
+    LaunchedEffect(Unit) { vm.errors.collect { snack.show(it) } }
     val s by vm.settings.collectAsStateWithLifecycle()
     val width = LocalConfiguration.current.screenWidthDp
     val wide = width >= 840
@@ -90,20 +100,28 @@ fun AppRoot(vm: AppVm, locked: Boolean, onUnlock: () -> Unit, onLockBack: () -> 
     val back by nav.currentBackStackEntryAsState()
     val route = back?.destination?.route?.substringBefore('?')?.substringBefore('/')
     val top = route in tabs.map { it.route }
-    val pending by vm.smsPending.collectAsStateWithLifecycle()
+    val pendingOk by vm.smsPending.collectAsStateWithLifecycle()
+    val pendingLook by vm.smsLook.collectAsStateWithLifecycle()
+    val pending = pendingOk + pendingLook   // same count as the Home card
     val start = remember { if (s.setupDone) "home" else "setup" }
 
-    LaunchedEffect(pendingRoute, back) {
+    LaunchedEffect(pendingRoute, back, locked) {
         val r = pendingRoute ?: return@LaunchedEffect
+        if (locked) return@LaunchedEffect   // open the screen only after unlocking
         if (back == null) return@LaunchedEffect
         onRouteConsumed()
         if (!s.setupDone) return@LaunchedEffect
-        when (r) { "home", "entries", "accounts", "udhar", "reports" -> nav.root(r); "add" -> nav.go("add?type=EXPENSE"); else -> nav.go(r) }
+        // routes can come from other apps (the activity is exported for the launcher/shortcuts): only known screens are opened
+        if (!SAFE_ROUTE.matches(r)) { android.util.Log.w("BahiNav", "ignored route"); return@LaunchedEffect }
+        runCatching { when (r) { "home", "entries", "accounts", "udhar", "reports" -> nav.root(r); "add" -> nav.go("add?type=EXPENSE"); else -> nav.go(r) } }
     }
 
     CompositionLocalProvider(LocalSnack provides snack, LocalNav provides nav, LocalHide provides s.hideAmounts, LocalWide provides wide) {
-        Box(Modifier.fillMaxSize()) {
-            Row(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+        // debug builds expose test tags to UI Automator so the e2e audit can tap real elements
+        Box(Modifier.fillMaxSize().semantics { testTagsAsResourceId = com.sushant.bahikhata.BuildConfig.DEBUG }) {
+            // while locked the app is neither drawn nor readable by accessibility services (state is kept underneath)
+            Row(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)
+                .then(if (locked) Modifier.alpha(0f).clearAndSetSemantics { } else Modifier)) {
                 if (rail && top) {
                     NavigationRail(containerColor = MaterialTheme.colorScheme.surfaceContainerLow, header = {
                         FloatingActionButton(onClick = { nav.go("add?type=EXPENSE") }, containerColor = com.sushant.bahikhata.ui.theme.LocalBk.current.saffron,
@@ -132,7 +150,12 @@ fun AppRoot(vm: AppVm, locked: Boolean, onUnlock: () -> Unit, onLockBack: () -> 
                     },
                     contentWindowInsets = WindowInsets(0),
                 ) { pad ->
-                    Box(Modifier.padding(pad).fillMaxSize()) { Graph(nav, vm, start) }
+                    // screens without the bottom bar keep their Save/Next buttons above the gesture bar, and every
+                    // screen shrinks above the keyboard (edge-to-edge turns off the old automatic resize)
+                    // on tablets/desktop windows, screens other than the main tabs are centred at ≤ 840 dp (forms never stretch)
+                    Box(Modifier.padding(pad).fillMaxSize().then(if (top && !rail) Modifier else Modifier.navigationBarsPadding()).imePadding(), contentAlignment = Alignment.TopCenter) {
+                        Box(Modifier.fillMaxHeight().then(if (!top && width >= 840) Modifier.widthIn(max = 840.dp) else Modifier.fillMaxWidth())) { Graph(nav, vm, start) }
+                    }
                 }
             }
             if (locked) LockScreen(onUnlock, onLockBack)
@@ -193,5 +216,21 @@ private fun LockScreen(onUnlock: () -> Unit, onBack: () -> Unit) {
             FilledTonalIconButton(onClick = onUnlock, modifier = Modifier.size(72.dp).testTag("unlock")) { Icon(Icons.Outlined.Fingerprint, "Unlock", Modifier.size(40.dp)) }
             TextButton(onClick = onUnlock) { Text("Unlock") }
         }
+    }
+}
+
+/** Shown instead of the app when the phone's secure key store can't unlock the encrypted data. */
+@Composable
+fun StorageLocked(onClose: () -> Unit) {
+    Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).systemBarsPadding().padding(24.dp),
+        verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) {
+        Icon(Icons.Outlined.Lock, null, Modifier.size(48.dp), tint = MaterialTheme.colorScheme.primary)
+        Spacer(Modifier.height(16.dp))
+        Text("Can't open your khata right now", style = MaterialTheme.typography.headlineSmall, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+        Spacer(Modifier.height(8.dp))
+        Text("The phone's secure key store didn't respond, so Bahi Khata kept your data locked instead of opening it unprotected. Nothing was lost. Restart the phone and open the app again.",
+            style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+        Spacer(Modifier.height(24.dp))
+        Button(onClick = onClose) { Text("Close") }
     }
 }

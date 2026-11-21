@@ -27,6 +27,8 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextOverflow
@@ -41,6 +43,7 @@ import com.sushant.bahikhata.ui.components.*
 import com.sushant.bahikhata.ui.theme.LocalBk
 import com.sushant.bahikhata.work.Notify
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.async
 
 @Composable
 fun SmsInboxScreen(vm: AppVm) {
@@ -56,12 +59,15 @@ fun SmsInboxScreen(vm: AppVm) {
     val nets by vm.nets.collectAsStateWithLifecycle()
     val s by vm.settings.collectAsStateWithLifecycle()
     var tab by rememberSaveable { mutableIntStateOf(0) }
-    var chooseAcc by remember { mutableStateOf<SmsItem?>(null) }
-    var teach by remember { mutableStateOf<SmsItem?>(null) }
-    var scanning by remember { mutableStateOf(false) }
+    var chooseAcc by rememberSaveable(stateSaver = recordSaver<SmsItem>()) { mutableStateOf<SmsItem?>(null) }
+    var teach by rememberSaveable(stateSaver = recordSaver<SmsItem>()) { mutableStateOf<SmsItem?>(null) }
+    var scanning by rememberSaveable { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     val app = ctx.applicationContext as App
     val accOk = accounts.filter { !it.archived }
+    var tipDue by remember { mutableStateOf(app.prefs.batteryTipDue && !app.prefs.batteryTipShown) }
+    var showGuide by rememberSaveable { mutableStateOf(false) }
+    if (showGuide) BatteryGuide { showGuide = false; tipDue = false; app.prefs.batteryTipShown = true; app.prefs.batteryTipDue = false }
 
     fun ok(item: SmsItem, accountId: Long) = vm.launch {
         vm.repo.acceptSms(item, accountId, item.categoryId, item.merchant)
@@ -76,7 +82,8 @@ fun SmsInboxScreen(vm: AppVm) {
         Act(Icons.Outlined.Refresh, "Scan inbox now", "scan") {
             if (!app.sms.enabled()) { nav.go("sms_setup"); return@Act }
             scanning = true
-            scope.launch { val st = app.sms.scanSince(null, notify = false); scanning = false; snack.show(if (st.parsed + st.look == 0) "No new money SMS" else "Found ${st.parsed + st.look} new") }
+            val job = app.appScope.async { app.sms.scanSince(null, notify = false) }
+            scope.launch { val st = job.await(); scanning = false; snack.show(if (st.parsed + st.look == 0) "No new money SMS" else "Found ${st.parsed + st.look} new") }
         }
     } }, contentWindowInsets = WindowInsets(0)) { pad ->
         Column(Modifier.padding(pad).fillMaxSize()) {
@@ -88,6 +95,13 @@ fun SmsInboxScreen(vm: AppVm) {
                     TextButton(onClick = { nav.go("sms_setup") }) { Text("Turn on") }
                 }
             }
+            if (tipDue) {
+                Row(Modifier.padding(16.dp, 6.dp).fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(LocalBk.current.info).padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Outlined.BatteryAlert, null, tint = LocalBk.current.onInfo); Spacer(Modifier.width(10.dp))
+                    Text("Some bank SMS reached Bahi Khata late. Your phone may be pausing it to save battery.", color = LocalBk.current.onInfo, style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(1f))
+                    TextButton(onClick = { showGuide = true }, modifier = Modifier.testTag("battery_fix")) { Text("Fix it") }
+                }
+            }
             Row(Modifier.horizontalScroll(rememberScrollState()).padding(16.dp, 10.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Pill("Suggestions · ${pending.size}", tab == 0, { tab = 0 }, modifier = Modifier.testTag("tab_sugg"))
                 Pill("Needs a look · ${look.size}", tab == 1, { tab = 1 }, modifier = Modifier.testTag("tab_look"))
@@ -97,20 +111,30 @@ fun SmsInboxScreen(vm: AppVm) {
             if (tab == 0 && pending.size > 1 && pending.any { it.accountId != null && it.confidence >= 90 && it.duplicateOf == null }) {
                 TextButton(onClick = {
                     val good = pending.filter { it.accountId != null && it.confidence >= 90 && it.duplicateOf == null }
-                    vm.launch { good.forEach { vm.repo.acceptSms(it, it.accountId!!, it.categoryId, it.merchant) }; snack.show("Saved ${good.size} entries") }
+                    vm.launch {
+                        good.forEach { vm.repo.acceptSms(it, it.accountId!!, it.categoryId, it.merchant) }
+                        snack.show("Saved ${good.size} entries", "Undo") {
+                            vm.launch { good.forEach { item -> vm.repo.dao.smsItem(item.id)?.entryId?.let { id -> vm.repo.dao.entry(id)?.let { vm.repo.deleteEntry(it) } }; vm.repo.restoreSms(item) } }
+                        }
+                    }
                 }, modifier = Modifier.padding(start = 8.dp).testTag("ok_all")) { Icon(Icons.Outlined.DoneAll, null); Spacer(Modifier.width(6.dp)); Text("OK all sure ones (${pending.count { it.accountId != null && it.confidence >= 90 && it.duplicateOf == null }})") }
             }
             if (list.isEmpty()) EmptyState(Icons.Outlined.Sms, when (tab) { 0 -> "All caught up"; 1 -> "Nothing needs a look"; else -> "Nothing ignored" },
                 when (tab) { 0 -> "New bank SMS will show up here for one-tap saving."; 1 -> "Money SMS in a new format land here so nothing is missed."; else -> "SMS you ignored can be brought back from here." })
             else LazyColumn(contentPadding = PaddingValues(bottom = 32.dp), modifier = Modifier.testTag("sms_list")) {
                 items(list, key = { it.id }) { item ->
+                    val okIt: () -> Unit = { if (item.accountId != null) ok(item, item.accountId) else chooseAcc = item }
+                    val ignoreIt: () -> Unit = { vm.launch { vm.repo.ignoreSms(item); Notify.cancel(ctx, Notify.smsId(item)); snack.show("Ignored", "Undo") { vm.launch { vm.repo.restoreSms(item) } } } }
+                    // suggestions: swipe right = OK, swipe left = Ignore (the buttons stay for TalkBack and one-handed use)
+                    SwipeRow(enabled = tab == 0, onRight = okIt, onLeft = ignoreIt) {
                     SmsCard(item, accounts, cats, nets, tab,
-                        onOk = { if (item.accountId != null) ok(item, item.accountId) else chooseAcc = item },
+                        onOk = okIt,
                         onEdit = { nav.go("add?sms=${item.id}") },
-                        onIgnore = { vm.launch { vm.repo.ignoreSms(item); Notify.cancel(ctx, Notify.smsId(item)); snack.show("Ignored", "Undo") { vm.launch { vm.repo.restoreSms(item) } } } },
+                        onIgnore = ignoreIt,
                         onTeach = { teach = item },
                         onRestore = { vm.launch { vm.repo.restoreSms(item); snack.show("Moved back to the list") } },
                         onAdjust = { acc, bal -> vm.launch { vm.repo.adjustBalance(acc, bal); vm.repo.dao.updateSms(item.copy(note = item.note.replace(Regex("BAL:\\d+"), "").trim(' ', '·'))); snack.show("${acc.name} balance now matches the bank") } })
+                    }
                 }
             }
         }
@@ -130,7 +154,7 @@ private fun SmsCard(
     onOk: () -> Unit, onEdit: () -> Unit, onIgnore: () -> Unit, onTeach: () -> Unit, onRestore: () -> Unit, onAdjust: (Account, Long) -> Unit,
 ) {
     val bk = LocalBk.current
-    var expanded by remember { mutableStateOf(false) }
+    var expanded by rememberSaveable { mutableStateOf(false) }
     val acc = accounts.firstOrNull { it.id == item.accountId }
     BkCard(Modifier.padding(16.dp, 6.dp).fillMaxWidth().testTag("sms_${item.id}"), padding = PaddingValues(14.dp), onClick = { expanded = !expanded }) {
         Row(verticalAlignment = Alignment.Top) {
@@ -152,7 +176,7 @@ private fun SmsCard(
         Regex("BAL:(\\d+)").find(item.note)?.let { m ->
             val bal = m.groupValues[1].toLong()
             if (acc != null) Row(Modifier.padding(top = 8.dp).fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(bk.info).padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text("Bank shows ${Money.fmt(bal)}, app shows ${Money.fmt(nets[acc.id] ?: 0L)}", color = bk.onInfo, style = MaterialTheme.typography.labelMedium, modifier = Modifier.weight(1f))
+                Text("Bank shows ${hm(bal)}, app shows ${hm(nets[acc.id] ?: 0L)}", color = bk.onInfo, style = MaterialTheme.typography.labelMedium, modifier = Modifier.weight(1f))
                 TextButton(onClick = { onAdjust(acc, bal) }) { Text("Match") }
             }
         }
@@ -180,11 +204,11 @@ private fun SmsCard(
 private fun TeachDialog(vm: AppVm, item: SmsItem, accounts: List<Account>, onDismiss: () -> Unit) {
     val snack = LocalSnack.current
     val categories by vm.categories.collectAsStateWithLifecycle()
-    var amt by remember { mutableStateOf(if (item.amountPaise > 0) Money.input(item.amountPaise) else "") }
-    var debit by remember { mutableStateOf(item.debit) }
-    var accId by remember { mutableStateOf(item.accountId) }
-    var merchant by remember { mutableStateOf(item.merchant) }
-    var catId by remember { mutableStateOf(item.categoryId) }
+    var amt by rememberSaveable { mutableStateOf(if (item.amountPaise > 0) Money.input(item.amountPaise) else "") }
+    var debit by rememberSaveable { mutableStateOf(item.debit) }
+    var accId by rememberSaveable { mutableStateOf(item.accountId) }
+    var merchant by rememberSaveable { mutableStateOf(item.merchant) }
+    var catId by rememberSaveable { mutableStateOf(item.categoryId) }
     AlertDialog(onDismissRequest = onDismiss, title = { Text("Fix & teach") }, text = {
         Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Text(item.body, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -193,12 +217,13 @@ private fun TeachDialog(vm: AppVm, item: SmsItem, accounts: List<Account>, onDis
             TextIn(merchant, { merchant = it }, "Shop / person", tag = "tmerchant")
             Text("Account", style = MaterialTheme.typography.labelLarge)
             Row(Modifier.horizontalScrollSafe(), horizontalArrangement = Arrangement.spacedBy(8.dp)) { accounts.forEach { a -> Pill(a.name, accId == a.id, { accId = a.id }) } }
+            if (accId == null) Text("Pick the account to save it", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
             Text("Category", style = MaterialTheme.typography.labelLarge)
             Row(Modifier.horizontalScrollSafe(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 categories.filter { it.kind == (if (debit) "EXPENSE" else "INCOME") && !it.archived }.forEach { c -> Pill(c.name, catId == c.id, { catId = c.id }) }
             }
         }
-    }, confirmButton = { TextButton(onClick = {
+    }, confirmButton = { TextButton(enabled = (Money.parse(amt) ?: 0L) > 0 && accId != null, onClick = {
         val a = Money.parse(amt) ?: 0L
         val acc = accId
         if (a <= 0 || acc == null) return@TextButton
@@ -220,8 +245,8 @@ fun SmsSetupScreen(vm: AppVm) {
     val ctx = LocalContext.current
     val snack = LocalSnack.current
     val app = ctx.applicationContext as App
-    var denied by remember { mutableStateOf(false) }
-    var working by remember { mutableStateOf(false) }
+    var denied by rememberSaveable { mutableStateOf(false) }
+    var working by rememberSaveable { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     val launcher = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { res ->
         app.prefs.askedSms = true
@@ -229,8 +254,10 @@ fun SmsSetupScreen(vm: AppVm) {
             vm.prefs.update { it.copy(smsOn = true) }
             app.sms.startObserver()
             working = true
+            // the scan itself runs app-wide, so leaving this screen doesn't stop it half-way
+            val job = app.appScope.async { app.sms.scanSince(System.currentTimeMillis() - 90L * 86_400_000L, notify = false) }
             scope.launch {
-                val st = app.sms.scanSince(System.currentTimeMillis() - 90L * 86_400_000L, notify = false)
+                val st = job.await()
                 working = false
                 snack.show("Found ${st.parsed} entries and ${st.look} to look at from the last 90 days")
                 nav.popBackStack(); nav.go("sms")
@@ -270,4 +297,57 @@ fun SmsSetupScreen(vm: AppVm) {
             }
         }
     }
+}
+
+@Composable
+private fun SwipeRow(enabled: Boolean, onRight: () -> Unit, onLeft: () -> Unit, content: @Composable () -> Unit) {
+    if (!enabled) { content(); return }
+    val bk = LocalBk.current
+    val density = androidx.compose.ui.platform.LocalDensity.current
+    val limit = with(density) { 110.dp.toPx() }
+    val scope = rememberCoroutineScope()
+    val offset = remember { androidx.compose.animation.core.Animatable(0f) }
+    Box {
+        val x = offset.value
+        if (x != 0f) Row(Modifier.matchParentSize().padding(horizontal = 16.dp, vertical = 6.dp).clip(RoundedCornerShape(18.dp))
+            .background(if (x > 0) bk.income.copy(alpha = 0.18f) else MaterialTheme.colorScheme.surfaceVariant).padding(horizontal = 20.dp),
+            verticalAlignment = Alignment.CenterVertically, horizontalArrangement = if (x > 0) Arrangement.Start else Arrangement.End) {
+            Icon(if (x > 0) Icons.Outlined.Check else Icons.Outlined.Close, null, tint = if (x > 0) bk.income else MaterialTheme.colorScheme.onSurfaceVariant)
+            Spacer(Modifier.width(8.dp)); Text(if (x > 0) "OK, save" else "Ignore", style = MaterialTheme.typography.labelLarge)
+        }
+        Box(Modifier.offset { androidx.compose.ui.unit.IntOffset(x.toInt(), 0) }.pointerInput(Unit) {
+            detectHorizontalDragGestures(
+                onDragEnd = {
+                    val v = offset.value
+                    if (v > limit) onRight() else if (v < -limit) onLeft()
+                    scope.launch { offset.animateTo(0f) }
+                },
+                onDragCancel = { scope.launch { offset.animateTo(0f) } },
+            ) { _, d -> scope.launch { offset.snapTo((offset.value + d).coerceIn(-limit * 1.6f, limit * 1.6f)) } }
+        }) { content() }
+    }
+}
+
+/** Phone-maker steps so the SMS receiver isn't paused by battery savers (Xiaomi, Vivo, Oppo/Realme, Samsung, others). */
+@Composable
+fun BatteryGuide(onDismiss: () -> Unit) {
+    val ctx = LocalContext.current
+    val maker = android.os.Build.MANUFACTURER.lowercase(java.util.Locale.ROOT)
+    val steps = when {
+        "xiaomi" in maker || "redmi" in maker || "poco" in maker -> listOf("Open Settings → Apps → Manage apps → Bahi Khata", "Turn on Autostart", "Battery saver → No restrictions")
+        "vivo" in maker || "iqoo" in maker -> listOf("Open Settings → Battery → Background power consumption", "Allow Bahi Khata", "Settings → Apps → Autostart → turn on Bahi Khata")
+        "oppo" in maker || "realme" in maker || "oneplus" in maker -> listOf("Open Settings → Apps → Bahi Khata → Battery usage", "Turn on Allow background activity and Allow auto launch")
+        "samsung" in maker -> listOf("Open Settings → Apps → Bahi Khata → Battery", "Choose Unrestricted", "Also check Battery → Background usage limits: Bahi Khata must not be in Sleeping apps")
+        else -> listOf("Open Settings → Apps → Bahi Khata → Battery", "Choose Unrestricted or Don't optimise")
+    }
+    AlertDialog(onDismissRequest = onDismiss, icon = { Icon(Icons.Outlined.BatteryAlert, null) }, title = { Text("Let bank SMS arrive instantly") }, text = {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("Your phone's battery saver can stop Bahi Khata from seeing a bank SMS the moment it arrives. Nothing is lost — it's picked up when you open the app — but instant suggestions need this:",
+                style = MaterialTheme.typography.bodyMedium)
+            steps.forEachIndexed { i, t -> Text("${i + 1}. $t", style = MaterialTheme.typography.bodyMedium) }
+        }
+    }, confirmButton = { TextButton(onClick = {
+        runCatching { ctx.startActivity(android.content.Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS, android.net.Uri.parse("package:" + ctx.packageName))) }
+        onDismiss()
+    }, modifier = Modifier.testTag("battery_open")) { Text("Open app settings") } }, dismissButton = { TextButton(onClick = onDismiss) { Text("Done") } })
 }

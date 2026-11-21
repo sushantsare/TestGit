@@ -97,4 +97,14 @@ object Ledger {
         "YEARLY" -> from.plusYears(1)
         else -> from.plusMonths(1)
     }
+
+    /** Equal split of [amount] between [people] (and me when [includeMe]). Leftover paise stay with me, or go to the
+     *  first people when I'm not included, so the shares always add up exactly. */
+    fun splitShares(amount: Long, people: List<Long>, includeMe: Boolean): List<Pair<Long, Long>> {
+        if (people.isEmpty() || amount <= 0) return emptyList()
+        val n = people.size + if (includeMe) 1 else 0
+        val base = amount / n
+        val rest = if (includeMe) 0L else amount - base * n
+        return people.mapIndexed { i, p -> p to base + if (i < rest) 1 else 0 }
+    }
 }

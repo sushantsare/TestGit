@@ -28,6 +28,11 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.Role
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -83,10 +88,12 @@ fun SettingsScreen(vm: AppVm) {
     val cats by vm.categories.collectAsStateWithLifecycle()
     val rec by vm.recurring.collectAsStateWithLifecycle()
     val (notifOk, askNotif) = rememberNotifState()
-    var themePick by remember { mutableStateOf(false) }
-    var timePick by remember { mutableStateOf(false) }
-    var lockPick by remember { mutableStateOf(false) }
-    var reset by remember { mutableStateOf(false) }
+    var themePick by rememberSaveable { mutableStateOf(false) }
+    var timePick by rememberSaveable { mutableStateOf(false) }
+    var lockPick by rememberSaveable { mutableStateOf(false) }
+    var startPick by rememberSaveable { mutableStateOf(false) }
+    var duePick by rememberSaveable { mutableStateOf(false) }
+    var reset by rememberSaveable { mutableStateOf(false) }
     val canLock = androidx.biometric.BiometricManager.from(ctx).canAuthenticate(androidx.biometric.BiometricManager.Authenticators.BIOMETRIC_WEAK) == androidx.biometric.BiometricManager.BIOMETRIC_SUCCESS ||
         (ctx.getSystemService(android.content.Context.KEYGUARD_SERVICE) as android.app.KeyguardManager).isDeviceSecure
 
@@ -113,14 +120,16 @@ fun SettingsScreen(vm: AppVm) {
                 SettingNav(Icons.Outlined.Category, "Categories", "${cats.count { !it.archived }} categories") { nav.go("categories") }
                 SettingNav(Icons.Outlined.Repeat, "Repeating entries", if (rec.isEmpty()) "Rent, EMI, subscriptions" else "${rec.count { it.active }} active") { nav.go("recurring") }
                 SettingNav(Icons.Outlined.Savings, "Budgets & savings goals") { nav.go("budgets") }
+                SettingNav(Icons.Outlined.CalendarMonth, "Budget month starts on", if (s.monthStartDay == 1) "1st of every month" else "${ordinal(s.monthStartDay)} of every month (e.g. salary day)") { startPick = true }
             } }
             item { SectionLabel("Notifications") }
             item { BkCard(Modifier.padding(horizontal = 16.dp).fillMaxWidth()) {
-                SettingSwitch(Icons.Outlined.Notifications, "Daily reminder", "If nothing was added by ${String.format("%d:%02d %s", ((s.dailyReminderMin / 60 + 11) % 12) + 1, s.dailyReminderMin % 60, if (s.dailyReminderMin >= 720) "PM" else "AM")}", s.dailyReminderOn, { on ->
+                SettingSwitch(Icons.Outlined.Notifications, "Daily reminder", "If nothing was added by ${String.format(java.util.Locale.ROOT, "%d:%02d %s", ((s.dailyReminderMin / 60 + 11) % 12) + 1, s.dailyReminderMin % 60, if (s.dailyReminderMin >= 720) "PM" else "AM")}", s.dailyReminderOn, { on ->
                     notifSwitch(on) { vm.prefs.update { it.copy(dailyReminderOn = on) }; Workers.scheduleReminder(ctx) }
                 }, "daily")
                 if (s.dailyReminderOn) SettingNav(Icons.Outlined.Schedule, "Reminder time") { timePick = true }
-                SettingSwitch(Icons.Outlined.Event, "Card due reminders", "5 days, 2 days and on the due day", s.dueRemindersOn, { on -> notifSwitch(on) { vm.prefs.update { it.copy(dueRemindersOn = on) }; Workers.runNow(ctx) } }, "due")
+                SettingSwitch(Icons.Outlined.Event, "Card due reminders", dueText(s.dueReminderDays), s.dueRemindersOn, { on -> notifSwitch(on) { vm.prefs.update { it.copy(dueRemindersOn = on) }; Workers.runNow(ctx) } }, "due")
+                if (s.dueRemindersOn) SettingNav(Icons.Outlined.Tune, "When to remind", dueText(s.dueReminderDays)) { duePick = true }
                 SettingSwitch(Icons.Outlined.PieChart, "Budget alerts", "At 80% and 100% of a budget", s.budgetAlertsOn, { on -> notifSwitch(on) { vm.prefs.update { it.copy(budgetAlertsOn = on) } } }, "budget")
                 if (!notifOk && (s.dailyReminderOn || s.dueRemindersOn || s.budgetAlertsOn || s.smsOn)) {
                     Row(Modifier.fillMaxWidth().padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -143,6 +152,8 @@ fun SettingsScreen(vm: AppVm) {
         }
     }
     if (themePick) PickSheet("Theme", ThemeMode.entries.toList(), { when (it) { ThemeMode.SYSTEM -> "Follow phone"; ThemeMode.LIGHT -> "Light"; ThemeMode.DARK -> "Dark" } }, onPick = { vm.setTheme(it) }, onDismiss = { themePick = false })
+    if (startPick) PickSheet("Budget month starts on", (1..28).toList(), { if (it == 1) "1st (calendar month)" else ordinal(it) }, onPick = { d -> vm.prefs.update { it.copy(monthStartDay = d) } }, onDismiss = { startPick = false })
+    if (duePick) DueDaysDialog(s.dueReminderDays, { v -> vm.prefs.update { it.copy(dueReminderDays = v) } }) { duePick = false }
     if (lockPick) PickSheet("Lock after", listOf(0, 60, 300, 900), { when (it) { 0 -> "Immediately"; 60 -> "1 minute"; 300 -> "5 minutes"; else -> "15 minutes" } }, onPick = { v -> vm.prefs.update { it.copy(lockAfterSec = v) } }, onDismiss = { lockPick = false })
     if (timePick) {
         val st = rememberTimePickerState(s.dailyReminderMin / 60, s.dailyReminderMin % 60, false)
@@ -162,8 +173,8 @@ fun CategoriesScreen(vm: AppVm) {
     val categories by vm.categories.collectAsStateWithLifecycle()
     val entries by vm.entries.collectAsStateWithLifecycle()
     var kind by rememberSaveable { mutableStateOf("EXPENSE") }
-    var edit by remember { mutableStateOf<Category?>(null) }
-    var merge by remember { mutableStateOf<Category?>(null) }
+    var edit by rememberSaveable(stateSaver = recordSaver<Category>()) { mutableStateOf<Category?>(null) }
+    var merge by rememberSaveable(stateSaver = recordSaver<Category>()) { mutableStateOf<Category?>(null) }
     val list = categories.filter { it.kind == kind }
     Scaffold(containerColor = MaterialTheme.colorScheme.background, topBar = { BackBar("Categories") { Act(Icons.Outlined.Add, "Add category", "add_cat") { edit = Category(name = "", kind = kind, icon = "more", colorIdx = list.size % 10, sort = list.size) } } }, contentWindowInsets = WindowInsets(0)) { pad ->
         LazyColumn(Modifier.padding(pad).fillMaxSize(), contentPadding = PaddingValues(bottom = 32.dp)) {
@@ -175,7 +186,7 @@ fun CategoriesScreen(vm: AppVm) {
                     ListRow(c.name + if (c.archived) " (hidden)" else "", "$n ${if (n == 1) "entry" else "entries"}", Modifier.testTag("catrow_${c.name}"), leading = { IconBadge(Ico.cat(c.icon), bg, fg) }, trailing = { Chev() }, onClick = { edit = c })
                 }
             } }
-            item { Text("Tap a category to rename it, change its icon, hide it or merge it into another.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(18.dp, 10.dp)) }
+            item { Text("Tap a category to rename it, change its icon or order, hide it or merge it into another.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(18.dp, 10.dp)) }
         }
     }
     edit?.let { c ->
@@ -186,19 +197,26 @@ fun CategoriesScreen(vm: AppVm) {
             Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 TextIn(name, { name = it }, "Name", tag = "cname")
                 Text("Icon", style = MaterialTheme.typography.labelLarge)
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Ico.catKeys.forEach { k -> Box(Modifier.size(42.dp).clip(RoundedCornerShape(10.dp)).background(if (icon == k) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surfaceVariant).clickable { icon = k }, contentAlignment = Alignment.Center) { Icon(Ico.cat(k), k) } }
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Ico.catKeys.forEach { k -> Box(Modifier.size(48.dp).clip(RoundedCornerShape(12.dp)).background(if (icon == k) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surfaceVariant)
+                        .selectable(icon == k, role = Role.RadioButton) { icon = k }.semantics { contentDescription = "Icon " + k.replace('_', ' ') }, contentAlignment = Alignment.Center) { Icon(Ico.cat(k), k) } }
                 }
                 Text("Colour", style = MaterialTheme.typography.labelLarge)
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    bk.cat.forEachIndexed { i, (b, f) -> Box(Modifier.size(34.dp).clip(CircleShape).background(b).border(if (color == i) 3.dp else 1.dp, if (color == i) bk.saffron else f, CircleShape).clickable { color = i }) }
+                    bk.cat.forEachIndexed { i, (b, f) -> Box(Modifier.size(48.dp).clip(CircleShape).background(b).border(if (color == i) 3.dp else 1.dp, if (color == i) bk.saffron else f, CircleShape)
+                        .selectable(color == i, role = Role.RadioButton) { color = i }.semantics { contentDescription = "Colour ${i + 1}" }) }
+                }
+                if (c.id > 0) Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Text("Order", style = MaterialTheme.typography.labelLarge, modifier = Modifier.weight(1f))
+                    OutlinedButton(onClick = { vm.launch { vm.repo.moveCategory(c, -1) } }, modifier = Modifier.testTag("cat_up")) { Icon(Icons.Outlined.ArrowUpward, null); Spacer(Modifier.width(4.dp)); Text("Up") }
+                    OutlinedButton(onClick = { vm.launch { vm.repo.moveCategory(c, 1) } }, modifier = Modifier.testTag("cat_down")) { Icon(Icons.Outlined.ArrowDownward, null); Spacer(Modifier.width(4.dp)); Text("Down") }
                 }
                 if (c.id > 0) Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedButton(onClick = { vm.launch { vm.repo.saveCategory(c.copy(archived = !c.archived)) }; edit = null }) { Text(if (c.archived) "Show again" else "Hide") }
                     OutlinedButton(onClick = { merge = c; edit = null }) { Text("Merge into…") }
                 }
             }
-        }, confirmButton = { TextButton(onClick = { if (name.isNotBlank()) vm.launch { vm.repo.saveCategory(c.copy(name = name.trim(), icon = icon, colorIdx = color)) }; edit = null }, modifier = Modifier.testTag("cat_ok")) { Text("Save") } },
+        }, confirmButton = { TextButton(enabled = name.isNotBlank(), onClick = { if (name.isNotBlank()) vm.launch { vm.repo.saveCategory(c.copy(name = name.trim(), icon = icon, colorIdx = color)) }; edit = null }, modifier = Modifier.testTag("cat_ok")) { Text("Save") } },
             dismissButton = { TextButton(onClick = { edit = null }) { Text("Cancel") } })
     }
     merge?.let { c ->
@@ -212,7 +230,7 @@ fun RecurringScreen(vm: AppVm) {
     val rec by vm.recurring.collectAsStateWithLifecycle()
     val accs by vm.accMap.collectAsStateWithLifecycle()
     val cats by vm.catMap.collectAsStateWithLifecycle()
-    var edit by remember { mutableStateOf<Recurring?>(null) }
+    var edit by rememberSaveable(stateSaver = recordSaver<Recurring>()) { mutableStateOf<Recurring?>(null) }
     Scaffold(containerColor = MaterialTheme.colorScheme.background, topBar = { BackBar("Repeating entries") }, contentWindowInsets = WindowInsets(0)) { pad ->
         if (rec.isEmpty()) Box(Modifier.padding(pad).fillMaxSize(), contentAlignment = Alignment.Center) {
             EmptyState(Icons.Outlined.Repeat, "No repeating entries", "When adding an entry, set Repeat to monthly for rent, EMI or subscriptions — it's added on its own.")
@@ -238,8 +256,8 @@ fun RecurringScreen(vm: AppVm) {
 
 @Composable
 private fun PasswordDialog(title: String, confirm: Boolean, onDone: (CharArray) -> Unit, onDismiss: () -> Unit) {
-    var p1 by remember { mutableStateOf("") }
-    var p2 by remember { mutableStateOf("") }
+    var p1 by rememberSaveable { mutableStateOf("") }
+    var p2 by rememberSaveable { mutableStateOf("") }
     val ok = p1.length >= 6 && (!confirm || p1 == p2)
     AlertDialog(onDismissRequest = onDismiss, title = { Text(title) }, text = {
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -260,11 +278,11 @@ fun BackupScreen(vm: AppVm) {
     val snack = LocalSnack.current
     val scope = rememberCoroutineScope()
     val s by vm.settings.collectAsStateWithLifecycle()
-    var pwFor by remember { mutableStateOf<String?>(null) }   // save / restore / drive / drive_restore
-    var pendingUri by remember { mutableStateOf<Uri?>(null) }
-    var busy by remember { mutableStateOf<String?>(null) }
+    var pwFor by rememberSaveable { mutableStateOf<String?>(null) }   // save / restore / drive / drive_restore
+    var pendingUri by rememberSaveable { mutableStateOf<Uri?>(null) }
+    var busy by rememberSaveable { mutableStateOf<String?>(null) }
     var confirmRestore by remember { mutableStateOf<(() -> Unit)?>(null) }
-    var freqPick by remember { mutableStateOf(false) }
+    var freqPick by rememberSaveable { mutableStateOf(false) }
     val hasPw = remember(s.driveOn, pwFor) { Backup.loadPassword(ctx) != null }
 
     val create = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/octet-stream")) { u -> if (u != null) { pendingUri = u; pwFor = "save" } }
@@ -282,7 +300,7 @@ fun BackupScreen(vm: AppVm) {
             res.onSuccess { (tok, pi) ->
                 if (tok != null) { vm.prefs.update { it.copy(driveOn = true) }; Workers.scheduleDrive(ctx); Workers.driveNow(ctx); snack.show("Google Drive backup is on") }
                 else if (pi != null) consent.launch(IntentSenderRequest.Builder(pi.intentSender).build())
-            }.onFailure { snack.show("Google sign-in isn't available on this phone: " + (it.message ?: "")) }
+            }.onFailure { snack.show("Google sign-in isn't available on this phone. Drive backup needs Google Play services.") }
         }
     }
 
@@ -302,8 +320,8 @@ fun BackupScreen(vm: AppVm) {
                 }
             }
             if (s.driveOn) Row(Modifier.padding(16.dp, 10.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedPillButton("Back up now", Icons.Outlined.Backup, { busy = "Backing up…"; scope.launch { val r = Drive.backup(ctx); busy = null
-                    snack.show(when (r) { is Drive.Res.Ok -> "Backed up to Google Drive"; is Drive.Res.NeedsSignIn -> "Sign in to Google Drive again"; is Drive.Res.Fail -> "Backup failed: ${r.msg}" }) } }, tag = "drive_now")
+                OutlinedPillButton("Back up now", Icons.Outlined.Backup, { busy = "Backing up…"; vm.background { val r = Drive.backup(ctx); busy = null
+                    snack.show(when (r) { is Drive.Res.Ok -> "Backed up to Google Drive"; is Drive.Res.NeedsSignIn -> "Sign in to Google Drive again"; is Drive.Res.Fail -> "Backup didn't finish: ${r.msg}" }) } }, tag = "drive_now")
                 OutlinedPillButton("Restore from Drive", Icons.Outlined.CloudDownload, { pwFor = "drive_restore" }, tag = "drive_restore")
             }
             SectionLabel("Backup file")
@@ -324,23 +342,23 @@ fun BackupScreen(vm: AppVm) {
     pwFor?.let { mode ->
         PasswordDialog(if (mode == "save" || mode == "drive") "Set backup password" else "Backup password", confirm = mode == "save" || mode == "drive", onDone = { pw ->
             when (mode) {
-                "save" -> { val u = pendingUri ?: return@PasswordDialog; busy = "Saving backup…"; scope.launch {
+                "save" -> { val u = pendingUri ?: return@PasswordDialog; busy = "Saving backup…"; vm.background {
                     runCatching { val b = Backup.build(ctx, pw); withContext(Dispatchers.IO) { ctx.contentResolver.openOutputStream(u)!!.use { it.write(b) } } }
                         .onSuccess { vm.prefs.update { it.copy(lastFileBackup = System.currentTimeMillis()) }; Backup.savePassword(ctx, pw); snack.show("Backup saved") }
-                        .onFailure { snack.show("Couldn't save: ${it.message}") }
+                        .onFailure { snack.show("Couldn't save the backup. Check the phone has free space and try again.") }
                     busy = null } }
-                "restore" -> { val u = pendingUri ?: return@PasswordDialog; confirmRestore = { busy = "Restoring…"; scope.launch {
+                "restore" -> { val u = pendingUri ?: return@PasswordDialog; confirmRestore = { busy = "Restoring…"; vm.background {
                     runCatching { val b = withContext(Dispatchers.IO) { ctx.contentResolver.openInputStream(u)!!.use { it.readBytes() } }; Backup.restore(ctx, b, pw) }
-                        .onSuccess { snack.show("Restored ${it.entries} entries and ${it.accounts} accounts") }.onFailure { snack.show(it.message ?: "Restore failed") }
+                        .onSuccess { snack.show("Restored ${it.entries} entries and ${it.accounts} accounts") }.onFailure { snack.show(plainError(it, "Restore didn't work. Nothing on this phone was changed.")) }
                     busy = null } } }
                 "drive" -> { Backup.savePassword(ctx, pw); turnOnDrive() }
-                "drive_restore" -> confirmRestore = { busy = "Downloading from Drive…"; scope.launch {
+                "drive_restore" -> confirmRestore = { busy = "Downloading from Drive…"; vm.background {
                     runCatching {
                         val (remote, res) = Drive.latest(ctx)
                         if (res !is Drive.Res.Ok) throw IllegalStateException(if (res is Drive.Res.Fail) res.msg else "Sign in to Google Drive again")
                         val r = remote ?: throw IllegalStateException("No backup found on Google Drive")
                         Backup.restore(ctx, Drive.download(ctx, r.id), pw)
-                    }.onSuccess { snack.show("Restored ${it.entries} entries from Drive") }.onFailure { snack.show(it.message ?: "Restore failed") }
+                    }.onSuccess { snack.show("Restored ${it.entries} entries from Drive") }.onFailure { snack.show(plainError(it, "Restore didn't work. Nothing on this phone was changed.")) }
                     busy = null } }
             }
         }, onDismiss = { pwFor = null })
@@ -360,7 +378,7 @@ fun ExportScreen(vm: AppVm) {
     var period by rememberSaveable { mutableStateOf("THIS") }
     var from by rememberSaveable { mutableLongStateOf(Dates.startOf(Dates.today().withDayOfMonth(1))) }
     var to by rememberSaveable { mutableLongStateOf(Dates.endOf(Dates.today())) }
-    var showRange by remember { mutableStateOf(false) }
+    var showRange by rememberSaveable { mutableStateOf(false) }
     var pending by remember { mutableStateOf<Pair<ByteArray, String>?>(null) }
     val r: LongRange = when (period) {
         "THIS" -> Dates.monthRange(YearMonth.now())
@@ -399,8 +417,8 @@ fun ExportScreen(vm: AppVm) {
                     ListRow(t, d, Modifier.testTag("fmt_$k"), leading = { Icon(if (k == "pdf") Icons.Outlined.PictureAsPdf else Icons.Outlined.TableView, null) }, trailing = {
                         Row {
                             IconButton(onClick = { scope.launch { val b = withContext(Dispatchers.IO) { build(k) }; pending = b; save.launch(b.second) } }) { Icon(Icons.Outlined.Save, "Save $t") }
-                            IconButton(onClick = { scope.launch { val b = withContext(Dispatchers.IO) { build(k) }
-                                val f = File(ctx.cacheDir, "share").apply { mkdirs() }.let { File(it, b.second) }; f.writeBytes(b.first); shareFile(ctx, f, mime(b.second), "Share $t") } }) { Icon(Icons.Outlined.Share, "Share $t") }
+                            IconButton(onClick = { scope.launch { val f = withContext(Dispatchers.IO) { val b = build(k)
+                                File(ctx.cacheDir, "share").apply { mkdirs() }.let { File(it, b.second) }.also { it.writeBytes(b.first) } }; shareFile(ctx, f, mime(f.name), "Share $t") } }) { Icon(Icons.Outlined.Share, "Share $t") }
                         }
                     })
                 }
@@ -446,8 +464,11 @@ fun DiagnosticsScreen(vm: AppVm) {
             }
             Row(Modifier.padding(16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedPillButton("Export crash log", Icons.Outlined.Share, {
-                    val f = File(ctx.cacheDir, "share").apply { mkdirs() }.let { File(it, "bahikhata-crash-log.txt") }
-                    f.writeText(log.ifBlank { "No crashes logged." }); shareFile(ctx, f, "text/plain", "Share crash log")
+                    vm.background {
+                        val f = File(ctx.cacheDir, "share").apply { mkdirs() }.let { File(it, "bahikhata-crash-log.txt") }
+                        f.writeText(log.ifBlank { "No crashes logged." })
+                        withContext(Dispatchers.Main) { shareFile(ctx, f, "text/plain", "Share crash log") }
+                    }
                 }, tag = "export_log")
                 if (crashes > 0) OutlinedPillButton("Clear", Icons.Outlined.Delete, { Diagnostics.clear(ctx); log = ""; snack.show("Crash log cleared") }, tag = "clear_log")
             }
@@ -485,4 +506,34 @@ fun AboutScreen() {
             Gap(24)
         }
     }
+}
+
+/** Our own messages (wrong password, no backup found) are shown as they are; anything technical gets a plain sentence. */
+fun plainError(t: Throwable, fallback: String): String =
+    if ((t is IllegalStateException || t is IllegalArgumentException) && !t.message.isNullOrBlank() && t.message!!.length < 90) t.message!! else fallback
+
+fun ordinal(n: Int): String = n.toString() + when { n % 100 in 11..13 -> "th"; n % 10 == 1 -> "st"; n % 10 == 2 -> "nd"; n % 10 == 3 -> "rd"; else -> "th" }
+
+private fun dueText(days: String): String {
+    val d = days.split(',').mapNotNull { it.trim().toIntOrNull() }.sortedDescending()
+    if (d.isEmpty()) return "No reminders chosen"
+    return d.joinToString(", ") { if (it == 0) "on the due day" else if (it == 1) "1 day before" else "$it days before" }.replaceFirstChar { it.uppercase() }
+}
+
+/** Which days before a card's due date to remind (any of 7, 5, 3, 2, 1, due day). */
+@Composable
+private fun DueDaysDialog(current: String, onDone: (String) -> Unit, onDismiss: () -> Unit) {
+    var sel by rememberSaveable { mutableStateOf(current.split(',').mapNotNull { it.trim().toIntOrNull() }) }
+    AlertDialog(onDismissRequest = onDismiss, title = { Text("Remind me") }, text = {
+        Column {
+            listOf(7, 5, 3, 2, 1, 0).forEach { d ->
+                val on = d in sel
+                Row(Modifier.fillMaxWidth().heightIn(min = 48.dp).toggleable(on, role = Role.Checkbox) { sel = if (it) sel + d else sel - d }.testTag("dueday_$d"),
+                    verticalAlignment = Alignment.CenterVertically) {
+                    Checkbox(on, null); Spacer(Modifier.width(8.dp)); Text(if (d == 0) "On the due day" else if (d == 1) "1 day before" else "$d days before")
+                }
+            }
+        }
+    }, confirmButton = { TextButton(enabled = sel.isNotEmpty(), onClick = { onDone(sel.sortedDescending().joinToString(",")); onDismiss() }) { Text("Save") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } })
 }

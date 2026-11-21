@@ -43,16 +43,17 @@ fun HomeScreen(vm: AppVm) {
     val wide = LocalWide.current
 
     val r = Dates.monthRange(ym)
-    val spent = Ledger.spent(entries, r); val got = Ledger.received(entries, r)
+    // totals are worked out once per data change, not on every redraw
+    val spent = remember(entries, r) { Ledger.spent(entries, r) }; val got = remember(entries, r) { Ledger.received(entries, r) }
     val prev = Dates.monthRange(ym.minusMonths(1))
-    val prevSpent = Ledger.spent(entries, prev)
+    val prevSpent = remember(entries, prev) { Ledger.spent(entries, prev) }
     val today = Dates.today()
     val dueCards = accounts.filter { it.type == AccType.CARD && !it.archived }.mapNotNull { c ->
         val b = Ledger.cardBill(c, nets[c.id] ?: 0, entries, today)
         if (b.bill > 0 && b.due != null) Triple(c, b, java.time.temporal.ChronoUnit.DAYS.between(today, b.due)) else null
     }.filter { it.third in -3..20 }.sortedBy { it.third }
     val recent = entries.filter { it.time in r || ym == YearMonth.now() }.take(8)
-    val byCat = Ledger.byCategory(entries, r)
+    val byCat = remember(entries, r) { Ledger.byCategory(entries, r) }
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
@@ -102,7 +103,7 @@ fun HomeScreen(vm: AppVm) {
                     if (prevSpent > 0 && ym == YearMonth.now()) {
                         Spacer(Modifier.height(8.dp))
                         val pct = ((spent - prevSpent) * 100 / prevSpent)
-                        Text(if (pct <= 0) "${-pct}% less than last month so far" else if (pct > 200) "${Money.fmt(spent - prevSpent)} more than last month" else "$pct% more than last month",
+                        Text(if (pct <= 0) "${-pct}% less than last month so far" else if (pct > 200) "${hm(spent - prevSpent)} more than last month" else "$pct% more than last month",
                             style = MaterialTheme.typography.labelSmall, color = if (pct <= 0) bk.income else bk.expense)
                     }
                 }
@@ -130,12 +131,15 @@ fun HomeScreen(vm: AppVm) {
                         }
                     }
                 }
-                val shownBudgets = budgets.sortedByDescending { b -> (if (b.categoryId == null) spent else byCat[b.categoryId] ?: 0L).toDouble() / b.limitPaise.coerceAtLeast(1) }.take(3)
+                // budgets follow the budget cycle (Settings → first day), which may differ from the calendar month shown above
+                val cyc = Dates.cycleRange(Dates.today(), s.monthStartDay)
+                val bSpent = Ledger.spent(entries, cyc); val bByCat = Ledger.byCategory(entries, cyc)
+                val shownBudgets = budgets.sortedByDescending { b -> (if (b.categoryId == null) bSpent else bByCat[b.categoryId] ?: 0L).toDouble() / b.limitPaise.coerceAtLeast(1) }.take(3)
                 if (shownBudgets.isNotEmpty() && ym == YearMonth.now()) {
                     SectionTitle("Budgets", "Manage") { nav.go("budgets") }
                     BkCard(Modifier.padding(horizontal = 16.dp).fillMaxWidth(), padding = PaddingValues(14.dp)) {
                         shownBudgets.forEachIndexed { i, b ->
-                            val used = if (b.categoryId == null) spent else byCat[b.categoryId] ?: 0L
+                            val used = if (b.categoryId == null) bSpent else bByCat[b.categoryId] ?: 0L
                             val f = used.toFloat() / b.limitPaise.coerceAtLeast(1)
                             if (i > 0) Spacer(Modifier.height(10.dp))
                             Row { Text(if (b.categoryId == null) "Overall" else cats[b.categoryId]?.name ?: "Budget", style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))

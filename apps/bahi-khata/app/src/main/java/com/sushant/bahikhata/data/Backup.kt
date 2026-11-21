@@ -28,6 +28,7 @@ data class BackupData(
 
 /** Encrypted backup file: zip(data.json + attachments) sealed with a password (AES-GCM, PBKDF2). */
 object Backup {
+    private val SAFE_NAME = Regex("^[A-Za-z0-9._-]{1,120}$")
     private val json = Json { ignoreUnknownKeys = true; encodeDefaults = true }
 
     suspend fun build(context: Context, password: CharArray): ByteArray = withContext(Dispatchers.IO) {
@@ -62,12 +63,17 @@ object Backup {
                 val e = z.nextEntry ?: break
                 val b = z.readBytes()
                 if (e.name == "data.json") data = json.decodeFromString<BackupData>(String(b))
-                else if (e.name.startsWith("att/")) files[e.name.removePrefix("att/")] = b
+                else if (e.name.startsWith("att/")) e.name.removePrefix("att/").takeIf { SAFE_NAME.matches(it) }?.let { files[it] = b }   // no "../" tricks
             }
         }
         val d = data ?: throw IllegalStateException("This file has no Bahi Khata data")
         val app = context.applicationContext as App
         val dao = app.repo.dao
+        // 1) receipts go to a side folder first; 2) one database transaction; 3) folders swapped.
+        // Steps 2–3 can't be cancelled half-way, so a restore never leaves entries without their receipts.
+        val staged = File(context.filesDir, "attachments.new").apply { deleteRecursively(); mkdirs() }
+        files.forEach { (name, b) -> File(staged, name).writeBytes(FileCrypto.encrypt(context, b)) }
+        withContext(kotlinx.coroutines.NonCancellable) {
         app.db.withTransaction {
             dao.clearEntries(); dao.clearAttachments(); dao.clearAccounts(); dao.clearCategories(); dao.clearMerchants(); dao.clearRecurring()
             dao.clearPeople(); dao.clearUdhar(); dao.clearBudgets(); dao.clearGoals(); dao.clearSms(); dao.clearLearned()
@@ -75,10 +81,14 @@ object Backup {
             d.merchants.forEach { dao.upsertMerchant(it) }; d.recurring.forEach { dao.upsertRecurring(it) }; d.people.forEach { dao.upsertPerson(it) }
             d.udhar.forEach { dao.upsertUdhar(it) }; d.budgets.forEach { dao.upsertBudget(it) }; d.goals.forEach { dao.upsertGoal(it) }
             d.sms.forEach { dao.insertSms(it) }; d.learned.forEach { dao.insertLearned(it) }
-            d.attachments.forEach { dao.insertAttachment(it) }
+            d.attachments.filter { SAFE_NAME.matches(it.fileName) }.forEach { dao.insertAttachment(it) }
         }
-        val dir = File(context.filesDir, "attachments").apply { deleteRecursively(); mkdirs() }
-        files.forEach { (name, b) -> File(dir, name).writeBytes(FileCrypto.encrypt(context, b)) }
+        val dir = File(context.filesDir, "attachments")
+        val old = File(context.filesDir, "attachments.old").apply { deleteRecursively() }
+        if (dir.exists()) dir.renameTo(old)
+        if (!staged.renameTo(dir)) { staged.copyRecursively(dir, overwrite = true); staged.deleteRecursively() }
+        old.deleteRecursively()
+        }
         val keep = app.prefs.now
         app.prefs.importMap(d.settings)
         // device-specific things are not taken from the backup

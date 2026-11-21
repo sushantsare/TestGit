@@ -9,6 +9,25 @@ import org.junit.Test
 import java.time.LocalDate
 
 class LogicTest {
+    @Test fun onlyKnownRoutesFromOutside() {
+        val ok = listOf("home", "sms", "add?type=INCOME", "add?sms=12", "add?id=4", "entry/9", "account/3", "account_edit/0?type=CARD", "transfer/paybill?acc=2", "person/7", "budgets")
+        val bad = listOf("", "settings/../x", "entry/abc", "add?type=EXPENSE&x=1", "unknown", "entry/1; rm", "account_edit/1?type=card")
+        ok.forEach { assertTrue(it, com.sushant.bahikhata.ui.SAFE_ROUTE.matches(it)) }
+        bad.forEach { assertTrue(it, !com.sushant.bahikhata.ui.SAFE_ROUTE.matches(it)) }
+    }
+
+    @Test fun budgetCycleStartsOnChosenDay() {
+        assertEquals(java.time.LocalDate.of(2026, 10, 25), Dates.cycleStart(java.time.LocalDate.of(2026, 11, 21), 25))
+        assertEquals(java.time.LocalDate.of(2026, 11, 25), Dates.cycleStart(java.time.LocalDate.of(2026, 11, 25), 25))
+        assertEquals(java.time.LocalDate.of(2026, 11, 1), Dates.cycleStart(java.time.LocalDate.of(2026, 11, 21), 1))
+    }
+
+    @Test fun splitSharesAddUp() {
+        assertEquals(listOf(1L to 33_33L, 2L to 33_33L), Ledger.splitShares(100_00, listOf(1, 2), true))   // my share keeps the extra paisa
+        assertEquals(listOf(1L to 50_01L, 2L to 50_00L), Ledger.splitShares(100_01, listOf(1, 2), false))
+        assertEquals(emptyList<Pair<Long, Long>>(), Ledger.splitShares(100_00, emptyList(), true))
+    }
+
     @Test fun money() {
         assertEquals("₹1,00,000", Money.fmt(10_000_000))
         assertEquals("₹1,23,45,678.50", Money.fmt(1_234_567_850))

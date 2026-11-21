@@ -25,14 +25,29 @@ class App : Application() {
         private set
     lateinit var sms: SmsEngine
         private set
+    /** False when the phone's secure key store couldn't unlock the encrypted data. The app then shows an
+     *  explanation instead of ever creating an unencrypted database (fail closed). */
+    var ready = false
+        private set
 
     override fun onCreate() {
         super.onCreate()
+        if (BuildConfig.DEBUG) {   // audit T4: main-thread disk/network and leaked closables are logged in debug builds
+            android.os.StrictMode.setThreadPolicy(android.os.StrictMode.ThreadPolicy.Builder().detectAll().penaltyLog().build())
+            android.os.StrictMode.setVmPolicy(android.os.StrictMode.VmPolicy.Builder().detectLeakedClosableObjects().detectLeakedSqlLiteObjects().detectActivityLeaks().penaltyLog().build())
+        }
         Diagnostics.install(this)
         prefs = Prefs(this)
-        db = AppDb.open(this)
-        repo = Repo(this, db, prefs)
-        sms = SmsEngine(this, repo, appScope)
+        try {
+            db = AppDb.open(this)
+            repo = Repo(this, db, prefs)
+            sms = SmsEngine(this, repo, appScope)
+            ready = true
+        } catch (t: Throwable) {
+            android.util.Log.e("Bahi", "secure storage unavailable", t)
+            Diagnostics.count(this, "storage_locked")
+            return
+        }
         Notify.channels(this)
         appScope.launch {
             repo.ensureCategories()

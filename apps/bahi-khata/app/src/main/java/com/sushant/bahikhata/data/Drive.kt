@@ -37,7 +37,7 @@ object Drive {
     suspend fun backup(context: Context): Res = withContext(Dispatchers.IO) {
         val app = context.applicationContext as App
         val pw = Backup.loadPassword(context) ?: return@withContext Res.Fail("Set a backup password in Bahi Khata → Backup")
-        val (tok, pi) = try { token(context) } catch (e: Exception) { return@withContext Res.Fail("Google sign-in isn't available: " + (e.message ?: "unknown error")) }
+        val (tok, pi) = try { token(context) } catch (e: Exception) { return@withContext Res.Fail("Google sign-in isn't available on this phone") }
         if (tok == null) return@withContext Res.NeedsSignIn(pi)
         try {
             val bytes = Backup.build(context, pw)
@@ -59,16 +59,16 @@ object Drive {
             }
             c.outputStream.use { it.write(body) }
             val code = c.responseCode
-            if (code !in 200..299) return@withContext Res.Fail("Drive said $code")
+            if (code !in 200..299) return@withContext Res.Fail(if (code == 401 || code == 403) "Google Drive refused access — sign in again" else "Google Drive had a problem — it will try again later")
             app.prefs.update { it.copy(lastDriveBackup = System.currentTimeMillis()) }
             Res.Ok
-        } catch (e: Exception) { Res.Fail(e.message ?: "Network problem") }
+        } catch (e: Exception) { Res.Fail("No internet connection — it will try again later") }
     }
 
     data class Remote(val id: String, val modified: String, val size: Long)
 
     suspend fun latest(context: Context): Pair<Remote?, Res> = withContext(Dispatchers.IO) {
-        val (tok, pi) = try { token(context) } catch (e: Exception) { return@withContext null to Res.Fail(e.message ?: "Google sign-in isn't available") }
+        val (tok, pi) = try { token(context) } catch (e: Exception) { return@withContext null to Res.Fail("Google sign-in isn't available on this phone") }
         if (tok == null) return@withContext null to Res.NeedsSignIn(pi)
         try {
             val c = URL("https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&fields=files(id,name,modifiedTime,size)&q=name%3D'$NAME'").openConnection() as HttpURLConnection
@@ -77,7 +77,7 @@ object Drive {
             if (arr.length() == 0) return@withContext null to Res.Ok
             val f = arr.getJSONObject(0)
             Remote(f.getString("id"), f.optString("modifiedTime"), f.optString("size", "0").toLongOrNull() ?: 0L) to Res.Ok
-        } catch (e: Exception) { null to Res.Fail(e.message ?: "Network problem") }
+        } catch (e: Exception) { null to Res.Fail("No internet connection — try again when you're online") }
     }
 
     suspend fun download(context: Context, id: String): ByteArray = withContext(Dispatchers.IO) {

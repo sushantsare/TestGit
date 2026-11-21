@@ -63,6 +63,7 @@ jobs:
           [ -z "$main" ] && main=$(ls app/build/outputs/apk/release/*.apk | head -1)
           cp "$main" "/tmp/out/${{ needs.target.outputs.name }}.apk"
           mkdir -p /tmp/out/apks && cp app/build/outputs/apk/release/*.apk /tmp/out/apks/
+          [ -d app/schemas ] && cp -r app/schemas /tmp/out/schemas || true
           echo BUILT > /tmp/out/STATUS
       - uses: actions/upload-artifact@v4
         if: always()

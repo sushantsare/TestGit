@@ -64,6 +64,15 @@ class Repo(private val context: Context, val db: AppDb, val prefs: Prefs) {
 
     // ---------------- categories
     suspend fun saveCategory(c: Category) = dao.upsertCategory(c)
+
+    /** Moves a category one place up (-1) or down (+1) within its kind; the order shows everywhere categories are picked. */
+    suspend fun moveCategory(c: Category, dir: Int) = db.withTransaction {
+        val list = dao.categoriesNow().filter { it.kind == c.kind }.sortedWith(compareBy({ it.sort }, { it.id })).toMutableList()
+        val i = list.indexOfFirst { it.id == c.id }; val j = i + dir
+        if (i < 0 || j !in list.indices) return@withTransaction
+        java.util.Collections.swap(list, i, j)
+        list.forEachIndexed { k, x -> if (x.sort != k) dao.upsertCategory(x.copy(sort = k)) }
+    }
     suspend fun mergeCategory(from: Category, into: Long) = db.withTransaction {
         dao.moveCategory(from.id, into); dao.deleteCategory(from)
     }
@@ -86,8 +95,9 @@ class Repo(private val context: Context, val db: AppDb, val prefs: Prefs) {
                 e = e.copy(recurringId = rid)
             }
             val id = dao.upsertEntry(e).let { if (e.id != 0L) e.id else it }
-            if (r.splits.isNotEmpty()) {
-                dao.udharOfEntry(id).forEach { dao.deleteUdhar(it) }
+            // the entry's shares are always replaced by what the form shows now ("No split" removes them)
+            dao.udharOfEntry(id).forEach { dao.deleteUdhar(it) }
+            run {
                 r.splits.filter { it.second > 0 }.forEach { (pid, share) ->
                     dao.upsertUdhar(Udhar(personId = pid, gave = true, amountPaise = share, entryId = id, note = "Split: " + (e.merchant ?: "bill"), time = e.time))
                 }
@@ -95,15 +105,19 @@ class Repo(private val context: Context, val db: AppDb, val prefs: Prefs) {
             if (!e.merchant.isNullOrBlank() && e.type == EType.EXPENSE || e.type == EType.INCOME && !e.merchant.isNullOrBlank()) remember(e)
             id
         }
-        r.newFiles.forEach { runCatching { addAttachment(id, it) } }
+        lastAttachFailures = r.newFiles.count { runCatching { addAttachment(id, it) }.isFailure }
         if (r.entry.type == EType.EXPENSE || r.entry.type == EType.INCOME) prefs.update { it.copy(lastAccountId = r.entry.accountId) }
         id
     }
 
+    /** How many files of the last save couldn't be stored (shown to the user, never silent). */
+    @Volatile var lastAttachFailures = 0
+        private set
+
     private suspend fun remember(e: Entry) {
         val key = e.merchant!!.trim().lowercase(Locale.ROOT)
         val old = dao.merchant(key)
-        dao.upsertMerchant(Merchant(key, e.merchant.trim(), e.categoryId, e.accountId, (old?.uses ?: 0) + 1, System.currentTimeMillis()))
+        dao.upsertMerchant(Merchant(key, e.merchant.trim(), e.categoryId, e.accountId, (old?.uses ?: 0) + 1, System.currentTimeMillis(), kind = e.type))
     }
 
     suspend fun merchant(name: String): Merchant? = dao.merchant(name.trim().lowercase(Locale.ROOT))

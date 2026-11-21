@@ -108,6 +108,15 @@ object Dates {
     fun startOf(d: LocalDate): Long = d.atStartOfDay(zone).toInstant().toEpochMilli()
     fun endOf(d: LocalDate): Long = startOf(d.plusDays(1)) - 1
     fun monthRange(ym: YearMonth): LongRange = startOf(ym.atDay(1))..endOf(ym.atEndOfMonth())
+
+    /** Budget cycle containing [day] when budgets start on [startDay] (e.g. salary day 25 → 25 Oct – 24 Nov). */
+    fun cycleStart(day: LocalDate, startDay: Int): LocalDate {
+        val sd = startDay.coerceIn(1, 28)
+        val thisMonth = day.withDayOfMonth(sd)
+        return if (day.dayOfMonth >= sd) thisMonth else thisMonth.minusMonths(1)
+    }
+    fun cycleRange(day: LocalDate, startDay: Int): LongRange { val a = cycleStart(day, startDay); return startOf(a)..endOf(a.plusMonths(1).minusDays(1)) }
+    fun cycleDaysLeft(day: LocalDate, startDay: Int): Long = java.time.temporal.ChronoUnit.DAYS.between(day, cycleStart(day, startDay).plusMonths(1).minusDays(1))
     fun today(): LocalDate = LocalDate.now(zone)
 
     private val dayFmt = DateTimeFormatter.ofPattern("d MMM", Locale.ENGLISH)
