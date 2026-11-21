@@ -1,0 +1,28 @@
+11-21 12:05:56.705   371   382 W TransactionTracing: Could not find layer handle 0x7c7fc6eacc10
+--------- beginning of crash
+11-21 12:05:56.736  8443  8522 E AndroidRuntime: FATAL EXCEPTION: GLThread 50
+11-21 12:05:56.736  8443  8522 E AndroidRuntime: Process: com.breel.wallpapers18, PID: 8443
+11-21 12:05:56.736  8443  8522 E AndroidRuntime: java.lang.RuntimeException: Vertex shader
+11-21 12:05:56.736  8443  8522 E AndroidRuntime: ERROR: 0:1: '310' : version number not supported
+11-21 12:05:56.736  8443  8522 E AndroidRuntime: ERROR: 0:4: 'in' : storage qualifier supported in GLSL ES 3.00 only  
+11-21 12:05:56.736  8443  8522 E AndroidRuntime: ERROR: 0:5: 'in' : storage qualifier supported in GLSL ES 3.00 only  
+11-21 12:05:56.736  8443  8522 E AndroidRuntime: ERROR: 0:9: 'out' : storage qualifier supported in GLSL ES 3.00 only  
+11-21 12:05:56.736  8443  8522 E AndroidRuntime: Fragment shader:
+11-21 12:05:56.736  8443  8522 E AndroidRuntime: ERROR: 0:1: '310' : version number not supported
+11-21 12:05:56.736  8443  8522 E AndroidRuntime: ERROR: 0:7: 'in' : storage qualifier supported in GLSL ES 3.00 only  
+11-21 12:05:56.736  8443  8522 E AndroidRuntime: ERROR: 0:9: 'out' : storage qualifier supported in GLSL ES 3.00 only  
+11-21 12:05:56.736  8443  8522 E AndroidRuntime: ERROR: 0:12: 'texture' : no matching overloaded function found 
+11-21 12:05:56.736  8443  8522 E AndroidRuntime: ERROR: 0:12: '=' :  cannot convert from 'const mediump float' to '4-component vector of float'
+11-21 12:05:56.736  8443  8522 E AndroidRuntime: 
+11-21 12:05:56.736  8443  8522 E AndroidRuntime: 	at com.breel.wallpapers18.utils.ShaderUtils.load(ShaderUtils.java:86)
+11-21 12:05:56.736  8443  8522 E AndroidRuntime: 	at com.breel.wallpapers18.utils.ShaderUtils.load(ShaderUtils.java:66)
+11-21 12:05:56.736  8443  8522 E AndroidRuntime: 	at com.breel.wallpapers18.dioramas.BaseDioramasEngine.initialize(BaseDioramasEngine.java:102)
+11-21 12:05:56.736  8443  8522 E AndroidRuntime: 	at com.breel.wallpapers18.dioramas.switzerland.SwitzerlandEngine.initialize(SwitzerlandEngine.java:83)
+11-21 12:05:56.736  8443  8522 E AndroidRuntime: 	at com.breel.wallpapers18.view.BaseWallpaperEngine.create(BaseWallpaperEngine.java:67)
+11-21 12:05:56.736  8443  8522 E AndroidRuntime: 	at com.badlogic.gdx.backends.android.AndroidGraphics.onSurfaceChanged(AndroidGraphics.java:275)
+11-21 12:05:56.736  8443  8522 E AndroidRuntime: 	at android.opengl.GLSurfaceView$GLThread.guardedRun(GLSurfaceView.java:1557)
+11-21 12:05:56.736  8443  8522 E AndroidRuntime: 	at android.opengl.GLSurfaceView$GLThread.run(GLSurfaceView.java:1272)
+11-21 12:05:56.758   436  1645 D OomAdjuster: Not killing cached processes
+11-21 12:05:56.785   436  1645 D SystemServerTiming: getUserSwitchability-0
+11-21 12:05:56.785   436  1645 D SystemServerTiming: TM.isInCall
+11-21 12:05:56.786   436  1645 V SystemServerTiming: TM.isInCall took to complete: 0ms

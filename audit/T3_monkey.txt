@@ -1,0 +1,1176 @@
+  bash arg: -p
+  bash arg: com.sushant.bahikhata
+  bash arg: -s
+  bash arg: 42
+  bash arg: --throttle
+  bash arg: 80
+  bash arg: --pct-syskeys
+  bash arg: 0
+  bash arg: -v
+  bash arg: 5000
+args: [-p, com.sushant.bahikhata, -s, 42, --throttle, 80, --pct-syskeys, 0, -v, 5000]
+ arg: "-p"
+ arg: "com.sushant.bahikhata"
+ arg: "-s"
+ arg: "42"
+ arg: "--throttle"
+ arg: "80"
+ arg: "--pct-syskeys"
+ arg: "0"
+ arg: "-v"
+ arg: "5000"
+data="com.sushant.bahikhata"
+data="42"
+arg="--throttle" mCurArgData="null" mNextArg=5 argwas="--throttle" nextarg="80"
+data="80"
+arg="--pct-syskeys" mCurArgData="null" mNextArg=7 argwas="--pct-syskeys" nextarg="0"
+data="0"
+:Monkey: seed=42 count=5000
+:AllowPackage: com.sushant.bahikhata
+:IncludeCategory: android.intent.category.LAUNCHER
+:IncludeCategory: android.intent.category.MONKEY
+// Event percentages:
+//   0: 15.306122%
+//   1: 10.204082%
+//   2: 2.0408163%
+//   3: 15.306122%
+//   4: -0.0%
+//   5: -0.0%
+//   6: 25.510204%
+//   7: 15.306122%
+//   8: -0.0%
+//   9: 2.0408163%
+//   10: 1.0204082%
+//   11: 13.265306%
+:Switch: #Intent;action=android.intent.action.MAIN;category=android.intent.category.LAUNCHER;launchFlags=0x10200000;component=com.sushant.bahikhata/.MainActivity;end
+    // Allowing start of Intent { act=android.intent.action.MAIN cat=[android.intent.category.LAUNCHER] cmp=com.sushant.bahikhata/.MainActivity } in package com.sushant.bahikhata
+:Sending Touch (ACTION_DOWN): 0:(1008.0,648.0)
+:Sending Touch (ACTION_UP): 0:(1005.35004,663.643)
+:Sending Trackball (ACTION_MOVE): 0:(-3.0,1.0)
+:Sending Touch (ACTION_DOWN): 0:(493.0,1501.0)
+:Sending Touch (ACTION_UP): 0:(457.87582,1519.7988)
+:Sending Trackball (ACTION_MOVE): 0:(-5.0,-2.0)
+:Sending Touch (ACTION_DOWN): 0:(753.0,1513.0)
+:Sending Touch (ACTION_UP): 0:(763.9854,1512.4431)
+:Sending Trackball (ACTION_MOVE): 0:(4.0,-2.0)
+:Sending Touch (ACTION_DOWN): 0:(1006.0,2156.0)
+:Sending Touch (ACTION_UP): 0:(985.07526,2081.8555)
+:Sending Touch (ACTION_DOWN): 0:(173.0,1026.0)
+:Sending Touch (ACTION_UP): 0:(172.13771,1029.9968)
+:Sending Trackball (ACTION_MOVE): 0:(0.0,-4.0)
+:Sending Trackball (ACTION_MOVE): 0:(-4.0,-3.0)
+:Sending Touch (ACTION_DOWN): 0:(383.0,1417.0)
+:Sending Touch (ACTION_UP): 0:(378.01694,1406.4639)
+    //[calendar_time:2026-11-21 12:02:27.063  system_uptime:189471]
+    // Sending event #100
+    //[calendar_time:2026-11-21 12:02:27.153  system_uptime:189552]
+    // Sending event #100
+:Sending Touch (ACTION_DOWN): 0:(750.0,2084.0)
+:Sending Touch (ACTION_UP): 0:(750.8976,2078.488)
+:Sending Touch (ACTION_DOWN): 0:(563.0,1802.0)
+:Sending Touch (ACTION_UP): 0:(544.16754,1814.3773)
+:Sending Touch (ACTION_DOWN): 0:(907.0,1672.0)
+:Sending Touch (ACTION_UP): 0:(916.1878,1677.8293)
+:Sending Touch (ACTION_DOWN): 0:(921.0,1192.0)
+:Sending Touch (ACTION_UP): 0:(1009.73535,1221.5725)
+:Switch: #Intent;action=android.intent.action.MAIN;category=android.intent.category.LAUNCHER;launchFlags=0x10200000;component=com.sushant.bahikhata/leakcanary.internal.activity.LeakLauncherActivity;end
+    // Allowing start of Intent { act=android.intent.action.MAIN cat=[android.intent.category.LAUNCHER] cmp=com.sushant.bahikhata/leakcanary.internal.activity.LeakLauncherActivity } in package com.sushant.bahikhata
+:Sending Touch (ACTION_DOWN): 0:(738.0,1082.0)
+:Sending Touch (ACTION_UP): 0:(734.5878,1082.3274)
+    // Allowing start of Intent { act=android.intent.action.MAIN cat=[android.intent.category.HOME] cmp=com.google.android.apps.nexuslauncher/.NexusLauncherActivity } in package com.google.android.apps.nexuslauncher
+:Sending Trackball (ACTION_MOVE): 0:(-2.0,-1.0)
+:Sending Trackball (ACTION_MOVE): 0:(2.0,-2.0)
+:Sending Touch (ACTION_DOWN): 0:(976.0,1692.0)
+:Sending Touch (ACTION_UP): 0:(1018.1666,1637.981)
+:Sending Touch (ACTION_DOWN): 0:(1002.0,1564.0)
+    //[calendar_time:2026-11-21 12:02:32.903  system_uptime:195302]
+    // Sending event #200
+:Sending Touch (ACTION_UP): 0:(1016.28845,1588.2755)
+:Sending Touch (ACTION_DOWN): 0:(307.0,1332.0)
+:Sending Touch (ACTION_UP): 0:(306.41153,1365.9467)
+    // Rejecting start of Intent { act=android.intent.action.MAIN cat=[android.intent.category.LAUNCHER] cmp=com.google.android.apps.maps/com.google.android.maps.MapsActivity } in package com.google.android.apps.maps
+:Sending Trackball (ACTION_MOVE): 0:(-1.0,4.0)
+:Sending Trackball (ACTION_UP): 0:(0.0,0.0)
+    // Rejecting start of Intent { act=android.intent.action.MAIN cat=[android.intent.category.LAUNCHER] cmp=com.google.android.youtube/.app.honeycomb.Shell$HomeActivity } in package com.google.android.youtube
+:Sending Touch (ACTION_DOWN): 0:(497.0,1435.0)
+:Sending Touch (ACTION_UP): 0:(496.63596,1432.3357)
+    // Rejecting start of Intent { act=android.intent.action.MAIN cat=[android.intent.category.LAUNCHER] cmp=com.google.android.googlequicksearchbox/.SearchActivity } in package com.google.android.googlequicksearchbox
+:Sending Touch (ACTION_DOWN): 0:(639.0,1352.0)
+:Sending Touch (ACTION_UP): 0:(600.9898,1353.3739)
+    // Rejecting start of Intent { act=android.intent.action.MAIN cat=[android.intent.category.LAUNCHER] cmp=com.google.android.apps.docs/.app.NewMainProxyActivity } in package com.google.android.apps.docs
+:Sending Touch (ACTION_DOWN): 0:(687.0,1991.0)
+:Sending Touch (ACTION_UP): 0:(679.07306,2012.8533)
+    // Rejecting start of Intent { act=android.intent.action.MAIN cat=[android.intent.category.LAUNCHER] cmp=com.google.android.gm/.ConversationListActivityGmail } in package com.google.android.gm
+:Switch: #Intent;action=android.intent.action.MAIN;category=android.intent.category.LAUNCHER;launchFlags=0x10200000;component=com.sushant.bahikhata/leakcanary.internal.activity.LeakLauncherActivity;end
+    // Allowing start of Intent { act=android.intent.action.MAIN cat=[android.intent.category.LAUNCHER] cmp=com.sushant.bahikhata/leakcanary.internal.activity.LeakLauncherActivity } in package com.sushant.bahikhata
+:Sending Trackball (ACTION_MOVE): 0:(-1.0,-4.0)
+:Sending Trackball (ACTION_UP): 0:(0.0,0.0)
+:Sending Trackball (ACTION_MOVE): 0:(0.0,-5.0)
+:Sending Touch (ACTION_DOWN): 0:(607.0,734.0)
+:Sending Touch (ACTION_UP): 0:(610.75507,738.2084)
+:Sending Trackball (ACTION_MOVE): 0:(2.0,-2.0)
+:Sending Touch (ACTION_DOWN): 0:(636.0,1986.0)
+:Sending Touch (ACTION_UP): 0:(629.0353,1975.3516)
+:Sending Touch (ACTION_DOWN): 0:(813.0,2121.0)
+:Sending Touch (ACTION_UP): 0:(790.81824,2116.1023)
+:Sending Touch (ACTION_DOWN): 0:(565.0,2118.0)
+    //[calendar_time:2026-11-21 12:02:36.141  system_uptime:198539]
+    // Sending event #300
+:Sending Touch (ACTION_UP): 0:(627.6952,2048.3599)
+:Sending Trackball (ACTION_MOVE): 0:(-4.0,2.0)
+    // Rejecting start of Intent { act=android.speech.action.WEB_SEARCH cmp=com.google.android.googlequicksearchbox/.SearchActivity } in package com.google.android.googlequicksearchbox
+:Sending Touch (ACTION_DOWN): 0:(804.0,1080.0)
+:Sending Touch (ACTION_UP): 0:(791.73615,1196.5864)
+:Sending Touch (ACTION_DOWN): 0:(669.0,1819.0)
+:Sending Touch (ACTION_UP): 0:(671.9807,1833.0083)
+:Sending Trackball (ACTION_MOVE): 0:(1.0,3.0)
+:Sending Touch (ACTION_DOWN): 0:(701.0,2002.0)
+:Sending Touch (ACTION_UP): 0:(702.5406,2005.8798)
+:Sending Touch (ACTION_DOWN): 0:(258.0,852.0)
+:Sending Touch (ACTION_UP): 0:(258.859,851.40765)
+:Sending Touch (ACTION_DOWN): 0:(631.0,466.0)
+:Sending Touch (ACTION_UP): 0:(606.0755,499.4201)
+:Sending Trackball (ACTION_MOVE): 0:(3.0,4.0)
+:Sending Touch (ACTION_DOWN): 0:(659.0,284.0)
+:Sending Touch (ACTION_UP): 0:(658.27313,279.94788)
+:Sending Trackball (ACTION_MOVE): 0:(-5.0,2.0)
+:Sending Trackball (ACTION_MOVE): 0:(-5.0,-4.0)
+    //[calendar_time:2026-11-21 12:02:38.012  system_uptime:200411]
+    // Sending event #400
+:Sending Touch (ACTION_DOWN): 0:(161.0,1032.0)
+:Sending Touch (ACTION_UP): 0:(176.4128,1046.74)
+:Sending Trackball (ACTION_MOVE): 0:(4.0,3.0)
+:Sending Touch (ACTION_DOWN): 0:(771.0,868.0)
+:Sending Touch (ACTION_UP): 0:(750.7931,844.9786)
+:Sending Touch (ACTION_DOWN): 0:(666.0,1249.0)
+:Sending Touch (ACTION_UP): 0:(661.03625,1266.3694)
+:Sending Trackball (ACTION_MOVE): 0:(-2.0,1.0)
+:Sending Touch (ACTION_DOWN): 0:(199.0,1156.0)
+:Sending Touch (ACTION_UP): 0:(205.3869,1158.4998)
+:Sending Touch (ACTION_DOWN): 0:(762.0,1309.0)
+:Sending Touch (ACTION_UP): 0:(757.8108,1304.2422)
+:Sending Touch (ACTION_DOWN): 0:(126.0,2053.0)
+:Sending Touch (ACTION_UP): 0:(137.45807,2049.4111)
+:Sending Trackball (ACTION_MOVE): 0:(-4.0,0.0)
+:Sending Trackball (ACTION_MOVE): 0:(3.0,0.0)
+:Switch: #Intent;action=android.intent.action.MAIN;category=android.intent.category.LAUNCHER;launchFlags=0x10200000;component=com.sushant.bahikhata/.MainActivity;end
+    // Allowing start of Intent { act=android.intent.action.MAIN cat=[android.intent.category.LAUNCHER] cmp=com.sushant.bahikhata/.MainActivity } in package com.sushant.bahikhata
+:Sending Trackball (ACTION_MOVE): 0:(3.0,3.0)
+:Sending Touch (ACTION_DOWN): 0:(451.0,769.0)
+:Sending Touch (ACTION_UP): 0:(437.23087,768.0673)
+:Sending Touch (ACTION_DOWN): 0:(444.0,2134.0)
+:Sending Touch (ACTION_UP): 0:(451.1419,2138.5605)
+:Sending Trackball (ACTION_MOVE): 0:(2.0,-3.0)
+    //[calendar_time:2026-11-21 12:02:40.505  system_uptime:202904]
+    // Sending event #500
+:Sending Trackball (ACTION_MOVE): 0:(2.0,-1.0)
+:Sending Trackball (ACTION_MOVE): 0:(-1.0,-4.0)
+:Sending Trackball (ACTION_MOVE): 0:(-1.0,-4.0)
+:Sending Trackball (ACTION_MOVE): 0:(3.0,1.0)
+:Sending Touch (ACTION_DOWN): 0:(79.0,2102.0)
+:Sending Touch (ACTION_UP): 0:(4.2439137,2158.741)
+:Sending Touch (ACTION_DOWN): 0:(155.0,594.0)
+:Sending Touch (ACTION_UP): 0:(31.92422,715.08887)
+:Sending Trackball (ACTION_MOVE): 0:(2.0,-4.0)
+:Sending Trackball (ACTION_MOVE): 0:(-2.0,0.0)
+    //[calendar_time:2026-11-21 12:02:44.925  system_uptime:207323]
+    // Sending event #600
+:Sending Trackball (ACTION_MOVE): 0:(-4.0,-4.0)
+:Sending Touch (ACTION_DOWN): 0:(606.0,592.0)
+:Sending Touch (ACTION_UP): 0:(599.39874,586.7758)
+:Sending Trackball (ACTION_MOVE): 0:(2.0,3.0)
+:Sending Trackball (ACTION_MOVE): 0:(-5.0,-1.0)
+:Sending Touch (ACTION_DOWN): 0:(8.0,1393.0)
+:Sending Touch (ACTION_UP): 0:(5.965501,1389.1953)
+:Sending Trackball (ACTION_MOVE): 0:(-5.0,0.0)
+:Switch: #Intent;action=android.intent.action.MAIN;category=android.intent.category.LAUNCHER;launchFlags=0x10200000;component=com.sushant.bahikhata/leakcanary.internal.activity.LeakLauncherActivity;end
+    // Allowing start of Intent { act=android.intent.action.MAIN cat=[android.intent.category.LAUNCHER] cmp=com.sushant.bahikhata/leakcanary.internal.activity.LeakLauncherActivity } in package com.sushant.bahikhata
+:Sending Touch (ACTION_DOWN): 0:(939.0,1861.0)
+:Sending Touch (ACTION_UP): 0:(972.77716,1861.1472)
+:Sending Trackball (ACTION_MOVE): 0:(-3.0,-4.0)
+:Sending Touch (ACTION_DOWN): 0:(29.0,693.0)
+:Sending Touch (ACTION_UP): 0:(0.0,630.5615)
+:Switch: #Intent;action=android.intent.action.MAIN;category=android.intent.category.LAUNCHER;launchFlags=0x10200000;component=com.sushant.bahikhata/.MainActivity;end
+    // Allowing start of Intent { act=android.intent.action.MAIN cat=[android.intent.category.LAUNCHER] cmp=com.sushant.bahikhata/.MainActivity } in package com.sushant.bahikhata
+:Sending Touch (ACTION_DOWN): 0:(17.0,1260.0)
+:Sending Touch (ACTION_UP): 0:(17.949873,1240.4254)
+    //[calendar_time:2026-11-21 12:02:49.375  system_uptime:211774]
+    // Sending event #700
+    //[calendar_time:2026-11-21 12:02:49.465  system_uptime:211864]
+    // Sending event #700
+:Sending Trackball (ACTION_MOVE): 0:(-3.0,-4.0)
+:Sending Trackball (ACTION_UP): 0:(0.0,0.0)
+:Sending Touch (ACTION_DOWN): 0:(711.0,1991.0)
+:Sending Touch (ACTION_UP): 0:(715.4358,1988.0107)
+:Sending Touch (ACTION_DOWN): 0:(1058.0,1668.0)
+:Sending Touch (ACTION_UP): 0:(1066.9797,1679.5146)
+:Sending Touch (ACTION_DOWN): 0:(26.0,1668.0)
+:Sending Touch (ACTION_UP): 0:(91.77583,1627.0454)
+:Sending Touch (ACTION_DOWN): 0:(381.0,2130.0)
+:Sending Touch (ACTION_UP): 0:(367.53296,2145.5195)
+:Sending Trackball (ACTION_MOVE): 0:(0.0,-2.0)
+:Sending Trackball (ACTION_MOVE): 0:(-2.0,3.0)
+:Sending Touch (ACTION_DOWN): 0:(66.0,1710.0)
+:Sending Touch (ACTION_UP): 0:(106.35076,1694.284)
+:Sending Trackball (ACTION_MOVE): 0:(-4.0,0.0)
+:Sending Touch (ACTION_DOWN): 0:(286.0,1664.0)
+:Sending Touch (ACTION_UP): 0:(279.0279,1667.4412)
+:Sending Touch (ACTION_DOWN): 0:(467.0,282.0)
+:Sending Touch (ACTION_UP): 0:(393.99155,244.16327)
+:Sending Touch (ACTION_DOWN): 0:(297.0,1343.0)
+:Sending Touch (ACTION_UP): 0:(283.4494,1318.9725)
+:Sending Touch (ACTION_DOWN): 0:(479.0,1743.0)
+:Sending Touch (ACTION_UP): 0:(481.38113,1752.4042)
+:Sending Touch (ACTION_DOWN): 0:(1040.0,1008.0)
+:Sending Touch (ACTION_UP): 0:(1047.8953,994.6128)
+:Switch: #Intent;action=android.intent.action.MAIN;category=android.intent.category.LAUNCHER;launchFlags=0x10200000;component=com.sushant.bahikhata/.MainActivity;end
+    // Allowing start of Intent { act=android.intent.action.MAIN cat=[android.intent.category.LAUNCHER] cmp=com.sushant.bahikhata/.MainActivity } in package com.sushant.bahikhata
+:Sending Touch (ACTION_DOWN): 0:(445.0,1176.0)
+:Sending Touch (ACTION_UP): 0:(444.61096,1164.2201)
+:Sending Touch (ACTION_DOWN): 0:(651.0,1711.0)
+    //[calendar_time:2026-11-21 12:02:52.303  system_uptime:214702]
+    // Sending event #800
+:Sending Touch (ACTION_UP): 0:(647.02405,1703.1104)
+:Sending Trackball (ACTION_MOVE): 0:(-4.0,0.0)
+:Sending Trackball (ACTION_MOVE): 0:(2.0,-2.0)
+:Sending Touch (ACTION_DOWN): 0:(932.0,5.0)
+:Sending Touch (ACTION_UP): 0:(925.4985,6.397008)
+:Sending Trackball (ACTION_MOVE): 0:(-1.0,-2.0)
+:Sending Touch (ACTION_DOWN): 0:(351.0,1686.0)
+:Sending Touch (ACTION_UP): 0:(384.8496,1698.3601)
+:Sending Touch (ACTION_DOWN): 0:(947.0,1900.0)
+:Sending Touch (ACTION_UP): 0:(853.60504,1975.0051)
+:Sending Touch (ACTION_DOWN): 0:(1055.0,879.0)
+:Sending Touch (ACTION_UP): 0:(1080.0,974.08124)
+:Sending Touch (ACTION_DOWN): 0:(977.0,1013.0)
+:Sending Touch (ACTION_UP): 0:(956.4757,998.1089)
+:Sending Trackball (ACTION_MOVE): 0:(-4.0,-5.0)
+:Sending Trackball (ACTION_MOVE): 0:(-5.0,2.0)
+    //[calendar_time:2026-11-21 12:02:54.350  system_uptime:216748]
+    // Sending event #900
+:Sending Touch (ACTION_DOWN): 0:(739.0,2049.0)
+:Sending Touch (ACTION_UP): 0:(772.6329,2046.8574)
+:Sending Touch (ACTION_DOWN): 0:(188.0,1089.0)
+:Sending Touch (ACTION_UP): 0:(138.12874,1143.627)
+:Sending Touch (ACTION_DOWN): 0:(262.0,1283.0)
+:Sending Touch (ACTION_UP): 0:(275.6639,1275.5809)
+:Sending Trackball (ACTION_MOVE): 0:(2.0,1.0)
+:Sending Touch (ACTION_DOWN): 0:(877.0,65.0)
+:Sending Touch (ACTION_UP): 0:(879.3451,55.587597)
+:Sending Touch (ACTION_DOWN): 0:(548.0,795.0)
+:Sending Touch (ACTION_UP): 0:(580.6102,763.2)
+:Sending Touch (ACTION_DOWN): 0:(728.0,162.0)
+:Sending Touch (ACTION_UP): 0:(663.38293,154.48172)
+:Sending Touch (ACTION_DOWN): 0:(992.0,1441.0)
+:Sending Touch (ACTION_UP): 0:(1080.0,1344.6036)
+:Sending Trackball (ACTION_MOVE): 0:(-3.0,2.0)
+:Sending Trackball (ACTION_MOVE): 0:(-3.0,-1.0)
+    //[calendar_time:2026-11-21 12:02:57.376  system_uptime:219774]
+    // Sending event #1000
+:Sending Touch (ACTION_DOWN): 0:(936.0,24.0)
+:Sending Touch (ACTION_UP): 0:(995.53015,83.62531)
+:Sending Touch (ACTION_DOWN): 0:(1004.0,2116.0)
+:Sending Touch (ACTION_UP): 0:(1016.96716,2125.9734)
+:Sending Touch (ACTION_DOWN): 0:(167.0,1658.0)
+:Sending Touch (ACTION_UP): 0:(108.506134,1612.6467)
+:Sending Touch (ACTION_DOWN): 0:(745.0,301.0)
+:Sending Touch (ACTION_UP): 0:(743.45184,301.15186)
+:Sending Touch (ACTION_DOWN): 0:(248.0,2170.0)
+:Sending Touch (ACTION_UP): 0:(255.9637,2160.024)
+:Sending Touch (ACTION_DOWN): 0:(591.0,1483.0)
+:Sending Touch (ACTION_UP): 0:(663.80756,1541.5421)
+:Sending Touch (ACTION_DOWN): 0:(507.0,1584.0)
+:Sending Touch (ACTION_UP): 0:(524.4207,1502.8737)
+:Sending Touch (ACTION_DOWN): 0:(1038.0,802.0)
+:Sending Touch (ACTION_UP): 0:(1027.3989,779.6964)
+:Sending Trackball (ACTION_MOVE): 0:(0.0,-2.0)
+:Sending Trackball (ACTION_MOVE): 0:(0.0,2.0)
+    //[calendar_time:2026-11-21 12:03:00.386  system_uptime:222785]
+    // Sending event #1100
+:Sending Touch (ACTION_DOWN): 0:(876.0,1618.0)
+:Sending Touch (ACTION_UP): 0:(874.3459,1615.652)
+:Sending Trackball (ACTION_MOVE): 0:(-5.0,-3.0)
+:Sending Touch (ACTION_DOWN): 0:(827.0,1539.0)
+:Sending Touch (ACTION_UP): 0:(827.58813,1528.5221)
+:Sending Touch (ACTION_DOWN): 0:(73.0,804.0)
+:Sending Touch (ACTION_UP): 0:(74.63241,803.38385)
+:Sending Trackball (ACTION_MOVE): 0:(1.0,4.0)
+:Sending Touch (ACTION_DOWN): 0:(962.0,776.0)
+:Sending Touch (ACTION_UP): 0:(1038.9039,812.5484)
+:Sending Touch (ACTION_DOWN): 0:(984.0,1995.0)
+:Sending Touch (ACTION_UP): 0:(974.0636,1994.988)
+:Sending Touch (ACTION_DOWN): 0:(671.0,910.0)
+:Sending Touch (ACTION_UP): 0:(668.41235,909.2388)
+:Sending Trackball (ACTION_MOVE): 0:(-1.0,-4.0)
+:Sending Trackball (ACTION_MOVE): 0:(4.0,-2.0)
+:Sending Touch (ACTION_DOWN): 0:(765.0,1022.0)
+:Sending Touch (ACTION_UP): 0:(763.03394,1038.0367)
+:Switch: #Intent;action=android.intent.action.MAIN;category=android.intent.category.LAUNCHER;launchFlags=0x10200000;component=com.sushant.bahikhata/leakcanary.internal.activity.LeakLauncherActivity;end
+    // Allowing start of Intent { act=android.intent.action.MAIN cat=[android.intent.category.LAUNCHER] cmp=com.sushant.bahikhata/leakcanary.internal.activity.LeakLauncherActivity } in package com.sushant.bahikhata
+:Sending Touch (ACTION_DOWN): 0:(994.0,1585.0)
+    //[calendar_time:2026-11-21 12:03:03.283  system_uptime:225682]
+    // Sending event #1200
+:Sending Touch (ACTION_UP): 0:(996.919,1582.7211)
+:Sending Touch (ACTION_DOWN): 0:(182.0,1666.0)
+:Sending Touch (ACTION_UP): 0:(216.9197,1635.9384)
+:Sending Trackball (ACTION_MOVE): 0:(-2.0,-4.0)
+:Sending Touch (ACTION_DOWN): 0:(168.0,2063.0)
+:Sending Touch (ACTION_UP): 0:(272.40677,2029.2828)
+    // Rejecting start of Intent { act=android.intent.action.CHOOSER cmp=android/com.android.internal.app.ChooserActivity } in package android
+:Sending Touch (ACTION_DOWN): 0:(391.0,743.0)
+:Sending Touch (ACTION_UP): 0:(389.48218,743.75104)
+:Sending Touch (ACTION_DOWN): 0:(868.0,787.0)
+:Sending Touch (ACTION_UP): 0:(858.9772,786.76605)
+:Sending Touch (ACTION_DOWN): 0:(497.0,258.0)
+:Sending Touch (ACTION_UP): 0:(491.83536,256.46176)
+:Sending Trackball (ACTION_MOVE): 0:(2.0,3.0)
+:Sending Trackball (ACTION_MOVE): 0:(1.0,-2.0)
+:Sending Touch (ACTION_DOWN): 0:(162.0,77.0)
+:Sending Touch (ACTION_UP): 0:(152.94644,81.538246)
+    // Rejecting start of Intent { act=android.intent.action.CHOOSER cmp=android/com.android.internal.app.ChooserActivity } in package android
+:Sending Trackball (ACTION_MOVE): 0:(-2.0,2.0)
+:Sending Trackball (ACTION_MOVE): 0:(4.0,1.0)
+    //[calendar_time:2026-11-21 12:03:06.808  system_uptime:229206]
+    // Sending event #1300
+:Sending Trackball (ACTION_MOVE): 0:(-5.0,-1.0)
+:Sending Touch (ACTION_DOWN): 0:(18.0,1045.0)
+:Sending Touch (ACTION_UP): 0:(2.4358902,1046.7579)
+:Sending Touch (ACTION_DOWN): 0:(984.0,242.0)
+:Sending Touch (ACTION_UP): 0:(939.9658,274.85574)
+:Sending Touch (ACTION_DOWN): 0:(787.0,422.0)
+:Sending Touch (ACTION_UP): 0:(794.7242,418.1458)
+:Switch: #Intent;action=android.intent.action.MAIN;category=android.intent.category.LAUNCHER;launchFlags=0x10200000;component=com.sushant.bahikhata/leakcanary.internal.activity.LeakLauncherActivity;end
+    // Allowing start of Intent { act=android.intent.action.MAIN cat=[android.intent.category.LAUNCHER] cmp=com.sushant.bahikhata/leakcanary.internal.activity.LeakLauncherActivity } in package com.sushant.bahikhata
+    // Rejecting start of Intent { act=android.intent.action.CHOOSER cmp=android/com.android.internal.app.ChooserActivity } in package android
+:Sending Touch (ACTION_DOWN): 0:(160.0,1342.0)
+:Sending Touch (ACTION_UP): 0:(159.83028,1340.355)
+:Sending Touch (ACTION_DOWN): 0:(487.0,1019.0)
+:Sending Touch (ACTION_UP): 0:(471.08826,1029.1041)
+:Sending Trackball (ACTION_MOVE): 0:(4.0,1.0)
+:Sending Touch (ACTION_DOWN): 0:(884.0,120.0)
+:Sending Touch (ACTION_UP): 0:(887.4986,108.8305)
+:Sending Touch (ACTION_DOWN): 0:(936.0,976.0)
+:Sending Touch (ACTION_UP): 0:(940.5962,963.3901)
+:Sending Touch (ACTION_DOWN): 0:(53.0,662.0)
+:Sending Touch (ACTION_UP): 0:(55.837284,661.7202)
+:Sending Touch (ACTION_DOWN): 0:(537.0,1623.0)
+:Sending Touch (ACTION_UP): 0:(549.1454,1621.3082)
+:Sending Trackball (ACTION_MOVE): 0:(-2.0,2.0)
+:Sending Trackball (ACTION_UP): 0:(0.0,0.0)
+:Sending Trackball (ACTION_MOVE): 0:(-4.0,-4.0)
+    //[calendar_time:2026-11-21 12:03:08.782  system_uptime:231181]
+    // Sending event #1400
+:Sending Trackball (ACTION_UP): 0:(0.0,0.0)
+:Sending Touch (ACTION_DOWN): 0:(121.0,1992.0)
+:Sending Touch (ACTION_UP): 0:(139.68692,1992.4514)
+:Sending Trackball (ACTION_MOVE): 0:(-1.0,4.0)
+:Sending Touch (ACTION_DOWN): 0:(943.0,543.0)
+:Sending Touch (ACTION_UP): 0:(947.86945,551.5738)
+:Sending Touch (ACTION_DOWN): 0:(716.0,1040.0)
+:Sending Touch (ACTION_UP): 0:(716.87524,1039.5482)
+:Sending Trackball (ACTION_MOVE): 0:(2.0,1.0)
+:Sending Trackball (ACTION_MOVE): 0:(1.0,-1.0)
+:Sending Touch (ACTION_DOWN): 0:(6.0,1395.0)
+:Sending Touch (ACTION_UP): 0:(6.870966,1394.7881)
+:Switch: #Intent;action=android.intent.action.MAIN;category=android.intent.category.LAUNCHER;launchFlags=0x10200000;component=com.sushant.bahikhata/.MainActivity;end
+    // Allowing start of Intent { act=android.intent.action.MAIN cat=[android.intent.category.LAUNCHER] cmp=com.sushant.bahikhata/.MainActivity } in package com.sushant.bahikhata
+:Sending Touch (ACTION_DOWN): 0:(678.0,555.0)
+:Sending Touch (ACTION_UP): 0:(673.878,504.30704)
+:Sending Touch (ACTION_DOWN): 0:(890.0,243.0)
+:Sending Touch (ACTION_UP): 0:(897.4428,249.47331)
+:Sending Touch (ACTION_DOWN): 0:(190.0,1830.0)
+:Sending Touch (ACTION_UP): 0:(183.48587,1804.571)
+:Sending Touch (ACTION_DOWN): 0:(115.0,1081.0)
+:Sending Touch (ACTION_UP): 0:(113.42606,1062.1494)
+:Sending Touch (ACTION_DOWN): 0:(854.0,1931.0)
+:Sending Touch (ACTION_UP): 0:(853.50006,1929.2037)
+:Switch: #Intent;action=android.intent.action.MAIN;category=android.intent.category.LAUNCHER;launchFlags=0x10200000;component=com.sushant.bahikhata/leakcanary.internal.activity.LeakLauncherActivity;end
+    // Allowing start of Intent { act=android.intent.action.MAIN cat=[android.intent.category.LAUNCHER] cmp=com.sushant.bahikhata/leakcanary.internal.activity.LeakLauncherActivity } in package com.sushant.bahikhata
+:Sending Trackball (ACTION_MOVE): 0:(1.0,-2.0)
+    //[calendar_time:2026-11-21 12:03:13.100  system_uptime:235499]
+    // Sending event #1500
+:Sending Trackball (ACTION_MOVE): 0:(-2.0,1.0)
+:Sending Touch (ACTION_DOWN): 0:(604.0,1185.0)
+:Sending Touch (ACTION_UP): 0:(585.8161,1221.7656)
+    // Rejecting start of Intent { act=android.intent.action.VIEW dat=https://github.com/... cmp=com.android.chrome/com.google.android.apps.chrome.IntentDispatcher } in package com.android.chrome
+:Sending Touch (ACTION_DOWN): 0:(300.0,803.0)
+:Sending Touch (ACTION_UP): 0:(319.91132,836.21533)
+:Sending Touch (ACTION_DOWN): 0:(1074.0,1649.0)
+:Sending Touch (ACTION_UP): 0:(1080.0,1684.3768)
+:Sending Trackball (ACTION_MOVE): 0:(-4.0,2.0)
+:Switch: #Intent;action=android.intent.action.MAIN;category=android.intent.category.LAUNCHER;launchFlags=0x10200000;component=com.sushant.bahikhata/.MainActivity;end
+    // Allowing start of Intent { act=android.intent.action.MAIN cat=[android.intent.category.LAUNCHER] cmp=com.sushant.bahikhata/.MainActivity } in package com.sushant.bahikhata
+:Sending Touch (ACTION_DOWN): 0:(439.0,119.0)
+:Sending Touch (ACTION_UP): 0:(428.00388,116.87277)
+:Sending Trackball (ACTION_MOVE): 0:(-2.0,0.0)
+:Sending Trackball (ACTION_UP): 0:(0.0,0.0)
+:Sending Trackball (ACTION_MOVE): 0:(1.0,4.0)
+:Switch: #Intent;action=android.intent.action.MAIN;category=android.intent.category.LAUNCHER;launchFlags=0x10200000;component=com.sushant.bahikhata/.MainActivity;end
+    // Allowing start of Intent { act=android.intent.action.MAIN cat=[android.intent.category.LAUNCHER] cmp=com.sushant.bahikhata/.MainActivity } in package com.sushant.bahikhata
+:Sending Touch (ACTION_DOWN): 0:(831.0,1395.0)
+:Sending Touch (ACTION_UP): 0:(829.0187,1395.976)
+:Sending Trackball (ACTION_MOVE): 0:(1.0,-3.0)
+:Sending Touch (ACTION_DOWN): 0:(198.0,1974.0)
+    //[calendar_time:2026-11-21 12:03:15.613  system_uptime:238012]
+    // Sending event #1600
+:Sending Touch (ACTION_UP): 0:(102.54129,1997.3368)
+:Sending Touch (ACTION_DOWN): 0:(1009.0,1711.0)
+:Sending Touch (ACTION_UP): 0:(1010.1805,1722.6013)
+:Sending Trackball (ACTION_MOVE): 0:(2.0,-1.0)
+:Sending Touch (ACTION_DOWN): 0:(364.0,1268.0)
+:Sending Touch (ACTION_UP): 0:(371.43045,1309.7628)
+:Sending Touch (ACTION_DOWN): 0:(696.0,2114.0)
+:Sending Touch (ACTION_UP): 0:(697.05994,2106.3347)
+:Sending Trackball (ACTION_MOVE): 0:(-3.0,-4.0)
+:Sending Trackball (ACTION_MOVE): 0:(-1.0,0.0)
+:Switch: #Intent;action=android.intent.action.MAIN;category=android.intent.category.LAUNCHER;launchFlags=0x10200000;component=com.sushant.bahikhata/.MainActivity;end
+    // Allowing start of Intent { act=android.intent.action.MAIN cat=[android.intent.category.LAUNCHER] cmp=com.sushant.bahikhata/.MainActivity } in package com.sushant.bahikhata
+:Sending Touch (ACTION_DOWN): 0:(263.0,1167.0)
+:Sending Touch (ACTION_UP): 0:(267.53854,1165.6208)
+:Sending Touch (ACTION_DOWN): 0:(488.0,132.0)
+:Sending Touch (ACTION_UP): 0:(476.65945,125.99829)
+:Sending Trackball (ACTION_MOVE): 0:(-5.0,3.0)
+:Sending Trackball (ACTION_MOVE): 0:(3.0,3.0)
+:Sending Trackball (ACTION_MOVE): 0:(-5.0,4.0)
+    //[calendar_time:2026-11-21 12:03:17.583  system_uptime:239982]
+    // Sending event #1700
+:Sending Touch (ACTION_DOWN): 0:(6.0,1194.0)
+:Sending Touch (ACTION_UP): 0:(0.0,1187.6083)
+:Sending Trackball (ACTION_MOVE): 0:(0.0,1.0)
+:Sending Touch (ACTION_DOWN): 0:(791.0,1792.0)
+:Sending Touch (ACTION_UP): 0:(789.4362,1773.915)
+:Sending Touch (ACTION_DOWN): 0:(671.0,666.0)
+:Sending Touch (ACTION_UP): 0:(672.93823,667.3471)
+:Sending Trackball (ACTION_MOVE): 0:(2.0,-3.0)
+:Sending Touch (ACTION_DOWN): 0:(327.0,676.0)
+:Sending Touch (ACTION_UP): 0:(341.3634,670.0905)
+:Sending Touch (ACTION_DOWN): 0:(327.0,1830.0)
+:Sending Touch (ACTION_UP): 0:(394.00424,1804.087)
+:Sending Touch (ACTION_DOWN): 0:(844.0,94.0)
+:Sending Touch (ACTION_UP): 0:(851.351,108.596054)
+:Sending Trackball (ACTION_MOVE): 0:(4.0,-3.0)
+:Sending Trackball (ACTION_MOVE): 0:(-3.0,3.0)
+:Sending Touch (ACTION_DOWN): 0:(575.0,1159.0)
+    //[calendar_time:2026-11-21 12:03:20.176  system_uptime:242574]
+    // Sending event #1800
+:Sending Touch (ACTION_UP): 0:(577.0336,1146.7206)
+:Sending Touch (ACTION_DOWN): 0:(395.0,1169.0)
+:Sending Touch (ACTION_UP): 0:(395.50198,1186.227)
+:Sending Touch (ACTION_DOWN): 0:(142.0,1376.0)
+:Sending Touch (ACTION_UP): 0:(130.60588,1381.4382)
+:Sending Touch (ACTION_DOWN): 0:(241.0,740.0)
+:Sending Touch (ACTION_UP): 0:(255.32417,749.6707)
+:Sending Touch (ACTION_DOWN): 0:(89.0,255.0)
+:Sending Touch (ACTION_UP): 0:(88.33027,257.2423)
+:Sending Touch (ACTION_DOWN): 0:(983.0,1194.0)
+:Sending Touch (ACTION_UP): 0:(967.638,1192.6609)
+:Sending Trackball (ACTION_MOVE): 0:(-3.0,3.0)
+:Sending Touch (ACTION_DOWN): 0:(741.0,269.0)
+:Sending Touch (ACTION_UP): 0:(749.3148,271.58185)
+:Sending Trackball (ACTION_MOVE): 0:(-3.0,1.0)
+:Sending Trackball (ACTION_MOVE): 0:(1.0,3.0)
+:Sending Touch (ACTION_DOWN): 0:(71.0,218.0)
+:Sending Touch (ACTION_UP): 0:(63.41346,169.80759)
+:Sending Touch (ACTION_DOWN): 0:(122.0,1906.0)
+:Sending Touch (ACTION_UP): 0:(122.150246,1906.3898)
+:Sending Touch (ACTION_DOWN): 0:(1018.0,470.0)
+:Sending Touch (ACTION_UP): 0:(1004.7318,467.09247)
+:Sending Trackball (ACTION_MOVE): 0:(0.0,-5.0)
+:Sending Trackball (ACTION_UP): 0:(0.0,0.0)
+:Sending Touch (ACTION_DOWN): 0:(487.0,421.0)
+:Sending Touch (ACTION_UP): 0:(506.299,430.39206)
+:Sending Touch (ACTION_DOWN): 0:(357.0,373.0)
+:Sending Touch (ACTION_UP): 0:(356.60593,370.24652)
+:Sending Touch (ACTION_DOWN): 0:(91.0,1485.0)
+:Sending Touch (ACTION_UP): 0:(106.865616,1473.8184)
+    //[calendar_time:2026-11-21 12:03:22.441  system_uptime:244839]
+    // Sending event #1900
+:Sending Touch (ACTION_DOWN): 0:(554.0,692.0)
+:Sending Touch (ACTION_UP): 0:(548.6676,689.556)
+:Sending Trackball (ACTION_MOVE): 0:(1.0,-4.0)
+:Sending Trackball (ACTION_MOVE): 0:(-3.0,-5.0)
+:Sending Trackball (ACTION_MOVE): 0:(-5.0,-5.0)
+:Sending Touch (ACTION_DOWN): 0:(928.0,364.0)
+:Sending Touch (ACTION_UP): 0:(928.14233,357.51624)
+:Sending Trackball (ACTION_MOVE): 0:(-4.0,4.0)
+:Sending Trackball (ACTION_MOVE): 0:(-1.0,2.0)
+:Sending Touch (ACTION_DOWN): 0:(979.0,1040.0)
+:Sending Touch (ACTION_UP): 0:(979.23486,1043.352)
+:Switch: #Intent;action=android.intent.action.MAIN;category=android.intent.category.LAUNCHER;launchFlags=0x10200000;component=com.sushant.bahikhata/.MainActivity;end
+    // Allowing start of Intent { act=android.intent.action.MAIN cat=[android.intent.category.LAUNCHER] cmp=com.sushant.bahikhata/.MainActivity } in package com.sushant.bahikhata
+:Sending Touch (ACTION_DOWN): 0:(10.0,262.0)
+:Sending Touch (ACTION_UP): 0:(108.47617,322.4101)
+:Switch: #Intent;action=android.intent.action.MAIN;category=android.intent.category.LAUNCHER;launchFlags=0x10200000;component=com.sushant.bahikhata/leakcanary.internal.activity.LeakLauncherActivity;end
+    // Allowing start of Intent { act=android.intent.action.MAIN cat=[android.intent.category.LAUNCHER] cmp=com.sushant.bahikhata/leakcanary.internal.activity.LeakLauncherActivity } in package com.sushant.bahikhata
+:Sending Trackball (ACTION_MOVE): 0:(0.0,-2.0)
+:Sending Touch (ACTION_DOWN): 0:(417.0,1903.0)
+:Sending Touch (ACTION_UP): 0:(414.1807,1878.5095)
+:Sending Touch (ACTION_DOWN): 0:(1020.0,1802.0)
+:Sending Touch (ACTION_UP): 0:(1023.28827,1764.9875)
+    //[calendar_time:2026-11-21 12:03:24.259  system_uptime:246658]
+    // Sending event #2000
+:Sending Touch (ACTION_DOWN): 0:(1036.0,1592.0)
+:Sending Touch (ACTION_UP): 0:(1041.092,1586.5483)
+:Sending Touch (ACTION_DOWN): 0:(24.0,1227.0)
+:Sending Touch (ACTION_UP): 0:(121.75427,1210.1095)
+:Sending Touch (ACTION_DOWN): 0:(635.0,291.0)
+:Sending Touch (ACTION_UP): 0:(627.5424,294.63275)
+:Sending Trackball (ACTION_MOVE): 0:(2.0,0.0)
+    // Rejecting start of Intent { act=android.intent.action.VIEW dat=https://github.com/... cmp=com.android.chrome/com.google.android.apps.chrome.IntentDispatcher } in package com.android.chrome
+:Sending Trackball (ACTION_MOVE): 0:(2.0,4.0)
+:Sending Trackball (ACTION_MOVE): 0:(3.0,-1.0)
+:Sending Touch (ACTION_DOWN): 0:(589.0,358.0)
+:Sending Touch (ACTION_UP): 0:(655.1006,327.9843)
+:Sending Touch (ACTION_DOWN): 0:(259.0,671.0)
+:Sending Touch (ACTION_UP): 0:(258.79962,681.4198)
+:Sending Flip keyboardOpen=false
+Got IOException performing flipjava.io.FileNotFoundException: /dev/input/event0: open failed: EACCES (Permission denied)
+    // Injection Failed
+:Sending Touch (ACTION_DOWN): 0:(570.0,572.0)
+:Sending Touch (ACTION_UP): 0:(554.7505,567.1655)
+:Sending Trackball (ACTION_MOVE): 0:(-1.0,-2.0)
+:Sending Trackball (ACTION_MOVE): 0:(-1.0,-2.0)
+    //[calendar_time:2026-11-21 12:03:26.140  system_uptime:248539]
+    // Sending event #2100
+:Sending Trackball (ACTION_UP): 0:(0.0,0.0)
+    // Rejecting start of Intent { act=android.intent.action.VIEW dat=https://squ.re/... cmp=com.android.chrome/com.google.android.apps.chrome.IntentDispatcher } in package com.android.chrome
+    // Rejecting start of Intent { act=android.intent.action.VIEW dat=https://squ.re/... cmp=com.android.chrome/com.google.android.apps.chrome.IntentDispatcher } in package com.android.chrome
+:Sending Touch (ACTION_DOWN): 0:(500.0,232.0)
+:Sending Touch (ACTION_UP): 0:(460.99286,254.96663)
+:Sending Touch (ACTION_DOWN): 0:(626.0,929.0)
+:Sending Touch (ACTION_UP): 0:(622.9026,924.6917)
+:Sending Trackball (ACTION_MOVE): 0:(2.0,-1.0)
+:Sending Trackball (ACTION_UP): 0:(0.0,0.0)
+    // Rejecting start of Intent { act=android.intent.action.VIEW dat=https://square.github.io/... cmp=com.android.chrome/com.google.android.apps.chrome.IntentDispatcher } in package com.android.chrome
+:Sending Trackball (ACTION_MOVE): 0:(-2.0,-5.0)
+:Sending Trackball (ACTION_MOVE): 0:(-4.0,-2.0)
+:Sending Trackball (ACTION_MOVE): 0:(0.0,-5.0)
+    // Rejecting start of Intent { act=android.intent.action.VIEW dat=https://square.github.io/... cmp=com.android.chrome/com.google.android.apps.chrome.IntentDispatcher } in package com.android.chrome
+:Sending Trackball (ACTION_MOVE): 0:(-4.0,0.0)
+    // Rejecting start of Intent { act=android.intent.action.VIEW dat=https://github.com/... cmp=com.android.chrome/com.google.android.apps.chrome.IntentDispatcher } in package com.android.chrome
+    //[calendar_time:2026-11-21 12:03:27.860  system_uptime:250259]
+    // Sending event #2200
+    // Rejecting start of Intent { act=android.intent.action.VIEW dat=https://squ.re/... cmp=com.android.chrome/com.google.android.apps.chrome.IntentDispatcher } in package com.android.chrome
+:Sending Trackball (ACTION_MOVE): 0:(0.0,3.0)
+    // Rejecting start of Intent { act=android.intent.action.VIEW dat=https://square.github.io/... cmp=com.android.chrome/com.google.android.apps.chrome.IntentDispatcher } in package com.android.chrome
+    // Rejecting start of Intent { act=android.intent.action.VIEW dat=https://square.github.io/... cmp=com.android.chrome/com.google.android.apps.chrome.IntentDispatcher } in package com.android.chrome
+:Sending Trackball (ACTION_MOVE): 0:(3.0,0.0)
+:Sending Trackball (ACTION_MOVE): 0:(-5.0,-1.0)
+:Sending Trackball (ACTION_MOVE): 0:(3.0,3.0)
+    // Rejecting start of Intent { act=android.intent.action.VIEW dat=https://twitter.com/... cmp=com.android.chrome/com.google.android.apps.chrome.IntentDispatcher } in package com.android.chrome
+:Sending Touch (ACTION_DOWN): 0:(488.0,727.0)
+:Sending Touch (ACTION_UP): 0:(486.8237,726.4096)
+:Sending Touch (ACTION_DOWN): 0:(151.0,1345.0)
+:Sending Touch (ACTION_UP): 0:(196.6776,1352.3832)
+:Switch: #Intent;action=android.intent.action.MAIN;category=android.intent.category.LAUNCHER;launchFlags=0x10200000;component=com.sushant.bahikhata/leakcanary.internal.activity.LeakLauncherActivity;end
+    // Allowing start of Intent { act=android.intent.action.MAIN cat=[android.intent.category.LAUNCHER] cmp=com.sushant.bahikhata/leakcanary.internal.activity.LeakLauncherActivity } in package com.sushant.bahikhata
+:Sending Trackball (ACTION_MOVE): 0:(-1.0,4.0)
+:Sending Touch (ACTION_DOWN): 0:(556.0,1661.0)
+:Sending Touch (ACTION_UP): 0:(555.58685,1659.5159)
+:Sending Touch (ACTION_DOWN): 0:(313.0,806.0)
+:Sending Touch (ACTION_UP): 0:(268.66238,761.2885)
+    //[calendar_time:2026-11-21 12:03:29.544  system_uptime:251943]
+    // Sending event #2300
+:Sending Trackball (ACTION_MOVE): 0:(2.0,-5.0)
+:Sending Trackball (ACTION_UP): 0:(0.0,0.0)
+    // Rejecting start of Intent { act=android.intent.action.VIEW dat=https://github.com/... cmp=com.android.chrome/com.google.android.apps.chrome.IntentDispatcher } in package com.android.chrome
+    // Rejecting start of Intent { act=android.intent.action.VIEW dat=https://squ.re/... cmp=com.android.chrome/com.google.android.apps.chrome.IntentDispatcher } in package com.android.chrome
+:Sending Touch (ACTION_DOWN): 0:(79.0,1292.0)
+:Sending Touch (ACTION_UP): 0:(90.55388,1298.3497)
+:Sending Touch (ACTION_DOWN): 0:(688.0,1839.0)
+:Sending Touch (ACTION_UP): 0:(736.6354,1939.6643)
+    // Rejecting start of Intent { act=android.intent.action.VIEW dat=https://squ.re/... cmp=com.android.chrome/com.google.android.apps.chrome.IntentDispatcher } in package com.android.chrome
+:Sending Trackball (ACTION_MOVE): 0:(-4.0,-3.0)
+:Sending Trackball (ACTION_UP): 0:(0.0,0.0)
+    // Rejecting start of Intent { act=android.intent.action.VIEW dat=https://square.github.io/... cmp=com.android.chrome/com.google.android.apps.chrome.IntentDispatcher } in package com.android.chrome
+:Switch: #Intent;action=android.intent.action.MAIN;category=android.intent.category.LAUNCHER;launchFlags=0x10200000;component=com.sushant.bahikhata/.MainActivity;end
+    // Allowing start of Intent { act=android.intent.action.MAIN cat=[android.intent.category.LAUNCHER] cmp=com.sushant.bahikhata/.MainActivity } in package com.sushant.bahikhata
+:Sending Touch (ACTION_DOWN): 0:(399.0,679.0)
+:Sending Touch (ACTION_UP): 0:(381.11853,656.2887)
+:Sending Trackball (ACTION_MOVE): 0:(4.0,-4.0)
+    //[calendar_time:2026-11-21 12:03:32.517  system_uptime:254915]
+    // Sending event #2400
+    //[calendar_time:2026-11-21 12:03:32.607  system_uptime:255005]
+    // Sending event #2400
+:Sending Touch (ACTION_DOWN): 0:(950.0,699.0)
+:Sending Touch (ACTION_UP): 0:(874.9769,727.8792)
+:Sending Trackball (ACTION_MOVE): 0:(3.0,-1.0)
+:Sending Trackball (ACTION_MOVE): 0:(1.0,0.0)
+:Sending Touch (ACTION_DOWN): 0:(40.0,1157.0)
+:Sending Touch (ACTION_UP): 0:(37.73103,1133.7068)
+:Sending Touch (ACTION_DOWN): 0:(411.0,838.0)
+:Sending Touch (ACTION_UP): 0:(410.7348,841.5937)
+:Sending Touch (ACTION_DOWN): 0:(475.0,280.0)
+:Sending Touch (ACTION_UP): 0:(468.4203,296.85706)
+:Switch: #Intent;action=android.intent.action.MAIN;category=android.intent.category.LAUNCHER;launchFlags=0x10200000;component=com.sushant.bahikhata/leakcanary.internal.activity.LeakLauncherActivity;end
+    // Allowing start of Intent { act=android.intent.action.MAIN cat=[android.intent.category.LAUNCHER] cmp=com.sushant.bahikhata/leakcanary.internal.activity.LeakLauncherActivity } in package com.sushant.bahikhata
+:Switch: #Intent;action=android.intent.action.MAIN;category=android.intent.category.LAUNCHER;launchFlags=0x10200000;component=com.sushant.bahikhata/.MainActivity;end
+    // Allowing start of Intent { act=android.intent.action.MAIN cat=[android.intent.category.LAUNCHER] cmp=com.sushant.bahikhata/.MainActivity } in package com.sushant.bahikhata
+:Sending Trackball (ACTION_MOVE): 0:(-5.0,-4.0)
+:Sending Trackball (ACTION_MOVE): 0:(0.0,-4.0)
+:Sending Touch (ACTION_DOWN): 0:(928.0,1526.0)
+:Sending Touch (ACTION_UP): 0:(921.7322,1529.874)
+    //[calendar_time:2026-11-21 12:03:35.798  system_uptime:258196]
+    // Sending event #2500
+    //[calendar_time:2026-11-21 12:03:35.881  system_uptime:258279]
+    // Sending event #2500
+:Sending Flip keyboardOpen=true
+Got IOException performing flipjava.io.FileNotFoundException: /dev/input/event0: open failed: EACCES (Permission denied)
+    // Injection Failed
+:Sending Touch (ACTION_DOWN): 0:(131.0,1774.0)
+:Sending Touch (ACTION_UP): 0:(122.30253,1754.4177)
+:Sending Trackball (ACTION_MOVE): 0:(-4.0,-4.0)
+    // Rejecting start of Intent { cmp=com.google.android.googlequicksearchbox/com.google.android.apps.gsa.staticplugins.opa.OpaActivity } in package com.google.android.googlequicksearchbox
+:Sending Touch (ACTION_DOWN): 0:(739.0,559.0)
+:Sending Touch (ACTION_UP): 0:(748.3892,544.2163)
+:Sending Touch (ACTION_DOWN): 0:(310.0,468.0)
+:Sending Touch (ACTION_UP): 0:(324.885,468.034)
+:Sending Trackball (ACTION_MOVE): 0:(1.0,3.0)
+:Sending Touch (ACTION_DOWN): 0:(44.0,1934.0)
+:Sending Touch (ACTION_UP): 0:(23.281446,1953.0731)
+:Sending Touch (ACTION_DOWN): 0:(594.0,1334.0)
+:Sending Touch (ACTION_UP): 0:(597.9164,1341.9662)
+:Sending Touch (ACTION_DOWN): 0:(991.0,1884.0)
+:Sending Touch (ACTION_UP): 0:(979.0324,1882.7738)
+:Sending Touch (ACTION_DOWN): 0:(46.0,199.0)
+:Sending Touch (ACTION_UP): 0:(58.39401,189.70456)
+:Sending Touch (ACTION_DOWN): 0:(1018.0,138.0)
+:Sending Touch (ACTION_UP): 0:(1015.84106,158.1044)
+:Sending Trackball (ACTION_MOVE): 0:(2.0,-3.0)
+    //[calendar_time:2026-11-21 12:03:39.572  system_uptime:261970]
+    // Sending event #2600
+    //[calendar_time:2026-11-21 12:03:39.652  system_uptime:262051]
+    // Sending event #2600
+:Sending Touch (ACTION_DOWN): 0:(393.0,814.0)
+:Sending Touch (ACTION_UP): 0:(474.20782,772.6515)
+:Sending Touch (ACTION_DOWN): 0:(826.0,519.0)
+:Sending Touch (ACTION_UP): 0:(818.4552,541.9096)
+:Sending Touch (ACTION_DOWN): 0:(437.0,648.0)
+:Sending Touch (ACTION_UP): 0:(501.43036,624.1489)
+:Sending Trackball (ACTION_MOVE): 0:(-1.0,3.0)
+:Sending Flip keyboardOpen=false
+Got IOException performing flipjava.io.FileNotFoundException: /dev/input/event0: open failed: EACCES (Permission denied)
+    // Injection Failed
+:Sending Touch (ACTION_DOWN): 0:(333.0,422.0)
+:Sending Touch (ACTION_UP): 0:(322.04236,436.88458)
+:Sending Touch (ACTION_DOWN): 0:(939.0,1572.0)
+:Sending Touch (ACTION_UP): 0:(907.6625,1589.3469)
+:Sending Touch (ACTION_DOWN): 0:(835.0,866.0)
+:Sending Touch (ACTION_UP): 0:(750.07916,926.2797)
+:Sending Trackball (ACTION_MOVE): 0:(-3.0,-1.0)
+    //[calendar_time:2026-11-21 12:03:42.574  system_uptime:264973]
+    // Sending event #2700
+:Sending Trackball (ACTION_MOVE): 0:(-3.0,-3.0)
+:Sending Touch (ACTION_DOWN): 0:(481.0,877.0)
+:Sending Touch (ACTION_UP): 0:(479.26797,870.45953)
+:Sending Touch (ACTION_DOWN): 0:(663.0,1370.0)
+:Sending Touch (ACTION_UP): 0:(571.74194,1341.6926)
+:Sending Trackball (ACTION_MOVE): 0:(-4.0,-1.0)
+:Sending Trackball (ACTION_MOVE): 0:(-1.0,-2.0)
+:Sending Touch (ACTION_DOWN): 0:(1008.0,1761.0)
+:Sending Touch (ACTION_UP): 0:(984.5929,1764.223)
+:Sending Touch (ACTION_DOWN): 0:(282.0,1429.0)
+:Sending Touch (ACTION_UP): 0:(304.93347,1450.1333)
+:Sending Touch (ACTION_DOWN): 0:(129.0,1887.0)
+:Sending Touch (ACTION_UP): 0:(104.7079,1897.9456)
+:Sending Touch (ACTION_DOWN): 0:(203.0,1486.0)
+:Sending Touch (ACTION_UP): 0:(213.26425,1483.9698)
+    // Rejecting start of Intent { act=android.intent.action.CHOOSER cmp=android/com.android.internal.app.ChooserActivity } in package android
+    // Rejecting start of Intent { act=android.intent.action.CHOOSER cmp=android/com.android.internal.app.ChooserActivity } in package android
+:Sending Trackball (ACTION_MOVE): 0:(-1.0,-1.0)
+:Sending Trackball (ACTION_MOVE): 0:(0.0,-4.0)
+:Sending Touch (ACTION_DOWN): 0:(308.0,212.0)
+:Sending Touch (ACTION_UP): 0:(315.79874,218.98889)
+:Sending Touch (ACTION_DOWN): 0:(148.0,958.0)
+:Sending Touch (ACTION_UP): 0:(120.769196,978.9095)
+:Sending Touch (ACTION_DOWN): 0:(210.0,1621.0)
+    //[calendar_time:2026-11-21 12:03:43.601  system_uptime:265999]
+    // Sending event #2800
+:Sending Touch (ACTION_UP): 0:(193.20302,1657.052)
+:Sending Touch (ACTION_DOWN): 0:(13.0,343.0)
+:Sending Touch (ACTION_UP): 0:(50.375523,416.3411)
+:Sending Trackball (ACTION_MOVE): 0:(3.0,-4.0)
+:Sending Touch (ACTION_DOWN): 0:(670.0,1298.0)
+:Sending Touch (ACTION_UP): 0:(600.4489,1305.0771)
+:Sending Touch (ACTION_DOWN): 0:(380.0,625.0)
+:Sending Touch (ACTION_UP): 0:(394.79486,633.218)
+:Sending Touch (ACTION_DOWN): 0:(1069.0,164.0)
+:Sending Touch (ACTION_UP): 0:(994.2648,171.76726)
+:Sending Touch (ACTION_DOWN): 0:(93.0,456.0)
+:Sending Touch (ACTION_UP): 0:(89.4734,460.52844)
+:Sending Touch (ACTION_DOWN): 0:(674.0,727.0)
+:Sending Touch (ACTION_UP): 0:(673.99634,729.3032)
+:Sending Touch (ACTION_DOWN): 0:(502.0,445.0)
+:Sending Touch (ACTION_UP): 0:(491.52133,427.06723)
+:Sending Touch (ACTION_DOWN): 0:(341.0,1069.0)
+:Sending Touch (ACTION_UP): 0:(348.29297,1081.5582)
+:Sending Touch (ACTION_DOWN): 0:(318.0,2197.0)
+:Sending Touch (ACTION_UP): 0:(318.21655,2197.665)
+:Sending Trackball (ACTION_MOVE): 0:(-4.0,2.0)
+    //[calendar_time:2026-11-21 12:03:46.323  system_uptime:268722]
+    // Sending event #2900
+:Sending Trackball (ACTION_MOVE): 0:(-1.0,-2.0)
+:Sending Trackball (ACTION_MOVE): 0:(3.0,2.0)
+:Sending Touch (ACTION_DOWN): 0:(711.0,1963.0)
+:Sending Touch (ACTION_UP): 0:(713.13696,1963.1139)
+:Sending Trackball (ACTION_MOVE): 0:(4.0,0.0)
+:Sending Trackball (ACTION_MOVE): 0:(2.0,4.0)
+:Sending Touch (ACTION_DOWN): 0:(198.0,2074.0)
+:Sending Touch (ACTION_UP): 0:(197.70604,2064.1174)
+:Sending Touch (ACTION_DOWN): 0:(110.0,1241.0)
+:Sending Touch (ACTION_UP): 0:(113.61447,1236.0707)
+:Sending Trackball (ACTION_MOVE): 0:(-5.0,2.0)
+:Sending Touch (ACTION_DOWN): 0:(452.0,1099.0)
+:Sending Touch (ACTION_UP): 0:(460.64853,1103.2396)
+    //[calendar_time:2026-11-21 12:03:48.195  system_uptime:270594]
+    // Sending event #3000
+    //[calendar_time:2026-11-21 12:03:48.276  system_uptime:270675]
+    // Sending event #3000
+:Sending Touch (ACTION_DOWN): 0:(1074.0,11.0)
+:Sending Touch (ACTION_UP): 0:(1009.6207,0.0)
+:Sending Touch (ACTION_DOWN): 0:(550.0,1541.0)
+:Sending Touch (ACTION_UP): 0:(482.11142,1513.2832)
+:Sending Touch (ACTION_DOWN): 0:(382.0,96.0)
+:Sending Touch (ACTION_UP): 0:(373.98303,103.91997)
+    // Rejecting start of Intent { cmp=com.google.android.googlequicksearchbox/com.google.android.apps.gsa.staticplugins.opa.OpaActivity } in package com.google.android.googlequicksearchbox
+:Sending Trackball (ACTION_MOVE): 0:(-5.0,4.0)
+:Sending Trackball (ACTION_MOVE): 0:(4.0,3.0)
+:Sending Trackball (ACTION_UP): 0:(0.0,0.0)
+:Sending Trackball (ACTION_MOVE): 0:(3.0,2.0)
+    //[calendar_time:2026-11-21 12:03:50.686  system_uptime:273084]
+    // Sending event #3100
+:Sending Trackball (ACTION_MOVE): 0:(-2.0,-4.0)
+:Sending Touch (ACTION_DOWN): 0:(123.0,238.0)
+:Sending Touch (ACTION_UP): 0:(105.56158,322.73398)
+:Sending Touch (ACTION_DOWN): 0:(619.0,71.0)
+:Sending Touch (ACTION_UP): 0:(620.8563,78.92453)
+:Sending Touch (ACTION_DOWN): 0:(164.0,22.0)
+:Sending Touch (ACTION_UP): 0:(178.77695,20.757158)
+:Sending Touch (ACTION_DOWN): 0:(649.0,1825.0)
+:Sending Touch (ACTION_UP): 0:(644.5081,1823.6296)
+:Sending Trackball (ACTION_MOVE): 0:(-2.0,1.0)
+:Sending Touch (ACTION_DOWN): 0:(180.0,1966.0)
+:Sending Touch (ACTION_UP): 0:(178.95403,1907.3425)
+:Sending Trackball (ACTION_MOVE): 0:(-1.0,-1.0)
+:Sending Trackball (ACTION_MOVE): 0:(-2.0,-3.0)
+    //[calendar_time:2026-11-21 12:03:52.954  system_uptime:275353]
+    // Sending event #3200
+    //[calendar_time:2026-11-21 12:03:53.036  system_uptime:275435]
+    // Sending event #3200
+:Sending Touch (ACTION_DOWN): 0:(467.0,2069.0)
+:Sending Touch (ACTION_UP): 0:(461.29233,2075.653)
+:Sending Trackball (ACTION_MOVE): 0:(2.0,-4.0)
+:Sending Touch (ACTION_DOWN): 0:(586.0,1816.0)
+:Sending Touch (ACTION_UP): 0:(521.48785,1830.1984)
+:Sending Touch (ACTION_DOWN): 0:(422.0,2187.0)
+:Sending Touch (ACTION_UP): 0:(438.17917,2189.8984)
+:Sending Touch (ACTION_DOWN): 0:(21.0,1626.0)
+:Sending Touch (ACTION_UP): 0:(47.8963,1651.0762)
+:Sending Touch (ACTION_DOWN): 0:(1041.0,25.0)
+:Sending Touch (ACTION_UP): 0:(995.75635,0.0)
+:Sending Touch (ACTION_DOWN): 0:(829.0,1688.0)
+:Sending Touch (ACTION_UP): 0:(731.469,1592.1266)
+:Sending Trackball (ACTION_MOVE): 0:(3.0,-3.0)
+:Sending Touch (ACTION_DOWN): 0:(944.0,110.0)
+:Sending Touch (ACTION_UP): 0:(939.85333,92.60187)
+:Sending Touch (ACTION_DOWN): 0:(1014.0,747.0)
+:Sending Touch (ACTION_UP): 0:(1013.89905,747.2142)
+    //[calendar_time:2026-11-21 12:03:55.761  system_uptime:278160]
+    // Sending event #3300
+    //[calendar_time:2026-11-21 12:03:55.842  system_uptime:278241]
+    // Sending event #3300
+:Sending Trackball (ACTION_MOVE): 0:(1.0,4.0)
+:Sending Trackball (ACTION_MOVE): 0:(-4.0,-2.0)
+:Sending Trackball (ACTION_MOVE): 0:(-4.0,2.0)
+:Sending Touch (ACTION_DOWN): 0:(685.0,9.0)
+:Sending Touch (ACTION_UP): 0:(685.9483,22.484634)
+:Sending Touch (ACTION_DOWN): 0:(875.0,671.0)
+:Sending Touch (ACTION_UP): 0:(887.05145,674.3301)
+:Sending Trackball (ACTION_MOVE): 0:(-4.0,4.0)
+:Sending Trackball (ACTION_MOVE): 0:(-4.0,-2.0)
+:Sending Trackball (ACTION_MOVE): 0:(-1.0,2.0)
+:Sending Flip keyboardOpen=true
+Got IOException performing flipjava.io.FileNotFoundException: /dev/input/event0: open failed: EACCES (Permission denied)
+    // Injection Failed
+:Switch: #Intent;action=android.intent.action.MAIN;category=android.intent.category.LAUNCHER;launchFlags=0x10200000;component=com.sushant.bahikhata/leakcanary.internal.activity.LeakLauncherActivity;end
+    // Allowing start of Intent { act=android.intent.action.MAIN cat=[android.intent.category.LAUNCHER] cmp=com.sushant.bahikhata/leakcanary.internal.activity.LeakLauncherActivity } in package com.sushant.bahikhata
+:Switch: #Intent;action=android.intent.action.MAIN;category=android.intent.category.LAUNCHER;launchFlags=0x10200000;component=com.sushant.bahikhata/leakcanary.internal.activity.LeakLauncherActivity;end
+    // Allowing start of Intent { act=android.intent.action.MAIN cat=[android.intent.category.LAUNCHER] cmp=com.sushant.bahikhata/leakcanary.internal.activity.LeakLauncherActivity } in package com.sushant.bahikhata
+:Sending Touch (ACTION_DOWN): 0:(1010.0,1671.0)
+:Sending Touch (ACTION_UP): 0:(998.45233,1690.5704)
+:Sending Trackball (ACTION_MOVE): 0:(3.0,-2.0)
+    //[calendar_time:2026-11-21 12:03:57.856  system_uptime:280254]
+    // Sending event #3400
+:Sending Flip keyboardOpen=false
+Got IOException performing flipjava.io.FileNotFoundException: /dev/input/event0: open failed: EACCES (Permission denied)
+    // Injection Failed
+:Sending Touch (ACTION_DOWN): 0:(181.0,16.0)
+:Sending Touch (ACTION_UP): 0:(179.50276,22.48814)
+:Sending Trackball (ACTION_MOVE): 0:(2.0,4.0)
+:Sending Touch (ACTION_DOWN): 0:(199.0,1660.0)
+:Sending Touch (ACTION_UP): 0:(255.65324,1609.5778)
+:Sending Trackball (ACTION_MOVE): 0:(4.0,-1.0)
+:Sending Trackball (ACTION_UP): 0:(0.0,0.0)
+    // Rejecting start of Intent { act=android.intent.action.VIEW dat=https://square.github.io/... cmp=com.android.chrome/com.google.android.apps.chrome.IntentDispatcher } in package com.android.chrome
+    // Rejecting start of Intent { act=android.intent.action.VIEW dat=https://square.github.io/... cmp=com.android.chrome/com.google.android.apps.chrome.IntentDispatcher } in package com.android.chrome
+:Sending Trackball (ACTION_MOVE): 0:(3.0,-3.0)
+:Sending Touch (ACTION_DOWN): 0:(590.0,732.0)
+:Sending Touch (ACTION_UP): 0:(583.6351,728.0014)
+:Sending Trackball (ACTION_MOVE): 0:(2.0,-1.0)
+:Sending Touch (ACTION_DOWN): 0:(221.0,1697.0)
+:Sending Touch (ACTION_UP): 0:(274.36945,1716.8148)
+:Sending Touch (ACTION_DOWN): 0:(681.0,1567.0)
+:Sending Touch (ACTION_UP): 0:(718.4145,1574.6476)
+:Sending Touch (ACTION_DOWN): 0:(821.0,832.0)
+:Sending Touch (ACTION_UP): 0:(824.3561,830.5739)
+    //[calendar_time:2026-11-21 12:03:59.609  system_uptime:282007]
+    // Sending event #3500
+:Sending Trackball (ACTION_MOVE): 0:(-5.0,4.0)
+:Sending Trackball (ACTION_MOVE): 0:(2.0,2.0)
+:Sending Trackball (ACTION_MOVE): 0:(-3.0,-3.0)
+:Sending Trackball (ACTION_MOVE): 0:(-2.0,-1.0)
+    // Rejecting start of Intent { act=android.intent.action.VIEW dat=https://square.github.io/... cmp=com.android.chrome/com.google.android.apps.chrome.IntentDispatcher } in package com.android.chrome
+:Sending Flip keyboardOpen=true
+Got IOException performing flipjava.io.FileNotFoundException: /dev/input/event0: open failed: EACCES (Permission denied)
+    // Injection Failed
+    // Rejecting start of Intent { act=android.intent.action.VIEW dat=https://twitter.com/... cmp=com.android.chrome/com.google.android.apps.chrome.IntentDispatcher } in package com.android.chrome
+:Sending Touch (ACTION_DOWN): 0:(443.0,1861.0)
+:Sending Touch (ACTION_UP): 0:(442.6349,1884.9437)
+:Sending Touch (ACTION_DOWN): 0:(833.0,1827.0)
+:Sending Touch (ACTION_UP): 0:(777.736,1918.2031)
+:Sending Touch (ACTION_DOWN): 0:(397.0,1120.0)
+:Sending Touch (ACTION_UP): 0:(440.0461,1102.8289)
+:Sending Touch (ACTION_DOWN): 0:(1050.0,1959.0)
+:Sending Touch (ACTION_UP): 0:(1029.8658,1971.6458)
+:Sending Trackball (ACTION_MOVE): 0:(1.0,-1.0)
+    //[calendar_time:2026-11-21 12:04:01.462  system_uptime:283861]
+    // Sending event #3600
+:Sending Touch (ACTION_DOWN): 0:(794.0,600.0)
+:Sending Touch (ACTION_UP): 0:(794.7901,601.73785)
+:Sending Flip keyboardOpen=false
+Got IOException performing flipjava.io.FileNotFoundException: /dev/input/event0: open failed: EACCES (Permission denied)
+    // Injection Failed
+:Sending Trackball (ACTION_MOVE): 0:(0.0,3.0)
+:Sending Trackball (ACTION_MOVE): 0:(-5.0,-5.0)
+:Sending Trackball (ACTION_MOVE): 0:(1.0,2.0)
+:Sending Trackball (ACTION_MOVE): 0:(4.0,2.0)
+:Sending Touch (ACTION_DOWN): 0:(679.0,2039.0)
+:Sending Touch (ACTION_UP): 0:(683.01733,2035.5967)
+:Sending Trackball (ACTION_MOVE): 0:(-2.0,3.0)
+:Sending Touch (ACTION_DOWN): 0:(31.0,993.0)
+:Sending Touch (ACTION_UP): 0:(35.682552,1004.1686)
+:Sending Touch (ACTION_DOWN): 0:(341.0,1677.0)
+:Sending Touch (ACTION_UP): 0:(335.44305,1675.0599)
+:Sending Touch (ACTION_DOWN): 0:(891.0,556.0)
+:Sending Touch (ACTION_UP): 0:(898.2515,569.875)
+:Sending Trackball (ACTION_MOVE): 0:(3.0,4.0)
+    //[calendar_time:2026-11-21 12:04:03.360  system_uptime:285759]
+    // Sending event #3700
+:Sending Trackball (ACTION_MOVE): 0:(0.0,-5.0)
+:Sending Touch (ACTION_DOWN): 0:(369.0,700.0)
+:Sending Touch (ACTION_UP): 0:(359.3999,699.5188)
+:Sending Trackball (ACTION_MOVE): 0:(1.0,-1.0)
+:Sending Trackball (ACTION_MOVE): 0:(4.0,1.0)
+:Sending Trackball (ACTION_MOVE): 0:(3.0,-2.0)
+:Sending Touch (ACTION_DOWN): 0:(585.0,201.0)
+:Sending Touch (ACTION_UP): 0:(587.0015,210.4544)
+:Sending Trackball (ACTION_MOVE): 0:(2.0,3.0)
+:Sending Touch (ACTION_DOWN): 0:(55.0,419.0)
+:Sending Touch (ACTION_UP): 0:(9.325808,440.01117)
+:Sending Touch (ACTION_DOWN): 0:(796.0,1636.0)
+:Sending Touch (ACTION_UP): 0:(757.0181,1655.432)
+    //[calendar_time:2026-11-21 12:04:04.881  system_uptime:287279]
+    // Sending event #3800
+:Sending Touch (ACTION_DOWN): 0:(829.0,882.0)
+:Sending Touch (ACTION_UP): 0:(831.1877,883.1786)
+:Sending Touch (ACTION_DOWN): 0:(177.0,677.0)
+:Sending Touch (ACTION_UP): 0:(177.46298,666.15027)
+    // Rejecting start of Intent { act=android.intent.action.VIEW dat=https://squ.re/... cmp=com.android.chrome/com.google.android.apps.chrome.IntentDispatcher } in package com.android.chrome
+:Sending Trackball (ACTION_MOVE): 0:(-5.0,0.0)
+:Sending Touch (ACTION_DOWN): 0:(845.0,1863.0)
+:Sending Touch (ACTION_UP): 0:(845.0004,1851.1046)
+:Sending Trackball (ACTION_MOVE): 0:(1.0,3.0)
+:Sending Trackball (ACTION_MOVE): 0:(-4.0,3.0)
+:Sending Trackball (ACTION_MOVE): 0:(3.0,0.0)
+    // Rejecting start of Intent { act=android.intent.action.VIEW dat=https://square.github.io/... cmp=com.android.chrome/com.google.android.apps.chrome.IntentDispatcher } in package com.android.chrome
+:Sending Touch (ACTION_DOWN): 0:(72.0,890.0)
+:Sending Touch (ACTION_UP): 0:(73.37825,894.6339)
+:Sending Touch (ACTION_DOWN): 0:(332.0,1148.0)
+:Sending Touch (ACTION_UP): 0:(398.17432,1145.6433)
+:Sending Touch (ACTION_DOWN): 0:(92.0,2004.0)
+:Sending Touch (ACTION_UP): 0:(98.624275,2001.6489)
+:Sending Touch (ACTION_DOWN): 0:(147.0,1548.0)
+:Sending Touch (ACTION_UP): 0:(38.008705,1508.1783)
+:Sending Touch (ACTION_DOWN): 0:(662.0,221.0)
+:Sending Touch (ACTION_UP): 0:(666.88696,230.73889)
+    //[calendar_time:2026-11-21 12:04:06.613  system_uptime:289012]
+    // Sending event #3900
+    //[calendar_time:2026-11-21 12:04:06.694  system_uptime:289092]
+    // Sending event #3900
+:Sending Touch (ACTION_DOWN): 0:(1051.0,2014.0)
+:Sending Touch (ACTION_UP): 0:(1005.12805,1969.2302)
+    // Rejecting start of Intent { act=android.intent.action.VIEW dat=https://square.github.io/... cmp=com.android.chrome/com.google.android.apps.chrome.IntentDispatcher } in package com.android.chrome
+:Sending Trackball (ACTION_MOVE): 0:(1.0,1.0)
+:Sending Trackball (ACTION_MOVE): 0:(-2.0,2.0)
+:Sending Touch (ACTION_DOWN): 0:(841.0,81.0)
+:Sending Touch (ACTION_UP): 0:(786.14703,124.14048)
+:Sending Trackball (ACTION_MOVE): 0:(2.0,3.0)
+:Sending Trackball (ACTION_MOVE): 0:(2.0,0.0)
+:Sending Touch (ACTION_DOWN): 0:(292.0,1322.0)
+:Sending Touch (ACTION_UP): 0:(304.27936,1301.4563)
+    // Rejecting start of Intent { cmp=com.google.android.googlequicksearchbox/com.google.android.apps.gsa.staticplugins.opa.OpaActivity } in package com.google.android.googlequicksearchbox
+    // Rejecting start of Intent { act=android.intent.action.VIEW dat=https://squ.re/... cmp=com.android.chrome/com.google.android.apps.chrome.IntentDispatcher } in package com.android.chrome
+:Sending Touch (ACTION_DOWN): 0:(437.0,178.0)
+:Sending Touch (ACTION_UP): 0:(454.86264,178.10663)
+:Sending Trackball (ACTION_MOVE): 0:(2.0,3.0)
+    //[calendar_time:2026-11-21 12:04:08.629  system_uptime:291028]
+    // Sending event #4000
+:Switch: #Intent;action=android.intent.action.MAIN;category=android.intent.category.LAUNCHER;launchFlags=0x10200000;component=com.sushant.bahikhata/.MainActivity;end
+    // Allowing start of Intent { act=android.intent.action.MAIN cat=[android.intent.category.LAUNCHER] cmp=com.sushant.bahikhata/.MainActivity } in package com.sushant.bahikhata
+:Sending Touch (ACTION_DOWN): 0:(592.0,100.0)
+:Sending Touch (ACTION_UP): 0:(586.6613,97.43826)
+:Sending Touch (ACTION_DOWN): 0:(841.0,1626.0)
+:Sending Touch (ACTION_UP): 0:(853.0036,1625.4294)
+    // Rejecting start of Intent { act=android.intent.action.MAIN cmp=com.google.android.inputmethod.latin/com.google.android.apps.inputmethod.latin.preference.SettingsActivity } in package com.google.android.inputmethod.latin
+:Sending Touch (ACTION_DOWN): 0:(364.0,428.0)
+:Sending Touch (ACTION_UP): 0:(359.84546,421.94247)
+:Sending Touch (ACTION_DOWN): 0:(944.0,1656.0)
+:Sending Touch (ACTION_UP): 0:(924.1231,1676.2451)
+:Sending Touch (ACTION_DOWN): 0:(330.0,1629.0)
+:Sending Touch (ACTION_UP): 0:(337.9299,1614.534)
+:Sending Trackball (ACTION_MOVE): 0:(-3.0,-5.0)
+:Sending Touch (ACTION_DOWN): 0:(755.0,1193.0)
+:Sending Touch (ACTION_UP): 0:(734.8403,1192.3997)
+:Sending Touch (ACTION_DOWN): 0:(23.0,1827.0)
+:Sending Touch (ACTION_UP): 0:(13.681795,1851.8313)
+:Sending Trackball (ACTION_MOVE): 0:(0.0,-3.0)
+:Sending Touch (ACTION_DOWN): 0:(712.0,209.0)
+:Sending Touch (ACTION_UP): 0:(708.59766,210.84254)
+:Sending Touch (ACTION_DOWN): 0:(949.0,1938.0)
+:Sending Touch (ACTION_UP): 0:(959.37476,1955.1342)
+:Sending Trackball (ACTION_MOVE): 0:(3.0,-5.0)
+    //[calendar_time:2026-11-21 12:04:12.218  system_uptime:294616]
+    // Sending event #4100
+:Sending Touch (ACTION_DOWN): 0:(602.0,2158.0)
+:Sending Touch (ACTION_UP): 0:(579.4321,2209.0)
+:Sending Touch (ACTION_DOWN): 0:(1079.0,1737.0)
+:Sending Touch (ACTION_UP): 0:(1055.6086,1754.2334)
+:Sending Touch (ACTION_DOWN): 0:(907.0,1370.0)
+:Sending Touch (ACTION_UP): 0:(907.9568,1377.7927)
+:Switch: #Intent;action=android.intent.action.MAIN;category=android.intent.category.LAUNCHER;launchFlags=0x10200000;component=com.sushant.bahikhata/leakcanary.internal.activity.LeakLauncherActivity;end
+    // Allowing start of Intent { act=android.intent.action.MAIN cat=[android.intent.category.LAUNCHER] cmp=com.sushant.bahikhata/leakcanary.internal.activity.LeakLauncherActivity } in package com.sushant.bahikhata
+:Sending Trackball (ACTION_MOVE): 0:(-3.0,-5.0)
+    // Rejecting start of Intent { act=android.intent.action.VIEW dat=https://square.github.io/... cmp=com.android.chrome/com.google.android.apps.chrome.IntentDispatcher } in package com.android.chrome
+    // Rejecting start of Intent { act=android.intent.action.VIEW dat=https://square.github.io/... cmp=com.android.chrome/com.google.android.apps.chrome.IntentDispatcher } in package com.android.chrome
+:Sending Touch (ACTION_DOWN): 0:(794.0,94.0)
+:Sending Touch (ACTION_UP): 0:(799.5472,77.882416)
+    // Rejecting start of Intent { act=android.intent.action.VIEW dat=https://square.github.io/... cmp=com.android.chrome/com.google.android.apps.chrome.IntentDispatcher } in package com.android.chrome
+:Sending Trackball (ACTION_MOVE): 0:(0.0,-1.0)
+:Switch: #Intent;action=android.intent.action.MAIN;category=android.intent.category.LAUNCHER;launchFlags=0x10200000;component=com.sushant.bahikhata/leakcanary.internal.activity.LeakLauncherActivity;end
+    // Allowing start of Intent { act=android.intent.action.MAIN cat=[android.intent.category.LAUNCHER] cmp=com.sushant.bahikhata/leakcanary.internal.activity.LeakLauncherActivity } in package com.sushant.bahikhata
+    // Rejecting start of Intent { act=android.intent.action.VIEW dat=https://github.com/... cmp=com.android.chrome/com.google.android.apps.chrome.IntentDispatcher } in package com.android.chrome
+    // Rejecting start of Intent { act=android.intent.action.VIEW dat=https://squ.re/... cmp=com.android.chrome/com.google.android.apps.chrome.IntentDispatcher } in package com.android.chrome
+:Sending Touch (ACTION_DOWN): 0:(141.0,1371.0)
+:Sending Touch (ACTION_UP): 0:(117.363785,1402.2433)
+:Sending Trackball (ACTION_MOVE): 0:(-4.0,-1.0)
+:Sending Touch (ACTION_DOWN): 0:(436.0,2048.0)
+:Sending Touch (ACTION_UP): 0:(432.10098,2059.4585)
+:Sending Touch (ACTION_DOWN): 0:(1069.0,2012.0)
+:Sending Touch (ACTION_UP): 0:(1080.0,2011.2025)
+    // Rejecting start of Intent { act=android.intent.action.VIEW dat=https://squ.re/... cmp=com.android.chrome/com.google.android.apps.chrome.IntentDispatcher } in package com.android.chrome
+:Sending Touch (ACTION_DOWN): 0:(862.0,142.0)
+    //[calendar_time:2026-11-21 12:04:15.262  system_uptime:297661]
+    // Sending event #4200
+:Sending Touch (ACTION_UP): 0:(868.7745,131.41702)
+:Sending Touch (ACTION_DOWN): 0:(61.0,697.0)
+:Sending Touch (ACTION_UP): 0:(78.42342,698.2848)
+    // Rejecting start of Intent { act=android.intent.action.VIEW dat=https://github.com/... cmp=com.android.chrome/com.google.android.apps.chrome.IntentDispatcher } in package com.android.chrome
+:Sending Touch (ACTION_DOWN): 0:(349.0,1300.0)
+:Sending Touch (ACTION_UP): 0:(348.31442,1304.981)
+:Sending Touch (ACTION_DOWN): 0:(396.0,574.0)
+:Sending Touch (ACTION_UP): 0:(383.20837,580.5872)
+:Sending Trackball (ACTION_MOVE): 0:(0.0,3.0)
+:Sending Trackball (ACTION_UP): 0:(0.0,0.0)
+    // Rejecting start of Intent { act=android.intent.action.VIEW dat=https://squ.re/... cmp=com.android.chrome/com.google.android.apps.chrome.IntentDispatcher } in package com.android.chrome
+    // Rejecting start of Intent { act=android.intent.action.VIEW dat=https://squ.re/... cmp=com.android.chrome/com.google.android.apps.chrome.IntentDispatcher } in package com.android.chrome
+:Sending Touch (ACTION_DOWN): 0:(336.0,221.0)
+:Sending Touch (ACTION_UP): 0:(332.04257,221.11015)
+    // Rejecting start of Intent { act=android.intent.action.MAIN cat=[android.intent.category.LAUNCHER] cmp=com.google.android.calendar/com.android.calendar.AllInOneActivity } in package com.google.android.calendar
+:Sending Touch (ACTION_DOWN): 0:(152.0,1963.0)
+:Sending Touch (ACTION_UP): 0:(137.35516,1967.3604)
+:Sending Touch (ACTION_DOWN): 0:(229.0,1601.0)
+:Sending Touch (ACTION_UP): 0:(219.82855,1601.6328)
+:Switch: #Intent;action=android.intent.action.MAIN;category=android.intent.category.LAUNCHER;launchFlags=0x10200000;component=com.sushant.bahikhata/.MainActivity;end
+    // Allowing start of Intent { act=android.intent.action.MAIN cat=[android.intent.category.LAUNCHER] cmp=com.sushant.bahikhata/.MainActivity } in package com.sushant.bahikhata
+:Sending Touch (ACTION_DOWN): 0:(440.0,935.0)
+:Sending Touch (ACTION_UP): 0:(438.311,934.9396)
+:Sending Touch (ACTION_DOWN): 0:(271.0,1372.0)
+:Sending Touch (ACTION_UP): 0:(223.34494,1337.8098)
+:Sending Trackball (ACTION_MOVE): 0:(-4.0,-2.0)
+:Sending Touch (ACTION_DOWN): 0:(551.0,841.0)
+:Sending Touch (ACTION_UP): 0:(558.42944,868.5343)
+:Sending Trackball (ACTION_MOVE): 0:(-1.0,0.0)
+:Sending Trackball (ACTION_MOVE): 0:(-1.0,0.0)
+    //[calendar_time:2026-11-21 12:04:18.261  system_uptime:300660]
+    // Sending event #4300
+:Sending Trackball (ACTION_MOVE): 0:(4.0,-3.0)
+:Sending Trackball (ACTION_MOVE): 0:(1.0,-2.0)
+:Sending Touch (ACTION_DOWN): 0:(191.0,733.0)
+:Sending Touch (ACTION_UP): 0:(230.81935,705.7026)
+:Sending Touch (ACTION_DOWN): 0:(543.0,36.0)
+:Sending Touch (ACTION_UP): 0:(543.98315,32.620857)
+:Sending Touch (ACTION_DOWN): 0:(8.0,1004.0)
+:Sending Touch (ACTION_UP): 0:(18.04949,993.9354)
+:Switch: #Intent;action=android.intent.action.MAIN;category=android.intent.category.LAUNCHER;launchFlags=0x10200000;component=com.sushant.bahikhata/.MainActivity;end
+    // Allowing start of Intent { act=android.intent.action.MAIN cat=[android.intent.category.LAUNCHER] cmp=com.sushant.bahikhata/.MainActivity } in package com.sushant.bahikhata
+:Switch: #Intent;action=android.intent.action.MAIN;category=android.intent.category.LAUNCHER;launchFlags=0x10200000;component=com.sushant.bahikhata/leakcanary.internal.activity.LeakLauncherActivity;end
+    // Allowing start of Intent { act=android.intent.action.MAIN cat=[android.intent.category.LAUNCHER] cmp=com.sushant.bahikhata/leakcanary.internal.activity.LeakLauncherActivity } in package com.sushant.bahikhata
+:Sending Touch (ACTION_DOWN): 0:(621.0,1451.0)
+:Sending Touch (ACTION_UP): 0:(613.33105,1449.0135)
+    // Rejecting start of Intent { act=android.intent.action.VIEW dat=https://squ.re/... cmp=com.android.chrome/com.google.android.apps.chrome.IntentDispatcher } in package com.android.chrome
+    // Rejecting start of Intent { act=android.intent.action.VIEW dat=https://github.com/... cmp=com.android.chrome/com.google.android.apps.chrome.IntentDispatcher } in package com.android.chrome
+    // Rejecting start of Intent { act=android.intent.action.VIEW dat=https://github.com/... cmp=com.android.chrome/com.google.android.apps.chrome.IntentDispatcher } in package com.android.chrome
+:Sending Touch (ACTION_DOWN): 0:(452.0,973.0)
+:Sending Touch (ACTION_UP): 0:(566.452,934.49725)
+:Sending Touch (ACTION_DOWN): 0:(881.0,1351.0)
+:Sending Touch (ACTION_UP): 0:(925.8024,1398.3445)
+:Sending Trackball (ACTION_MOVE): 0:(2.0,-3.0)
+    //[calendar_time:2026-11-21 12:04:21.050  system_uptime:303449]
+    // Sending event #4400
+:Sending Touch (ACTION_DOWN): 0:(986.0,149.0)
+:Sending Touch (ACTION_UP): 0:(887.21155,72.548386)
+:Sending Trackball (ACTION_MOVE): 0:(-5.0,1.0)
+:Sending Trackball (ACTION_MOVE): 0:(1.0,-3.0)
+:Sending Touch (ACTION_DOWN): 0:(807.0,1381.0)
+:Sending Touch (ACTION_UP): 0:(834.4376,1393.9197)
+:Sending Touch (ACTION_DOWN): 0:(1022.0,691.0)
+:Sending Touch (ACTION_UP): 0:(865.2995,640.13007)
+:Sending Trackball (ACTION_MOVE): 0:(-5.0,-2.0)
+:Switch: #Intent;action=android.intent.action.MAIN;category=android.intent.category.LAUNCHER;launchFlags=0x10200000;component=com.sushant.bahikhata/.MainActivity;end
+    // Allowing start of Intent { act=android.intent.action.MAIN cat=[android.intent.category.LAUNCHER] cmp=com.sushant.bahikhata/.MainActivity } in package com.sushant.bahikhata
+:Sending Touch (ACTION_DOWN): 0:(587.0,457.0)
+:Sending Touch (ACTION_UP): 0:(588.3637,448.19257)
+:Sending Touch (ACTION_DOWN): 0:(715.0,1954.0)
+:Sending Touch (ACTION_UP): 0:(625.57623,1897.5974)
+    //[calendar_time:2026-11-21 12:04:23.111  system_uptime:305510]
+    // Sending event #4500
+:Sending Touch (ACTION_DOWN): 0:(940.0,1930.0)
+:Sending Touch (ACTION_UP): 0:(936.5904,1932.5056)
+:Sending Touch (ACTION_DOWN): 0:(928.0,728.0)
+:Sending Touch (ACTION_UP): 0:(923.3287,731.0726)
+:Sending Touch (ACTION_DOWN): 0:(988.0,1760.0)
+:Sending Touch (ACTION_UP): 0:(982.7453,1755.1495)
+:Sending Trackball (ACTION_MOVE): 0:(4.0,3.0)
+:Sending Trackball (ACTION_MOVE): 0:(-3.0,0.0)
+:Sending Touch (ACTION_DOWN): 0:(788.0,1242.0)
+:Sending Touch (ACTION_UP): 0:(780.3768,1246.6152)
+:Sending Touch (ACTION_DOWN): 0:(957.0,567.0)
+:Sending Touch (ACTION_UP): 0:(960.94257,583.40234)
+:Sending Touch (ACTION_DOWN): 0:(911.0,1532.0)
+:Sending Touch (ACTION_UP): 0:(920.7242,1526.9137)
+:Sending Touch (ACTION_DOWN): 0:(516.0,1764.0)
+:Sending Touch (ACTION_UP): 0:(496.07855,1720.8834)
+:Sending Trackball (ACTION_MOVE): 0:(-2.0,-2.0)
+:Sending Touch (ACTION_DOWN): 0:(795.0,876.0)
+:Sending Touch (ACTION_UP): 0:(829.4532,932.5942)
+:Sending Touch (ACTION_DOWN): 0:(33.0,1994.0)
+:Sending Touch (ACTION_UP): 0:(0.0,1953.3032)
+:Sending Touch (ACTION_DOWN): 0:(458.0,1468.0)
+:Sending Touch (ACTION_UP): 0:(426.9552,1537.8326)
+    //[calendar_time:2026-11-21 12:04:25.893  system_uptime:308292]
+    // Sending event #4600
+:Sending Trackball (ACTION_MOVE): 0:(0.0,-3.0)
+:Sending Trackball (ACTION_MOVE): 0:(-3.0,-4.0)
+:Switch: #Intent;action=android.intent.action.MAIN;category=android.intent.category.LAUNCHER;launchFlags=0x10200000;component=com.sushant.bahikhata/.MainActivity;end
+    // Allowing start of Intent { act=android.intent.action.MAIN cat=[android.intent.category.LAUNCHER] cmp=com.sushant.bahikhata/.MainActivity } in package com.sushant.bahikhata
+:Sending Touch (ACTION_DOWN): 0:(431.0,491.0)
+:Sending Touch (ACTION_UP): 0:(418.97293,492.85526)
+:Sending Trackball (ACTION_MOVE): 0:(-3.0,3.0)
+:Sending Flip keyboardOpen=true
+Got IOException performing flipjava.io.FileNotFoundException: /dev/input/event0: open failed: EACCES (Permission denied)
+    // Injection Failed
+:Sending Trackball (ACTION_MOVE): 0:(-4.0,-3.0)
+:Sending Trackball (ACTION_UP): 0:(0.0,0.0)
+:Sending Trackball (ACTION_MOVE): 0:(-5.0,-3.0)
+:Sending Trackball (ACTION_MOVE): 0:(3.0,-5.0)
+:Sending Touch (ACTION_DOWN): 0:(527.0,1351.0)
+:Sending Touch (ACTION_UP): 0:(523.3768,1347.9958)
+:Sending Trackball (ACTION_MOVE): 0:(2.0,-1.0)
+:Sending Touch (ACTION_DOWN): 0:(400.0,567.0)
+:Sending Touch (ACTION_UP): 0:(391.3455,561.5202)
+:Sending Trackball (ACTION_MOVE): 0:(-4.0,1.0)
+    //[calendar_time:2026-11-21 12:04:27.415  system_uptime:309814]
+    // Sending event #4700
+:Sending Touch (ACTION_DOWN): 0:(141.0,1784.0)
+:Sending Touch (ACTION_UP): 0:(161.78369,1781.783)
+:Sending Touch (ACTION_DOWN): 0:(499.0,62.0)
+:Sending Touch (ACTION_UP): 0:(518.46967,65.65477)
+:Sending Touch (ACTION_DOWN): 0:(1048.0,1330.0)
+:Sending Touch (ACTION_UP): 0:(1054.2616,1343.4575)
+:Sending Touch (ACTION_DOWN): 0:(274.0,365.0)
+:Sending Touch (ACTION_UP): 0:(267.12155,364.07687)
+:Sending Touch (ACTION_DOWN): 0:(463.0,1588.0)
+:Sending Touch (ACTION_UP): 0:(431.53372,1650.6165)
+:Sending Touch (ACTION_DOWN): 0:(942.0,1285.0)
+:Sending Touch (ACTION_UP): 0:(1042.4678,1191.115)
+:Sending Touch (ACTION_DOWN): 0:(994.0,584.0)
+:Sending Touch (ACTION_UP): 0:(994.5002,518.59827)
+:Sending Touch (ACTION_DOWN): 0:(1023.0,1765.0)
+:Sending Touch (ACTION_UP): 0:(986.06415,1684.7672)
+:Sending Touch (ACTION_DOWN): 0:(123.0,1121.0)
+:Sending Touch (ACTION_UP): 0:(194.31804,1162.3896)
+:Sending Touch (ACTION_DOWN): 0:(809.0,790.0)
+:Sending Touch (ACTION_UP): 0:(735.2877,832.8755)
+:Sending Touch (ACTION_DOWN): 0:(271.0,1976.0)
+:Sending Touch (ACTION_UP): 0:(274.91367,1977.6053)
+:Sending Touch (ACTION_DOWN): 0:(982.0,1374.0)
+:Sending Touch (ACTION_UP): 0:(971.42145,1375.028)
+:Sending Touch (ACTION_DOWN): 0:(141.0,693.0)
+    //[calendar_time:2026-11-21 12:04:30.578  system_uptime:312977]
+    // Sending event #4800
+:Sending Touch (ACTION_UP): 0:(194.82602,615.99695)
+:Sending Touch (ACTION_DOWN): 0:(1054.0,204.0)
+:Sending Touch (ACTION_UP): 0:(1058.5702,209.6407)
+:Sending Touch (ACTION_DOWN): 0:(580.0,956.0)
+:Sending Touch (ACTION_UP): 0:(579.2878,950.39844)
+:Sending Flip keyboardOpen=false
+Got IOException performing flipjava.io.FileNotFoundException: /dev/input/event0: open failed: EACCES (Permission denied)
+    // Injection Failed
+:Sending Trackball (ACTION_MOVE): 0:(3.0,0.0)
+:Sending Trackball (ACTION_MOVE): 0:(4.0,-3.0)
+:Sending Trackball (ACTION_MOVE): 0:(2.0,-1.0)
+:Sending Touch (ACTION_DOWN): 0:(403.0,1818.0)
+:Sending Touch (ACTION_UP): 0:(373.6926,1858.9478)
+:Sending Trackball (ACTION_MOVE): 0:(2.0,-5.0)
+:Sending Trackball (ACTION_UP): 0:(0.0,0.0)
+:Sending Touch (ACTION_DOWN): 0:(450.0,712.0)
+:Sending Touch (ACTION_UP): 0:(380.90854,680.01953)
+:Sending Touch (ACTION_DOWN): 0:(670.0,1962.0)
+:Sending Touch (ACTION_UP): 0:(658.5788,1982.6865)
+:Sending Trackball (ACTION_MOVE): 0:(-1.0,1.0)
+    //[calendar_time:2026-11-21 12:04:32.624  system_uptime:315022]
+    // Sending event #4900
+:Sending Touch (ACTION_DOWN): 0:(593.0,103.0)
+:Sending Touch (ACTION_UP): 0:(598.8787,80.3249)
+:Sending Trackball (ACTION_MOVE): 0:(3.0,3.0)
+:Sending Touch (ACTION_DOWN): 0:(403.0,1360.0)
+:Sending Touch (ACTION_UP): 0:(412.43124,1344.7529)
+:Sending Trackball (ACTION_MOVE): 0:(3.0,-3.0)
+:Sending Touch (ACTION_DOWN): 0:(967.0,823.0)
+:Sending Touch (ACTION_UP): 0:(895.7073,898.46826)
+:Sending Touch (ACTION_DOWN): 0:(271.0,418.0)
+:Sending Touch (ACTION_UP): 0:(232.01587,383.04468)
+    // Rejecting start of Intent { act=android.intent.action.MAIN cat=[android.intent.category.LAUNCHER] cmp=com.google.android.apps.youtube.music/.activities.MusicActivity } in package com.google.android.apps.youtube.music
+:Sending Touch (ACTION_DOWN): 0:(457.0,752.0)
+:Sending Touch (ACTION_UP): 0:(463.19727,780.06)
+:Sending Touch (ACTION_DOWN): 0:(716.0,1969.0)
+:Sending Touch (ACTION_UP): 0:(730.01074,1878.2231)
+:Switch: #Intent;action=android.intent.action.MAIN;category=android.intent.category.LAUNCHER;launchFlags=0x10200000;component=com.sushant.bahikhata/leakcanary.internal.activity.LeakLauncherActivity;end
+    // Allowing start of Intent { act=android.intent.action.MAIN cat=[android.intent.category.LAUNCHER] cmp=com.sushant.bahikhata/leakcanary.internal.activity.LeakLauncherActivity } in package com.sushant.bahikhata
+:Sending Trackball (ACTION_MOVE): 0:(-5.0,-1.0)
+:Sending Touch (ACTION_DOWN): 0:(802.0,343.0)
+Events injected: 5000
+:Sending rotation degree=0, persist=false
+:Dropped: keys=0 pointers=0 trackballs=0 flips=9 rotations=0
+## Network stats: elapsed time=130342ms (0ms mobile, 0ms wifi, 130342ms not connected)
+// Monkey finished

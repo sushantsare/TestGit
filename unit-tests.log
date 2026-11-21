@@ -1,0 +1,80 @@
+Downloading https://services.gradle.org/distributions/gradle-9.7.1-bin.zip
+..............10%..............20%...............30%..............40%...............50%..............60%...............70%..............80%..............90%...............100%
+
+Welcome to Gradle 9.7.1!
+
+Here are the highlights of this release:
+ - Isolated Projects graduates to incubating
+ - Broader Configuration Cache compatibility
+ - Resilient Sync helps you fix broken builds
+ - More source locations in problem reports
+
+For more details see https://docs.gradle.org/9.7.1/release-notes.html
+
+Starting a Gradle Daemon (subsequent builds will be faster)
+
+> Configure project :app
+w: file:///home/runner/work/TestGit/TestGit/apps/bahi-khata/app/build.gradle.kts:50:34: 'var xmlReport: Boolean' is deprecated. Lint reports are now always generated. Use SingleArtifact.LINT_XML_REPORT or SingleArtifact.AGGREGATED_LINT_XML_REPORT to consume lint report artifacts.
+w: file:///home/runner/work/TestGit/TestGit/apps/bahi-khata/app/build.gradle.kts:50:52: 'var htmlReport: Boolean' is deprecated. Lint reports are now always generated. Use SingleArtifact.LINT_HTML_REPORT or SingleArtifact.AGGREGATED_LINT_HTML_REPORT to consume lint report artifacts.
+
+> Task :app:preBuild UP-TO-DATE
+> Task :app:preDebugBuild UP-TO-DATE
+> Task :app:generateDebugBuildConfig
+> Task :app:generateDebugResources
+> Task :app:packageDebugResources
+> Task :app:processDebugNavigationResources
+> Task :app:parseDebugLocalResources
+> Task :app:javaPreCompileDebug
+> Task :app:generateDebugRFile
+> Task :app:checkDebugAarMetadata
+> Task :app:mapDebugSourceSetPaths
+> Task :app:compileDebugNavigationResources
+> Task :app:createDebugCompatibleScreenManifests
+> Task :app:extractDeepLinksDebug
+
+> Task :app:processDebugMainManifest
+/home/runner/work/TestGit/TestGit/apps/bahi-khata/app/src/main/AndroidManifest.xml:17:5-107 Warning:
+	uses-permission#android.permission.FOREGROUND_SERVICE_DATA_SYNC was tagged at AndroidManifest.xml:17 to remove other declarations but no other declaration present
+/home/runner/work/TestGit/TestGit/apps/bahi-khata/app/src/main/AndroidManifest.xml:18:5-86 Warning:
+	uses-permission#android.permission.VIBRATE was tagged at AndroidManifest.xml:18 to remove other declarations but no other declaration present
+
+> Task :app:processDebugManifest
+> Task :app:preDebugUnitTestBuild UP-TO-DATE
+> Task :app:javaPreCompileDebugUnitTest
+> Task :app:generateDebugAssets UP-TO-DATE
+> Task :app:mergeDebugAssets
+> Task :app:mergeDebugResources
+
+> Task :app:mergeDebugUnitTestManifest
+/home/runner/work/TestGit/TestGit/apps/bahi-khata/app/src/main/AndroidManifest.xml:16:5-97 Warning:
+	uses-permission#android.permission.FOREGROUND_SERVICE was tagged at AndroidManifest.xml:16 to remove other declarations but no other declaration present
+/home/runner/work/TestGit/TestGit/apps/bahi-khata/app/src/main/AndroidManifest.xml:17:5-107 Warning:
+	uses-permission#android.permission.FOREGROUND_SERVICE_DATA_SYNC was tagged at AndroidManifest.xml:17 to remove other declarations but no other declaration present
+/home/runner/work/TestGit/TestGit/apps/bahi-khata/app/src/main/AndroidManifest.xml:18:5-86 Warning:
+	uses-permission#android.permission.VIBRATE was tagged at AndroidManifest.xml:18 to remove other declarations but no other declaration present
+/home/runner/work/TestGit/TestGit/apps/bahi-khata/app/build/intermediates/tmp/manifest/test/debug/tempFile2ProcessTestManifest1142035409240182742.xml:24:5-26:31 Warning:
+	uses-permission#android.permission.FOREGROUND_SERVICE_DATA_SYNC was tagged at tempFile2ProcessTestManifest1142035409240182742.xml:24 to remove other declarations but no other declaration present
+/home/runner/work/TestGit/TestGit/apps/bahi-khata/app/build/intermediates/tmp/manifest/test/debug/tempFile2ProcessTestManifest1142035409240182742.xml:27:5-29:31 Warning:
+	uses-permission#android.permission.VIBRATE was tagged at tempFile2ProcessTestManifest1142035409240182742.xml:27 to remove other declarations but no other declaration present
+
+> Task :app:processDebugUnitTestManifest
+> Task :app:processDebugManifestForPackage
+> Task :app:processDebugResources
+> Task :app:packageDebugUnitTestForUnitTest
+> Task :app:generateDebugUnitTestConfig
+> Task :app:kspDebugKotlin
+> Task :app:compileDebugKotlin
+> Task :app:compileDebugJavaWithJavac
+> Task :app:bundleDebugClassesToCompileJar
+> Task :app:bundleDebugClassesToRuntimeJar
+> Task :app:processDebugJavaRes
+> Task :app:kspDebugUnitTestKotlin
+> Task :app:compileDebugUnitTestKotlin
+> Task :app:compileDebugUnitTestJavaWithJavac NO-SOURCE
+> Task :app:processDebugUnitTestJavaRes
+> Task :app:testDebugUnitTest
+gradle/actions: Writing build results to /home/runner/work/_temp/.gradle-actions/build-results/__run-1795262013941.json
+
+BUILD SUCCESSFUL in 2m 38s
+33 actionable tasks: 33 executed
+Consider enabling configuration cache to speed up this build: https://docs.gradle.org/9.7.1/userguide/configuration_cache_enabling.html

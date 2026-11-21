@@ -1,0 +1,6 @@
+--------- beginning of main
+11-21 12:02:07.006  5458  5538 I BahiSms : scan parsed=0 look=0 info=0 ignored=0
+11-21 12:02:07.078  5458  5538 I BahiSms : scan parsed=0 look=0 info=0 ignored=0
+11-21 12:02:07.160  5458  5539 I BahiSms : scan parsed=0 look=0 info=0 ignored=0
+11-21 12:02:07.377  5458  5539 I BahiSms : scan parsed=0 look=0 info=0 ignored=0
+11-21 12:02:11.804  5458  5536 I BahiSms : scan parsed=0 look=0 info=0 ignored=0

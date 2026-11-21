@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.sushant.bahikhata.LogicTest" tests="8" skipped="0" failures="0" errors="0" timestamp="2026-11-21T11:56:02.650Z" hostname="runnervm0hi8g" time="0.572">
+  <properties/>
+  <testcase name="recurringDates" classname="com.sushant.bahikhata.LogicTest" time="0.003"/>
+  <testcase name="personBalance" classname="com.sushant.bahikhata.LogicTest" time="0.02"/>
+  <testcase name="calculator" classname="com.sushant.bahikhata.LogicTest" time="0.01"/>
+  <testcase name="cardCycle" classname="com.sushant.bahikhata.LogicTest" time="0.003"/>
+  <testcase name="generatedCorpus" classname="com.sushant.bahikhata.LogicTest" time="0.522"/>
+  <testcase name="tags" classname="com.sushant.bahikhata.LogicTest" time="0.004"/>
+  <testcase name="money" classname="com.sushant.bahikhata.LogicTest" time="0.005"/>
+  <testcase name="ledgerBalancesAndTransfers" classname="com.sushant.bahikhata.LogicTest" time="0.002"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

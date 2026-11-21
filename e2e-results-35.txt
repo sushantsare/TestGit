@@ -1,0 +1,9 @@
+== Bahi Khata e2e on Android 15 (API 35) ==
+Performing Streamed Install
+Success
+launch=PASSED
+monkey_crashes_35=0
+Performing Streamed Install
+Success
+sms_received_bg=1 sms_otp_ignored=1 sms_received_after_kill=0 sms_needs_look=0 notifications=0 rescan_duplicates=1
+sms_e2e=FAILED

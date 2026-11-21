@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.sushant.bahikhata.SmsParserTest" tests="6" skipped="0" failures="0" errors="0" timestamp="2026-11-21T11:56:03.225Z" hostname="runnervm0hi8g" time="0.053">
+  <properties/>
+  <testcase name="shapeSimilarityForLearnedFormats" classname="com.sushant.bahikhata.SmsParserTest" time="0.001"/>
+  <testcase name="unknownFormatGoesToNeedsALook" classname="com.sushant.bahikhata.SmsParserTest" time="0.001"/>
+  <testcase name="corpus" classname="com.sushant.bahikhata.SmsParserTest" time="0.03"/>
+  <testcase name="billFields" classname="com.sushant.bahikhata.SmsParserTest" time="0.0"/>
+  <testcase name="everyMoneySmsIsParsedOrNeedsALook" classname="com.sushant.bahikhata.SmsParserTest" time="0.02"/>
+  <testcase name="senders" classname="com.sushant.bahikhata.SmsParserTest" time="0.001"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

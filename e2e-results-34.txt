@@ -1,0 +1,9 @@
+== Bahi Khata e2e on Android 14 (API 34) ==
+Performing Streamed Install
+Success
+launch=PASSED
+monkey_crashes_34=0
+Performing Streamed Install
+Success
+sms_received_bg=0 sms_otp_ignored=0 sms_received_after_kill=1 sms_needs_look=0 notifications=0 rescan_duplicates=1
+sms_e2e=FAILED

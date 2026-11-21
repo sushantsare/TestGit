@@ -1,0 +1,23 @@
+== Bahi Khata e2e on Android 13 (API 33) ==
+Performing Streamed Install
+Success
+launch=PASSED
+monkey_crashes_33=0
+Performing Streamed Install
+Success
+sms_received_bg=1 sms_otp_ignored=1 sms_received_after_kill=1 sms_needs_look=1 notifications=4 rescan_duplicates=0
+sms_e2e=PASSED
+Performing Streamed Install
+Success
+T3 crashes=0 anrs=0
+T4 strictmode=3
+T5 app_leaks=0
+T6 cold_median=1674 warm_median=199
+T7 Janky frames: 0 (0.00%)
+T8 before= TOTAL PSS: 51616 TOTAL RSS: 121856 TOTAL SWAP PSS: 230 after= TOTAL PSS: 58367 TOTAL RSS: 129340 TOTAL SWAP PSS: 125
+T9 crash_after_kill=0
+T10 offline_crashes=0
+T11 crashes=0
+T14 crashes=0
+T15 apk_bytes=25033552 signature_v2=1 native_libs=8
+T15 zipalign16_exit=0
