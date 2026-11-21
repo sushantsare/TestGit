@@ -130,12 +130,6 @@ if [ -f "$DBG" ]; then
     set -- $b; [ -n "$4" ] && adb shell input tap $(( ($1 + $3) / 2 )) $(( ($2 + $4) / 2 ))
   }
   seed 0
-  # T7 jank: scroll the Entries list
-  adb shell am force-stop $PKG; adb shell am start -W -n $ACT --es route entries >/dev/null 2>&1; sleep 4
-  adb shell dumpsys gfxinfo $PKG reset >/dev/null
-  for i in 1 2 3 4 5; do adb shell input swipe 540 1800 540 700 300; sleep 0.4; adb shell input swipe 540 700 540 1800 300; sleep 0.4; done
-  adb shell dumpsys gfxinfo $PKG > $A/T7_gfxinfo.txt
-  echo "T7 frames=$(grep -m1 'Total frames rendered' $A/T7_gfxinfo.txt | awk '{print $4}') $(grep -m1 'Janky frames' $A/T7_gfxinfo.txt)" >> $A/summary.txt
   # T9 process death mid-form: type an amount, leave, let the system kill the process, come back
   adb logcat -c; adb shell am start -n $ACT --es route add >/dev/null 2>&1; sleep 3
   tapid key_7; tapid key_5; tapid key_0; sleep 1
@@ -162,8 +156,16 @@ if [ -f "$DBG" ]; then
   adb shell wm size reset; adb shell wm density reset; sleep 2
   echo "T14 crashes=$(mycrash)" >> $A/summary.txt
   adb logcat -d | grep -B2 -A25 "FATAL EXCEPTION" | head -60 > $A/T14_crash.txt
-  # T13 large data: 5,000 extra entries, then open lists, search and reports
-  seed 5000; adb logcat -c
+  # T13 large data: 5,000 extra entries, then open lists, search and reports (release build)
+  seed 5000
+  adb install -r -t $REL >> $LOG 2>&1; echo "T7_T13_on=release" >> $A/summary.txt
+  # T7 jank on the optimised release build (same signing key in CI, so it installs over the seeded debug app and keeps the data)
+  adb shell am force-stop $PKG; adb shell am start -W -n $ACT --es route entries >/dev/null 2>&1; sleep 4
+  adb shell dumpsys gfxinfo $PKG reset >/dev/null
+  for i in 1 2 3 4 5; do adb shell input swipe 540 1800 540 700 300; sleep 0.4; adb shell input swipe 540 700 540 1800 300; sleep 0.4; done
+  adb shell dumpsys gfxinfo $PKG > $A/T7_gfxinfo.txt
+  echo "T7 frames=$(grep -m1 'Total frames rendered' $A/T7_gfxinfo.txt | awk '{print $4}') $(grep -m1 'Janky frames' $A/T7_gfxinfo.txt)" >> $A/summary.txt
+  adb logcat -c
   T13=$(adb shell am start -W -n $ACT --es route entries | grep TotalTime | awk '{print $2}'); sleep 3
   for i in 1 2 3; do adb shell input swipe 540 1800 540 500 200; done
   adb shell am start -n $ACT --es route search >/dev/null 2>&1; sleep 2; adb shell input text swig; sleep 3
