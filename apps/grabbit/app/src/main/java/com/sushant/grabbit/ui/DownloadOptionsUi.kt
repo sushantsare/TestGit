@@ -65,6 +65,9 @@ class OptsState(info: MediaInfo) {
     var trim by mutableStateOf(0f..info.duration.toFloat())
     var chapters by mutableStateOf(false)
     var audioFormat by mutableStateOf(Prefs.audioFormat)
+    private val defaultName = com.sushant.grabbit.download.FileNames.clean(info.title).ifBlank { "Grabbit" }
+    /** File name shown on the card; the user can change it with the pen icon. */
+    var name by mutableStateOf(defaultName)
 
     val trimmed get() = duration > 0 && (trim.start > 0.5f || trim.endInclusive < duration - 0.5f)
     /** Share of the video kept (for size estimates). */
@@ -78,6 +81,7 @@ class OptsState(info: MediaInfo) {
         trimEnd = if (trimmed) kotlin.math.ceil(trim.endInclusive.toDouble()).toLong() else -1,
         splitChapters = chapters,
         audioFormat = audioFormat,
+        name = if (name != defaultName) name else "",
     )
 
     companion object {

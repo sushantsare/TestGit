@@ -11,6 +11,8 @@ object Errors {
         if (m.isEmpty()) return "Something went wrong. Please try again."
         val l = m.lowercase()
         return when {
+            "file name too long" in l || "errno 36" in l ->
+                "The file name was too long. Tap the pen icon to give it a shorter name, then try again."
             isSubtitleError(m) ->
                 "The site refused the subtitles right now. Try again in a few minutes, or download without subtitles."
             "unable to resolve host" in l || "network is unreachable" in l || "failed to resolve" in l ||

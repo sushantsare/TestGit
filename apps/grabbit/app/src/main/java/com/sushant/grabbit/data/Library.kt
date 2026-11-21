@@ -39,6 +39,12 @@ object Library {
     }
 
     @Synchronized
+    fun update(item: SavedItem) {
+        items.value = items.value.map { if (it.id == item.id) item else it }
+        persist()
+    }
+
+    @Synchronized
     fun remove(id: String) {
         items.value = items.value.filterNot { it.id == id }
         persist()

@@ -24,7 +24,7 @@ object Downloads {
             .setInputData(
                 workDataOf(
                     DownloadWorker.K_URL to job.url,
-                    DownloadWorker.K_TITLE to job.title,
+                    DownloadWorker.K_TITLE to job.opts.name.ifBlank { job.title },
                     DownloadWorker.K_THUMB to job.thumb,
                     DownloadWorker.K_SITE to job.site,
                     DownloadWorker.K_QUALITY to job.quality,
@@ -35,7 +35,7 @@ object Downloads {
             .setExpedited(OutOfQuotaPolicy.RUN_AS_NON_EXPEDITED_WORK_REQUEST)
             .addTag(TAG)
             .addTag("u:${job.url}")
-            .addTag("t:${job.title.take(200)}")
+            .addTag("t:${job.opts.name.ifBlank { job.title }.take(200)}")
             .addTag("i:${job.thumb}")
             .addTag("s:${job.site}")
             .addTag("q:${job.quality}")

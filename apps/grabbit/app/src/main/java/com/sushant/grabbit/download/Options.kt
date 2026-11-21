@@ -18,6 +18,8 @@ data class DlOpts(
     val splitChapters: Boolean = false,
     /** Audio downloads: "mp3", "m4a", "opus" or "best" (original, no conversion). */
     val audioFormat: String = "mp3",
+    /** File name chosen by the user ("" = use the title). */
+    val name: String = "",
 ) {
     val trimmed get() = trimStart >= 0 && trimEnd > trimStart
     val keepSubFiles get() = subLang.isNotEmpty() && subMode != "embed"
@@ -25,6 +27,7 @@ data class DlOpts(
     fun encode(): String = listOf(
         "sl=$subLang", "sa=${if (subAuto) 1 else 0}", "sm=$subMode", "ts=$trimStart", "te=$trimEnd",
         "ch=${if (splitChapters) 1 else 0}", "af=$audioFormat",
+        "nm=${java.net.URLEncoder.encode(name, "UTF-8")}",
     ).joinToString(";")
 
     companion object {
@@ -39,6 +42,7 @@ data class DlOpts(
                 trimEnd = m["te"]?.toLongOrNull() ?: -1,
                 splitChapters = m["ch"] == "1",
                 audioFormat = m["af"]?.takeIf { it in AUDIO_FORMATS } ?: "mp3",
+                name = m["nm"]?.let { runCatching { java.net.URLDecoder.decode(it, "UTF-8") }.getOrNull() }.orEmpty(),
             )
         }
 
@@ -68,7 +72,7 @@ object DownloadArgs {
         o("--no-mtime"); o("--no-warnings")
         o(if (playlist) "--yes-playlist" else "--no-playlist")
         if (playlist) o("--ignore-errors")
-        val template = if (playlist) "%(playlist_index)03d - %(title).90B [%(id)s].%(ext)s" else "%(title).120B [%(id)s].%(ext)s"
+        val template = if (playlist) "%(playlist_index)03d - %(title).70B [%(id).30B].%(ext)s" else "%(title).80B [%(id).40B].%(ext)s"
         o("-o", "$outDir/$template")
         if (g.faster) o("--concurrent-fragments", "4")
 

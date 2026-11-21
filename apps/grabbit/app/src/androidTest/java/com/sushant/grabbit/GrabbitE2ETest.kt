@@ -21,6 +21,7 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.core.view.WindowCompat
@@ -149,6 +150,13 @@ class GrabbitE2ETest {
             log("[$name] FETCH FAILED"); shot("${name}_fetch_error"); return false
         }
         shot("${name}_1_info")
+        if (name == "direct" && exists("renameBtn")) {
+            compose.onNodeWithTag("renameBtn").performClick()
+            compose.onNodeWithTag("nameField").performTextClearance()
+            compose.onNodeWithTag("nameField").performTextInput("My test: clip")
+            shot("${name}_1d_rename")
+            compose.onNodeWithTag("nameOk").performClick()
+        }
         if (name == "x" && compose.onAllNodesWithText("Audio").fetchSemanticsNodes().isNotEmpty()) {
             compose.onNodeWithText("Audio").performClick()
             compose.onNodeWithTag("downloadBtn").performScrollTo()
@@ -344,6 +352,30 @@ class GrabbitE2ETest {
         r.release(); d
     }.getOrDefault(-1)
 
+    /** Pen-icon name before download, then Rename from the Downloads list. */
+    private fun renameFlow(): String {
+        val item = Library.items.value.firstOrNull { it.fileName.startsWith("My test clip") }
+        log("RENAME before-download name=${Library.items.value.firstOrNull()?.fileName}")
+        if (item == null) return "renameBefore=false"
+        compose.onNodeWithTag("nav_downloads").performClick()
+        compose.waitForIdle()
+        return runCatching {
+            compose.onAllNodesWithContentDescription("More options", useUnmergedTree = true)[0].performClick()
+            compose.onNodeWithText("Rename").performClick()
+            compose.onNodeWithTag("nameField").performTextClearance()
+            compose.onNodeWithTag("nameField").performTextInput("Renamed clip")
+            shot("direct_4_rename_dialog")
+            compose.onNodeWithTag("renameConfirm").performClick()
+            compose.waitUntil(20_000) { Library.items.value.any { it.id == item.id && it.fileName.startsWith("Renamed clip") } }
+            val now = Library.items.value.first { it.id == item.id }
+            val vm = ViewModelProvider(compose.activity)[MainViewModel::class.java]
+            val exists = vm.fileExists(now)
+            log("RENAME after name=${now.fileName} exists=$exists")
+            shot("direct_5_renamed")
+            "renameBefore=true renameAfter=$exists"
+        }.getOrElse { log("RENAME failed: ${it.message}"); shot("direct_rename_fail"); "renameBefore=true renameAfter=false" }
+    }
+
     private fun optionsFlow(): String {
         val url = "https://www.w3schools.com/html/mov_bbb.mp4"
         val vm = ViewModelProvider(compose.activity)[MainViewModel::class.java]
@@ -393,6 +425,7 @@ class GrabbitE2ETest {
         compose.onNodeWithTag("nav_home").performClick()
 
         val direct = grab("direct", "https://www.w3schools.com/html/mov_bbb.mp4")
+        val renamed = renameFlow()
         val x = grab("x", "https://x.com/SpaceX/status/1732824684683784516")
         val dm = grab("dailymotion", "https://www.dailymotion.com/video/x7tgad0")
         val fb = grab("facebook", "https://www.facebook.com/watch/?v=10153231379946729")
@@ -492,7 +525,7 @@ class GrabbitE2ETest {
         val threads = threadsFlow()
         val options = optionsFlow()
 
-        log("SUMMARY direct=$direct x=$x dailymotion=$dm facebook=$fb youtube=$youtube share=$share threads=$threads $options")
+        log("SUMMARY direct=$direct x=$x dailymotion=$dm facebook=$fb youtube=$youtube share=$share threads=$threads $options $renamed")
         results.forEach { Log.i("GrabbitE2E", "RESULT $it") }
         assertTrue("Downloads failed", direct && x)
         assertTrue("Share sheet download failed", share)

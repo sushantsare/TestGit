@@ -219,6 +219,69 @@ class MainViewModel(private val app: Application) : AndroidViewModel(app) {
         }
     }
 
+    sealed interface RenameResult {
+        data class Done(val name: String) : RenameResult
+        data class NeedsConfirm(val sender: IntentSender) : RenameResult
+        data class Failed(val message: String) : RenameResult
+    }
+
+    /** Renames the real file on the phone and the entry in the list. [base] is the name without extension. */
+    fun renameNow(item: SavedItem, base: String): RenameResult {
+        val clean = com.sushant.grabbit.download.FileNames.clean(base)
+        if (clean.isBlank()) return RenameResult.Failed("Type a name first")
+        if (!fileExists(item)) return RenameResult.Failed("The file is missing, so it can't be renamed")
+        val ext = item.fileName.substringAfterLast('.', "").takeIf { '.' in item.fileName && it.length in 1..5 }
+            ?: android.webkit.MimeTypeMap.getSingleton().getExtensionFromMimeType(item.mime).orEmpty()
+        val unique = com.sushant.grabbit.download.FileNames::unique
+        if (item.path != null) {
+            val old = File(item.path)
+            val newName = unique(clean, ext) { n -> n != old.name && File(old.parentFile, n).exists() }
+            val dest = File(old.parentFile, newName)
+            if (dest.absolutePath != old.absolutePath && !old.renameTo(dest)) return RenameResult.Failed("Couldn't rename the file")
+            android.media.MediaScannerConnection.scanFile(app, arrayOf(old.absolutePath, dest.absolutePath), null, null)
+            val uri = androidx.core.content.FileProvider.getUriForFile(app, "${app.packageName}.files", dest)
+            Library.update(item.copy(title = clean, fileName = newName, path = dest.absolutePath, uri = uri.toString()))
+            return RenameResult.Done(newName)
+        }
+        if (Build.VERSION.SDK_INT < 29) return RenameResult.Failed("Couldn't rename the file")
+        val uri = Uri.parse(item.uri)
+        val cr = app.contentResolver
+        val rel = runCatching {
+            cr.query(uri, arrayOf(MediaStore.MediaColumns.RELATIVE_PATH), null, null, null)?.use { c ->
+                if (c.moveToFirst()) c.getString(0) else null
+            }
+        }.getOrNull() ?: return RenameResult.Failed("Couldn't find the file")
+        val newName = unique(clean, ext) { n -> com.sushant.grabbit.download.Saver.taken(app, n, rel, uri) }
+        try {
+            cr.update(uri, android.content.ContentValues().apply { put(MediaStore.MediaColumns.DISPLAY_NAME, newName) }, null, null)
+        } catch (e: SecurityException) {
+            val sender: IntentSender? = when {
+                Build.VERSION.SDK_INT >= 30 -> MediaStore.createWriteRequest(cr, listOf(uri)).intentSender
+                Build.VERSION.SDK_INT == 29 && e is RecoverableSecurityException -> e.userAction.actionIntent.intentSender
+                else -> null
+            }
+            return if (sender != null) RenameResult.NeedsConfirm(sender)
+            else RenameResult.Failed("Android didn't allow renaming this file")
+        }
+        val real = runCatching {
+            cr.query(uri, arrayOf(MediaStore.MediaColumns.DISPLAY_NAME), null, null, null)?.use { c ->
+                if (c.moveToFirst()) c.getString(0) else null
+            }
+        }.getOrNull() ?: newName
+        Library.update(item.copy(title = clean, fileName = real))
+        return RenameResult.Done(real)
+    }
+
+    fun rename(item: SavedItem, base: String, confirm: (IntentSender) -> Unit) {
+        viewModelScope.launch {
+            when (val r = withContext(Dispatchers.IO) { renameNow(item, base) }) {
+                is RenameResult.Done -> app.toast("Renamed to ${r.name}")
+                is RenameResult.NeedsConfirm -> confirm(r.sender)
+                is RenameResult.Failed -> app.toast(r.message)
+            }
+        }
+    }
+
     fun removeFromList(item: SavedItem) {
         Library.remove(item.id)
         missing = missing - item.id

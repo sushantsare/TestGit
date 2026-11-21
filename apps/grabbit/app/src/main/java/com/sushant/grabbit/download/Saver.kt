@@ -35,26 +35,50 @@ object Saver {
 
     private val SUBS = setOf("srt", "vtt", "ass")
 
+    /** True if a file with this name already exists in that phone folder (Android 10+). */
+    @androidx.annotation.RequiresApi(29)
+    fun taken(ctx: Context, name: String, relPath: String, exceptUri: Uri? = null): Boolean = runCatching {
+        val except = exceptUri?.lastPathSegment?.toLongOrNull() ?: -1L
+        ctx.contentResolver.query(
+            MediaStore.Files.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY),
+            arrayOf(MediaStore.MediaColumns._ID),
+            "${MediaStore.MediaColumns.DISPLAY_NAME}=? AND ${MediaStore.MediaColumns.RELATIVE_PATH}=?",
+            arrayOf(name, relPath), null,
+        )?.use { c -> var hit = false; while (c.moveToNext()) if (c.getLong(0) != except) hit = true; hit } ?: false
+    }.getOrDefault(false)
+
     /**
      * Saves every finished media file. With [keepSubs], subtitle files are also saved (to Download/Grabbit,
      * next to nothing else, since Movies/ only accepts video) but they don't appear in the downloads list.
      */
-    fun saveAll(ctx: Context, dir: File, title: String, site: String, thumb: String, url: String, keepSubs: Boolean = false): List<SavedItem> {
+    fun saveAll(
+        ctx: Context, dir: File, title: String, site: String, thumb: String, url: String,
+        keepSubs: Boolean = false, name: String = "",
+    ): List<SavedItem> {
         val all = dir.walkTopDown().filter { it.isFile && it.length() > 0 }.sortedBy { it.name }.toList()
         val files = all.filter { it.extension.lowercase() !in SKIP }
         val single = files.size == 1
-        val items = files.map { f ->
-            val cleanName = f.nameWithoutExtension.replace(Regex("""\s*\[[^\]]+]$"""), "")
-                .removePrefix(DownloadArgs.CHAPTER_PREFIX)
-            save(ctx, f, if (single) title else cleanName, site, thumb, url)
+        val custom = FileNames.clean(name)
+        val mainBase = custom.ifBlank { FileNames.clean(title) }.ifBlank { "Grabbit" }
+        val items = files.mapIndexed { i, f ->
+            val base = when {
+                single -> mainBase
+                custom.isNotBlank() -> FileNames.numbered(custom, i + 1, files.size)
+                else -> FileNames.clean(
+                    f.nameWithoutExtension.replace(Regex("""\s*\[[^\]]+]$"""), "").removePrefix(DownloadArgs.CHAPTER_PREFIX)
+                ).ifBlank { FileNames.numbered(mainBase, i + 1, files.size) }
+            }
+            save(ctx, f, base, base, site, thumb, url)
         }
         if (keepSubs) all.filter { it.extension.lowercase() in SUBS && it.exists() }.forEach { f ->
-            runCatching { save(ctx, f, f.nameWithoutExtension, site, thumb, url) }
+            // "title [id].en.srt" -> "<name>.en.srt"
+            val lang = f.nameWithoutExtension.substringAfterLast('.', "").takeIf { it.length in 2..8 && ' ' !in it }
+            runCatching { save(ctx, f, mainBase, if (lang != null) "$mainBase.$lang" else mainBase, site, thumb, url) }
         }
         return items
     }
 
-    private fun save(ctx: Context, f: File, title: String, site: String, thumb: String, url: String): SavedItem {
+    private fun save(ctx: Context, f: File, title: String, base: String, site: String, thumb: String, url: String): SavedItem {
         val mime = mimeOf(f.extension)
         val isAudio = mime.startsWith("audio")
         val isVideo = mime.startsWith("video")
@@ -63,7 +87,7 @@ object Saver {
             isVideo -> Environment.DIRECTORY_MOVIES
             else -> Environment.DIRECTORY_DOWNLOADS
         }
-        val name = f.name
+        var name = "$base.${f.extension}"
         val uri: Uri
         var path: String? = null
 
@@ -75,6 +99,7 @@ object Saver {
                 else -> MediaStore.Downloads.getContentUri(vol)
             }
             val cr = ctx.contentResolver
+            name = FileNames.unique(base, f.extension) { n -> taken(ctx, n, "$dirType/Grabbit/") }
             val values = ContentValues().apply {
                 put(MediaStore.MediaColumns.DISPLAY_NAME, name)
                 put(MediaStore.MediaColumns.MIME_TYPE, mime)
@@ -89,16 +114,19 @@ object Saver {
                 values.clear()
                 values.put(MediaStore.MediaColumns.IS_PENDING, 0)
                 cr.update(uri, values, null, null)
+                // Android may still adjust the name; keep what was really saved
+                cr.query(uri, arrayOf(MediaStore.MediaColumns.DISPLAY_NAME), null, null, null)?.use { c ->
+                    if (c.moveToFirst()) c.getString(0)?.let { name = it }
+                }
             } catch (e: Exception) {
                 runCatching { cr.delete(uri, null, null) }
                 throw e
             }
         } else {
             @Suppress("DEPRECATION")
-            val base = File(Environment.getExternalStoragePublicDirectory(dirType), "Grabbit").apply { mkdirs() }
-            var dest = File(base, name)
-            var n = 1
-            while (dest.exists()) dest = File(base, "${f.nameWithoutExtension} (${n++}).${f.extension}")
+            val folder = File(Environment.getExternalStoragePublicDirectory(dirType), "Grabbit").apply { mkdirs() }
+            name = FileNames.unique(base, f.extension) { File(folder, it).exists() }
+            val dest = File(folder, name)
             f.copyTo(dest)
             path = dest.absolutePath
             MediaScannerConnection.scanFile(ctx, arrayOf(dest.absolutePath), arrayOf(mime), null)

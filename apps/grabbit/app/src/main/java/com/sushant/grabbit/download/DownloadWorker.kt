@@ -181,7 +181,7 @@ class DownloadWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(c
             }
         }
         val saved = try {
-            Saver.saveAll(ctx, tmp, title, site, thumb, url, keepSubs = opts.keepSubFiles)
+            Saver.saveAll(ctx, tmp, title, site, thumb, url, keepSubs = opts.keepSubFiles, name = opts.name)
         } catch (e: Exception) {
             return fail("Couldn't save the file: ${e.message ?: e}", e.toString())
         } finally {

@@ -398,8 +398,10 @@ internal fun MediaCard(info: MediaInfo, framed: Boolean = true, onDownload: (Str
             if (d.isNotEmpty()) ImageTag(d, modifier = Modifier.align(Alignment.BottomEnd).padding(sp.m))
         }
         Column(Modifier.padding(horizontal = sp.xs).padding(top = sp.l, bottom = sp.xs)) {
-            Text(info.title, style = MaterialTheme.typography.titleMedium.copy(fontSize = MaterialTheme.typography.titleLarge.fontSize * 0.8f),
-                maxLines = 2, overflow = TextOverflow.Ellipsis)
+            EditableName(st.name, { st.name = it }) { m ->
+                Text(st.name, style = MaterialTheme.typography.titleMedium.copy(fontSize = MaterialTheme.typography.titleLarge.fontSize * 0.8f),
+                    maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = m.padding(top = sp.s))
+            }
             if (info.uploader.isNotBlank()) Text(info.uploader, style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
             if (info.isPlaylist) Row(Modifier.padding(top = sp.s), verticalAlignment = Alignment.CenterVertically) {

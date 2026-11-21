@@ -27,6 +27,7 @@ import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.ErrorOutline
 import androidx.compose.material.icons.rounded.Link
+import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Refresh
@@ -250,6 +251,12 @@ private fun SavedRow(item: SavedItem, missing: Boolean, vm: MainViewModel, modif
     var menu by remember { mutableStateOf(false) }
     var confirm by remember { mutableStateOf(false) }
     var confirmRemove by remember { mutableStateOf(false) }
+    var renaming by remember { mutableStateOf(false) }
+    var pendingName by remember { mutableStateOf("") }
+    val renameLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) { r ->
+        // Android asked "Allow Grabbit to modify this file?": rename again if allowed
+        if (r.resultCode == android.app.Activity.RESULT_OK) vm.rename(item, pendingName) {}
+    }
     val deleteLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) {
         vm.afterDeleteConfirm(item)
     }
@@ -286,6 +293,8 @@ private fun SavedRow(item: SavedItem, missing: Boolean, vm: MainViewModel, modif
                         onClick = { menu = false; ctx.openUri(item.uri, item.mime) })
                     DropdownMenuItem(text = { Text("Share") }, leadingIcon = { Icon(Icons.Rounded.Share, null) },
                         onClick = { menu = false; ctx.shareUri(item.uri, item.mime) })
+                    DropdownMenuItem(text = { Text("Rename") }, leadingIcon = { Icon(Icons.Rounded.Edit, null) },
+                        onClick = { menu = false; renaming = true })
                 }
                 if (item.sourceUrl.isNotBlank()) DropdownMenuItem(text = { Text("Open original post") },
                     leadingIcon = { Icon(Icons.AutoMirrored.Rounded.OpenInNew, null) },
@@ -298,6 +307,14 @@ private fun SavedRow(item: SavedItem, missing: Boolean, vm: MainViewModel, modif
                     onClick = { menu = false; confirm = true })
             }
         }
+    }
+    if (renaming) RenameDialog(
+        current = item.fileName.substringBeforeLast('.').ifBlank { item.title },
+        onDismiss = { renaming = false },
+    ) { newName ->
+        renaming = false
+        pendingName = newName
+        vm.rename(item, newName) { sender -> renameLauncher.launch(IntentSenderRequest.Builder(sender).build()) }
     }
     if (confirm) AlertDialog(
         onDismissRequest = { confirm = false },
