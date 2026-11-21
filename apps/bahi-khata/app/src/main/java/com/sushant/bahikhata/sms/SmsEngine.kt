@@ -143,7 +143,7 @@ class SmsEngine(private val context: Context, private val repo: Repo, private va
             SmsKind.AUTOPAY_SETUP, SmsKind.BALANCE -> {
                 st.info++
                 val note = balanceNote(account, p.balancePaise)
-                return insert(SmsItem(key = key, sender = sender, body = body, receivedAt = time, status = SmsStatus.INFO, kind = p.kind.name, amountPaise = p.amountPaise, last4 = p.last4, accountId = account?.id, balancePaise = p.balancePaise, note = note))
+                return insert(SmsItem(key = key, sender = sender, body = body, receivedAt = time, status = SmsStatus.INFO, kind = p.kind.name, amountPaise = p.amountPaise, last4 = p.last4, accountId = account?.id, balancePaise = p.balancePaise, note = note.orEmpty()))
             }
             else -> Unit
         }
