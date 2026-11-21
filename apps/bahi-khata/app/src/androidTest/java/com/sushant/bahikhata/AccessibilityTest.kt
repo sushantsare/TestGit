@@ -2,6 +2,7 @@ package com.sushant.bahikhata
 
 import android.content.Intent
 import androidx.compose.ui.test.*
+import androidx.compose.ui.test.accessibility.enableAccessibilityChecks
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.sushant.bahikhata.data.Settings
