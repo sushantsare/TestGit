@@ -50,28 +50,30 @@ if [ -f "$DBG" ]; then
   adb shell am start -W -n $ACT >/dev/null 2>&1; sleep 4
   adb shell input keyevent KEYCODE_HOME; sleep 1
   adb logcat -c
-  # 1) instant layer: app in background
-  adb emu sms send 5554 "Rs.412.00 spent on HDFC Bank Card 8812 at ZOMATO on 21-11-26. Not you? Call 18002586161"; sleep 6
-  R1=$(adb logcat -d -s BahiSms:I | grep -c "received status=PENDING")
-  # 2) OTP must be ignored
-  adb emu sms send 5554 "Your OTP for transaction of Rs 1,299 at AMAZON is 482910. Do not share it with anyone."; sleep 5
-  R2=$(adb logcat -d -s BahiSms:I | grep -c "received status=skipped")
-  # 3) app killed: the manifest receiver still wakes it
+  P() { adb logcat -d -s BahiSms:I | grep -c "processed via=.* status=$1"; }
+  # 1) app in background (receiver or live observer)
+  adb emu sms send 5554 "Rs.412.00 spent on HDFC Bank Card 8812 at ZOMATO on 21-11-26. Not you? Call 18002586161"; sleep 12
+  R1=$(P PENDING)
+  # 2) OTP must be ignored (never a suggestion)
+  adb emu sms send 5554 "Your OTP for transaction of Rs 1,299 at AMAZON is 482910. Do not share it with anyone."; sleep 10
+  R2=$(P ignored)
+  # 3) app killed: only the manifest receiver can catch it
   adb shell am force-stop $PKG; sleep 1
-  adb emu sms send 5554 "Dear UPI user A/C X4417 debited by 230.0 on date 21Nov26 trf to RAVI KIRANA Refno 532511234567. -SBI"; sleep 8
-  R3=$(adb logcat -d -s BahiSms:I | grep -c "received status=PENDING")
+  adb emu sms send 5554 "Dear UPI user A/C X4417 debited by 230.0 on date 21Nov26 trf to RAVI KIRANA Refno 532511234567. -SBI"; sleep 15
+  R3=$(adb logcat -d -s BahiSms:I | grep -c "processed via=receiver status=PENDING")
   # 4) unknown format -> needs a look
-  adb emu sms send 5554 "Your acct 99887766 has a txn Rs 450.00 on 21/11. Bal Rs 1,000."; sleep 5
-  R4=$(adb logcat -d -s BahiSms:I | grep -c "received status=LOOK")
+  adb emu sms send 5554 "Your acct 99887766 has a txn Rs 450.00 on 21/11. Bal Rs 1,000."; sleep 12
+  R4=$(P LOOK)
+  TOTAL=$(adb logcat -d -s BahiSms:I | grep -c "processed via=")
   NOTIF=$(adb shell dumpsys notification --noredact | grep -c "pkg=$PKG")
   adb shell cmd statusbar expand-notifications 2>/dev/null; sleep 2; adb exec-out screencap -p > $OUT/screens/e2e_${TAG}_sms_notification.png; adb shell cmd statusbar collapse 2>/dev/null
-  # 5) catch-up scan on app open finds nothing new twice (no duplicates)
-  adb logcat -c; adb shell am start -W -n $ACT >/dev/null 2>&1; sleep 5
+  # 5) opening the app re-scans the inbox: nothing may be processed twice
+  adb logcat -c; adb shell am start -W -n $ACT >/dev/null 2>&1; sleep 6
   adb shell am start -n $ACT --es route sms >/dev/null 2>&1; sleep 3; adb exec-out screencap -p > $OUT/screens/e2e_${TAG}_sms_inbox.png
-  DUP=$(adb logcat -d -s BahiSms:I | grep -E "scan parsed=[1-9]" -c)
+  DUP=$(adb logcat -d -s BahiSms:I | grep -c "processed via=")
   adb logcat -d -s BahiSms:I > $OUT/audit/sms_e2e_$TAG.txt
-  echo "sms_received_bg=$R1 sms_otp_ignored=$R2 sms_received_after_kill=$((R3-R1)) sms_needs_look=$R4 notifications=$NOTIF rescan_duplicates=$DUP" >> $LOG
-  if [ "$R1" -ge 1 ] && [ "$R2" -ge 1 ] && [ "$R3" -ge 2 ] && [ "$R4" -ge 1 ] && [ "$DUP" = "0" ]; then SMSOK=PASSED; else SMSOK=FAILED; fi
+  echo "sms_pending=$R1 sms_otp_ignored=$R2 sms_by_receiver_after_kill=$R3 sms_needs_look=$R4 processed_total=$TOTAL notifications=$NOTIF reprocessed_on_open=$DUP" >> $LOG
+  if [ "$R1" -ge 2 ] && [ "$R2" -ge 1 ] && [ "$R3" -ge 1 ] && [ "$R4" -ge 1 ] && [ "$TOTAL" = "4" ] && [ "$DUP" = "0" ]; then SMSOK=PASSED; else SMSOK=FAILED; fi
   echo "sms_e2e=$SMSOK" >> $LOG
   echo $SMSOK > $OUT/SMS_E2E_$TAG
 fi

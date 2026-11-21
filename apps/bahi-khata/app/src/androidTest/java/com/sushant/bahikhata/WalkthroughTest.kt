@@ -39,8 +39,8 @@ class WalkthroughTest {
 
     private fun waitTag(tag: String, ms: Long = 8_000) = compose.waitUntil(ms) { compose.onAllNodesWithTag(tag, useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty() }
     private fun waitText(t: String, ms: Long = 8_000) = compose.waitUntil(ms) { compose.onAllNodesWithText(t, substring = true, useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty() }
-    private fun click(tag: String) { waitTag(tag); compose.onAllNodesWithTag(tag, useUnmergedTree = true).onFirst().performClick(); compose.waitForIdle() }
-    private fun type(tag: String, text: String) { waitTag(tag); compose.onNodeWithTag(tag).performTextClearance(); compose.onNodeWithTag(tag).performTextInput(text) }
+    private fun click(tag: String) { log("click $tag"); waitTag(tag); compose.onAllNodesWithTag(tag, useUnmergedTree = true).onFirst().performClick(); compose.waitForIdle() }
+    private fun type(tag: String, text: String) { waitTag(tag); compose.onNodeWithTag(tag).performTextClearance(); compose.onNodeWithTag(tag).performTextInput(text); runCatching { androidx.test.espresso.Espresso.closeSoftKeyboard() }; compose.waitForIdle() }
 
     private fun go(route: String, waitFor: String? = null) {
         scenario.onActivity { a -> a.startActivity(Intent(a, MainActivity::class.java).putExtra(MainActivity.EXTRA_ROUTE, route).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP)) }
@@ -66,7 +66,7 @@ class WalkthroughTest {
 
     @Test fun walkthroughEveryScreen() {
         runBlocking { app.repo.wipeAll() }
-        app.prefs.update { Settings() }
+        app.prefs.update { Settings(secureScreens = false) }
         scenario = ActivityScenario.launch(MainActivity::class.java)
 
         // ---- first launch setup

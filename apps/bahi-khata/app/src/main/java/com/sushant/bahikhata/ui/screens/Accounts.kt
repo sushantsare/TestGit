@@ -82,13 +82,6 @@ fun AccountsScreen(vm: AppVm) {
             if (accounts.isEmpty()) item {
                 EmptyState(Icons.Outlined.AccountBalanceWallet, "No accounts yet", "Add your bank accounts, credit cards, cash and wallets with today's balance.", "Add account", { addPick = true })
             }
-            item {
-                Row(Modifier.padding(16.dp).horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    listOf(AccType.BANK to "+ Bank", AccType.CARD to "+ Credit card", AccType.CASH to "+ Cash", AccType.WALLET to "+ Wallet").forEach { (t, l) ->
-                        OutlinedPillButton(l, Ico.account(t), { nav.go("account_edit/0?type=$t") }, tag = "add_$t")
-                    }
-                }
-            }
         }
     }
 

@@ -65,3 +65,4 @@
 
 - Mockups: approved all screens. Extra requirement (his words): "a very responsive system which detects SMS and collects useful data out of that... so good that it doesn't fail every single time whenever there is a financial message". → SMS engine spec added (app-spec §11).
 - **Approved** by him on 21 Nov 2026 (prototype + mockups + spec). Skipped as not applicable (personal app): target-user survey, real-user prototype test.
+- Element review (his new rule, done after approval since the build had started): removed the repeated add-account row on Accounts (#40) and the repeated PDF/Export rows in Reports → Plan (#65); everything else confirmed.

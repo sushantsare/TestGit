@@ -132,8 +132,6 @@ fun ReportsScreen(vm: AppVm) {
             item { SectionLabel("Plan") }
             item { BkCard(Modifier.padding(horizontal = 16.dp).fillMaxWidth()) {
                 SettingNav(Icons.Outlined.Savings, "Budgets & savings goals", "Limits per category, alerts at 80% and 100%") { nav.go("budgets") }
-                SettingNav(Icons.Outlined.PictureAsPdf, "Share this report as PDF") { pdf() }
-                SettingNav(Icons.Outlined.TableView, "Export CSV / Excel / PDF", "Any dates") { nav.go("export") }
             } }
         }
     }

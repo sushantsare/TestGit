@@ -67,7 +67,7 @@ class SmsEngine(private val context: Context, private val repo: Repo, private va
                     val addr = c.getString(0) ?: continue
                     val body = c.getString(1) ?: continue
                     val date = c.getLong(2)
-                    processInternal(addr, body, date, st)
+                    processInternal(addr, body, date, st, "scan")
                     if (date > newest) newest = date
                 }
             }
@@ -84,9 +84,9 @@ class SmsEngine(private val context: Context, private val repo: Repo, private va
     suspend fun onReceived(sender: String, body: String, time: Long) = lock.withLock {
         if (!enabled()) return@withLock
         val st = Stats()
-        val item = processInternal(sender, body, time, st)
-        Log.i(TAG, "received status=${item?.status ?: "skipped"} kind=${item?.kind ?: "-"} conf=${item?.confidence ?: 0}")
-        if (item != null && (item.status == SmsStatus.PENDING || item.status == SmsStatus.LOOK)) Notify.smsItem(context, item)
+        val item = processInternal(sender, body, time, st, "receiver")
+        Log.i(TAG, "receiver done")
+        if (item != null && item !== SEEN && (item.status == SmsStatus.PENDING || item.status == SmsStatus.LOOK)) Notify.smsItem(context, item)
     }
 
     /** The receiver sees the network timestamp and the inbox stores the arrival time, so keys use 10-minute buckets
@@ -98,9 +98,17 @@ class SmsEngine(private val context: Context, private val repo: Repo, private va
         return bytes.take(12).joinToString("") { "%02x".format(it) }
     }
 
-    private suspend fun processInternal(sender: String, body: String, time: Long, st: Stats): SmsItem? {
+    private suspend fun processInternal(sender: String, body: String, time: Long, st: Stats, via: String): SmsItem? {
+        val r = processCore(sender, body, time, st)
+        if (r !== SEEN) Log.i(TAG, "processed via=$via status=${r?.status ?: "ignored"} kind=${r?.kind ?: "-"}")
+        return r
+    }
+
+    private val SEEN = SmsItem(key = "", sender = "", body = "", receivedAt = 0, status = "", kind = "")
+
+    private suspend fun processCore(sender: String, body: String, time: Long, st: Stats): SmsItem? {
         val key = key(sender, body, time)
-        if ((-1..1).any { dao.seen(key(sender, body, time, it)) }) return null
+        if ((-1..1).any { dao.seen(key(sender, body, time, it)) }) return SEEN
         dao.markSeen(SmsSeen(key, System.currentTimeMillis()))
         var p = SmsParser.parse(sender, body)
         if (p.kind == SmsKind.NOT_FINANCIAL || p.kind == SmsKind.OTP || p.kind == SmsKind.PROMO) { st.ignored++; return null }
