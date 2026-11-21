@@ -73,11 +73,14 @@ private fun androidx.navigation.NavGraph.findStartDestination(): androidx.naviga
 @Composable
 fun AppRoot(vm: AppVm, locked: Boolean, onUnlock: () -> Unit, onLockBack: () -> Unit, pendingRoute: String?, onRouteConsumed: () -> Unit) {
     val nav = rememberNavController()
+    val host = remember { SnackbarHostState() }
     DisposableEffect(nav) {
-        val l = androidx.navigation.NavController.OnDestinationChangedListener { _, d, _ -> android.util.Log.d("BahiNav", "now ${d.route}") }
+        val l = androidx.navigation.NavController.OnDestinationChangedListener { _, d, _ ->
+            android.util.Log.d("BahiNav", "now ${d.route}")
+            host.currentSnackbarData?.dismiss() // a message belongs to the screen it was shown on; never let it cover the next screen
+        }
         nav.addOnDestinationChangedListener(l); onDispose { nav.removeOnDestinationChangedListener(l) }
     }
-    val host = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     val snack = remember { Snack(host, scope) }
     val s by vm.settings.collectAsStateWithLifecycle()
