@@ -165,7 +165,7 @@ fun MediaGrid(
         }
     }
 
-    BoxWithConstraints(modifier.fillMaxSize()) {
+    Box(modifier.fillMaxSize()) {
         LazyVerticalGrid(
             columns = GridCells.Fixed(columns),
             state = state,

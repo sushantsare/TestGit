@@ -54,6 +54,7 @@ fun PhotosScreen(vm: MainViewModel, nav: Nav, wide: Boolean) {
     val items by vm.items.collectAsStateWithLifecycle()
     val loaded by vm.loaded.collectAsStateWithLifecycle()
     val sort by vm.prefs.photoSort.collectAsStateWithLifecycle()
+    val desc by vm.prefs.sortDesc.collectAsStateWithLifecycle()
     val cols by vm.prefs.gridColumns.collectAsStateWithLifecycle()
     val favs by vm.favourites.collectAsStateWithLifecycle()
     val selList by vm.selection.collectAsStateWithLifecycle()
@@ -97,7 +98,7 @@ fun PhotosScreen(vm: MainViewModel, nav: Nav, wide: Boolean) {
             )
         }
     }
-    if (sortSheet) SortSheet(sort, vm.prefs.sortDesc.value, onPick = { s, d -> vm.prefs.setPhotoSort(s, d) }, onDismiss = { sortSheet = false })
+    if (sortSheet) SortSheet(sort, desc, onPick = { s, d -> vm.prefs.setPhotoSort(s, d) }, onDismiss = { sortSheet = false })
 }
 
 /** Contextual top bar for a multi-selection, with share, delete and more. Shared by grid screens. */
@@ -108,6 +109,7 @@ fun SelectionBar(vm: MainViewModel, selected: List<MediaItem>, onSelectAll: () -
     var more by rememberSaveable { mutableStateOf(false) }
     var picker by rememberSaveable { mutableStateOf(0) } // 1 move, 2 copy
     val albums by vm.albums.collectAsStateWithLifecycle()
+    val strip by vm.prefs.stripLocation.collectAsStateWithLifecycle()
     SelectionTopBar(pluralText(R.plurals.n_selected, selected.size), onClose = { vm.clearSelection() }) {
         IconButton(onClick = { share = true }, modifier = Modifier.testTag("sel_share")) { Icon(Icons.Rounded.Share, stringResource(R.string.share)) }
         IconButton(onClick = { vm.moveToBin(selected); vm.clearSelection() }, modifier = Modifier.testTag("sel_delete")) {
@@ -116,7 +118,7 @@ fun SelectionBar(vm: MainViewModel, selected: List<MediaItem>, onSelectAll: () -
         IconButton(onClick = { more = true }, modifier = Modifier.testTag("sel_more")) { Icon(Icons.Rounded.MoreVert, stringResource(R.string.more_options)) }
     }
     if (share) com.sushant.gallery.ui.components.ShareSheet(
-        selected.size, vm.prefs.stripLocation.value, hasPhotos = selected.any { !it.isVideo },
+        selected.size, strip, hasPhotos = selected.any { !it.isVideo },
         onShare = { strip -> share = false; com.sushant.gallery.ui.components.shareItems(ctx, vm.repo.ops, selected, strip); vm.countShare(selected.size) },
         onDismiss = { share = false },
     )

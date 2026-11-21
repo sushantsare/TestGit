@@ -188,6 +188,7 @@ fun FolderGrid(vm: MainViewModel, nav: Nav, source: Source, title: String, onBac
     val items by vm.items.collectAsStateWithLifecycle()
     val favs by vm.favourites.collectAsStateWithLifecycle()
     val sort by vm.prefs.photoSort.collectAsStateWithLifecycle()
+    val desc by vm.prefs.sortDesc.collectAsStateWithLifecycle()
     val cols by vm.prefs.gridColumns.collectAsStateWithLifecycle()
     val selList by vm.selection.collectAsStateWithLifecycle()
     val sel = remember(selList) { selList.toSet() }
@@ -221,7 +222,7 @@ fun FolderGrid(vm: MainViewModel, nav: Nav, source: Source, title: String, onBac
             )
         }
     }
-    if (sortSheet) SortSheet(sort, vm.prefs.sortDesc.value, onPick = { s, d -> vm.prefs.setPhotoSort(s, d) }, onDismiss = { sortSheet = false })
+    if (sortSheet) SortSheet(sort, desc, onPick = { s, d -> vm.prefs.setPhotoSort(s, d) }, onDismiss = { sortSheet = false })
 }
 
 @Composable

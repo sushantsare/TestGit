@@ -191,6 +191,7 @@ private fun PhotoPager(
     var playing by remember { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
     val albums by vm.albums.collectAsStateWithLifecycle()
+    val strip by vm.prefs.stripLocation.collectAsStateWithLifecycle()
     val isVault = source == Source.Vault
     val isExternal = source == Source.External
     val hintKey = "viewer"
@@ -307,7 +308,7 @@ private fun PhotoPager(
     }
 
     if (info) InfoSheet(vm, item) { info = false }
-    if (share) ShareSheet(1, vm.prefs.stripLocation.value, hasPhotos = !item.isVideo,
+    if (share) ShareSheet(1, strip, hasPhotos = !item.isVideo,
         onShare = { strip -> share = false; shareItems(ctx, vm.repo.ops, listOf(item), strip); vm.countShare(1) }, onDismiss = { share = false })
     if (picker != 0) AlbumPickerSheet(
         copy = picker == 2, albums = albums,

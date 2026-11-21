@@ -60,7 +60,8 @@ fun readExif(path: String): ExifInfo? = runCatching {
 @Composable
 fun InfoSheet(vm: MainViewModel, item: MediaItem, onDismiss: () -> Unit) {
     val exif by produceState<ExifInfo?>(null, item.cacheKey) {
-        value = if (item.isVideo || item.vaultId != null || item.folder.isEmpty()) null else withContext(Dispatchers.IO) { readExif(item.path) }
+        val info = if (item.isVideo || item.vaultId != null || item.folder.isEmpty()) null else withContext(Dispatchers.IO) { readExif(item.path) }
+        value = info
     }
     val w = if (item.width > 0) item.width else exif?.width ?: 0
     val h = if (item.height > 0) item.height else exif?.height ?: 0
