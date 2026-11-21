@@ -139,6 +139,7 @@ if [ -f "$DBG" ]; then
   # T9 process death mid-form: type an amount, leave, let the system kill the process, come back
   adb logcat -c; adb shell am start -n $ACT --es route add >/dev/null 2>&1; sleep 3
   tapid key_7; tapid key_5; tapid key_0; sleep 1
+  adb exec-out screencap -p > $OUT/screens/audit_T9_before_kill.png
   adb shell input keyevent KEYCODE_HOME; sleep 1; adb shell am kill $PKG; sleep 1
   adb shell am start -a android.intent.action.MAIN -c android.intent.category.LAUNCHER -n $ACT >/dev/null 2>&1; sleep 4   # like tapping it in Recents
   adb exec-out screencap -p > $OUT/screens/audit_T9_after_kill.png

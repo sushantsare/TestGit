@@ -56,7 +56,9 @@ class MainActivity : AppCompatActivity() {
         enableEdgeToEdge()
         if (savedInstanceState == null) locked = vm.prefs.now.lockOn
         else locked = savedInstanceState.getBoolean("locked", vm.prefs.now.lockOn)
-        pendingRoute = routeFrom(intent)
+        // after the system restores the app (rotation, or process death then Recents) the old launch intent must not
+        // be replayed — it would throw away the screen and typing the user came back to
+        if (savedInstanceState == null && (intent.flags and Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY) == 0) pendingRoute = routeFrom(intent)
         ProcessLifecycleOwner.get().lifecycle.addObserver(processObserver)
         lifecycleScope.launch {
             vm.settings.collect { s ->
