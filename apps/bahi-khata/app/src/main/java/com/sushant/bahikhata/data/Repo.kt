@@ -184,9 +184,21 @@ class Repo(private val context: Context, val db: AppDb, val prefs: Prefs) {
 
     // ---------------- people / udhar
     suspend fun savePerson(p: Person) = dao.upsertPerson(p)
-    suspend fun deletePerson(p: Person) = db.withTransaction {
-        dao.udharNow().filter { it.personId == p.id }.forEach { u -> u.entryId?.let { id -> dao.entry(id)?.takeIf { it.type == EType.UDHAR_GAVE || it.type == EType.UDHAR_GOT }?.let { dao.deleteEntry(it) } } }
+    /** Everything a person delete removes, so Undo can put it back exactly. */
+    class PersonBackup(val person: Person, val lines: List<Udhar>, val entries: List<Entry>)
+
+    suspend fun deletePerson(p: Person): PersonBackup = db.withTransaction {
+        val lines = dao.udharNow().filter { it.personId == p.id }
+        val entries = lines.mapNotNull { u -> u.entryId?.let { id -> dao.entry(id)?.takeIf { it.type == EType.UDHAR_GAVE || it.type == EType.UDHAR_GOT } } }
+        entries.forEach { dao.deleteEntry(it) }
         dao.deleteUdharOf(p.id); dao.deletePerson(p)
+        PersonBackup(p, lines, entries)
+    }
+
+    suspend fun restorePerson(b: PersonBackup) = db.withTransaction {
+        dao.upsertPerson(b.person)
+        b.entries.forEach { dao.upsertEntry(it) }
+        b.lines.forEach { dao.upsertUdhar(it) }
     }
 
     /** I gave / I got money. With an account, the money also leaves / enters that account (not counted as spending or income). */

@@ -84,7 +84,8 @@ fun AddEntryScreen(vm: AppVm, initialType: String, editId: Long, smsId: Long) {
     var tags by rememberSaveable { mutableStateOf("") }
     var files by rememberSaveable { mutableStateOf(listOf<String>()) }
     var splits by rememberSaveable { mutableStateOf(listOf<String>()) }   // "personId:paise"
-    var splitMode by rememberSaveable { mutableStateOf("eq1") }            // eq1 = equal incl. me, eq0 = equal without me, amt = by amounts
+    var splitMode by rememberSaveable { mutableStateOf("eq1") }
+    var splitsTouched by rememberSaveable { mutableStateOf(false) }            // eq1 = equal incl. me, eq0 = equal without me, amt = by amounts
     var rule by rememberSaveable { mutableStateOf<String?>(null) }
     var loadedOnce by rememberSaveable { mutableStateOf(false) }
     var saving by rememberSaveable { mutableStateOf(false) }
@@ -125,8 +126,9 @@ fun AddEntryScreen(vm: AppVm, initialType: String, editId: Long, smsId: Long) {
     var askDiscard by rememberSaveable { mutableStateOf(false) }
     val dirty = existing?.let { e ->
         amount != e.amountPaise || merchant != e.merchant.orEmpty() || catId != (e.categoryId ?: 0L) || accId != e.accountId ||
-            note != e.note.orEmpty() || time != e.time || files.isNotEmpty()
-    } ?: if (smsId > 0) false else (expr.isNotBlank() || merchant.isNotBlank() || note.isNotBlank() || tags.isNotBlank() || files.isNotEmpty())
+            note != e.note.orEmpty() || time != e.time || files.isNotEmpty() || tags != e.tags.orEmpty() || upi != e.upiApp.orEmpty() ||
+            rule != null || splitsTouched
+    } ?: if (smsId > 0) false else (expr.isNotBlank() || merchant.isNotBlank() || note.isNotBlank() || tags.isNotBlank() || files.isNotEmpty() || splits.isNotEmpty())
     fun close() { if (dirty && !saving) askDiscard = true else nav.popBackStack() }
     BackHandler(step > 1 && editId == 0L && smsId == 0L) { step-- }
     BackHandler(!(step > 1 && editId == 0L && smsId == 0L) && dirty) { askDiscard = true }
@@ -143,6 +145,8 @@ fun AddEntryScreen(vm: AppVm, initialType: String, editId: Long, smsId: Long) {
         )
         val chosen = splits.mapNotNull { t -> t.split(':').takeIf { it.size == 2 }?.let { it[0].toLong() to it[1].toLong() } }
         // equal splits follow the saved amount, so editing the amount re-shares it
+        // shares typed "by amounts" can't add up to more than the (possibly edited) total
+        if (splitMode == "amt" && chosen.sumOf { it.second } > amount) { saving = false; snack.show("The split shares add up to more than ${Money.fmt(amount)}. Open Split to fix them."); return }
         val sp = if (splitMode == "amt") chosen else Ledger.splitShares(amount, chosen.map { it.first }, splitMode == "eq1")
         vm.launch {
             val id = vm.repo.saveEntry(Repo.SaveRequest(e, files.map { Uri.parse(it) }, sp, rule))
@@ -196,7 +200,7 @@ fun AddEntryScreen(vm: AppVm, initialType: String, editId: Long, smsId: Long) {
                 else -> DetailsStep(
                     vm, type, accounts.filter { !it.archived || it.id == accId }, accId, { accId = it; if (accounts.firstOrNull { a -> a.id == it }?.type != AccType.BANK) upi = "" },
                     upi, { upi = it }, time, { time = it }, note, { note = it }, tags, { tags = it }, files, { files = it },
-                    existing?.id ?: 0L, splits, { l, m -> splits = l; splitMode = m }, splitMode, people, amount, rule, { rule = it }, editId == 0L,
+                    existing?.id ?: 0L, splits, { l, m -> splits = l; splitMode = m; splitsTouched = true }, splitMode, people, amount, rule, { rule = it }, editId == 0L,
                     amountText = expr, onAmount = { expr = it }, merchant = merchant, onMerchant = { merchant = it },
                     cat = cat, onChangeCat = { step = 2 }, smsBody = smsItem?.body,
                     onSave = { save() }, saving = saving,
@@ -237,7 +241,7 @@ private fun AmountStep(
                     topM.forEach { m -> AssistChip(onClick = { onPickMerchant(m); showSug = false }, label = { Text(m.display, maxLines = 1) }, modifier = Modifier.testTag("sug_${m.display}")) }
                 }
             }
-            if (type == EType.EXPENSE) Row(Modifier.padding(horizontal = 16.dp, vertical = 4.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            if (type == EType.EXPENSE) FlowRow(Modifier.padding(horizontal = 16.dp, vertical = 4.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedPillButton("Pay card bill", Icons.Outlined.CreditCard, { onTransfer("paybill") })
                 OutlinedPillButton("Withdraw cash", Icons.Outlined.LocalAtm, { onTransfer("withdraw") })
             }
@@ -494,7 +498,8 @@ private fun kotlinx.coroutines.CoroutineScope.launchSafe(block: suspend () -> Un
 @Composable
 fun TextDialog(title: String, value: String, onDone: (String) -> Unit, onDismiss: () -> Unit, single: Boolean = true, hint: String? = null, kb: androidx.compose.ui.text.input.KeyboardType = androidx.compose.ui.text.input.KeyboardType.Text) {
     var t by rememberSaveable { mutableStateOf(value) }
-    AlertDialog(onDismissRequest = onDismiss, title = { Text(title) },
+    // once something is typed, a stray tap outside doesn't throw it away (Cancel still does)
+    AlertDialog(onDismissRequest = onDismiss, title = { Text(title) }, properties = androidx.compose.ui.window.DialogProperties(dismissOnClickOutside = t == value),
         text = { OutlinedTextField(t, { t = it }, singleLine = single, minLines = if (single) 1 else 3, supportingText = hint?.let { { Text(it) } },
             keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = kb), modifier = Modifier.fillMaxWidth().testTag("dlg_field")) },
         confirmButton = { TextButton(onClick = { onDone(t.trim()); onDismiss() }, modifier = Modifier.testTag("dlg_ok")) { Text("Done") } },

@@ -29,13 +29,16 @@ object Diagnostics {
     fun crashCount(context: Context, sinceMs: Long): Int = crashLog(context).lines().count { it.startsWith("=== ") } // whole log is ≤200 KB
     fun clear(context: Context) { file(context).delete() }
 
-    fun count(context: Context, key: String, n: Int = 1) {
-        val sp = context.getSharedPreferences("diag", Context.MODE_PRIVATE)
+    // counters are written on one background thread, never the main thread
+    private val io = java.util.concurrent.Executors.newSingleThreadExecutor()
+
+    fun count(context: Context, key: String, n: Int = 1) = io.execute {
+        val sp = context.applicationContext.getSharedPreferences("diag", Context.MODE_PRIVATE)
         sp.edit().putInt(key, sp.getInt(key, 0) + n).apply()
     }
 
-    fun time(context: Context, key: String, ms: Long) {
-        val sp = context.getSharedPreferences("diag", Context.MODE_PRIVATE)
+    fun time(context: Context, key: String, ms: Long) = io.execute {
+        val sp = context.applicationContext.getSharedPreferences("diag", Context.MODE_PRIVATE)
         val n = sp.getInt("${key}_n", 0)
         val avg = sp.getLong("${key}_avg", 0)
         sp.edit().putInt("${key}_n", n + 1).putLong("${key}_avg", (avg * n + ms) / (n + 1)).apply()

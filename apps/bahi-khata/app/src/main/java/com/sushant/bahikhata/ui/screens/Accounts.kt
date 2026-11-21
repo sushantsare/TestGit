@@ -320,7 +320,9 @@ fun AccountEditScreen(vm: AppVm, id: Long, type: String) {
                     }
                 }
             }
-            Button(onClick = {
+            if (!nameOk || !stOk || !dueOk) Text(if (!nameOk) "Add a name to save this account" else "Bill and due dates must be days 1–31",
+                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(horizontal = 18.dp).testTag("save_reason"))
+            Button(enabled = nameOk && stOk && dueOk, onClick = {
                 tried = true
                 if (!nameOk || !stOk || !dueOk) return@Button
                 val op = Money.parse(opening) ?: 0L

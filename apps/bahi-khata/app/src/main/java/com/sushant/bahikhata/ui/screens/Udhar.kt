@@ -222,7 +222,7 @@ fun PersonContent(vm: AppVm, id: Long, embedded: Boolean, onGone: () -> Unit) {
             onConfirm = { vm.launch { vm.repo.deleteUdhar(u); snack.show("Removed", "Undo") { vm.launch { vm.repo.addUdhar(u.personId, u.gave, u.amountPaise, u.accountId, u.note, u.time) } } } },
             onDismiss = { removeLine = null })
     }
-    if (confirmDel) ConfirmDialog("Delete ${p.name}?", "Their udhar history is deleted too. Split expenses stay in your entries.", "Delete", onConfirm = { vm.launch { vm.repo.deletePerson(p) }; onGone() }, onDismiss = { confirmDel = false })
+    if (confirmDel) ConfirmDialog("Delete ${p.name}?", "Their udhar history is deleted too. Split expenses stay in your entries.", "Delete", onConfirm = { vm.launch { val b = vm.repo.deletePerson(p); snack.show("${p.name} deleted", "Undo") { vm.launch { vm.repo.restorePerson(b) } } }; onGone() }, onDismiss = { confirmDel = false })
     if (confirmSettle) ConfirmDialog("Settle up with ${p.name}?", "Adds a ${if (bal > 0) "You got" else "You gave"} entry of ${Money.fmt(kotlin.math.abs(bal))} so the balance becomes zero.", "Settle",
         onConfirm = { vm.launch { vm.repo.addUdhar(p.id, bal < 0, kotlin.math.abs(bal), null, "Settled up"); snack.show("Settled with ${p.name}") } }, onDismiss = { confirmSettle = false }, danger = false)
     if (langPick) PickSheet("Reminder language", listOf("en" to "English", "hi" to "हिंदी (Hindi)"), { it.second }, onPick = { vm.prefs.update { s2 -> s2.copy(reminderLang = it.first) }; whatsapp(it.first) }, onDismiss = { langPick = false })

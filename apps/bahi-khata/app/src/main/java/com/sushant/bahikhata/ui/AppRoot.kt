@@ -21,8 +21,10 @@ import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.testTagsAsResourceId
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
@@ -97,7 +99,8 @@ fun AppRoot(vm: AppVm, locked: Boolean, onUnlock: () -> Unit, onLockBack: () -> 
     val s by vm.settings.collectAsStateWithLifecycle()
     val width = LocalConfiguration.current.screenWidthDp
     val wide = width >= 840
-    val rail = width >= 600
+    // the rail needs height for five items: phones in landscape (short windows) keep the bottom bar
+    val rail = width >= 600 && LocalConfiguration.current.screenHeightDp >= 480
     val back by nav.currentBackStackEntryAsState()
     val route = back?.destination?.route?.substringBefore('?')?.substringBefore('/')
     val top = route in tabs.map { it.route }
@@ -145,7 +148,7 @@ fun AppRoot(vm: AppVm, locked: Boolean, onUnlock: () -> Unit, onLockBack: () -> 
                             tabs.forEach { t ->
                                 NavigationBarItem(selected = route == t.route, onClick = { nav.tab(t.route) },
                                     icon = { BadgedBox(badge = { if (t.route == "home" && pending.isNotEmpty()) Badge { Text("${pending.size}") } }) { Icon(if (route == t.route) t.selIcon else t.icon, null) } },
-                                    label = { Text(t.label, maxLines = 1) }, modifier = Modifier.testTag("tab_${t.route}"))
+                                    label = { BarLabel(t.label) }, modifier = Modifier.testTag("tab_${t.route}"))
                             }
                         }
                     },
@@ -234,4 +237,12 @@ fun StorageLocked(onClose: () -> Unit) {
         Spacer(Modifier.height(24.dp))
         Button(onClick = onClose) { Text("Close") }
     }
+}
+
+/** Bottom-bar label that grows with the phone's font size only up to what fits five tabs (never below a real 12 sp). */
+@Composable
+private fun BarLabel(text: String) {
+    val scale = LocalDensity.current.fontScale
+    val size = if (scale <= 1.3f) MaterialTheme.typography.labelMedium.fontSize else (12f * 1.3f / scale).coerceAtLeast(12f / scale).sp
+    Text(text, maxLines = 1, softWrap = false, overflow = androidx.compose.ui.text.style.TextOverflow.Clip, fontSize = size)
 }

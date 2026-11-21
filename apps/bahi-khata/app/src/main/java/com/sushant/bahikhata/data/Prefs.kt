@@ -36,7 +36,8 @@ data class Settings(
 class Prefs(context: Context) {
     private val sp: SharedPreferences = context.getSharedPreferences("settings", Context.MODE_PRIVATE)
     private val local: SharedPreferences = context.getSharedPreferences("device_local", Context.MODE_PRIVATE)
-    private val _s = MutableStateFlow(read())
+    // read once at start-up on purpose: theme, app lock and screenshot blocking must be known before the first frame
+    private val _s = MutableStateFlow(android.os.StrictMode.allowThreadDiskReads().let { old -> try { read() } finally { android.os.StrictMode.setThreadPolicy(old) } })
     val settings: StateFlow<Settings> = _s.asStateFlow()
     val now: Settings get() = _s.value
 

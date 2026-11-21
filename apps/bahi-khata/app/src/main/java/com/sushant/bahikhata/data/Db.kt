@@ -325,7 +325,8 @@ abstract class AppDb : RoomDatabase() {
         fun open(context: Context, key: ByteArray? = DbKey.get(context)): AppDb {
             // never fall back to a plain database: no key means no database
             checkNotNull(key) { "database key unavailable" }
-            System.loadLibrary("sqlcipher")
+            // loading the encryption library is a one-time, required step before the first query
+            android.os.StrictMode.allowThreadDiskReads().let { old -> try { System.loadLibrary("sqlcipher") } finally { android.os.StrictMode.setThreadPolicy(old) } }
             // the key is 32 random bytes, so it is handed to SQLCipher as a raw key (x'…'): no password stretching
             // (256,000 PBKDF2 rounds) on every app start — same strength, much faster cold start
             val raw = ("x'" + key.joinToString("") { "%02x".format(it) } + "'").toByteArray()

@@ -190,9 +190,9 @@ fun CategoriesScreen(vm: AppVm) {
         }
     }
     edit?.let { c ->
-        var name by remember(c) { mutableStateOf(c.name) }
-        var icon by remember(c) { mutableStateOf(c.icon) }
-        var color by remember(c) { mutableIntStateOf(c.colorIdx) }
+        var name by rememberSaveable(c) { mutableStateOf(c.name) }
+        var icon by rememberSaveable(c) { mutableStateOf(c.icon) }
+        var color by rememberSaveable(c) { mutableIntStateOf(c.colorIdx) }
         AlertDialog(onDismissRequest = { edit = null }, title = { Text(if (c.id == 0L) "New category" else "Edit category") }, text = {
             Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 TextIn(name, { name = it }, "Name", tag = "cname")
@@ -240,15 +240,16 @@ fun RecurringScreen(vm: AppVm) {
                     ListRow((r.merchant ?: r.categoryId?.let { cats[it]?.name } ?: Export.typeName(r.type)) + " · " + Money.fmt(r.amountPaise),
                         "${r.rule.lowercase().replaceFirstChar { it.uppercase() }} · ${accs[r.accountId]?.name ?: "—"} · next ${Dates.dayMonth(LocalDate.ofEpochDay(r.nextEpochDay))}",
                         Modifier.testTag("rec_${r.id}"), leading = { Icon(Icons.Outlined.Repeat, null) },
-                        trailing = { Switch(r.active, { on -> vm.launch { vm.repo.saveRecurring(r.copy(active = on)) } }) }, onClick = { edit = r })
+                        trailing = { Switch(r.active, { on -> vm.launch { vm.repo.saveRecurring(r.copy(active = on)) } },
+                            Modifier.semantics { contentDescription = "Keep repeating" }) }, onClick = { edit = r })   // row = edit, switch = pause: two different actions
                 }
             } }
         }
     }
     edit?.let { r ->
-        var amt by remember(r) { mutableStateOf(Money.input(r.amountPaise)) }
-        AlertDialog(onDismissRequest = { edit = null }, title = { Text("Repeating entry") }, text = { MoneyField(amt, { amt = it }, "Amount", tag = "ramount") },
-            confirmButton = { TextButton(onClick = { Money.parse(amt)?.takeIf { it > 0 }?.let { v -> vm.launch { vm.repo.saveRecurring(r.copy(amountPaise = v)) } }; edit = null }) { Text("Save") } },
+        var amt by rememberSaveable(r) { mutableStateOf(Money.input(r.amountPaise)) }
+        AlertDialog(onDismissRequest = { edit = null }, title = { Text("Repeating entry") }, text = { MoneyField(amt, { amt = it }, "Amount *", tag = "ramount", required = true) },
+            confirmButton = { TextButton(enabled = (Money.parse(amt) ?: 0L) > 0, onClick = { Money.parse(amt)?.takeIf { it > 0 }?.let { v -> vm.launch { vm.repo.saveRecurring(r.copy(amountPaise = v)) } }; edit = null }) { Text("Save") } },
             dismissButton = { Row { TextButton(onClick = { vm.launch { vm.repo.deleteRecurring(r) }; snack.show("Stopped repeating", "Undo") { vm.launch { vm.repo.saveRecurring(r) } }; edit = null }) { Text("Delete", color = MaterialTheme.colorScheme.error) }
                 TextButton(onClick = { edit = null }) { Text("Cancel") } } })
     }
@@ -416,9 +417,17 @@ fun ExportScreen(vm: AppVm) {
                 listOf(Triple("csv", "CSV", "Opens in any spreadsheet app"), Triple("xlsx", "Excel (.xlsx)", "Formatted sheet with amounts as numbers"), Triple("pdf", "PDF statement", "Totals, categories and every entry")).forEach { (k, t, d) ->
                     ListRow(t, d, Modifier.testTag("fmt_$k"), leading = { Icon(if (k == "pdf") Icons.Outlined.PictureAsPdf else Icons.Outlined.TableView, null) }, trailing = {
                         Row {
-                            IconButton(onClick = { scope.launch { val b = withContext(Dispatchers.IO) { build(k) }; pending = b; save.launch(b.second) } }) { Icon(Icons.Outlined.Save, "Save $t") }
-                            IconButton(onClick = { scope.launch { val f = withContext(Dispatchers.IO) { val b = build(k)
-                                File(ctx.cacheDir, "share").apply { mkdirs() }.let { File(it, b.second) }.also { it.writeBytes(b.first) } }; shareFile(ctx, f, mime(f.name), "Share $t") } }) { Icon(Icons.Outlined.Share, "Share $t") }
+                            IconButton(onClick = { scope.launch {
+                                runCatching { val b = withContext(Dispatchers.IO) { build(k) }; pending = b; save.launch(b.second) }
+                                    .onFailure { snack.show("Couldn't make the file. Please try again.") }
+                            } }) { Icon(Icons.Outlined.Save, "Save $t") }
+                            IconButton(onClick = { scope.launch {
+                                runCatching {
+                                    val f = withContext(Dispatchers.IO) { val b = build(k)
+                                        File(ctx.cacheDir, "share").apply { mkdirs() }.let { File(it, b.second) }.also { it.writeBytes(b.first) } }
+                                    shareFile(ctx, f, mime(f.name), "Share $t")
+                                }.onFailure { snack.show("Couldn't make the file. Please try again.") }
+                            } }) { Icon(Icons.Outlined.Share, "Share $t") }
                         }
                     })
                 }
@@ -446,7 +455,8 @@ fun FlowRowSafe(content: @Composable () -> Unit) {
 fun DiagnosticsScreen(vm: AppVm) {
     val ctx = LocalContext.current
     val snack = LocalSnack.current
-    var log by remember { mutableStateOf(Diagnostics.crashLog(ctx)) }
+    var log by remember { mutableStateOf("") }
+    LaunchedEffect(Unit) { log = withContext(Dispatchers.IO) { Diagnostics.crashLog(ctx) } }   // file read off the main thread
     val counters = remember { Diagnostics.counters(ctx) }
     val crashes = log.lines().count { it.startsWith("=== ") }
     Scaffold(containerColor = MaterialTheme.colorScheme.background, topBar = { BackBar("Diagnostics") }, contentWindowInsets = WindowInsets(0)) { pad ->

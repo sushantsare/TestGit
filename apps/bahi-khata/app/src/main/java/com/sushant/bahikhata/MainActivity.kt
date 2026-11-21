@@ -99,7 +99,7 @@ class MainActivity : AppCompatActivity() {
         }
         val handled = super.dispatchKeyEvent(event)
         // keys nobody used (no text field focused) go to the screen that wants them, e.g. typing an amount
-        if (!handled && event.action == android.view.KeyEvent.ACTION_DOWN) return KeyBus.keys.tryEmit(event.keyCode) && KeyBus.wanted(event.keyCode)
+        if (!handled && event.action == android.view.KeyEvent.ACTION_DOWN) return KeyBus.keys.subscriptionCount.value > 0 && KeyBus.wanted(event.keyCode) && KeyBus.keys.tryEmit(event.keyCode)
         return handled
     }
 
@@ -153,5 +153,6 @@ class MainActivity : AppCompatActivity() {
 object KeyBus {
     val keys = kotlinx.coroutines.flow.MutableSharedFlow<Int>(extraBufferCapacity = 16)
     fun wanted(code: Int) = code in android.view.KeyEvent.KEYCODE_0..android.view.KeyEvent.KEYCODE_9 ||
-        code in android.view.KeyEvent.KEYCODE_NUMPAD_0..android.view.KeyEvent.KEYCODE_NUMPAD_9 || code == android.view.KeyEvent.KEYCODE_DEL
+        code in android.view.KeyEvent.KEYCODE_NUMPAD_0..android.view.KeyEvent.KEYCODE_NUMPAD_9 || code == android.view.KeyEvent.KEYCODE_DEL ||
+        code == android.view.KeyEvent.KEYCODE_ENTER || code == android.view.KeyEvent.KEYCODE_NUMPAD_ENTER || code == android.view.KeyEvent.KEYCODE_PERIOD
 }
