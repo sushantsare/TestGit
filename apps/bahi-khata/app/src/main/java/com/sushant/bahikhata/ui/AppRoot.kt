@@ -107,7 +107,7 @@ fun AppRoot(vm: AppVm, locked: Boolean, onUnlock: () -> Unit, onLockBack: () -> 
                 Scaffold(
                     modifier = Modifier.weight(1f),
                     containerColor = MaterialTheme.colorScheme.background,
-                    snackbarHost = { SnackbarHost(host) },
+                    snackbarHost = { SnackbarHost(host, Modifier.padding(bottom = if (top) 0.dp else 80.dp)) }, // keep clear of bottom action buttons (Next / Save)
                     bottomBar = {
                         if (!rail && top) NavigationBar(containerColor = MaterialTheme.colorScheme.surfaceContainerLow, tonalElevation = 0.dp) {
                             tabs.forEach { t ->

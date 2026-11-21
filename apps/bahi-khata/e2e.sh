@@ -57,8 +57,9 @@ if [ -f "$DBG" ]; then
   # 2) OTP must be ignored (never a suggestion)
   adb emu sms send 5554 "Your OTP for transaction of Rs 1,299 at AMAZON is 482910. Do not share it with anyone."; sleep 10
   R2=$(P ignored)
-  # 3) app killed: only the manifest receiver can catch it
-  adb shell am force-stop $PKG; sleep 1
+  # 3) app process killed by the system (low memory): only the manifest receiver can catch it
+  adb shell input keyevent KEYCODE_HOME; sleep 2; adb shell am kill $PKG; sleep 2
+  echo "alive_after_kill=$(adb shell pidof $PKG | wc -w)" >> $LOG
   adb emu sms send 5554 "Dear UPI user A/C X4417 debited by 230.0 on date 21Nov26 trf to RAVI KIRANA Refno 532511234567. -SBI"; sleep 15
   R3=$(adb logcat -d -s BahiSms:I | grep -c "processed via=receiver status=PENDING")
   # 4) unknown format -> needs a look
@@ -68,13 +69,17 @@ if [ -f "$DBG" ]; then
   PEND=$(P PENDING)
   NOTIF=$(adb shell dumpsys notification --noredact | grep -c "pkg=$PKG")
   adb shell cmd statusbar expand-notifications 2>/dev/null; sleep 2; adb exec-out screencap -p > $OUT/screens/e2e_${TAG}_sms_notification.png; adb shell cmd statusbar collapse 2>/dev/null
-  # 5) opening the app re-scans the inbox: nothing may be processed twice
+  # 5) user force-stopped the app (Android blocks all broadcasts): the catch-up scan on open must pick up the
+  #    missed SMS exactly once, and must not process anything already handled again
+  adb shell am force-stop $PKG; sleep 1
+  adb emu sms send 5554 "INR 999.00 debited from A/c XX4417 on 21-11-26 to VPA blinkit@ybl. Ref 611234567890. -SBI"; sleep 5
   adb logcat -c; adb shell am start -W -n $ACT >/dev/null 2>&1; sleep 6
   adb shell am start -n $ACT --es route sms >/dev/null 2>&1; sleep 3; adb exec-out screencap -p > $OUT/screens/e2e_${TAG}_sms_inbox.png
-  DUP=$(adb logcat -d -s BahiSms:I | grep -c "processed via=")
+  CATCH=$(adb logcat -d -s BahiSms:I | grep -c "processed via=scan status=PENDING")
+  DUP=$(( $(adb logcat -d -s BahiSms:I | grep -c "processed via=") - CATCH ))
   adb logcat -d -s BahiSms:I > $OUT/audit/sms_e2e_$TAG.txt
-  echo "sms_pending=$PEND first_sms=$R1 sms_otp_ignored=$R2 sms_by_receiver_after_kill=$R3 sms_needs_look=$R4 processed_total=$TOTAL notifications=$NOTIF reprocessed_on_open=$DUP" >> $LOG
-  if [ "$PEND" -ge 2 ] && [ "$R1" -ge 1 ] && [ "$R2" -ge 1 ] && [ "$R3" -ge 1 ] && [ "$R4" -ge 1 ] && [ "$TOTAL" = "4" ] && [ "$DUP" = "0" ]; then SMSOK=PASSED; else SMSOK=FAILED; fi
+  echo "sms_pending=$PEND first_sms=$R1 sms_otp_ignored=$R2 sms_by_receiver_after_kill=$R3 sms_needs_look=$R4 processed_total=$TOTAL notifications=$NOTIF missed_caught_on_open=$CATCH reprocessed_on_open=$DUP" >> $LOG
+  if [ "$PEND" -ge 2 ] && [ "$R1" -ge 1 ] && [ "$R2" -ge 1 ] && [ "$R3" -ge 1 ] && [ "$R4" -ge 1 ] && [ "$TOTAL" = "4" ] && [ "$CATCH" = "1" ] && [ "$DUP" = "0" ]; then SMSOK=PASSED; else SMSOK=FAILED; fi
   echo "sms_e2e=$SMSOK" >> $LOG
   echo $SMSOK > $OUT/SMS_E2E_$TAG
 fi
