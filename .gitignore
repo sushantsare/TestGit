@@ -2,3 +2,6 @@
 build/
 *.iml
 local.properties
+apps/gallery/**/*.jks
+apps/gallery/**/*.keystore
+!apps/gallery/debug.keystore

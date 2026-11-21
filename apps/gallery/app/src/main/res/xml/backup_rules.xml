@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<full-backup-content>
+    <exclude domain="sharedpref" path="gallery_secure.xml"/>
+    <exclude domain="file" path="vault/"/>
+    <exclude domain="database" path="gallery.db"/>
+</full-backup-content>
