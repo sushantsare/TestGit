@@ -5,3 +5,6 @@ local.properties
 apps/gallery/**/*.jks
 apps/gallery/**/*.keystore
 !apps/gallery/debug.keystore
+apps/bahi-khata/**/*.jks
+apps/bahi-khata/**/*.keystore
+!apps/bahi-khata/debug.keystore

@@ -6,7 +6,7 @@ name: Build APK
 # Results are merged and published to the apk-builds branch in the same layout as before.
 on:
   push:
-    branches: [main]
+    branches: [main, 'build/**']
   workflow_dispatch:
 
 permissions:
