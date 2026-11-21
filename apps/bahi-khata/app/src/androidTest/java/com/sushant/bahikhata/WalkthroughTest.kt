@@ -37,16 +37,26 @@ class WalkthroughTest {
 
     private fun log(m: String) = Log.i("Walk", m)
 
-    private fun waitTag(tag: String, ms: Long = 8_000) = compose.waitUntil(ms) { compose.onAllNodesWithTag(tag, useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty() }
-    private fun waitText(t: String, ms: Long = 8_000) = compose.waitUntil(ms) { compose.onAllNodesWithText(t, substring = true, useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty() }
-    private fun click(tag: String) { log("click $tag"); waitTag(tag); compose.onAllNodesWithTag(tag, useUnmergedTree = true).onFirst().performClick(); compose.waitForIdle() }
-    private fun type(tag: String, text: String) { waitTag(tag); compose.onNodeWithTag(tag).performTextClearance(); compose.onNodeWithTag(tag).performTextInput(text); hideKeyboard() }
+    // Soft checks: a missing element is recorded (with a screenshot) and the walk carries on, so one run shows
+    // every problem; the test fails at the end if anything was recorded.
+    private val problems = mutableListOf<String>()
+    private fun problem(what: String) { problems += what; log("PROBLEM $what"); runCatching { shot("PROBLEM_" + what.replace(Regex("[^A-Za-z0-9_]"), "_").take(40)) } }
+    private fun has(tag: String) = compose.onAllNodesWithTag(tag, useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty()
+    private fun waitTag(tag: String, ms: Long = 8_000): Boolean = runCatching { compose.waitUntil(ms) { has(tag) } }.isSuccess.also { if (!it && ms >= 8_000) problem("missing $tag") }
+    private fun waitText(t: String, ms: Long = 8_000): Boolean = runCatching { compose.waitUntil(ms) { compose.onAllNodesWithText(t, substring = true, useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty() } }.isSuccess.also { if (!it) problem("missing text $t") }
+    private fun click(tag: String) { log("click $tag"); if (!waitTag(tag)) return; runCatching { compose.onAllNodesWithTag(tag, useUnmergedTree = true).onFirst().performClick() }.onFailure { problem("click $tag: ${it.message?.take(60)}") }; compose.waitForIdle() }
+    private fun type(tag: String, text: String) { if (!waitTag(tag)) return; compose.onNodeWithTag(tag).performTextClearance(); compose.onNodeWithTag(tag).performTextInput(text); hideKeyboard() }
 
     /** Click and wait for the next screen; one retry (logged) if the first tap was swallowed by a recomposition. */
     private fun clickTo(tag: String, expect: String) {
         click(tag)
-        val ok = runCatching { waitTag(expect, 4_000) }.isSuccess
-        if (!ok) { log("RETRY $tag -> $expect"); click(tag); waitTag(expect) }
+        if (!waitTag(expect, 4_000)) { problem("first tap on $tag did not open $expect"); click(tag); waitTag(expect) }
+    }
+
+    /** Go to a top-level tab the way a user would: press back until the tab bar shows, then tap the tab. */
+    private fun tab(r: String) {
+        repeat(4) { if (compose.onAllNodesWithTag("tab_$r", useUnmergedTree = true).fetchSemanticsNodes().isEmpty()) back() }
+        click("tab_$r")
     }
 
     private fun hideKeyboard() {
@@ -85,6 +95,8 @@ class WalkthroughTest {
             runCatching { compose.onRoot(useUnmergedTree = true).printToLog("WalkTree") }
             throw t
         }
+        log("problems=${problems.size}")
+        org.junit.Assert.assertTrue("Walkthrough problems: " + problems.joinToString("; "), problems.isEmpty())
     }
 
     private fun walk() {
@@ -133,7 +145,7 @@ class WalkthroughTest {
         // ---- accounts
         val accs = runBlocking { app.repo.dao.accountsNow() }
         val sbi = accs.first { it.name == "SBI Savings" }; val hdfc = accs.first { it.name == "HDFC Millennia" }
-        click("tab_accounts"); waitTag("accounts_list"); shot("accounts")
+        tab("accounts"); waitTag("accounts_list"); shot("accounts")
         go("account/${sbi.id}", "account_detail"); shot("account_bank")
         click("btn_adjust"); waitTag("dlg_field"); shot("adjust_balance_dialog"); back()
         go("account/${hdfc.id}", "pay_bill"); shot("card_detail")
@@ -144,14 +156,14 @@ class WalkthroughTest {
         go("account_edit/0?type=WALLET", "save_account"); shot("account_add_wallet"); back()
 
         // ---- udhar
-        click("tab_udhar"); waitTag("udhar_list"); shot("udhar")
+        tab("udhar"); waitTag("udhar_list"); shot("udhar")
         val rahul = runBlocking { app.repo.dao.peopleNow().first { it.name == "Rahul Kumar" } }
         go("person/${rahul.id}", "person_detail"); shot("person")
         click("you_gave"); waitTag("f_uamount"); type("f_uamount", "250"); shot("you_gave_dialog"); click("udhar_save"); waitText("₹250")
         click("btn_settle"); waitTag("confirm"); shot("settle_confirm"); back()
 
         // ---- reports, budgets, goals
-        click("tab_reports"); waitTag("reports"); shot("reports")
+        tab("reports"); waitTag("reports"); shot("reports")
         go("budgets", "budgets"); shot("budgets_goals")
 
         // ---- SMS
