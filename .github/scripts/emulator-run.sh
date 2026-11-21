@@ -33,7 +33,7 @@ run_ui() {
   } > $LOG 2>&1
   INSTR=$(adb shell pm list instrumentation | tr -d '\r' | grep "(target=$PKG)" | head -1 | sed 's/^instrumentation:\([^ ]*\) .*/\1/')
   echo "Instrumentation: $INSTR" >> $LOG
-  adb logcat -c
+  adb logcat -G 16M 2>/dev/null; adb logcat -c
   adb shell am instrument -w -r "$INSTR" >> $LOG 2>&1
   if grep -q "OK (" $LOG && ! grep -qE "FAILURES!!!|Process crashed|INSTRUMENTATION_FAILED|INSTRUMENTATION_ABORTED|shortMsg=" $LOG; then
     echo PASSED > $OUT/UI_TESTS
@@ -42,7 +42,7 @@ run_ui() {
   fi
   # one-line summary at the end, e.g. "OK (12 tests)" or "Tests run: 12,  Failures: 1"
   grep -E "^OK \(|^Tests run:" $LOG | tail -1 > $OUT/UI_TESTS_SUMMARY || true
-  adb logcat -d | grep -E "Walk|TestRunner|AndroidJUnitRunner" > $OUT/walk-log.txt 2>&1 || true
+  adb logcat -d | grep -E "Walk|TestRunner|AndroidJUnitRunner|BahiNav" > $OUT/walk-log.txt 2>&1 || true
   adb pull /sdcard/Pictures/GymShots/. $OUT/screens/ || true
   adb pull /sdcard/Pictures/AppShots/. $OUT/screens/ || true
   adb logcat -d -t 3000 > $OUT/logcat.txt || true

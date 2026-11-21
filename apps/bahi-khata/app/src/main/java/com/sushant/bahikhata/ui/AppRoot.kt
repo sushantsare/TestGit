@@ -67,6 +67,10 @@ private fun androidx.navigation.NavGraph.findStartDestination(): androidx.naviga
 @Composable
 fun AppRoot(vm: AppVm, locked: Boolean, onUnlock: () -> Unit, onLockBack: () -> Unit, pendingRoute: String?, onRouteConsumed: () -> Unit) {
     val nav = rememberNavController()
+    DisposableEffect(nav) {
+        val l = androidx.navigation.NavController.OnDestinationChangedListener { _, d, _ -> android.util.Log.d("BahiNav", "now ${d.route}") }
+        nav.addOnDestinationChangedListener(l); onDispose { nav.removeOnDestinationChangedListener(l) }
+    }
     val host = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     val snack = remember { Snack(host, scope) }
