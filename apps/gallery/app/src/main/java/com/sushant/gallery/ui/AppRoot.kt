@@ -103,7 +103,8 @@ fun AppRoot(vm: MainViewModel, startExternal: Boolean) {
 
     if (com.sushant.gallery.BuildConfig.DEBUG) LaunchedEffect(route) { android.util.Log.i("GalleryNav", "route=$route") }
     StatusBarIcons(light = !media && !isDark(theme))
-    SecureWindow(secure)
+    // Debug (test) builds allow screenshots of the Hidden album for the automated walkthrough.
+    SecureWindow(secure && !com.sushant.gallery.BuildConfig.DEBUG)
 
     LaunchedEffect(Unit) {
         vm.snacks.collect { s ->
@@ -148,6 +149,7 @@ fun AppRoot(vm: MainViewModel, startExternal: Boolean) {
         val bottom: Dp = when {
             route == "home" -> 88.dp
             route.startsWith("viewer") -> 116.dp
+            route.startsWith("editor") -> 230.dp
             else -> 16.dp
         }
         SnackbarHost(

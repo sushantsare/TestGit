@@ -103,6 +103,7 @@ class WalkthroughTest {
             tag("v_info").performClick(); waitTag("info_sheet"); shot("viewer_info"); back()
         }
         step("filmstrip_flick_undo") {
+            firstCell().performClick(); waitTag("viewer"); Thread.sleep(1000)
             tag("viewer").performTouchInput {
                 pinch(center + Offset(-320f, -320f), center + Offset(-50f, -50f), center + Offset(320f, 320f), center + Offset(50f, 50f), 500L)
             }
@@ -155,7 +156,7 @@ class WalkthroughTest {
             tag("row_about").performScrollTo().performClick(); waitTag("developer"); shot("about"); back()
         }
         step("dark") {
-            tag("theme_DARK").performScrollTo().performClick(); Thread.sleep(800); shot("settings_dark"); back(); waitTag("cell"); shot("photos_dark")
+            compose.onNodeWithText("Dark", useUnmergedTree = true).performClick(); Thread.sleep(800); shot("settings_dark"); back(); waitTag("cell"); shot("photos_dark")
             tag("tab_albums").performClick(); waitTag("album_card"); shot("albums_dark")
             tag("pin_bin").performClick(); Thread.sleep(1000); shot("bin_dark"); back()
             tag("tab_photos").performClick(); waitTag("cell")
@@ -167,8 +168,9 @@ class WalkthroughTest {
             main { app.prefs.setTheme(ThemeMode.LIGHT) }
         }
         step("landscape") {
-            device.setOrientationLeft(); Thread.sleep(2000)
-            firstCell().performClick(); waitTag("viewer"); Thread.sleep(1200); shot("viewer_landscape"); back()
+            device.setOrientationLeft(); Thread.sleep(2500)
+            shot("photos_landscape")
+            firstCell().performClick(); waitTag("viewer"); Thread.sleep(2500); shot("viewer_landscape"); back()
             device.setOrientationNatural(); Thread.sleep(1500)
         }
         step("onboarding") {
