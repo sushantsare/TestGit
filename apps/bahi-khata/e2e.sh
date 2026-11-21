@@ -171,7 +171,7 @@ if [ -f "$DBG" ]; then
   adb shell dumpsys gfxinfo $PKG > $A/T7_gfxinfo.txt
   echo "T7 frames=$(grep -m1 'Total frames rendered' $A/T7_gfxinfo.txt | awk '{print $4}') $(grep -m1 'Janky frames' $A/T7_gfxinfo.txt)" >> $A/summary.txt
   adb logcat -c
-  T13=$(adb shell am start -W -n $ACT --es route entries | grep TotalTime | awk '{print $2}'); sleep 3
+  adb shell am force-stop $PKG; T13=$(adb shell am start -W -n $ACT --es route entries | grep TotalTime | awk '{print $2}'); sleep 3
   for i in 1 2 3; do adb shell input swipe 540 1800 540 500 200; done
   adb shell am start -n $ACT --es route search >/dev/null 2>&1; sleep 2; adb shell input text swig; sleep 3
   adb exec-out screencap -p > $OUT/screens/audit_T13_search.png
