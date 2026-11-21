@@ -326,7 +326,10 @@ abstract class AppDb : RoomDatabase() {
             // never fall back to a plain database: no key means no database
             checkNotNull(key) { "database key unavailable" }
             System.loadLibrary("sqlcipher")
-            return Room.databaseBuilder(context, AppDb::class.java, NAME).openHelperFactory(SupportOpenHelperFactory(key)).build()
+            // the key is 32 random bytes, so it is handed to SQLCipher as a raw key (x'…'): no password stretching
+            // (256,000 PBKDF2 rounds) on every app start — same strength, much faster cold start
+            val raw = ("x'" + key.joinToString("") { "%02x".format(it) } + "'").toByteArray()
+            return Room.databaseBuilder(context, AppDb::class.java, NAME).openHelperFactory(SupportOpenHelperFactory(raw)).build()
         }
 
         fun inMemory(context: Context): AppDb =

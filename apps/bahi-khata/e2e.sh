@@ -63,6 +63,14 @@ if [ -f "$DBG" ]; then
   adb emu sms send 5554 "Dear UPI user A/C X4417 debited by 230.0 on date 21Nov26 trf to RAVI KIRANA Refno 532511234567. -SBI"
   # a killed app is started by the system for the SMS; emulators can take a while, so wait up to 60 s
   for i in $(seq 1 30); do [ "$(adb logcat -d -s BahiSms:I | grep -c 'processed via=receiver status=PENDING')" -ge 2 ] && break; sleep 2; done
+  # emulator check: did the SMS reach the phone at all? (the emulator's modem sometimes drops one while an app dies)
+  INBOX=$(adb shell content query --uri content://sms/inbox --projection body 2>/dev/null | grep -c "RAVI KIRANA")
+  echo "after_kill_sms_in_inbox=$INBOX" >> $LOG
+  if [ "$INBOX" = "0" ]; then
+    adb emu sms send 5554 "Dear UPI user A/C X4417 debited by 230.0 on date 21Nov26 trf to RAVI KIRANA Refno 532511234567. -SBI"
+    for i in $(seq 1 30); do [ "$(adb logcat -d -s BahiSms:I | grep -c 'processed via=receiver status=PENDING')" -ge 2 ] && break; sleep 2; done
+    echo "after_kill_sms_resent=1" >> $LOG
+  fi
   echo "receiver_after_kill_wait_s=$((i*2))" >> $LOG
   R3=$(adb logcat -d -s BahiSms:I | grep -c "processed via=receiver status=PENDING")
   # 4) unknown format -> needs a look

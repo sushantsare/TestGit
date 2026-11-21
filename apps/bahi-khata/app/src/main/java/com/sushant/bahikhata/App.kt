@@ -48,13 +48,14 @@ class App : Application() {
             Diagnostics.count(this, "storage_locked")
             return
         }
-        Notify.channels(this)
+        // everything below runs off the main thread so the first screen appears sooner
         appScope.launch {
+            Notify.channels(this@App)
+            Workers.schedule(this@App)
+            sms.startObserver()
             repo.ensureCategories()
             File(cacheDir, "open").deleteRecursively()
             File(cacheDir, "share").deleteRecursively()
         }
-        Workers.schedule(this)
-        sms.startObserver()
     }
 }

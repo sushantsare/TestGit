@@ -32,5 +32,6 @@ class AuditSeed {
             }
         }
         app.prefs.update { it.copy(setupDone = true, secureScreens = false, smsOn = false) }
+        Thread.sleep(2_000)   // settings are saved asynchronously; let them reach disk before the test process ends
     }
 }
