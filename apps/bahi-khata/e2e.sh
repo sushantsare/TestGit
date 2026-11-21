@@ -60,10 +60,14 @@ if [ -f "$DBG" ]; then
   # 3) app process killed by the system (low memory): only the manifest receiver can catch it
   adb shell input keyevent KEYCODE_HOME; sleep 2; adb shell am kill $PKG; sleep 2
   echo "alive_after_kill=$(adb shell pidof $PKG | wc -w)" >> $LOG
-  adb emu sms send 5554 "Dear UPI user A/C X4417 debited by 230.0 on date 21Nov26 trf to RAVI KIRANA Refno 532511234567. -SBI"; sleep 15
+  adb emu sms send 5554 "Dear UPI user A/C X4417 debited by 230.0 on date 21Nov26 trf to RAVI KIRANA Refno 532511234567. -SBI"
+  # a killed app is started by the system for the SMS; emulators can take a while, so wait up to 60 s
+  for i in $(seq 1 30); do [ "$(adb logcat -d -s BahiSms:I | grep -c 'processed via=receiver status=PENDING')" -ge 2 ] && break; sleep 2; done
+  echo "receiver_after_kill_wait_s=$((i*2))" >> $LOG
   R3=$(adb logcat -d -s BahiSms:I | grep -c "processed via=receiver status=PENDING")
   # 4) unknown format -> needs a look
-  adb emu sms send 5554 "Your acct 99887766 has a txn Rs 450.00 on 21/11. Bal Rs 1,000."; sleep 12
+  adb emu sms send 5554 "Your acct 99887766 has a txn Rs 450.00 on 21/11. Bal Rs 1,000."
+  for i in $(seq 1 20); do [ "$(adb logcat -d -s BahiSms:I | grep -c 'processed via=.* status=LOOK')" -ge 1 ] && break; sleep 2; done
   R4=$(P LOOK)
   TOTAL=$(adb logcat -d -s BahiSms:I | grep -c "processed via=")
   PEND=$(P PENDING)
@@ -107,8 +111,10 @@ fi
 # T7 / T9 / T13 / T14 on the debug build filled with realistic data ("Block screenshots" off, so captures work)
 if [ -f "$DBG" ]; then
   adb uninstall $PKG >/dev/null 2>&1; adb install -r -t $DBG >> $LOG 2>&1
+  TAPK=$(ls app/build/outputs/apk/androidTest/debug/*.apk 2>/dev/null | head -1)
+  [ -f "$TAPK" ] && adb install -r -t "$TAPK" >> $LOG 2>&1
   INSTR=$(adb shell pm list instrumentation | tr -d '\r' | grep "(target=$PKG)" | head -1 | sed 's/^instrumentation:\([^ ]*\) .*/\1/')
-  seed() { adb shell am instrument -w -e class com.sushant.bahikhata.AuditSeed -e auditSeed $1 "$INSTR" > $A/seed_$1.txt 2>&1; }
+  seed() { adb shell am instrument -w -e class com.sushant.bahikhata.AuditSeed -e auditSeed $1 "$INSTR" > $A/seed_$1.txt 2>&1; echo "seed_$1 instr=$INSTR $(grep -c 'OK (' $A/seed_$1.txt)" >> $A/summary.txt; }
   tapid() {   # tap a Compose element by its test tag (exposed as resource-id in debug builds)
     adb shell uiautomator dump /sdcard/ui.xml >/dev/null 2>&1; adb shell cat /sdcard/ui.xml > /tmp/ui.xml
     local b=$(grep -o "resource-id=\"$1\"[^>]*bounds=\"\[[0-9]*,[0-9]*\]\[[0-9]*,[0-9]*\]\"" /tmp/ui.xml | head -1 | grep -o '\[[0-9]*,[0-9]*\]\[[0-9]*,[0-9]*\]' | tr -d '[]' | tr ',' ' ')

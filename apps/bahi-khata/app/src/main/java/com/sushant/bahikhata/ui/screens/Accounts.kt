@@ -270,9 +270,11 @@ fun AccountEditScreen(vm: AppVm, id: Long, type: String) {
             color = existing.colorIdx; upis = existing.upiApps; loaded = true
         }
     }
-    val snap = listOf(t, name, bank, last4, opening, limit, st, due, color, upis).joinToString("|")
+    fun snapNow() = listOf(t, name, bank, last4, opening, limit, st, due, color, upis).joinToString("|")
+    val snap = snapNow()
     var initial by rememberSaveable { mutableStateOf<String?>(null) }
-    LaunchedEffect(loaded, existing) { if (initial == null && (id == 0L || loaded)) initial = snap }
+    // the starting point is read when the form is filled (not from an older composition), so an untouched form is never "dirty"
+    LaunchedEffect(loaded) { if (initial == null && (id == 0L || loaded)) initial = snapNow() }
     val close = rememberDiscardGuard(initial != null && snap != initial, if (id > 0) "Discard your changes?" else "Discard this account?")
     val stOk = st.isBlank() || st.toIntOrNull() in 1..31
     val dueOk = due.isBlank() || due.toIntOrNull() in 1..31

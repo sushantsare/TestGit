@@ -57,7 +57,8 @@ val tabs = listOf(
     Tab("reports", "Reports", Icons.Outlined.BarChart, Icons.Filled.BarChart),
 )
 
-fun NavHostController.go(route: String) { android.util.Log.d("BahiNav", "go $route"); navigate(route) { launchSingleTop = true } }
+// single-top only for plain screens: "account_edit/5" must never reuse an open "account_edit/0" (its typed state would leak in)
+fun NavHostController.go(route: String) { android.util.Log.d("BahiNav", "go $route"); navigate(route) { launchSingleTop = !route.contains('/') && !route.contains('?') } }
 fun NavHostController.tab(route: String) = navigate(route) {
     popUpTo(graph.findStartDestination().id) { saveState = true }
     launchSingleTop = true; restoreState = true
