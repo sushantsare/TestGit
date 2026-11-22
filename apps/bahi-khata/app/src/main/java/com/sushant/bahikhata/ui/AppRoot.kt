@@ -312,4 +312,3 @@ private fun androidx.navigation.NavGraphBuilder.page(
         } else Box(Modifier.fillMaxHeight().navigationBarsPadding().then(if (!tab && wide) Modifier.widthIn(max = 840.dp) else Modifier.fillMaxWidth())) { content(entry) }
     }
 }
-}
