@@ -44,7 +44,7 @@ class WalkthroughTest {
     private fun has(tag: String) = compose.onAllNodesWithTag(tag, useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty()
     private fun waitTag(tag: String, ms: Long = 8_000): Boolean = runCatching { compose.waitUntil(ms) { has(tag) } }.isSuccess.also { if (!it && ms >= 8_000) problem("missing $tag") }
     private fun waitText(t: String, ms: Long = 8_000): Boolean = runCatching { compose.waitUntil(ms) { compose.onAllNodesWithText(t, substring = true, useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty() } }.isSuccess.also { if (!it) problem("missing text $t") }
-    private fun click(tag: String) { log("click $tag"); if (!waitTag(tag)) return; runCatching { compose.onAllNodesWithTag(tag, useUnmergedTree = true).onFirst().also { n -> runCatching { n.performScrollTo() } }.performClick() }.onFailure { problem("click $tag: ${it.message?.take(60)}") }; compose.waitForIdle() }
+    private fun click(tag: String) { dismissSystemDialogs(); log("click $tag"); if (!waitTag(tag)) return; runCatching { compose.onAllNodesWithTag(tag, useUnmergedTree = true).onFirst().also { n -> runCatching { n.performScrollTo() } }.performClick() }.onFailure { problem("click $tag: ${it.message?.take(60)}") }; compose.waitForIdle() }
     private fun type(tag: String, text: String) { if (!waitTag(tag)) return; compose.onNodeWithTag(tag).performTextClearance(); compose.onNodeWithTag(tag).performTextInput(text); hideKeyboard() }
 
     /** Click and wait for the next screen; one retry (logged) if the first tap was swallowed by a recomposition. */
@@ -85,10 +85,19 @@ class WalkthroughTest {
         else problem("no discard prompt after typing")
     }
 
-    private fun back() { InstrumentationRegistry.getInstrumentation().uiAutomation.performGlobalAction(android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_BACK); Thread.sleep(500); compose.waitForIdle() }
+    /** The emulator's own launcher sometimes shows "isn't responding" over the app; tap Wait and carry on. */
+    private fun dismissSystemDialogs() {
+        runCatching {
+            val d = androidx.test.uiautomator.UiDevice.getInstance(InstrumentationRegistry.getInstrumentation())
+            val wait = d.findObject(androidx.test.uiautomator.By.text("Wait"))
+            if (wait != null && d.findObject(androidx.test.uiautomator.By.textContains("isn't responding")) != null) { log("dismissed system ANR dialog"); wait.click(); Thread.sleep(500) }
+        }
+    }
+
+    private fun back() { dismissSystemDialogs(); InstrumentationRegistry.getInstrumentation().uiAutomation.performGlobalAction(android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_BACK); Thread.sleep(500); compose.waitForIdle() }
 
     private fun shot(name: String) {
-        compose.waitForIdle(); Thread.sleep(900)
+        compose.waitForIdle(); Thread.sleep(900); dismissSystemDialogs()
         val bmp: Bitmap = InstrumentationRegistry.getInstrumentation().uiAutomation.takeScreenshot() ?: return
         val file = "%02d_%s.png".format(++shots, name)
         val cv = ContentValues().apply {
