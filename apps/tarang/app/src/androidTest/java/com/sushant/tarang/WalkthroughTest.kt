@@ -137,7 +137,7 @@ class WalkthroughTest {
         if (!waitTag("mini_player", 5000, soft = true)) problem("swipe down on the cover did not close the player") else shot("after_swipe_down")
         // swipe down on the bottom strip also closes it
         clickTo("mini_player", "full_player"); Thread.sleep(800)
-        compose.onNodeWithTag("peek_line", useUnmergedTree = true).performTouchInput { swipeDown(durationMillis = 300) }
+        compose.onNodeWithTag("peek_line", useUnmergedTree = true).performTouchInput { swipeDown(startY = centerY, endY = centerY + 900f, durationMillis = 300) }   // a real thumb-length pull
         if (!waitTag("mini_player", 5000, soft = true)) problem("swipe down on the bottom strip did not close the player")
         clickTo("mini_player", "full_player"); Thread.sleep(800)
         click("btn_next"); Thread.sleep(1200); shot("player_next_song")
