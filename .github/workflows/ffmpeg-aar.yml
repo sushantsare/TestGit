@@ -1,0 +1,58 @@
+name: Build Media3 FFmpeg decoder AAR
+# Builds androidx/media's FFmpeg audio decoder extension (AC3, E-AC3, DTS, TrueHD/MLP and more)
+# for a given Media3 version and publishes the .aar to branch ffmpeg-aar. Apps copy it into app/libs.
+on:
+  push:
+    branches: ['ffmpeg/**']
+  workflow_dispatch:
+permissions:
+  contents: read
+env:
+  MEDIA3_TAG: '1.11.1'
+  FFMPEG_BRANCH: 'release/6.0'
+  NDK_VERSION: '26.3.11579264'
+  ANDROID_ABI: '26'
+jobs:
+  aar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: '17' }
+      - name: Install NDK
+        run: |
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "ndk;${NDK_VERSION}" > /dev/null
+          echo "NDK_PATH=$ANDROID_HOME/ndk/${NDK_VERSION}" >> $GITHUB_ENV
+      - name: Get androidx/media and FFmpeg sources
+        run: |
+          git clone --depth 1 --branch "${MEDIA3_TAG}" https://github.com/androidx/media.git media
+          cd media/libraries/decoder_ffmpeg/src/main/jni
+          git clone --depth 1 --branch "${FFMPEG_BRANCH}" https://github.com/FFmpeg/FFmpeg.git ffmpeg
+      - name: Build FFmpeg (armeabi-v7a, arm64-v8a, x86, x86_64)
+        run: |
+          cd media
+          FFMPEG_MODULE_PATH="$(pwd)/libraries/decoder_ffmpeg/src/main"
+          ENABLED_DECODERS=(vorbis opus flac alac pcm_mulaw pcm_alaw mp3 amrnb amrwb aac ac3 eac3 dca mlp truehd)
+          cd "${FFMPEG_MODULE_PATH}/jni"
+          chmod +x build_ffmpeg.sh
+          ./build_ffmpeg.sh "${FFMPEG_MODULE_PATH}" "${NDK_PATH}" linux-x86_64 "${ANDROID_ABI}" "${ENABLED_DECODERS[@]}" 2>&1 | tail -40
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Build the AAR
+        run: |
+          cd media
+          echo "sdk.dir=$ANDROID_HOME" > local.properties
+          echo "ndk.dir=$NDK_PATH" >> local.properties
+          ./gradlew :lib-decoder-ffmpeg:assembleRelease --stacktrace 2>&1 | tail -60
+          mkdir -p /tmp/aar
+          find . -path '*decoder_ffmpeg*' -name '*.aar' -exec cp {} /tmp/aar/ \;
+          ls -la /tmp/aar
+          for f in /tmp/aar/*.aar; do unzip -l "$f" | grep -E '\.so|classes.jar'; done
+          cp /tmp/aar/*release*.aar /tmp/aar/media3-decoder-ffmpeg-${MEDIA3_TAG}.aar 2>/dev/null || cp "$(ls /tmp/aar/*.aar | head -1)" /tmp/aar/media3-decoder-ffmpeg-${MEDIA3_TAG}.aar
+      - name: Publish to ffmpeg-aar branch
+        run: |
+          mkdir /tmp/pub && cp /tmp/aar/media3-decoder-ffmpeg-${MEDIA3_TAG}.aar /tmp/pub/
+          cd /tmp/pub && echo "${GITHUB_SHA}" > SOURCE_SHA && echo "media3=${MEDIA3_TAG} ffmpeg=${FFMPEG_BRANCH} ndk=${NDK_VERSION} minApi=${ANDROID_ABI}" > INFO
+          git init -q -b ffmpeg-aar && git add -A && git -c user.name=ci -c user.email=ci@local commit -qm "FFmpeg decoder AAR for Media3 ${MEDIA3_TAG}"
+          git push -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}" ffmpeg-aar
