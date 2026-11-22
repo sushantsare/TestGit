@@ -158,6 +158,31 @@ if [ -f "$DBG" ]; then
   adb shell am start -n $ACT --es route sms >/dev/null 2>&1; sleep 2
   adb shell input keyevent KEYCODE_BACK & sleep 0.12; adb exec-out screencap -p > $OUT/screens/audit_back_button_frame.png; wait
   echo "back_motion crashes=$(mycrash)" >> $A/summary.txt
+  # Settings and every screen inside it: open each one, then edge-swipe back (slow, held), recorded on video
+  edgeback() {   # a slow real edge swipe; $1 = cancel to let go early (screen must spring back)
+    adb shell input motionevent DOWN 3 1300
+    for x in 30 60 90 120 150 180 210 240 270 300 330 360 390; do adb shell input motionevent MOVE $x 1300; sleep 0.05; done
+    sleep 0.4
+    if [ "$1" = cancel ]; then for x in 300 200 100 30; do adb shell input motionevent MOVE $x 1300; done; adb shell input motionevent UP 30 1300
+    else for x in 450 520 600; do adb shell input motionevent MOVE $x 1300; done; adb shell input motionevent UP 600 1300; fi
+    sleep 1.5
+  }
+  adb shell am start -n $ACT --es route home >/dev/null 2>&1; sleep 2
+  adb shell screenrecord --bit-rate 6000000 --time-limit 170 /sdcard/settings_back.mp4 & REC=$!
+  sleep 1
+  adb shell am start -n $ACT --es route settings >/dev/null 2>&1; sleep 2
+  edgeback cancel; edgeback            # Settings -> Home
+  adb shell am start -n $ACT --es route settings >/dev/null 2>&1; sleep 2
+  for r in categories recurring budgets sms_setup backup export diagnostics about; do
+    adb shell am start -n $ACT --es route $r >/dev/null 2>&1; sleep 2
+    adb exec-out screencap -p > $OUT/screens/audit_settings_$r.png
+    edgeback; adb exec-out screencap -p > $OUT/screens/audit_settings_after_$r.png
+  done
+  edgeback                              # Settings -> Home
+  adb shell pkill -INT screenrecord; sleep 3; wait $REC 2>/dev/null
+  adb pull /sdcard/settings_back.mp4 $OUT/screens/settings_back.mp4 >/dev/null 2>&1
+  adb logcat -d -s BahiNav:D | tail -60 > $A/settings_nav.txt
+  echo "settings_back crashes=$(mycrash) video=$(ls -s $OUT/screens/settings_back.mp4 2>/dev/null | cut -d' ' -f1)" >> $A/summary.txt
   # T14 config stress with real content
   adb logcat -c; adb shell am force-stop $PKG; adb shell am start -W -n $ACT --es route home >/dev/null 2>&1; sleep 3
   adb shell settings put system accelerometer_rotation 0
