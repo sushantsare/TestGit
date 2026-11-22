@@ -71,7 +71,10 @@ fun TarangTheme(mode: ThemeMode, pureBlack: Boolean, wallpaper: Boolean, content
     }
     if (dark && pureBlack) scheme = scheme.pureBlack()
     androidx.compose.runtime.CompositionLocalProvider(LocalIsDark provides dark) {
-        MaterialTheme(colorScheme = scheme, typography = TarangType, shapes = Shapes, content = content)
+        MaterialTheme(colorScheme = scheme, typography = TarangType, shapes = Shapes) {
+            SystemBarIcons(light = !dark)
+            androidx.compose.material3.Surface(color = scheme.background, contentColor = scheme.onBackground, content = content)
+        }
     }
 }
 
@@ -124,3 +127,17 @@ private fun fromScheme(s: ColorScheme, dark: Boolean) = CoverColors(
 )
 
 @Suppress("unused") private fun Color.argb() = toArgb()
+
+
+/** Dark status/navigation bar icons on light backgrounds and light icons on dark ones (follows the app's theme, not the phone's). */
+@Composable
+fun SystemBarIcons(light: Boolean) {
+    val view = androidx.compose.ui.platform.LocalView.current
+    if (view.isInEditMode) return
+    androidx.compose.runtime.SideEffect {
+        val window = (view.context as? android.app.Activity)?.window ?: return@SideEffect
+        androidx.core.view.WindowCompat.getInsetsController(window, view).apply {
+            isAppearanceLightStatusBars = light; isAppearanceLightNavigationBars = light
+        }
+    }
+}

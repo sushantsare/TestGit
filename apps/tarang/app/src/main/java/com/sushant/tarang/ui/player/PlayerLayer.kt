@@ -51,6 +51,8 @@ import com.sushant.tarang.ui.components.LocalCovers
 import com.sushant.tarang.ui.theme.CoverColors
 import com.sushant.tarang.ui.theme.LocalIsDark
 import com.sushant.tarang.ui.theme.coverColors
+import com.sushant.tarang.ui.theme.SystemBarIcons
+import androidx.compose.ui.graphics.luminance
 import kotlinx.coroutines.launch
 import kotlin.math.abs
 import kotlin.math.max
@@ -110,6 +112,8 @@ fun PlayerLayer(
     val seed by produceState<Int?>(null, song?.id) { value = song?.let { covers.seed(it) } }
     val target = remember(seed, dark, fallback) { coverColors(seed, dark, fallback) }
     val colors = animateCoverColors(target)
+
+    SystemBarIcons(light = if (state.progress.value > 0.5f && song != null) colors.full.luminance() > 0.5f else !dark)
 
     BackHandler(enabled = state.progress.value > 0.5f) {
         scope.launch { if (state.panel.value > 0.5f) state.panel.animateTo(0f, spring()) else state.progress.animateTo(0f, spring(dampingRatio = 0.9f, stiffness = 380f)) }
