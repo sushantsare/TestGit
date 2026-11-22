@@ -202,8 +202,11 @@ private fun Graph(nav: NavHostController, vm: AppVm, start: String) {
         // fully visible, behind the card
         popEnterTransition = { EnterTransition.None },
         popExitTransition = {
-            // while the finger drags, the card stays solid and only shrinks; it fades out only at the very end
-            scaleOut(tween(300, easing = ease), targetScale = 0.9f) + slideOutHorizontally(tween(300, easing = ease)) { it / 12 } + fadeOut(tween(80, delayMillis = 220))
+            // the card reaches its full shrink in the first 40 % of the swipe, so it clearly follows the finger
+            // (like Android's back-to-home); it stays solid and fades out only at the very end
+            scaleOut(tween(120, easing = androidx.compose.animation.core.LinearOutSlowInEasing), targetScale = 0.9f) +
+                slideOutHorizontally(tween(120, easing = androidx.compose.animation.core.LinearOutSlowInEasing)) { it / 14 } +
+                fadeOut(tween(80, delayMillis = 220))
         },
     ) {
         page("setup") { SetupScreen(vm) }
@@ -299,7 +302,7 @@ private fun androidx.navigation.NavGraphBuilder.page(
     route: String, arguments: List<androidx.navigation.NamedNavArgument> = emptyList(),
     content: @Composable (androidx.navigation.NavBackStackEntry) -> Unit,
 ) = composable(route, arguments) { entry ->
-    val corner by transition.animateDp(label = "corner") { st -> if (st == androidx.compose.animation.EnterExitState.PostExit) 28.dp else 0.dp }
+    val corner by transition.animateDp(transitionSpec = { tween(120) }, label = "corner") { st -> if (st == androidx.compose.animation.EnterExitState.PostExit) 28.dp else 0.dp }
     val me = route.substringBefore('?').substringBefore('/')
     val tab = me in TAB_ROUTES
     val rail = railShown()
