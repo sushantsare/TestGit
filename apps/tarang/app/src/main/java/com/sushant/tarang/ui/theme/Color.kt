@@ -1,0 +1,93 @@
+package com.sushant.tarang.ui.theme
+
+import androidx.compose.material3.ColorScheme
+import androidx.compose.material3.darkColorScheme
+import androidx.compose.material3.lightColorScheme
+import androidx.compose.ui.graphics.Color
+
+// Tarang green (seed #4C7A5A, Material tonal-spot) — exactly the approved "Mint" mockups.
+val TarangLight: ColorScheme = lightColorScheme(
+    primary = Color(0xFF376948),
+    onPrimary = Color(0xFFE8FFEA),
+    primaryContainer = Color(0xFFB8F0C5),
+    onPrimaryContainer = Color(0xFF295B3C),
+    inversePrimary = Color(0xFFC3FBD0),
+    secondary = Color(0xFF506454),
+    onSecondary = Color(0xFFE8FFEA),
+    secondaryContainer = Color(0xFFD2E8D4),
+    onSecondaryContainer = Color(0xFF435647),
+    tertiary = Color(0xFF576434),
+    onTertiary = Color(0xFFF2FFC8),
+    tertiaryContainer = Color(0xFFEBFBBC),
+    onTertiaryContainer = Color(0xFF546131),
+    background = Color(0xFFF7FAF4),
+    onBackground = Color(0xFF2C342D),
+    surface = Color(0xFFF7FAF4),
+    onSurface = Color(0xFF2C342D),
+    surfaceVariant = Color(0xFFDCE5DB),
+    onSurfaceVariant = Color(0xFF586159),
+    surfaceTint = Color(0xFF376948),
+    inverseSurface = Color(0xFF0B0F0C),
+    inverseOnSurface = Color(0xFF9A9E98),
+    error = Color(0xFFA83836),
+    onError = Color(0xFFFFF7F6),
+    errorContainer = Color(0xFFFA746F),
+    onErrorContainer = Color(0xFF6E0A12),
+    outline = Color(0xFF747D74),
+    outlineVariant = Color(0xFFABB4AB),
+    scrim = Color(0xFF000000),
+    surfaceBright = Color(0xFFF7FAF4),
+    surfaceContainer = Color(0xFFE9F0E7),
+    surfaceContainerHigh = Color(0xFFE3EAE1),
+    surfaceContainerHighest = Color(0xFFDCE5DB),
+    surfaceContainerLow = Color(0xFFF0F5ED),
+    surfaceContainerLowest = Color(0xFFFFFFFF),
+    surfaceDim = Color(0xFFD3DCD2),
+)
+
+val TarangDark: ColorScheme = darkColorScheme(
+    primary = Color(0xFFA7D0B0),
+    onPrimary = Color(0xFF22482F),
+    primaryContainer = Color(0xFF355A41),
+    onPrimaryContainer = Color(0xFFC3EECC),
+    inversePrimary = Color(0xFF41674D),
+    secondary = Color(0xFFB6CCB9),
+    onSecondary = Color(0xFF314536),
+    secondaryContainer = Color(0xFF2D4032),
+    onSecondaryContainer = Color(0xFFAFC5B2),
+    tertiary = Color(0xFFF3FFCC),
+    onTertiary = Color(0xFF576434),
+    tertiaryContainer = Color(0xFFE2F2B4),
+    onTertiaryContainer = Color(0xFF4F5C2C),
+    background = Color(0xFF0B0F0C),
+    onBackground = Color(0xFFDFE8DD),
+    surface = Color(0xFF0B0F0C),
+    onSurface = Color(0xFFDFE8DD),
+    surfaceVariant = Color(0xFF202821),
+    onSurfaceVariant = Color(0xFFA4ADA4),
+    surfaceTint = Color(0xFFA7D0B0),
+    inverseSurface = Color(0xFFF7FAF4),
+    inverseOnSurface = Color(0xFF525652),
+    error = Color(0xFFFA746F),
+    onError = Color(0xFF490006),
+    errorContainer = Color(0xFF871F21),
+    onErrorContainer = Color(0xFFFF9993),
+    outline = Color(0xFF6F786F),
+    outlineVariant = Color(0xFF414A42),
+    scrim = Color(0xFF000000),
+    surfaceBright = Color(0xFF262E27),
+    surfaceContainer = Color(0xFF151B16),
+    surfaceContainerHigh = Color(0xFF1A211C),
+    surfaceContainerHighest = Color(0xFF202821),
+    surfaceContainerLow = Color(0xFF0F1510),
+    surfaceContainerLowest = Color(0xFF000000),
+    surfaceDim = Color(0xFF0B0F0C),
+)
+
+/** Pure black (AMOLED): dark scheme with black surfaces and slightly lifted containers so cards stay visible. */
+fun ColorScheme.pureBlack(): ColorScheme = copy(
+    background = Color.Black, surface = Color.Black, surfaceDim = Color.Black, surfaceContainerLowest = Color.Black,
+    surfaceContainerLow = Color(0xFF0E0E0E), surfaceContainer = Color(0xFF0E0E0E),
+    surfaceContainerHigh = Color(0xFF1A1A1A), surfaceVariant = Color(0xFF1A1A1A),
+    surfaceContainerHighest = Color(0xFF242424), surfaceBright = Color(0xFF2A2A2A), outlineVariant = Color(0xFF2A2A2A),
+)

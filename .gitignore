@@ -8,3 +8,6 @@ apps/gallery/**/*.keystore
 apps/bahi-khata/**/*.jks
 apps/bahi-khata/**/*.keystore
 !apps/bahi-khata/debug.keystore
+apps/tarang/**/*.jks
+apps/tarang/**/*.keystore
+!apps/tarang/debug.keystore

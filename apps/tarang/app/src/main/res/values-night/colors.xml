@@ -1,0 +1,5 @@
+<resources>
+    <color name="window_bg">#0B0F0C</color>
+    <color name="splash_bg">#0B0F0C</color>
+    <color name="widget_bg">#1A211C</color>
+</resources>
