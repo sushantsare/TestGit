@@ -369,6 +369,67 @@ private fun Modifier.songSwipe(x: Animatable<Float, AnimationVector1D>, width: F
     }
 }
 
+private fun geometry(W: Float, H: Float, statusTop: Float, navBottom: Float, navVisible: Boolean, wide: Boolean, dp: (Float) -> Float): Geometry {
+    val miniW = min(W - dp(32f), dp(580f)).let { if (wide) min(it, dp(580f)) else it }
+    val miniX = (W - miniW) / 2f
+    val miniBottomGap = if (navVisible) navBottom + dp(4f) + dp(68f) + dp(4f) else navBottom + dp(14f)
+    val miniY = H - miniBottomGap - dp(72f)
+    val mini = Rect(miniX, miniY, miniX + miniW, miniY + dp(72f))
+    val full = Rect(0f, 0f, W, H)
+    val twoPane = W > H || W >= dp(840f)
+    val paneW = if (twoPane) W * 0.5f else W
+    val peekH = if (twoPane) 0f else dp(64f) + navBottom
+    val topY = statusTop
+    // full layout, top to bottom
+    val fixed = dp(56f) + dp(10f) + dp(22f) + dp(34f) + dp(30f) + dp(58f) + dp(80f) + dp(24f) + dp(68f) + dp(16f)
+    val avail = H - statusTop - fixed - peekH
+    val coverSize = min(paneW - dp(72f), avail).coerceIn(dp(120f), dp(420f))
+    val coverX = (paneW - coverSize) / 2f
+    val contentH = fixed + coverSize
+    val startY = if (twoPane) statusTop + max(0f, (H - statusTop - navBottom - contentH) / 2f) else statusTop
+    val coverY = startY + dp(56f) + dp(10f)
+    val titleY = coverY + coverSize + dp(22f)
+    val seekY = titleY + dp(34f) + dp(30f)
+    val controlsY = seekY + dp(58f)
+    // one evenly spaced row: shuffle · prev · PLAY · next · repeat (equal gaps between what you see)
+    val playW = dp(104f); val playH = dp(80f)
+    val side = dp(56f); val small = dp(24f); val margin = dp(24f)
+    val gap = ((paneW - 2 * margin - (2 * small + 2 * side + playW)) / 4f).coerceAtLeast(dp(6f))
+    val rowW = 2 * small + 2 * side + playW + 4 * gap
+    val rowX = (paneW - rowW) / 2f
+    val shuffleCx = rowX + small / 2
+    val prevX = rowX + small + gap
+    val playX = prevX + side + gap
+    val nextX = playX + playW + gap
+    val repeatCx = nextX + side + gap + small / 2
+    val sideY = controlsY + (playH - side) / 2
+    val prevFull = Rect(prevX, sideY, prevX + side, sideY + side)
+    val nextFull = Rect(nextX, sideY, nextX + side, sideY + side)
+    // mini layout (old Tarang): round cover 52, title, then prev 40 · play 48 · next 40
+    val right = mini.right - dp(12f)
+    val nextMini = Rect(right - dp(40f), mini.top + dp(16f), right, mini.top + dp(56f))
+    val playMini = Rect(nextMini.left - dp(8f) - dp(48f), mini.top + dp(12f), nextMini.left - dp(8f), mini.top + dp(60f))
+    val prevMini = Rect(playMini.left - dp(8f) - dp(40f), mini.top + dp(16f), playMini.left - dp(8f), mini.top + dp(56f))
+    return Geometry(
+        mini, full,
+        Rect(mini.left + dp(10f), mini.top + dp(10f), mini.left + dp(62f), mini.top + dp(62f)),
+        Rect(coverX, coverY, coverX + coverSize, coverY + coverSize),
+        Offset2(mini.left + dp(76f), mini.top + dp(13f)), Offset2(dp(24f), titleY),
+        prevMini.left - dp(8f) - (mini.left + dp(76f)), paneW - dp(24f) - dp(64f),
+        playMini, Rect(playX, controlsY, playX + playW, controlsY + playH), prevMini, prevFull, nextMini, nextFull,
+        seekY, controlsY, controlsY + playH + dp(24f), paneW, twoPane, startY, peekH,
+        shuffleCx, repeatCx,
+    )
+}
+
+@Composable
+private fun animateCoverColors(t: CoverColors): CoverColors {
+    val spec = tween<Color>(450)
+    @Composable fun a(c: Color) = animateColorAsState(c, spec, label = "cc").value
+    return CoverColors(a(t.full), a(t.onFull), a(t.accent), a(t.onAccent), a(t.chip), a(t.onChip), a(t.mini), a(t.miniFill), a(t.onMini),
+        a(t.onMiniVariant), a(t.panel), a(t.onPanel), a(t.onPanelVariant), a(t.outline))
+}
+
 /** Top bar, heart, wavy seek bar, shuffle/repeat and the Sleep · Speed · Sound · Playlist row. */
 @Composable
 private fun FullChrome(
