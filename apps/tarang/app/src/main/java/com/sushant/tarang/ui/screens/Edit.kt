@@ -138,7 +138,7 @@ fun LyricsEditScreen(songId: Long) {
         Text("Plain text is fine. Lines starting with a time like [01:23.45] scroll along with the song.", style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(horizontal = 20.dp, vertical = 6.dp))
         if (text == null) Box(Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
-        else OutlinedTextField(text!!, { text = it }, Modifier.fillMaxWidth().weight(1f).padding(horizontal = 16.dp).padding(bottom = 16.dp).testTag("lyrics_field"),
+        else OutlinedTextField(text!!, { text = it }, Modifier.fillMaxWidth().weight(1f).padding(horizontal = 16.dp).padding(bottom = LocalDockPadding.current).testTag("lyrics_field"),
             placeholder = { Text("Type or paste lyrics here") }, textStyle = MaterialTheme.typography.bodyLarge.copy(fontFamily = if (text!!.trimStart().startsWith("[")) FontFamily.Monospace else MaterialTheme.typography.bodyLarge.fontFamily))
     }
     if (leave) ConfirmDialog("Discard changes?", "Your lyrics haven't been saved.", "Discard", { leave = false }, { leave = false; nav.back() })

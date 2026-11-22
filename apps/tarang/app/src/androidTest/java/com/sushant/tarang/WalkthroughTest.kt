@@ -179,8 +179,10 @@ class WalkthroughTest {
         clickTo("set_about", "about"); shot("about"); back()
         song("Kesariya.mp3")?.let { s ->
             go(com.sushant.tarang.ui.R0.edit(s.id), "edit_details"); Thread.sleep(800); shot("edit_details")
-            type("edit_title", "Kesariya (edit)"); back(); if (waitTag("confirm", 3000)) { shot("edit_discard_prompt"); click("confirm") }
-            go(com.sushant.tarang.ui.R0.lyrics(s.id), "lyrics_edit"); Thread.sleep(800); shot("lyrics_edit"); back()
+            type("edit_title", "Kesariya (edit)"); back()   // first back closes the keyboard
+            if (!has("confirm")) back()
+            if (waitTag("confirm", 3000)) { shot("edit_discard_prompt"); click("confirm") }
+            go(com.sushant.tarang.ui.R0.lyrics(s.id), "lyrics_edit"); Thread.sleep(800); shot("lyrics_edit"); back(); if (has("lyrics_edit")) back()
         }
 
         // ---- Dark theme, then pure black

@@ -92,9 +92,10 @@ class AppNav(
     }
     fun collapsePlayer() { scope.launch { player.progress.animateTo(0f, spring(dampingRatio = 0.86f, stiffness = 380f)) } }
     fun go(route: String) = nav.navigate(route) { launchSingleTop = true }
+    /** Bottom tabs always open the tab's own page (inner screens above it are closed). */
     fun tab(route: String) = nav.navigate(route) {
-        popUpTo(R0.HOME) { saveState = true }
-        launchSingleTop = true; restoreState = true
+        popUpTo(R0.HOME)
+        launchSingleTop = true
     }
     fun back() { if (!nav.popBackStack()) Unit }
     fun sheet(s: Sheet?) = sheetSetter(s)
