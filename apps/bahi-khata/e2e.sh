@@ -149,6 +149,8 @@ if [ -f "$DBG" ]; then
   adb shell settings put system accelerometer_rotation 0
   for r in 1 0 1 0 1 0; do adb shell settings put system user_rotation $r; sleep 1.2; done
   adb shell settings put system user_rotation 1; sleep 2; adb exec-out screencap -p > $OUT/screens/audit_T14_landscape_home.png
+  adb shell uiautomator dump /sdcard/ui.xml >/dev/null 2>&1; adb shell cat /sdcard/ui.xml > /tmp/ui.xml
+  echo "T14 landscape_add_button=$(grep -c 'resource-id="fab_add"' /tmp/ui.xml)" >> $A/summary.txt
   adb shell am start -n $ACT --es route add >/dev/null 2>&1; sleep 2; adb exec-out screencap -p > $OUT/screens/audit_T14_landscape_add.png
   adb shell input keyevent KEYCODE_BACK; adb shell settings put system user_rotation 0; sleep 2
   adb shell cmd uimode night yes; sleep 2; adb exec-out screencap -p > $OUT/screens/audit_T14_night.png; adb shell cmd uimode night no; sleep 1
@@ -177,6 +179,14 @@ if [ -f "$DBG" ]; then
   adb exec-out screencap -p > $OUT/screens/audit_T13_search.png
   adb shell am start -n $ACT --es route reports >/dev/null 2>&1; sleep 3
   echo "T13 rows=5000 open_entries_ms=$T13 crashes=$(mycrash) anrs=$(adb logcat -d | grep -c "ANR in $PKG")" >> $A/summary.txt
+fi
+# delivery check: an APK re-signed outside CI with the permanent release key installs and starts
+if [ -f delivery-check.apk ]; then
+  adb uninstall $PKG >/dev/null 2>&1
+  adb install delivery-check.apk >> $LOG 2>&1 && DC_INSTALL=ok || DC_INSTALL=failed
+  adb shell am start -W -n $ACT >/dev/null 2>&1; sleep 4
+  echo "delivery_signed_install=$DC_INSTALL running=$(adb shell pidof $PKG | wc -w) cert=$(adb shell dumpsys package $PKG | grep -m1 -o 'signatures=[^ ]*')" >> $A/summary.txt
+  adb uninstall $PKG >/dev/null 2>&1
 fi
 # release build for the rest
 adb uninstall $PKG >/dev/null 2>&1; adb install -r $REL >> $LOG 2>&1

@@ -149,3 +149,7 @@ Same amount + same account within 15 min, or same UPI ref/txn id, across bank SM
 - Targets: 0 missed financial SMS (every one lands in Suggestions or Needs a look); ≥ 97% fully-correct auto-parse on the corpus; 0 OTP/promo shown as transactions.
 - Parser is a pure Kotlin module with no Android dependency so it is fully unit-tested; Diagnostics shows parse stats (parsed / needs a look / ignored).
 - Privacy: SMS bodies stay on the phone; only financial SMS are stored (encrypted), others are never saved.
+
+
+## Owner decisions recorded after the audits
+- **Language:** the app is English-only by the owner's choice (interview: "English UI"). Moving every text to string resources (audit L10N1/3/4) is deferred until a Hindi version is wanted; until then those checks are treated as not applicable.

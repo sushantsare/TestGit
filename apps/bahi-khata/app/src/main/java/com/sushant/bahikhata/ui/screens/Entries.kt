@@ -122,7 +122,7 @@ fun EntriesScreen(vm: AppVm) {
             Act(if (calendar) Icons.Outlined.ViewList else Icons.Outlined.CalendarMonth, if (calendar) "List view" else "Calendar view", "calendar") { calendar = !calendar; day = 0 }
             Act(Icons.Outlined.FileDownload, "Export", "export") { nav.go("export") }
         } },
-        floatingActionButton = { if (androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp < 600) FloatingActionButton(onClick = { nav.go("add?type=EXPENSE") }, containerColor = bk.saffron, contentColor = bk.onSaffron, shape = RoundedCornerShape(18.dp), modifier = Modifier.testTag("fab_add")) { Icon(Icons.Outlined.Add, "Add entry", Modifier.size(30.dp)) } },
+        floatingActionButton = { if (!com.sushant.bahikhata.ui.railShown()) FloatingActionButton(onClick = { nav.go("add?type=EXPENSE") }, containerColor = bk.saffron, contentColor = bk.onSaffron, shape = RoundedCornerShape(18.dp), modifier = Modifier.testTag("fab_add")) { Icon(Icons.Outlined.Add, "Add entry", Modifier.size(30.dp)) } },
         contentWindowInsets = WindowInsets(0),
     ) { pad ->
         if (wide) Row(Modifier.padding(pad).fillMaxSize()) {

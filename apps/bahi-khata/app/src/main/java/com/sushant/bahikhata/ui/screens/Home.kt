@@ -16,9 +16,11 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.sushant.bahikhata.data.*
 import com.sushant.bahikhata.ui.*
@@ -65,7 +67,7 @@ fun HomeScreen(vm: AppVm) {
             }
         },
         floatingActionButton = {
-            if (!LocalWide.current && androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp < 600)
+            if (!com.sushant.bahikhata.ui.railShown())
                 FloatingActionButton(onClick = { nav.go("add?type=EXPENSE") }, containerColor = bk.saffron, contentColor = bk.onSaffron, shape = RoundedCornerShape(18.dp), modifier = Modifier.testTag("fab_add")) {
                     Icon(Icons.Outlined.Add, "Add entry", Modifier.size(30.dp))
                 }
@@ -125,7 +127,7 @@ fun HomeScreen(vm: AppVm) {
                     BkCard(Modifier.padding(horizontal = 16.dp).fillMaxWidth()) {
                         dueCards.forEach { (c, b, d) ->
                             ListRow(c.name, "Bill ${if (LocalHide.current) "₹ ••••" else Money.fmt(b.bill)} · due ${Dates.dayMonth(b.due!!)}", Modifier.testTag("due_${c.id}"),
-                                leading = { Box(Modifier.size(46.dp, 30.dp).clip(RoundedCornerShape(6.dp)).background(bk.cardFaces[c.colorIdx.mod(bk.cardFaces.size)]), contentAlignment = Alignment.BottomEnd) { Text(c.last4.split(',').firstOrNull { it.isNotBlank() }.orEmpty(), color = androidx.compose.ui.graphics.Color.White, style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(end = 4.dp, bottom = 2.dp)) } },
+                                leading = { Box(Modifier.size(46.dp, 30.dp).clip(RoundedCornerShape(6.dp)).background(bk.cardFaces[c.colorIdx.mod(bk.cardFaces.size)]), contentAlignment = Alignment.BottomEnd) { Text(c.last4.split(',').firstOrNull { it.isNotBlank() }.orEmpty(), color = androidx.compose.ui.graphics.Color.White, style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(end = 4.dp, bottom = 2.dp), fontSize = (10f / LocalDensity.current.fontScale).sp, maxLines = 1) } },
                                 trailing = { Text(when { d < 0 -> "overdue"; d == 0L -> "today"; d == 1L -> "tomorrow"; else -> "in $d days" }, style = MaterialTheme.typography.labelLarge, color = if (d <= 5) bk.expense else MaterialTheme.colorScheme.onSurfaceVariant) },
                                 onClick = { nav.go("account/${c.id}") })
                         }

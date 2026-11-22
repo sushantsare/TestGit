@@ -99,8 +99,7 @@ fun AppRoot(vm: AppVm, locked: Boolean, onUnlock: () -> Unit, onLockBack: () -> 
     val s by vm.settings.collectAsStateWithLifecycle()
     val width = LocalConfiguration.current.screenWidthDp
     val wide = width >= 840
-    // the rail needs height for five items: phones in landscape (short windows) keep the bottom bar
-    val rail = width >= 600 && LocalConfiguration.current.screenHeightDp >= 480
+    val rail = railShown()
     val back by nav.currentBackStackEntryAsState()
     val route = back?.destination?.route?.substringBefore('?')?.substringBefore('/')
     val top = route in tabs.map { it.route }
@@ -245,4 +244,12 @@ private fun BarLabel(text: String) {
     val scale = LocalDensity.current.fontScale
     val size = if (scale <= 1.3f) MaterialTheme.typography.labelMedium.fontSize else (12f * 1.3f / scale).coerceAtLeast(12f / scale).sp
     Text(text, maxLines = 1, softWrap = false, overflow = androidx.compose.ui.text.style.TextOverflow.Clip, fontSize = size)
+}
+
+/** The navigation rail (which carries the + button) needs width and height for five items; phones in landscape
+ *  and short split-screen windows keep the bottom bar, and then each screen shows its own + button. */
+@Composable
+fun railShown(): Boolean {
+    val c = LocalConfiguration.current
+    return c.screenWidthDp >= 600 && c.screenHeightDp >= 480
 }
