@@ -1,0 +1,12 @@
+
+T3 crashes=0
+T5 denied_crashes=0
+T6 cold_median=1348 warm_median=328
+T7 frames=100 Janky frames: 93 (93.00%)
+T8 before= TOTAL PSS: 56887 TOTAL RSS: 171656 TOTAL SWAP PSS: 289 after= TOTAL PSS: 66382 TOTAL RSS: 182452 TOTAL SWAP PSS: 172
+T10 offline_crashes=0
+T11 crashes=0
+T14 crashes=0
+T15 apk_bytes=4830652 signature_v2=1 native_libs=4
+T15 zipalign16_exit=0
+T15 internet_permission=0
