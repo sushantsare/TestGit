@@ -5,7 +5,14 @@ package com.sushant.bahikhata.ui
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.core.tween
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.animation.core.animateDp
 import androidx.compose.foundation.background
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
@@ -50,6 +57,8 @@ val LocalNav = staticCompositionLocalOf<NavHostController> { error("no nav") }
 val LocalWide = staticCompositionLocalOf { false }
 
 data class Tab(val route: String, val label: String, val icon: androidx.compose.ui.graphics.vector.ImageVector, val selIcon: androidx.compose.ui.graphics.vector.ImageVector)
+
+private val TAB_ROUTES = setOf("home", "entries", "accounts", "udhar", "reports")
 
 val tabs = listOf(
     Tab("home", "Home", Icons.Outlined.Home, Icons.Filled.Home),
@@ -168,38 +177,62 @@ fun AppRoot(vm: AppVm, locked: Boolean, onUnlock: () -> Unit, onLockBack: () -> 
 
 @Composable
 private fun Graph(nav: NavHostController, vm: AppVm, start: String) {
-    NavHost(nav, startDestination = start, enterTransition = { fadeIn() }, exitTransition = { fadeOut() }) {
-        composable("setup") { SetupScreen(vm) }
-        composable("home") { HomeScreen(vm) }
-        composable("entries") { EntriesScreen(vm) }
-        composable("accounts") { AccountsScreen(vm) }
-        composable("udhar") { UdharScreen(vm) }
-        composable("reports") { ReportsScreen(vm) }
-        composable("add?type={type}&id={id}&sms={sms}", arguments = listOf(
+    // Motion follows Material 3 / Android predictive back:
+    // • between bottom-bar tabs: a quick fade-through (no sliding between peers)
+    // • opening a screen: shared-axis X — the new screen comes in from the right, the old one drifts left
+    // • going back (button or gesture): the top screen shrinks toward the finger and fades while the
+    //   previous screen settles back in place. With the gesture this follows the finger and can be cancelled.
+    fun isTab(r: String?) = r?.substringBefore('?')?.substringBefore('/') in TAB_ROUTES
+    val ease = androidx.compose.animation.core.FastOutSlowInEasing
+    NavHost(nav, startDestination = start,
+        enterTransition = {
+            if (isTab(initialState.destination.route) && isTab(targetState.destination.route)) fadeIn(tween(210, delayMillis = 90))
+            else slideInHorizontally(tween(300, easing = ease)) { it / 10 } + fadeIn(tween(210, delayMillis = 60))
+        },
+        exitTransition = {
+            if (isTab(initialState.destination.route) && isTab(targetState.destination.route)) fadeOut(tween(90))
+            else slideOutHorizontally(tween(300, easing = ease)) { -it / 10 } + fadeOut(tween(90))
+        },
+        popEnterTransition = {
+            if (isTab(initialState.destination.route) && isTab(targetState.destination.route)) fadeIn(tween(210, delayMillis = 90))
+            else slideInHorizontally(tween(300, easing = ease)) { -it / 10 } + fadeIn(tween(210))
+        },
+        popExitTransition = {
+            if (isTab(initialState.destination.route) && isTab(targetState.destination.route)) fadeOut(tween(90))
+            else scaleOut(tween(300, easing = ease), targetScale = 0.9f) + slideOutHorizontally(tween(300, easing = ease)) { it / 12 } + fadeOut(tween(250, delayMillis = 50))
+        },
+    ) {
+        page("setup") { SetupScreen(vm) }
+        page("home") { HomeScreen(vm) }
+        page("entries") { EntriesScreen(vm) }
+        page("accounts") { AccountsScreen(vm) }
+        page("udhar") { UdharScreen(vm) }
+        page("reports") { ReportsScreen(vm) }
+        page("add?type={type}&id={id}&sms={sms}", arguments = listOf(
             navArgument("type") { type = NavType.StringType; defaultValue = "EXPENSE" },
             navArgument("id") { type = NavType.LongType; defaultValue = 0L },
             navArgument("sms") { type = NavType.LongType; defaultValue = 0L },
         )) { b -> AddEntryScreen(vm, b.arguments?.getString("type") ?: "EXPENSE", b.arguments?.getLong("id") ?: 0L, b.arguments?.getLong("sms") ?: 0L) }
-        composable("entry/{id}", arguments = listOf(navArgument("id") { type = NavType.LongType })) { b -> EntryDetailScreen(vm, b.arguments!!.getLong("id")) }
-        composable("search") { SearchScreen(vm) }
-        composable("account/{id}", arguments = listOf(navArgument("id") { type = NavType.LongType })) { b -> AccountDetailScreen(vm, b.arguments!!.getLong("id")) }
-        composable("account_edit/{id}?type={type}", arguments = listOf(navArgument("id") { type = NavType.LongType }, navArgument("type") { type = NavType.StringType; defaultValue = "BANK" })) { b ->
+        page("entry/{id}", arguments = listOf(navArgument("id") { type = NavType.LongType })) { b -> EntryDetailScreen(vm, b.arguments!!.getLong("id")) }
+        page("search") { SearchScreen(vm) }
+        page("account/{id}", arguments = listOf(navArgument("id") { type = NavType.LongType })) { b -> AccountDetailScreen(vm, b.arguments!!.getLong("id")) }
+        page("account_edit/{id}?type={type}", arguments = listOf(navArgument("id") { type = NavType.LongType }, navArgument("type") { type = NavType.StringType; defaultValue = "BANK" })) { b ->
             AccountEditScreen(vm, b.arguments!!.getLong("id"), b.arguments?.getString("type") ?: "BANK")
         }
-        composable("transfer/{kind}?acc={acc}", arguments = listOf(navArgument("kind") { type = NavType.StringType }, navArgument("acc") { type = NavType.LongType; defaultValue = 0L })) { b ->
+        page("transfer/{kind}?acc={acc}", arguments = listOf(navArgument("kind") { type = NavType.StringType }, navArgument("acc") { type = NavType.LongType; defaultValue = 0L })) { b ->
             TransferScreen(vm, b.arguments!!.getString("kind")!!, b.arguments?.getLong("acc") ?: 0L)
         }
-        composable("person/{id}", arguments = listOf(navArgument("id") { type = NavType.LongType })) { b -> PersonScreen(vm, b.arguments!!.getLong("id")) }
-        composable("budgets") { BudgetsScreen(vm) }
-        composable("sms") { SmsInboxScreen(vm) }
-        composable("sms_setup") { SmsSetupScreen(vm) }
-        composable("settings") { SettingsScreen(vm) }
-        composable("categories") { CategoriesScreen(vm) }
-        composable("recurring") { RecurringScreen(vm) }
-        composable("backup") { BackupScreen(vm) }
-        composable("export") { ExportScreen(vm) }
-        composable("diagnostics") { DiagnosticsScreen(vm) }
-        composable("about") { AboutScreen() }
+        page("person/{id}", arguments = listOf(navArgument("id") { type = NavType.LongType })) { b -> PersonScreen(vm, b.arguments!!.getLong("id")) }
+        page("budgets") { BudgetsScreen(vm) }
+        page("sms") { SmsInboxScreen(vm) }
+        page("sms_setup") { SmsSetupScreen(vm) }
+        page("settings") { SettingsScreen(vm) }
+        page("categories") { CategoriesScreen(vm) }
+        page("recurring") { RecurringScreen(vm) }
+        page("backup") { BackupScreen(vm) }
+        page("export") { ExportScreen(vm) }
+        page("diagnostics") { DiagnosticsScreen(vm) }
+        page("about") { AboutScreen() }
     }
 }
 
@@ -252,4 +285,15 @@ private fun BarLabel(text: String) {
 fun railShown(): Boolean {
     val c = LocalConfiguration.current
     return c.screenWidthDp >= 600 && c.screenHeightDp >= 480
+}
+
+/** A screen in the graph. While it leaves (back gesture or button) its corners round off like a card being put
+ *  away, matching Android's predictive back look. */
+@OptIn(androidx.compose.animation.ExperimentalAnimationApi::class)
+private fun androidx.navigation.NavGraphBuilder.page(
+    route: String, arguments: List<androidx.navigation.NamedNavArgument> = emptyList(),
+    content: @Composable (androidx.navigation.NavBackStackEntry) -> Unit,
+) = composable(route, arguments) { entry ->
+    val corner by transition.animateDp(label = "corner") { st -> if (st == androidx.compose.animation.EnterExitState.PostExit) 28.dp else 0.dp }
+    Box(Modifier.fillMaxSize().graphicsLayer { shape = RoundedCornerShape(corner); clip = corner > 0.dp }) { content(entry) }
 }

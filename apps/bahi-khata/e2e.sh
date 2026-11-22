@@ -78,7 +78,7 @@ if [ -f "$DBG" ]; then
   for i in $(seq 1 20); do [ "$(adb logcat -d -s BahiSms:I | grep -c 'processed via=.* status=LOOK')" -ge 1 ] && break; sleep 2; done
   R4=$(P LOOK)
   TOTAL=$(adb logcat -d -s BahiSms:I | grep -c "processed via=")
-  PEND=$(P PENDING)
+  PEND=$(P PENDING); R2=$(P ignored)   # re-count: a slow emulator can deliver the OTP SMS late
   NOTIF=$(adb shell dumpsys notification --noredact | grep -c "pkg=$PKG")
   adb shell cmd statusbar expand-notifications 2>/dev/null; sleep 2; adb exec-out screencap -p > $OUT/screens/e2e_${TAG}_sms_notification.png; adb shell cmd statusbar collapse 2>/dev/null
   # 5) user force-stopped the app (Android blocks all broadcasts): the catch-up scan on open must pick up the
@@ -144,6 +144,16 @@ if [ -f "$DBG" ]; then
   adb exec-out screencap -p > $OUT/screens/audit_T9_after_kill.png
   adb shell uiautomator dump /sdcard/ui.xml >/dev/null 2>&1; adb shell cat /sdcard/ui.xml > /tmp/ui.xml
   echo "T9 crash_after_kill=$(mycrash) amount_kept=$(grep -c '₹750' /tmp/ui.xml)" >> $A/summary.txt
+  # back motion: a slow edge swipe (predictive back) captured half-way, then the button back
+  adb shell cmd overlay enable com.android.internal.systemui.navbar.gestural >/dev/null 2>&1; sleep 2
+  adb shell am start -n $ACT --es route accounts >/dev/null 2>&1; sleep 2
+  adb shell am start -n $ACT --es route settings >/dev/null 2>&1; sleep 2
+  adb shell input swipe 2 1300 420 1300 2600 &
+  sleep 1.2; adb exec-out screencap -p > $OUT/screens/audit_back_gesture_midway.png; wait; sleep 1
+  adb exec-out screencap -p > $OUT/screens/audit_back_gesture_done.png
+  adb shell am start -n $ACT --es route sms >/dev/null 2>&1; sleep 2
+  adb shell input keyevent KEYCODE_BACK & sleep 0.12; adb exec-out screencap -p > $OUT/screens/audit_back_button_frame.png; wait
+  echo "back_motion crashes=$(mycrash)" >> $A/summary.txt
   # T14 config stress with real content
   adb logcat -c; adb shell am force-stop $PKG; adb shell am start -W -n $ACT --es route home >/dev/null 2>&1; sleep 3
   adb shell settings put system accelerometer_rotation 0
