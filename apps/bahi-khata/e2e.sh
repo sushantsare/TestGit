@@ -78,7 +78,7 @@ if [ -f "$DBG" ]; then
   for i in $(seq 1 20); do [ "$(adb logcat -d -s BahiSms:I | grep -c 'processed via=.* status=LOOK')" -ge 1 ] && break; sleep 2; done
   R4=$(P LOOK)
   TOTAL=$(adb logcat -d -s BahiSms:I | grep -c "processed via=")
-  PEND=$(P PENDING)
+  PEND=$(P PENDING); R2=$(P ignored)   # re-count: a slow emulator can deliver the OTP SMS late
   NOTIF=$(adb shell dumpsys notification --noredact | grep -c "pkg=$PKG")
   adb shell cmd statusbar expand-notifications 2>/dev/null; sleep 2; adb exec-out screencap -p > $OUT/screens/e2e_${TAG}_sms_notification.png; adb shell cmd statusbar collapse 2>/dev/null
   # 5) user force-stopped the app (Android blocks all broadcasts): the catch-up scan on open must pick up the

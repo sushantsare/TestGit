@@ -33,7 +33,7 @@ jobs:
           echo "dir=$APP_DIR" >> "$GITHUB_OUTPUT"
           echo "name=$(basename "$APP_DIR")" >> "$GITHUB_OUTPUT"
           if [ -f "$APP_DIR/e2e.sh" ]; then
-            M='{"include":[{"role":"ui","api":35},{"role":"audit","api":33},{"role":"e2e","api":34},{"role":"e2e","api":35}]}'
+            M='{"include":[{"role":"ui","api":35},{"role":"audit","api":35},{"role":"e2e","api":34},{"role":"e2e","api":35}]}'
           else
             M='{"include":[{"role":"ui","api":33}]}'
           fi
