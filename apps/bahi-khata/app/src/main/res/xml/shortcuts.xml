@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut android:shortcutId="add_expense" android:enabled="true" android:icon="@drawable/ic_sc_expense"
+        android:shortcutShortLabel="@string/sc_expense_short" android:shortcutLongLabel="@string/sc_expense_long">
+        <intent android:action="com.sushant.bahikhata.ADD_EXPENSE" android:targetPackage="com.sushant.bahikhata" android:targetClass="com.sushant.bahikhata.MainActivity" />
+    </shortcut>
+    <shortcut android:shortcutId="add_income" android:enabled="true" android:icon="@drawable/ic_sc_income"
+        android:shortcutShortLabel="@string/sc_income_short" android:shortcutLongLabel="@string/sc_income_long">
+        <intent android:action="com.sushant.bahikhata.ADD_INCOME" android:targetPackage="com.sushant.bahikhata" android:targetClass="com.sushant.bahikhata.MainActivity" />
+    </shortcut>
+    <shortcut android:shortcutId="udhar" android:enabled="true" android:icon="@drawable/ic_sc_udhar"
+        android:shortcutShortLabel="@string/sc_udhar_short" android:shortcutLongLabel="@string/sc_udhar_long">
+        <intent android:action="com.sushant.bahikhata.UDHAR" android:targetPackage="com.sushant.bahikhata" android:targetClass="com.sushant.bahikhata.MainActivity" />
+    </shortcut>
+</shortcuts>

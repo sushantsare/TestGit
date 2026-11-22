@@ -1,0 +1,9 @@
+<resources>
+    <string name="app_name">Bahi Khata</string>
+    <string name="sc_expense_short">Add expense</string>
+    <string name="sc_expense_long">Add an expense</string>
+    <string name="sc_income_short">Add income</string>
+    <string name="sc_income_long">Add income</string>
+    <string name="sc_udhar_short">Udhar</string>
+    <string name="sc_udhar_long">Open udhar</string>
+</resources>
