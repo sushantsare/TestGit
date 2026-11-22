@@ -1,3 +1,5 @@
+@file:OptIn(androidx.media3.common.util.UnstableApi::class)
+
 package com.sushant.tarang.ui.screens
 
 import android.content.Intent
@@ -45,7 +47,6 @@ import java.util.Locale
 private fun SwitchRow(title: String, sub: String?, on: Boolean, tag: String, icon: androidx.compose.ui.graphics.vector.ImageVector? = null, enabled: Boolean = true, onChange: (Boolean) -> Unit) =
     ListItemRow(title, sub, icon, onClick = { onChange(!on) }, enabled = enabled, modifier = Modifier.testTag(tag), trailing = { Switch(on, onChange, enabled = enabled) })
 
-@UnstableApi
 @Composable
 fun SettingsScreen() {
     val vm = LocalVm.current
@@ -135,7 +136,6 @@ fun SettingsScreen() {
     }
 }
 
-@UnstableApi
 @Composable
 fun DiagnosticsScreen() {
     val vm = LocalVm.current

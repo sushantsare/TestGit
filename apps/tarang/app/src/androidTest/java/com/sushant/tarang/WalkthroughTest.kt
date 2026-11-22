@@ -1,3 +1,5 @@
+@file:OptIn(androidx.media3.common.util.UnstableApi::class)
+
 package com.sushant.tarang
 
 import android.Manifest
@@ -26,7 +28,6 @@ import org.junit.runner.RunWith
  * saving light and dark screenshots to Pictures/AppShots. Soft checks: problems are collected with a screenshot
  * and the test fails at the end if there were any.
  */
-@UnstableApi
 @RunWith(AndroidJUnit4::class)
 class WalkthroughTest {
     @get:Rule val compose = createEmptyComposeRule()

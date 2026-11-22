@@ -1,3 +1,5 @@
+@file:OptIn(androidx.media3.common.util.UnstableApi::class)
+
 package com.sushant.tarang.ui.screens
 
 import androidx.activity.compose.BackHandler
@@ -38,7 +40,6 @@ import com.sushant.tarang.ui.sheets.Sheet
 
 private val LIB_TABS = listOf("Songs", "Albums", "Artists", "Playlists")
 
-@UnstableApi
 @Composable
 fun LibraryScreen() {
     val vm = LocalVm.current
@@ -77,7 +78,6 @@ fun LibraryScreen() {
     }
 }
 
-@UnstableApi
 @Composable
 fun SelectionBar(selected: Set<Long>, all: List<Long>, onClear: () -> Unit, onAll: () -> Unit) {
     val vm = LocalVm.current
@@ -97,7 +97,6 @@ fun SelectionBar(selected: Set<Long>, all: List<Long>, onClear: () -> Unit, onAl
     }
 }
 
-@UnstableApi
 @Composable
 private fun SongsTab(songs: List<Song>, sort: SongSort, selected: Set<Long>, setSelected: (Set<Long>) -> Unit) {
     val vm = LocalVm.current
@@ -150,7 +149,6 @@ private fun Tile(icon: androidx.compose.ui.graphics.vector.ImageVector, title: S
     }
 }
 
-@UnstableApi
 @Composable
 private fun AlbumsTab(albums: List<Album>) {
     val nav = LocalNav.current
@@ -172,7 +170,6 @@ private fun AlbumsTab(albums: List<Album>) {
     }
 }
 
-@UnstableApi
 @Composable
 private fun ArtistsTab(artists: List<Artist>, sort: Int) {
     val nav = LocalNav.current
@@ -205,7 +202,6 @@ fun LetterAvatar(name: String, size: androidx.compose.ui.unit.Dp) {
     }
 }
 
-@UnstableApi
 @Composable
 private fun PlaylistsTab() {
     val vm = LocalVm.current
@@ -235,5 +231,5 @@ private fun PlaylistsTab() {
             }
         }
     }
-    if (creating) TextInputDialog("New playlist", "", "Create", onDismiss = { creating = false }) { n -> creating = false; if (n.isNotBlank()) vm.createPlaylist(n) }
+    if (creating) TextInputDialog("New playlist", "", "Create", onDismiss = { creating = false }, onConfirm = { n -> creating = false; if (n.isNotBlank()) vm.createPlaylist(n) })
 }

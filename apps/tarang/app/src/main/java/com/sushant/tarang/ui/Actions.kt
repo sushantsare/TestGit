@@ -1,3 +1,5 @@
+@file:OptIn(androidx.media3.common.util.UnstableApi::class)
+
 package com.sushant.tarang.ui
 
 import androidx.compose.runtime.staticCompositionLocalOf
@@ -23,5 +25,4 @@ class PlayerActions(
 
 val LocalPlayerActions = staticCompositionLocalOf<PlayerActions> { error("no player actions") }
 
-@UnstableApi
 val LocalVm = staticCompositionLocalOf<MainVm> { error("no vm") }

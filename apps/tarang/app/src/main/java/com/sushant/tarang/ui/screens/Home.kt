@@ -1,3 +1,5 @@
+@file:OptIn(androidx.media3.common.util.UnstableApi::class)
+
 package com.sushant.tarang.ui.screens
 
 import androidx.compose.foundation.Image
@@ -61,7 +63,6 @@ private fun greeting(): String = when (Calendar.getInstance().get(Calendar.HOUR_
 }
 
 // ------------------------------------------------------------------ Home
-@UnstableApi
 @Composable
 fun HomeScreen() {
     val vm = LocalVm.current

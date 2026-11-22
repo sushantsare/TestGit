@@ -1,3 +1,5 @@
+@file:OptIn(androidx.media3.common.util.UnstableApi::class)
+
 package com.sushant.tarang.ui.player
 
 import androidx.activity.compose.BackHandler
@@ -85,7 +87,6 @@ private class Geometry(
 }
 private data class Offset2(val x: Float, val y: Float)
 
-@UnstableApi
 @Composable
 fun PlayerLayer(
     state: SheetState,
@@ -283,7 +284,6 @@ private fun animateCoverColors(t: CoverColors): CoverColors {
 }
 
 /** Top bar, heart, wavy seek bar, shuffle/repeat and the Sleep · Speed · Sound · Playlist row. */
-@UnstableApi
 @Composable
 private fun FullChrome(
     g: Geometry, c: CoverColors, ui: PlayerUi, song: Song, liked: Boolean, contextLine: Pair<String, String>, sleepActive: Boolean,

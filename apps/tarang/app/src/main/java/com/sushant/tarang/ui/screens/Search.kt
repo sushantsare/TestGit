@@ -1,3 +1,5 @@
+@file:OptIn(androidx.media3.common.util.UnstableApi::class)
+
 package com.sushant.tarang.ui.screens
 
 import androidx.compose.foundation.clickable
@@ -29,7 +31,6 @@ import com.sushant.tarang.ui.LocalVm
 import com.sushant.tarang.ui.R0
 import com.sushant.tarang.ui.components.*
 
-@UnstableApi
 @Composable
 fun SearchScreen() {
     val vm = LocalVm.current

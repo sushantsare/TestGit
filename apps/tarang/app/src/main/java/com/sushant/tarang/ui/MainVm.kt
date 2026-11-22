@@ -1,3 +1,5 @@
+@file:OptIn(androidx.media3.common.util.UnstableApi::class)
+
 package com.sushant.tarang.ui
 
 import android.app.Application
@@ -27,7 +29,6 @@ sealed class SystemAsk {
 }
 
 
-@UnstableApi
 class MainVm(application: Application) : AndroidViewModel(application) {
     val app = application as TarangApp
     val repo = app.repo

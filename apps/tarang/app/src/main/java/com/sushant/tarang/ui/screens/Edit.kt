@@ -1,3 +1,5 @@
+@file:OptIn(androidx.media3.common.util.UnstableApi::class)
+
 package com.sushant.tarang.ui.screens
 
 import android.media.MediaMetadataRetriever
@@ -38,7 +40,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 /** Edit details: written into the song file itself (Android asks "Allow" first). */
-@UnstableApi
 @Composable
 fun EditDetailsScreen(songId: Long) {
     val vm = LocalVm.current
@@ -110,7 +111,6 @@ fun EditDetailsScreen(songId: Long) {
 }
 
 /** Type, paste or fix lyrics for one song (timed lines like [01:23.45] make them scroll with the song). */
-@UnstableApi
 @Composable
 fun LyricsEditScreen(songId: Long) {
     val vm = LocalVm.current

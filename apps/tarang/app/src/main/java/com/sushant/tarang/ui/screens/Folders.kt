@@ -1,3 +1,5 @@
+@file:OptIn(androidx.media3.common.util.UnstableApi::class)
+
 package com.sushant.tarang.ui.screens
 
 import androidx.compose.foundation.clickable
@@ -23,7 +25,6 @@ import com.sushant.tarang.ui.LocalVm
 import com.sushant.tarang.ui.R0
 import com.sushant.tarang.ui.components.*
 
-@UnstableApi
 @Composable
 fun FoldersScreen() {
     val vm = LocalVm.current
@@ -67,7 +68,6 @@ fun FoldersScreen() {
 }
 
 /** Settings → Folders to scan: switch each music folder on or off. */
-@UnstableApi
 @Composable
 fun ScanFoldersScreen() {
     val vm = LocalVm.current
@@ -96,7 +96,6 @@ fun ScanFoldersScreen() {
     }
 }
 
-@UnstableApi
 private fun toggle(vm: com.sushant.tarang.ui.MainVm, path: String, on: Boolean, all: List<Folder>) {
     vm.setSettings { st ->
         // the first change freezes today's defaults into an explicit list

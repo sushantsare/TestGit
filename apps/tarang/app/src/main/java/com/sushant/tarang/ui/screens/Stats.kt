@@ -1,3 +1,5 @@
+@file:OptIn(androidx.media3.common.util.UnstableApi::class)
+
 package com.sushant.tarang.ui.screens
 
 import android.content.Intent
@@ -67,9 +69,9 @@ fun buildStats(rows: List<PlayEntity>, period: StatsPeriod, kind: Int, byId: Map
         artistMs.entries.sortedByDescending { it.value }.take(3).map { it.key to it.value }, topHour, streakDays(days, dayIndex(now)), counted.map { it.songId }.distinct().size)
 }
 
-fun hourLabel(h: Int): String { val e = (h + 1) % 24; fun f(x: Int) = "${if (x % 12 == 0) 12 else x % 12} ${if (x < 12) "AM" else "PM"}"; return "${f(h)} – ${f(e)}" }
+private fun hour12(x: Int): String = (if (x % 12 == 0) 12 else x % 12).toString() + (if (x < 12) " AM" else " PM")
+fun hourLabel(h: Int): String = hour12(h) + " – " + hour12((h + 1) % 24)
 
-@UnstableApi
 @Composable
 fun StatsScreen() {
     val vm = LocalVm.current

@@ -1,3 +1,5 @@
+@file:OptIn(androidx.media3.common.util.UnstableApi::class)
+
 package com.sushant.tarang.ui.screens
 
 import androidx.activity.compose.BackHandler
@@ -40,7 +42,6 @@ sealed class ListKind {
 
 private data class ListModel(val title: String, val subtitle: String, val kind: String, val songs: List<Song>, val numbered: Boolean, val icon: androidx.compose.ui.graphics.vector.ImageVector?)
 
-@UnstableApi
 @Composable
 fun SongListScreen(kind: ListKind) {
     val vm = LocalVm.current
@@ -155,7 +156,7 @@ fun SongListScreen(kind: ListKind) {
             }
         }
     }
-    if (renaming && playlist != null) TextInputDialog("Rename playlist", playlist.name, "Rename", { renaming = false }) { n -> renaming = false; if (n.isNotBlank()) vm.renamePlaylist(playlist.id, n) }
+    if (renaming && playlist != null) TextInputDialog("Rename playlist", playlist.name, "Rename", onDismiss = { renaming = false }, onConfirm = { n -> renaming = false; if (n.isNotBlank()) vm.renamePlaylist(playlist.id, n) })
     if (deleting && playlist != null) ConfirmDialog("Delete “${playlist.name}”?", "Only the playlist is deleted. The songs stay on your phone.", "Delete",
         { deleting = false }, { deleting = false; vm.deletePlaylist(playlist.id); nav.back() })
     if (hiding && kind is ListKind.FolderList) ConfirmDialog("Hide “${model.title}”?", "Its songs won't show anywhere in Tarang. You can switch it back on in Settings → Folders to scan.", "Hide",

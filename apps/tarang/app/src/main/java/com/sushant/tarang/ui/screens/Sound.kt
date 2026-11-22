@@ -1,3 +1,5 @@
+@file:OptIn(androidx.media3.common.util.UnstableApi::class)
+
 package com.sushant.tarang.ui.screens
 
 import androidx.compose.foundation.horizontalScroll
@@ -23,7 +25,6 @@ private fun hz(f: Int) = if (f >= 1000) "${f / 1000}k" else "$f"
  * Equalizer, bass and surround — applied inside Tarang's own audio pipeline, so it works on every phone.
  * Shown in a bottom sheet that is only as tall as its controls (the sheet scrolls on short screens).
  */
-@UnstableApi
 @Composable
 fun SoundSheetContent() {
     val vm = LocalVm.current

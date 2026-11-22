@@ -1,3 +1,5 @@
+@file:OptIn(androidx.media3.common.util.UnstableApi::class)
+
 package com.sushant.tarang.ui.sheets
 
 import android.content.Intent
@@ -51,7 +53,6 @@ fun shareSong(ctx: android.content.Context, song: Song) {
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
-@UnstableApi
 @Composable
 fun SheetHost(sheet: Sheet?, vm: MainVm, set: (Sheet?) -> Unit) {
     if (sheet == null) return
@@ -82,7 +83,6 @@ private fun MenuItem(icon: ImageVector, text: String, tag: String, danger: Boole
     }
 }
 
-@UnstableApi
 @Composable
 private fun SongMenu(song: Song, playlistId: Long?, vm: MainVm, close: () -> Unit, set: (Sheet?) -> Unit, fromPlayer: Boolean) {
     val ctx = LocalContext.current
@@ -131,7 +131,6 @@ private fun SongMenu(song: Song, playlistId: Long?, vm: MainVm, close: () -> Uni
     }, confirmButton = { TextButton(onClick = { pickArtist = false }) { Text("Cancel") } })
 }
 
-@UnstableApi
 @Composable
 @OptIn(ExperimentalLayoutApi::class)
 private fun SleepSheet(vm: MainVm, close: () -> Unit) {
@@ -164,7 +163,6 @@ private fun SleepSheet(vm: MainVm, close: () -> Unit) {
     }
 }
 
-@UnstableApi
 @Composable
 private fun SpeedSheet(vm: MainVm) {
     val s by vm.settings.collectAsState()
@@ -173,7 +171,9 @@ private fun SpeedSheet(vm: MainVm) {
         speed = v; vm.player.setSpeed(v, pitch); vm.setSettings { it.copy(speed = v, keepPitch = pitch) }
     }
     Text("Playback speed", style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp))
-    Text("%.2fx".format(speed), style = MaterialTheme.typography.displaySmall, fontWeight = FontWeight.Bold, modifier = Modifier.align(Alignment.CenterHorizontally).testTag("speed_value"))
+    Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+        Text("%.2fx".format(speed), style = MaterialTheme.typography.displaySmall, fontWeight = FontWeight.Bold, modifier = Modifier.testTag("speed_value"))
+    }
     Slider(speed, { speed = (it * 20).roundToInt() / 20f }, valueRange = 0.5f..2f, steps = 29, onValueChangeFinished = { apply(speed) },
         modifier = Modifier.padding(horizontal = 24.dp).testTag("speed_slider"))
     Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp), horizontalArrangement = Arrangement.SpaceEvenly) {
@@ -190,7 +190,6 @@ private fun SpeedSheet(vm: MainVm) {
     }
 }
 
-@UnstableApi
 @Composable
 private fun AddToPlaylistSheet(ids: List<Long>, vm: MainVm, close: () -> Unit) {
     val lists by vm.playlists.collectAsState()
@@ -213,7 +212,7 @@ private fun AddToPlaylistSheet(ids: List<Long>, vm: MainVm, close: () -> Unit) {
         }
     }
     Button(onClick = { vm.setPlaylistMembership(ids, picked); close() }, modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 12.dp).testTag("pl_done")) { Text("Done") }
-    if (creating) TextInputDialog("New playlist", "", "Create", onDismiss = { creating = false }) { name ->
+    if (creating) TextInputDialog("New playlist", "", "Create", onDismiss = { creating = false }, onConfirm = { name ->
         creating = false; if (name.isNotBlank()) { vm.createPlaylist(name, ids); close() }
-    }
+    })
 }

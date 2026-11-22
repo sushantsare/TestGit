@@ -1,3 +1,5 @@
+@file:OptIn(androidx.media3.common.util.UnstableApi::class)
+
 package com.sushant.tarang.ui.player
 
 import android.media.MediaExtractor
@@ -67,7 +69,6 @@ import kotlin.math.roundToInt
 
 private val TABS = listOf("Up next", "Lyrics", "Info")
 
-@UnstableApi
 @Composable
 internal fun Panel(g: Any, c: CoverColors, ui: PlayerUi, song: Song, state: SheetState, alpha: Float, dp: (Float) -> Float) {
     val geo = g as PanelGeo
@@ -77,7 +78,6 @@ internal fun Panel(g: Any, c: CoverColors, ui: PlayerUi, song: Song, state: Shee
 /** The pieces of [Geometry] the panel needs. */
 internal interface PanelGeo { val fullH: Float; val fullW: Float; val panelTopY: Float; val panelPeek: Float; val panelTwoPane: Boolean; val panelPaneW: Float }
 
-@UnstableApi
 @Composable
 private fun PanelImpl(g: PanelGeo, c: CoverColors, ui: PlayerUi, song: Song, state: SheetState, alpha: Float, dp: (Float) -> Float) {
     val d = LocalDensity.current
@@ -134,7 +134,7 @@ private fun PanelImpl(g: PanelGeo, c: CoverColors, ui: PlayerUi, song: Song, sta
         Tabs(c, if (q > 0.05f) state.tab else -1, q) { i -> state.tab = i; scope.launch { state.panel.animateTo(1f, spring(dampingRatio = 0.9f, stiffness = 420f)) } }
         if (q > 0.02f) Box(Modifier.weight(1f).graphicsLayer {
             val k = ((q - 0.15f) / 0.85f).coerceIn(0f, 1f)
-            alpha = k; translationY = (1f - k) * 48.dp.toPx()
+            this.alpha = k; translationY = (1f - k) * 48.dp.toPx()
         }) { PanelContent(state.tab, c, ui, song) }
     }
 }
@@ -160,7 +160,6 @@ private fun Tabs(c: CoverColors, selected: Int, q: Float, onTab: (Int) -> Unit) 
     HorizontalDivider(color = c.outline.copy(alpha = q))
 }
 
-@UnstableApi
 @Composable
 private fun PanelContent(tab: Int, c: CoverColors, ui: PlayerUi, song: Song) {
     AnimatedContent(
@@ -181,7 +180,6 @@ private fun PanelContent(tab: Int, c: CoverColors, ui: PlayerUi, song: Song) {
 }
 
 // ------------------------------------------------------------------ Up next (3 queues)
-@UnstableApi
 @Composable
 private fun UpNext(c: CoverColors, ui: PlayerUi) {
     val vm = LocalVm.current
@@ -261,7 +259,6 @@ private fun UpNext(c: CoverColors, ui: PlayerUi) {
 }
 
 // ------------------------------------------------------------------ Lyrics
-@UnstableApi
 @Composable
 private fun LyricsTab(c: CoverColors, ui: PlayerUi, song: Song) {
     val vm = LocalVm.current
@@ -342,7 +339,6 @@ suspend fun readFileInfo(ctx: android.content.Context, song: Song): FileInfo = w
     FileInfo(fmt, br.ifEmpty { "—" }, sr.ifEmpty { "—" }, chs.ifEmpty { "—" })
 }
 
-@UnstableApi
 @Composable
 fun InfoRows(song: Song, color: androidx.compose.ui.graphics.Color, variant: androidx.compose.ui.graphics.Color, divider: androidx.compose.ui.graphics.Color) {
     val vm = LocalVm.current
@@ -371,7 +367,6 @@ fun InfoRows(song: Song, color: androidx.compose.ui.graphics.Color, variant: and
     }
 }
 
-@UnstableApi
 @Composable
 private fun InfoTab(c: CoverColors, song: Song) {
     val act = LocalPlayerActions.current

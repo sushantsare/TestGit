@@ -1,3 +1,5 @@
+@file:OptIn(androidx.media3.common.util.UnstableApi::class)
+
 package com.sushant.tarang.ui
 
 import android.Manifest
@@ -73,7 +75,6 @@ object R0 {
 }
 
 /** Everything a screen needs to move around and open sheets. */
-@UnstableApi
 class AppNav(
     val nav: NavHostController,
     private val sheetSetter: (Sheet?) -> Unit,
@@ -99,7 +100,6 @@ fun hasAudioPermission(ctx: android.content.Context) = ContextCompat.checkSelfPe
     ctx, if (Build.VERSION.SDK_INT >= 33) Manifest.permission.READ_MEDIA_AUDIO else Manifest.permission.READ_EXTERNAL_STORAGE,
 ) == PackageManager.PERMISSION_GRANTED
 
-@UnstableApi
 @Composable
 fun AppRoot(vm: MainVm, activity: MainActivity) {
     val ctx = LocalContext.current
@@ -122,7 +122,6 @@ fun AppRoot(vm: MainVm, activity: MainActivity) {
     }
 }
 
-@UnstableApi
 @Composable
 private fun Shell(vm: MainVm, activity: MainActivity) {
     val ctx = LocalContext.current
@@ -247,7 +246,6 @@ private fun Shell(vm: MainVm, activity: MainActivity) {
     }
 }
 
-@UnstableApi
 @Composable
 private fun Routes(nav: NavHostController, vm: MainVm) {
     // one overlapping fade for every move: tabs, opening screens, back button and back swipe
