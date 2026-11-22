@@ -5,6 +5,10 @@ package com.sushant.bahikhata.ui
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -50,6 +54,8 @@ val LocalNav = staticCompositionLocalOf<NavHostController> { error("no nav") }
 val LocalWide = staticCompositionLocalOf { false }
 
 data class Tab(val route: String, val label: String, val icon: androidx.compose.ui.graphics.vector.ImageVector, val selIcon: androidx.compose.ui.graphics.vector.ImageVector)
+
+private val TAB_ROUTES = setOf("home", "entries", "accounts", "udhar", "reports")
 
 val tabs = listOf(
     Tab("home", "Home", Icons.Outlined.Home, Icons.Filled.Home),
@@ -168,7 +174,31 @@ fun AppRoot(vm: AppVm, locked: Boolean, onUnlock: () -> Unit, onLockBack: () -> 
 
 @Composable
 private fun Graph(nav: NavHostController, vm: AppVm, start: String) {
-    NavHost(nav, startDestination = start, enterTransition = { fadeIn() }, exitTransition = { fadeOut() }) {
+    // Motion follows Material 3 / Android predictive back:
+    // • between bottom-bar tabs: a quick fade-through (no sliding between peers)
+    // • opening a screen: shared-axis X — the new screen comes in from the right, the old one drifts left
+    // • going back (button or gesture): the top screen shrinks toward the finger and fades while the
+    //   previous screen settles back in place. With the gesture this follows the finger and can be cancelled.
+    fun isTab(r: String?) = r?.substringBefore('?')?.substringBefore('/') in TAB_ROUTES
+    val ease = androidx.compose.animation.core.FastOutSlowInEasing
+    NavHost(nav, startDestination = start,
+        enterTransition = {
+            if (isTab(initialState.destination.route) && isTab(targetState.destination.route)) fadeIn(tween(210, delayMillis = 90))
+            else slideInHorizontally(tween(300, easing = ease)) { it / 10 } + fadeIn(tween(210, delayMillis = 60))
+        },
+        exitTransition = {
+            if (isTab(initialState.destination.route) && isTab(targetState.destination.route)) fadeOut(tween(90))
+            else slideOutHorizontally(tween(300, easing = ease)) { -it / 10 } + fadeOut(tween(90))
+        },
+        popEnterTransition = {
+            if (isTab(initialState.destination.route) && isTab(targetState.destination.route)) fadeIn(tween(210, delayMillis = 90))
+            else slideInHorizontally(tween(300, easing = ease)) { -it / 10 } + fadeIn(tween(210))
+        },
+        popExitTransition = {
+            if (isTab(initialState.destination.route) && isTab(targetState.destination.route)) fadeOut(tween(90))
+            else scaleOut(tween(300, easing = ease), targetScale = 0.9f) + slideOutHorizontally(tween(300, easing = ease)) { it / 12 } + fadeOut(tween(250, delayMillis = 50))
+        },
+    ) {
         composable("setup") { SetupScreen(vm) }
         composable("home") { HomeScreen(vm) }
         composable("entries") { EntriesScreen(vm) }
