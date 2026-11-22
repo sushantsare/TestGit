@@ -80,7 +80,17 @@ class AppNav(
     private val sheetSetter: (Sheet?) -> Unit,
     val player: SheetState,
     private val openPlayerFn: () -> Unit,
+    private val scope: kotlinx.coroutines.CoroutineScope,
 ) {
+    /** Closes the full player (if open) and then opens [route]; runs in the app's scope so it can't be cut off. */
+    fun goFromPlayer(route: String) {
+        scope.launch {
+            if (player.panel.value > 0f) player.panel.snapTo(0f)
+            if (player.progress.value > 0f) player.progress.animateTo(0f, tween(250))
+            go(route)
+        }
+    }
+    fun collapsePlayer() { scope.launch { player.progress.animateTo(0f, spring(dampingRatio = 0.86f, stiffness = 380f)) } }
     fun go(route: String) = nav.navigate(route) { launchSingleTop = true }
     fun tab(route: String) = nav.navigate(route) {
         popUpTo(R0.HOME) { saveState = true }
@@ -149,7 +159,7 @@ private fun Shell(vm: MainVm, activity: MainActivity) {
     var lastSong by remember { mutableStateOf<Song?>(null) }
     LaunchedEffect(song) { if (song != null) lastSong = song }
     val openPlayer: () -> Unit = { scope.launch { sheetState.progress.animateTo(1f, spring(dampingRatio = 0.86f, stiffness = 380f)) } }
-    val appNav = remember(nav) { AppNav(nav, { sheet = it }, sheetState, openPlayer) }
+    val appNav = remember(nav) { AppNav(nav, { sheet = it }, sheetState, openPlayer, scope) }
 
     LaunchedEffect(Unit) { vm.snack.collect { snackHost.currentSnackbarData?.dismiss(); snackHost.showSnackbar(it) } }
 
@@ -213,8 +223,8 @@ private fun Shell(vm: MainVm, activity: MainActivity) {
             like = { vm.toggleLike(it) }, seekTo = vm.player::seekTo, toggleShuffle = vm.player::toggleShuffle,
             cycleRepeat = vm.player::cycleRepeat, playAt = vm.player::playAt, removeAt = vm.player::removeAt, move = vm.player::move,
             switchQueue = vm.player::switchQueue, clearQueue = vm.player::clearQueue,
-            openLyricsEditor = { id -> scope.launch { sheetState.progress.animateTo(0f, tween(250)) }; nav.navigate(R0.lyrics(id)) },
-            openEdit = { id -> scope.launch { sheetState.progress.animateTo(0f, tween(250)) }; nav.navigate(R0.edit(id)) },
+            openLyricsEditor = { id -> appNav.goFromPlayer(R0.lyrics(id)) },
+            openEdit = { id -> appNav.goFromPlayer(R0.edit(id)) },
         )
     }
 

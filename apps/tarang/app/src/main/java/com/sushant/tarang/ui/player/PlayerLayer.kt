@@ -166,7 +166,7 @@ fun PlayerLayer(
         }
 
         // ---------- full-player-only content (fades in late)
-        if (fullAlpha > 0f) FullChrome(g, colors, ui, song, liked, contextLine, sleepActive, fullAlpha, state, onOpenMenu, onSleep, onSpeed, onSound, onPlaylist, ::dp)
+        if (fullAlpha > 0f) FullChrome(g, colors, ui, song, liked, contextLine, sleepActive, fullAlpha, state, scope, onOpenMenu, onSleep, onSpeed, onSound, onPlaylist, ::dp)
 
         // ---------- flying pieces
         val cover = lerpR(g.coverMini, g.coverFull, t)
@@ -201,7 +201,7 @@ fun PlayerLayer(
             lerp(colors.onMini, colors.onChip, t), Icons.Rounded.SkipNext, "Next", lerpF(20f, 32f, t), CircleShape, "btn_next") { act.next() }
 
         // ---------- Up next / Lyrics / Info panel (full player only)
-        if (fullAlpha > 0f) Panel(g, colors, ui, song, state, fullAlpha, ::dp)
+        if (fullAlpha > 0f) Panel(g, colors, ui, song, state, fullAlpha, scope, ::dp)
     }
 }
 
@@ -287,16 +287,16 @@ private fun animateCoverColors(t: CoverColors): CoverColors {
 @Composable
 private fun FullChrome(
     g: Geometry, c: CoverColors, ui: PlayerUi, song: Song, liked: Boolean, contextLine: Pair<String, String>, sleepActive: Boolean,
-    alpha: Float, state: SheetState, onOpenMenu: () -> Unit, onSleep: () -> Unit, onSpeed: () -> Unit, onSound: () -> Unit, onPlaylist: () -> Unit,
+    alpha: Float, state: SheetState, scope: kotlinx.coroutines.CoroutineScope, onOpenMenu: () -> Unit, onSleep: () -> Unit, onSpeed: () -> Unit, onSound: () -> Unit, onPlaylist: () -> Unit,
     dp: (Float) -> Float,
 ) {
     val act = LocalPlayerActions.current
-    val scope = rememberCoroutineScope()
     val d = LocalDensity.current
     val paneW = with(d) { g.paneW.toDp() }
+    val topAlpha = 1f - state.panel.value
     Box(Modifier.fillMaxSize().alpha(alpha)) {
         // top bar
-        Row(Modifier.offset { IntOffset(0, g.topY.toInt()) }.width(paneW).height(56.dp).padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+        if (topAlpha > 0.02f || g.twoPane) Row(Modifier.offset { IntOffset(0, g.topY.toInt()) }.width(paneW).height(56.dp).alpha(if (g.twoPane) 1f else topAlpha).padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = { scope.launch { state.progress.animateTo(0f, spring(dampingRatio = 0.86f, stiffness = 380f)) } }, modifier = Modifier.testTag("collapse")) {
                 Icon(Icons.Rounded.KeyboardArrowDown, "Minimise player", tint = c.onFull)
             }

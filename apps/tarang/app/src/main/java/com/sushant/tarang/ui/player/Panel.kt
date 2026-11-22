@@ -70,18 +70,17 @@ import kotlin.math.roundToInt
 private val TABS = listOf("Up next", "Lyrics", "Info")
 
 @Composable
-internal fun Panel(g: Any, c: CoverColors, ui: PlayerUi, song: Song, state: SheetState, alpha: Float, dp: (Float) -> Float) {
+internal fun Panel(g: Any, c: CoverColors, ui: PlayerUi, song: Song, state: SheetState, alpha: Float, scope: kotlinx.coroutines.CoroutineScope, dp: (Float) -> Float) {
     val geo = g as PanelGeo
-    PanelImpl(geo, c, ui, song, state, alpha, dp)
+    PanelImpl(geo, c, ui, song, state, alpha, scope, dp)
 }
 
 /** The pieces of [Geometry] the panel needs. */
 internal interface PanelGeo { val fullH: Float; val fullW: Float; val panelTopY: Float; val panelPeek: Float; val panelTwoPane: Boolean; val panelPaneW: Float }
 
 @Composable
-private fun PanelImpl(g: PanelGeo, c: CoverColors, ui: PlayerUi, song: Song, state: SheetState, alpha: Float, dp: (Float) -> Float) {
+private fun PanelImpl(g: PanelGeo, c: CoverColors, ui: PlayerUi, song: Song, state: SheetState, alpha: Float, scope: kotlinx.coroutines.CoroutineScope, dp: (Float) -> Float) {
     val d = LocalDensity.current
-    val scope = rememberCoroutineScope()
     val act = LocalPlayerActions.current
     if (g.panelTwoPane) {
         // tablet / landscape: panel always open beside the controls
@@ -264,8 +263,8 @@ private fun LyricsTab(c: CoverColors, ui: PlayerUi, song: Song) {
     val vm = LocalVm.current
     val act = LocalPlayerActions.current
     val stored by remember(song.id) { vm.repo.dao.lyricsFlow(song.id) }.collectAsState(null)
-    val lyrics by produceState<Lyrics?>(null, song.id, stored) { value = withContext(Dispatchers.IO) { vm.repo.lyrics.find(song) } }
-    val loading = lyrics == null && stored == null
+    var loading by remember(song.id) { mutableStateOf(true) }
+    val lyrics by produceState<Lyrics?>(null, song.id, stored) { value = withContext(Dispatchers.IO) { vm.repo.lyrics.find(song) }; loading = false }
     val pick = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri -> if (uri != null) vm.importLrc(song.id, uri) }
     val l = lyrics
     if (l == null) {

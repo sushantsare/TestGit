@@ -92,10 +92,7 @@ private fun SongMenu(song: Song, playlistId: Long?, vm: MainVm, close: () -> Uni
     val isLiked = song.id in liked
     var confirmDelete by remember { mutableStateOf(false) }
     var pickArtist by remember { mutableStateOf(false) }
-    fun go(route: String) {
-        close()
-        scope.launch { if (nav.player.progress.value > 0f) nav.player.progress.animateTo(0f, tween(250)); nav.go(route) }
-    }
+    fun go(route: String) { close(); nav.goFromPlayer(route) }
     Row(Modifier.padding(horizontal = 24.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
         Cover(song, 56.dp, RoundedCornerShape(14.dp))
         Spacer(Modifier.width(14.dp))
@@ -120,7 +117,7 @@ private fun SongMenu(song: Song, playlistId: Long?, vm: MainVm, close: () -> Uni
     MenuItem(Icons.Rounded.Share, "Share", "menu_share") { close(); shareSong(ctx, song) }
     if (playlistId != null) MenuItem(Icons.Rounded.RemoveCircleOutline, "Remove from this playlist", "menu_remove_pl") { vm.removeFromPlaylist(playlistId, song.id); close() }
     if (fromPlayer) MenuItem(Icons.Rounded.StopCircle, "End the queue", "menu_end_queue") {
-        vm.player.endQueue(); close(); scope.launch { nav.player.progress.animateTo(0f, tween(250)) }
+        vm.player.endQueue(); close(); nav.collapsePlayer()
     }
     MenuItem(Icons.Rounded.DeleteOutline, "Delete from phone", "menu_delete", danger = true) { confirmDelete = true }
 

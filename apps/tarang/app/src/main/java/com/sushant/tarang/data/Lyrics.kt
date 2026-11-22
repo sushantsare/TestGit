@@ -94,13 +94,22 @@ class LyricsFinder(private val ctx: Context, private val dao: LibraryDao, privat
     }
 
     private fun embedded(song: Song): Lyrics? {
-        if (song.path.isEmpty()) return null
-        return runCatching {
-            org.jaudiotagger.tag.TagOptionSingleton.getInstance().isAndroid = true
-            val f = org.jaudiotagger.audio.AudioFileIO.read(File(song.path))
-            val text = f.tag?.getFirst(org.jaudiotagger.tag.FieldKey.LYRICS)?.takeIf { it.isNotBlank() } ?: return null
-            LrcParser.parse(text, "Lyrics saved inside the song")
-        }.getOrNull()
+        org.jaudiotagger.tag.TagOptionSingleton.getInstance().isAndroid = true
+        fun read(file: File): String? =
+            org.jaudiotagger.audio.AudioFileIO.read(file).tag?.getFirst(org.jaudiotagger.tag.FieldKey.LYRICS)?.takeIf { it.isNotBlank() }
+        // 1) straight from the file when Android allows it
+        val direct = if (song.path.isNotEmpty()) runCatching { read(File(song.path)) }
+            .onFailure { android.util.Log.w("TarangLyrics", "direct read failed: ${it.javaClass.simpleName} ${it.message}") }.getOrNull() else null
+        // 2) otherwise from a temporary copy made through Android's content system (always allowed for music)
+        val text = direct ?: runCatching {
+            val ext = song.fileName.substringAfterLast('.', "mp3").lowercase()
+            val tmp = File(ctx.cacheDir, "lyrics_probe.$ext")
+            try {
+                ctx.contentResolver.openInputStream(song.uri)?.use { inp -> tmp.outputStream().use { inp.copyTo(it) } } ?: return null
+                read(tmp)
+            } finally { tmp.delete() }
+        }.onFailure { android.util.Log.w("TarangLyrics", "copy read failed: ${it.javaClass.simpleName} ${it.message}") }.getOrNull()
+        return text?.let { LrcParser.parse(it, "Lyrics saved inside the song") }
     }
 
     suspend fun save(songId: Long, text: String, source: String) {

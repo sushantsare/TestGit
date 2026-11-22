@@ -16,12 +16,13 @@ adb shell settings put global hide_error_dialogs 1 >/dev/null 2>&1
 mycrash() { adb logcat -d | grep -A3 "FATAL EXCEPTION" | grep -c "Process: $PKG"; }
 shot() { sleep 1; adb exec-out screencap -p > "$OUT/screens/e2e_${TAG}_$1.png"; }
 perm() { if [ "$API" -ge 33 ]; then echo android.permission.READ_MEDIA_AUDIO; else echo android.permission.READ_EXTERNAL_STORAGE; fi; }
-state() { adb shell dumpsys media_session | grep -A30 "$PKG" | grep -m1 -o "state=[0-9]*" | cut -d= -f2; }
+# playback state of Tarang's session: 3 = playing, 2 = paused (Android 13 prints "state=3", 14+ "state=PLAYING(3)")
+state() { adb shell dumpsys media_session | tr -d '\r' | grep -A40 "$PKG" | grep -m1 -oE "state=(PlaybackState \{state=)?[A-Z_]*\(?[0-9]+" | grep -oE "[0-9]+$"; }
 
 # ---------- put real songs on the phone (same files the walkthrough uses) and let Android index them
 MEDIA=app/src/androidTest/assets/media
 for d in "$MEDIA"/*/; do
-  n=$(basename "$d"); adb shell mkdir -p "/sdcard/Music/$n" >/dev/null 2>&1
+  n=$(basename "$d"); adb shell "mkdir -p '/sdcard/Music/$n'" >/dev/null 2>&1
   for f in "$d"*; do adb push "$f" "/sdcard/Music/$n/" >/dev/null 2>&1; done
 done
 adb shell content call --uri content://media/external/file --method scan_volume --arg external_primary >/dev/null 2>&1 \
