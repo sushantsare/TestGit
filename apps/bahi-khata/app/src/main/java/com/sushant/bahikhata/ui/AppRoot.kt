@@ -6,6 +6,7 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.LinearEasing
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -178,8 +179,9 @@ private fun Graph(nav: NavHostController, vm: AppVm, start: String) {
     // One motion for every move in the app, the same one the bottom tabs use: the current screen fades out
     // quickly and the next one fades in. Opening a screen, tapping a tab, tapping Home, the back button and the
     // back swipe all look identical. With the swipe, the fade follows the finger and can be cancelled.
-    val fadeInSpec = fadeIn(tween(210, delayMillis = 90))
-    val fadeOutSpec = fadeOut(tween(90))
+    // the two fades overlap, so a half-way swipe always shows the screens blending (never a blank screen)
+    val fadeInSpec = fadeIn(tween(250, delayMillis = 50, easing = LinearEasing))
+    val fadeOutSpec = fadeOut(tween(250, easing = LinearEasing))
     NavHost(nav, startDestination = start,
         enterTransition = { fadeInSpec },
         exitTransition = { fadeOutSpec },
