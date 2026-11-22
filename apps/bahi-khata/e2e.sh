@@ -148,8 +148,12 @@ if [ -f "$DBG" ]; then
   adb shell cmd overlay enable com.android.internal.systemui.navbar.gestural >/dev/null 2>&1; sleep 2
   adb shell am start -n $ACT --es route accounts >/dev/null 2>&1; sleep 2
   adb shell am start -n $ACT --es route settings >/dev/null 2>&1; sleep 2
-  adb shell input swipe 2 1300 420 1300 2600 &
-  sleep 1.2; adb exec-out screencap -p > $OUT/screens/audit_back_gesture_midway.png; wait; sleep 1
+  # a real system back gesture, held half-way with the finger still down
+  adb shell input motionevent DOWN 3 1300
+  for x in 40 80 120 160 200 240 280 320 360; do adb shell input motionevent MOVE $x 1300; done
+  sleep 0.5; adb exec-out screencap -p > $OUT/screens/audit_back_gesture_midway.png
+  for x in 420 480 540; do adb shell input motionevent MOVE $x 1300; done
+  adb shell input motionevent UP 540 1300; sleep 1
   adb exec-out screencap -p > $OUT/screens/audit_back_gesture_done.png
   adb shell am start -n $ACT --es route sms >/dev/null 2>&1; sleep 2
   adb shell input keyevent KEYCODE_BACK & sleep 0.12; adb exec-out screencap -p > $OUT/screens/audit_back_button_frame.png; wait
@@ -163,7 +167,14 @@ if [ -f "$DBG" ]; then
   echo "T14 landscape_add_button=$(grep -c 'resource-id="fab_add"' /tmp/ui.xml)" >> $A/summary.txt
   adb shell am start -n $ACT --es route add >/dev/null 2>&1; sleep 2; adb exec-out screencap -p > $OUT/screens/audit_T14_landscape_add.png
   adb shell input keyevent KEYCODE_BACK; adb shell settings put system user_rotation 0; sleep 2
-  adb shell cmd uimode night yes; sleep 2; adb exec-out screencap -p > $OUT/screens/audit_T14_night.png; adb shell cmd uimode night no; sleep 1
+  adb shell cmd uimode night yes; sleep 2; adb exec-out screencap -p > $OUT/screens/audit_T14_night.png
+  # lock screen in dark mode (text must be light on dark)
+  adb shell am instrument -w -e class com.sushant.bahikhata.AuditSeed -e lockOn 1 "$INSTR" >/dev/null 2>&1
+  adb shell am start -W -n $ACT >/dev/null 2>&1; sleep 3; adb exec-out screencap -p > $OUT/screens/audit_lock_dark.png
+  adb shell input keyevent KEYCODE_BACK; sleep 1; adb exec-out screencap -p > $OUT/screens/audit_lock_dark_2.png
+  adb shell am instrument -w -e class com.sushant.bahikhata.AuditSeed -e lockOn 0 "$INSTR" >/dev/null 2>&1
+  adb shell am start -W -n $ACT --es route home >/dev/null 2>&1; sleep 2
+  adb shell cmd uimode night no; sleep 1
   adb shell settings put system font_scale 2.0; sleep 3; adb exec-out screencap -p > $OUT/screens/audit_T14_font200.png
   adb shell am start -n $ACT --es route add >/dev/null 2>&1; sleep 2; adb exec-out screencap -p > $OUT/screens/audit_T14_font200_add.png; adb shell input keyevent KEYCODE_BACK
   adb shell settings put system font_scale 1.0

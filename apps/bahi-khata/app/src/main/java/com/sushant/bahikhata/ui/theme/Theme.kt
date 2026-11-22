@@ -131,6 +131,11 @@ fun isDark(mode: ThemeMode): Boolean = when (mode) { ThemeMode.SYSTEM -> isSyste
 fun BahiTheme(mode: ThemeMode = ThemeMode.SYSTEM, content: @Composable () -> Unit) {
     val dark = isDark(mode)
     CompositionLocalProvider(LocalBk provides if (dark) darkBk else lightBk, LocalSpacing provides Spacing()) {
-        MaterialTheme(colorScheme = if (dark) DarkColors else LightColors, typography = AppTypography, shapes = AppShapes, content = content)
+        val scheme = if (dark) DarkColors else LightColors
+        MaterialTheme(colorScheme = scheme, typography = AppTypography, shapes = AppShapes) {
+            // text drawn outside a Surface/Scaffold (lock screen, start-up error) must follow the theme too —
+            // otherwise it falls back to black and vanishes on the dark background
+            CompositionLocalProvider(androidx.compose.material3.LocalContentColor provides scheme.onBackground, content = content)
+        }
     }
 }

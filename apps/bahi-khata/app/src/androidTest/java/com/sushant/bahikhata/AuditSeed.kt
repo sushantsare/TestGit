@@ -16,7 +16,11 @@ import org.junit.runner.RunWith
 @RunWith(AndroidJUnit4::class)
 class AuditSeed {
     @Test fun seedForAudit() = runBlocking {
-        val rows = InstrumentationRegistry.getArguments().getString("auditSeed")?.toIntOrNull() ?: return@runBlocking
+        val args = InstrumentationRegistry.getArguments()
+        args.getString("lockOn")?.let { v ->   // e2e: show the lock screen for a screenshot
+            ApplicationProvider.getApplicationContext<App>().prefs.update { it.copy(lockOn = v == "1") }; Thread.sleep(2_000); return@runBlocking
+        }
+        val rows = args.getString("auditSeed")?.toIntOrNull() ?: return@runBlocking
         val app = ApplicationProvider.getApplicationContext<App>()
         Seed.fill(app.repo)
         if (rows > 0) {   // T13: thousands of extra entries across two years
