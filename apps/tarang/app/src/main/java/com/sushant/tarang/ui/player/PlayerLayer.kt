@@ -369,6 +369,20 @@ private fun Modifier.songSwipe(x: Animatable<Float, AnimationVector1D>, width: F
     }
 }
 
+@Composable
+private fun RoundBtn(r: Rect, bg: Color, fg: Color, icon: androidx.compose.ui.graphics.vector.ImageVector, desc: String, iconSize: Float,
+                     shape: androidx.compose.ui.graphics.Shape, tag: String, onClick: () -> Unit) {
+    val d = LocalDensity.current
+    Box(
+        Modifier.offset { IntOffset(r.left.toInt(), r.top.toInt()) }
+            .size(with(d) { r.width.toDp() }, with(d) { r.height.toDp() })
+            .clip(shape).background(bg)
+            .clickable(onClickLabel = desc, onClick = onClick)
+            .semantics { contentDescription = desc }.testTag(tag),
+        contentAlignment = Alignment.Center,
+    ) { Icon(icon, null, tint = fg, modifier = Modifier.size(iconSize.dp)) }
+}
+
 private fun geometry(W: Float, H: Float, statusTop: Float, navBottom: Float, navVisible: Boolean, wide: Boolean, dp: (Float) -> Float): Geometry {
     val miniW = min(W - dp(32f), dp(580f)).let { if (wide) min(it, dp(580f)) else it }
     val miniX = (W - miniW) / 2f
