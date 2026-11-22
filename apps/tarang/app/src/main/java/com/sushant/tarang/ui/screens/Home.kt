@@ -112,9 +112,7 @@ fun HomeScreen() {
                         Text(s.title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
                         Text("${s.artist} · ${formatDuration(ui.positionMs)} of ${formatDuration(s.durationMs)}", style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
-                    Box(Modifier.size(56.dp).clip(RoundedCornerShape(18.dp)).background(cs.primary), contentAlignment = Alignment.Center) {
-                        Icon(Icons.Rounded.PlayArrow, "Continue", tint = cs.onPrimary, modifier = Modifier.size(32.dp))
-                    }
+                    PlayPauseButton(ui.isPlaying, { vm.player.play() }, cs.primary, cs.onPrimary, 56.dp, squareRadius = 18.dp, iconSize = 30.dp, tag = "continue_play")
                 }
             }
         }

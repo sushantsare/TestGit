@@ -121,8 +121,27 @@ class WalkthroughTest {
 
         // ---- full player and its panels
         clickTo("mini_player", "full_player"); Thread.sleep(800); shot("player_full")
+        // ⋮ must open the menu and never pause the music
+        fun playing() = compose.onAllNodesWithContentDescription("Pause", useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty()
+        val wasPlaying = playing()
+        click("player_menu"); if (!waitTag("menu_end_queue", 4000)) problem("⋮ did not open the menu"); back(); Thread.sleep(500)
+        if (wasPlaying && !playing()) problem("⋮ paused the music")
+        if (has("panel_header")) problem("ghost now-playing bar visible while the panel is closed")
+        // bottom strip: just a handle and "Up next · …"
+        if (waitTag("peek_line", 4000)) shot("player_peek_line")
+        // swipe left on the cover: next song
+        compose.onNodeWithTag("player_cover", useUnmergedTree = true).performTouchInput { swipeLeft(durationMillis = 250) }
+        Thread.sleep(1200); shot("player_swiped_to_next")
+        // swipe down on the cover: closes into the mini player
+        compose.onNodeWithTag("player_cover", useUnmergedTree = true).performTouchInput { swipeDown(endY = bottom * 0.95f, durationMillis = 400) }
+        if (!waitTag("mini_player", 5000, soft = true)) problem("swipe down on the cover did not close the player") else shot("after_swipe_down")
+        // swipe down on the bottom strip also closes it
+        clickTo("mini_player", "full_player"); Thread.sleep(800)
+        compose.onNodeWithTag("peek_line", useUnmergedTree = true).performTouchInput { swipeDown(durationMillis = 300) }
+        if (!waitTag("mini_player", 5000, soft = true)) problem("swipe down on the bottom strip did not close the player")
+        clickTo("mini_player", "full_player"); Thread.sleep(800)
         click("btn_next"); Thread.sleep(1200); shot("player_next_song")
-        click("tab_up_next"); waitTag("queue_list"); shot("player_up_next")
+        click("peek_line"); waitTag("queue_list"); shot("player_up_next")
         click("queue_2"); Thread.sleep(800); shot("player_queue_2_empty"); click("queue_1"); Thread.sleep(800)
         click("tab_info"); waitTag("info"); shot("player_info")
         click("tab_lyrics"); Thread.sleep(1500); shot("player_lyrics")
@@ -138,7 +157,7 @@ class WalkthroughTest {
         song("Tum Se Hi.mp3")?.let { s ->
             go(com.sushant.tarang.ui.R0.folder(s.folderPath), "song_list")
             click("song_${s.id}"); Thread.sleep(1500)
-            clickTo("mini_player", "full_player"); click("tab_lyrics"); Thread.sleep(2000); shot("player_lyrics_embedded"); back(); click("collapse"); waitTag("mini_player")
+            clickTo("mini_player", "full_player"); click("peek_line"); Thread.sleep(600); click("tab_lyrics"); Thread.sleep(2000); shot("player_lyrics_embedded"); back(); click("collapse"); waitTag("mini_player")
         }
 
         // ---- Library
@@ -193,7 +212,7 @@ class WalkthroughTest {
         tab("library", "library"); shot("library")
         tab("stats", "stats"); shot("stats")
         clickTo("mini_player", "full_player"); Thread.sleep(800); shot("player_full")
-        click("tab_up_next"); waitTag("queue_list"); shot("player_up_next"); back(); click("collapse"); waitTag("mini_player")
+        click("peek_line"); waitTag("queue_list"); shot("player_up_next"); back(); click("collapse"); waitTag("mini_player")
         go(com.sushant.tarang.ui.R0.SETTINGS, "settings"); shot("settings")
         if (!has("set_pure_black")) problem("pure black switch missing in dark mode")
         click("set_pure_black"); suffix = "_pureblack"; shot("settings"); go(com.sushant.tarang.ui.R0.HOME, "home"); shot("home")

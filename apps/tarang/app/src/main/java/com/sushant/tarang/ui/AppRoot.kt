@@ -20,6 +20,9 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.indication
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -305,10 +308,18 @@ private fun BottomBar(route: String, miniVisible: Boolean, modifier: Modifier, o
         ) {
             TAB_ITEMS.forEach { t ->
                 val sel = route == t.route
-                Column(Modifier.weight(1f).fillMaxHeight().clickable(onClickLabel = t.label) { onTab(t.route) }.testTag("tab_${t.route}"),
+                // the whole quarter is tappable, but only the pill shows the press ripple
+                val press = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
+                val pillW by androidx.compose.animation.core.animateDpAsState(if (sel) 56.dp else 0.dp,
+                    androidx.compose.animation.core.spring(dampingRatio = 0.7f, stiffness = 600f), label = "pill")
+                Column(Modifier.weight(1f).fillMaxHeight()
+                    .clickable(interactionSource = press, indication = null, onClickLabel = t.label) { onTab(t.route) }
+                    .semantics { selected = sel }.testTag("tab_${t.route}"),
                     horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
-                    Box(Modifier.size(56.dp, 32.dp).clip(RoundedCornerShape(16.dp)).background(if (sel) cs.secondaryContainer else cs.surfaceContainerHigh.copy(alpha = 0f)),
+                    Box(Modifier.size(56.dp, 32.dp).clip(RoundedCornerShape(16.dp)).indication(press, androidx.compose.material3.ripple()),
                         contentAlignment = Alignment.Center) {
+                        // selected pill grows out from the icon's centre
+                        Box(Modifier.size(pillW, 32.dp).clip(RoundedCornerShape(16.dp)).background(cs.secondaryContainer))
                         Icon(if (sel) t.on else t.off, null, tint = if (sel) cs.onSecondaryContainer else cs.onSurfaceVariant)
                     }
                     Spacer(Modifier.height(4.dp))

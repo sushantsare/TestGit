@@ -64,7 +64,11 @@ class PlaybackService : MediaSessionService() {
                     .setEnableAudioTrackPlaybackParams(enableAudioTrackPlaybackParams)
                     .build()
         }
-        exo = ExoPlayer.Builder(this, rf)
+        // MP3s without a length header (common from downloaders) get their real length and exact seeking
+        val extractors = androidx.media3.extractor.DefaultExtractorsFactory()
+            .setMp3ExtractorFlags(androidx.media3.extractor.mp3.Mp3Extractor.FLAG_ENABLE_INDEX_SEEKING)
+            .setConstantBitrateSeekingEnabled(true)
+        exo = ExoPlayer.Builder(this, rf, androidx.media3.exoplayer.source.DefaultMediaSourceFactory(this, extractors))
             .setAudioAttributes(AudioAttributes.Builder().setUsage(C.USAGE_MEDIA).setContentType(C.AUDIO_CONTENT_TYPE_MUSIC).build(), true)
             .setHandleAudioBecomingNoisy(true)          // pause when headphones are unplugged
             .setWakeMode(C.WAKE_MODE_LOCAL)

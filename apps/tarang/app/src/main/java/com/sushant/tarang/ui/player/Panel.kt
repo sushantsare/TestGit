@@ -58,6 +58,7 @@ import com.sushant.tarang.playback.PlayerUi
 import com.sushant.tarang.ui.LocalPlayerActions
 import com.sushant.tarang.ui.LocalVm
 import com.sushant.tarang.ui.components.Cover
+import com.sushant.tarang.ui.components.PlayPauseButton
 import com.sushant.tarang.ui.theme.CoverColors
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -70,18 +71,21 @@ import kotlin.math.roundToInt
 private val TABS = listOf("Up next", "Lyrics", "Info")
 
 @Composable
-internal fun Panel(g: Any, c: CoverColors, ui: PlayerUi, song: Song, state: SheetState, alpha: Float, scope: kotlinx.coroutines.CoroutineScope, dp: (Float) -> Float) {
+internal fun Panel(g: Any, c: CoverColors, ui: PlayerUi, song: Song, state: SheetState, alpha: Float, scope: kotlinx.coroutines.CoroutineScope,
+                   collapse: PlayerDrag, dp: (Float) -> Float) {
     val geo = g as PanelGeo
-    PanelImpl(geo, c, ui, song, state, alpha, scope, dp)
+    PanelImpl(geo, c, ui, song, state, alpha, scope, collapse, dp)
 }
 
 /** The pieces of [Geometry] the panel needs. */
 internal interface PanelGeo { val fullH: Float; val fullW: Float; val panelTopY: Float; val panelPeek: Float; val panelTwoPane: Boolean; val panelPaneW: Float }
 
 @Composable
-private fun PanelImpl(g: PanelGeo, c: CoverColors, ui: PlayerUi, song: Song, state: SheetState, alpha: Float, scope: kotlinx.coroutines.CoroutineScope, dp: (Float) -> Float) {
+private fun PanelImpl(g: PanelGeo, c: CoverColors, ui: PlayerUi, song: Song, state: SheetState, alpha: Float, scope: kotlinx.coroutines.CoroutineScope,
+                      collapse: PlayerDrag, dp: (Float) -> Float) {
     val d = LocalDensity.current
     val act = LocalPlayerActions.current
+    val vm = LocalVm.current
     if (g.panelTwoPane) {
         // tablet / landscape: panel always open beside the controls
         Column(
@@ -98,39 +102,67 @@ private fun PanelImpl(g: PanelGeo, c: CoverColors, ui: PlayerUi, song: Song, sta
     val peekTop = g.fullH - g.panelPeek
     val openTop = g.panelTopY + dp(80f)
     val top = peekTop + (openTop - peekTop) * q
-    val drag = rememberDraggableState { delta -> scope.launch { state.panel.snapTo((state.panel.value - delta / (peekTop - openTop)).coerceIn(0f, 1f)) } }
+    // one gesture = one job: pull up (or down while open) moves the panel; pulling down on the closed strip closes the player
+    var mode by remember { mutableIntStateOf(0) }   // 0 undecided, 1 panel, 2 close player
+    val drag = rememberDraggableState { delta ->
+        if (mode == 0) mode = if (state.panel.value <= 0.001f && delta > 0) 2 else 1
+        if (mode == 2) collapse.onDelta(delta)
+        else scope.launch { state.panel.snapTo((state.panel.value - delta / (peekTop - openTop)).coerceIn(0f, 1f)) }
+    }
+    val openPanel: (Int) -> Unit = { i -> state.tab = i; scope.launch { state.panel.animateTo(1f, spring(dampingRatio = 0.9f, stiffness = 420f)) } }
 
-    // small "now playing" header while the panel is open
-    if (q > 0.01f) Row(
-        Modifier.offset { IntOffset(0, (g.panelTopY + dp(8f)).toInt()) }.fillMaxWidth().height(64.dp).alpha(alpha * q).padding(horizontal = 16.dp),
+    // small "now playing" bar — only while the panel is really open (never left behind invisible)
+    val headerA = ((q - 0.15f) / 0.85f).coerceIn(0f, 1f)
+    if (headerA > 0f) Row(
+        Modifier.offset { IntOffset(0, (g.panelTopY + dp(8f)).toInt()) }.fillMaxWidth().height(64.dp).alpha(alpha * headerA).padding(horizontal = 16.dp)
+            .testTag("panel_header"),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Cover(song, 56.dp, RoundedCornerShape(14.dp))
         Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f).clickable { scope.launch { state.panel.animateTo(0f, spring()) } }) {
             Text(song.title, color = c.onFull, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Text(song.artist, color = c.onFull.copy(alpha = 0.8f), style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(artistLine(song, c.onFull.copy(alpha = 0.8f), c.onFull.copy(alpha = 0.8f), showAlbum = false), style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
-        Box(Modifier.size(48.dp).clip(RoundedCornerShape(16.dp)).background(c.accent).clickable { act.togglePlay() }, contentAlignment = Alignment.Center) {
-            Icon(if (ui.isPlaying) Icons.Rounded.Pause else Icons.Rounded.PlayArrow, if (ui.isPlaying) "Pause" else "Play", tint = c.onAccent)
-        }
+        if (q > 0.5f) PlayPauseButton(ui.isPlaying, { act.togglePlay() }, c.accent, c.onAccent, 48.dp, squareRadius = 16.dp, iconSize = 26.dp, tag = "panel_play")
+    }
+
+    // what's next, shown on the closed strip (YouTube-Music style: just a handle and one line)
+    val lib by vm.library.collectAsState()
+    val peekLine = when {
+        ui.repeat == androidx.media3.common.Player.REPEAT_MODE_ONE -> "Repeating this song"
+        ui.nextIndex in ui.queueIds.indices -> "Up next · " + (lib.byId[ui.queueIds[ui.nextIndex]]?.title ?: "")
+        else -> "End of queue · Pull up for lyrics & info"
     }
 
     Column(
         Modifier.offset { IntOffset(0, top.toInt()) }.fillMaxWidth().height(with(d) { (g.fullH - top).toDp() })
             .alpha(alpha)
             .clip(RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp))
-            .background(lerp(c.chip.copy(alpha = 0.35f), c.panel, q))
-            .draggable(drag, Orientation.Vertical, onDragStopped = { v ->
-                val open = if (kotlin.math.abs(v) > 600f) v < 0 else state.panel.value > 0.4f
-                state.panel.animateTo(if (open) 1f else 0f, spring(dampingRatio = 0.9f, stiffness = 420f))
+            .background(c.panel.copy(alpha = q))                    // no sheet at all while closed: it sits on the player's colour
+            .draggable(drag, Orientation.Vertical, onDragStarted = { mode = 0 }, onDragStopped = { v ->
+                if (mode == 2) collapse.onStop(v)
+                else {
+                    val open = if (kotlin.math.abs(v) > 600f) v < 0 else state.panel.value > 0.4f
+                    state.panel.animateTo(if (open) 1f else 0f, spring(dampingRatio = 0.9f, stiffness = 420f))
+                }
+                mode = 0
             })
             .testTag("panel")
     ) {
         Box(Modifier.fillMaxWidth().padding(top = 8.dp), contentAlignment = Alignment.Center) {
-            Box(Modifier.size(32.dp, 4.dp).clip(CircleShape).background(c.onFull.copy(alpha = 0.4f)))
+            Box(Modifier.size(32.dp, 4.dp).clip(CircleShape).background(c.onFull.copy(alpha = 0.45f)))
         }
-        Tabs(c, if (q > 0.05f) state.tab else -1, q) { i -> state.tab = i; scope.launch { state.panel.animateTo(1f, spring(dampingRatio = 0.9f, stiffness = 420f)) } }
+        Box(Modifier.fillMaxWidth().height(48.dp)) {
+            // closed: one line; it fades out as the tabs fade in
+            val lineA = (1f - q * 3f).coerceIn(0f, 1f)
+            if (lineA > 0f) Box(Modifier.fillMaxSize().alpha(lineA).clickable(onClickLabel = "Open up next") { openPanel(0) }.testTag("peek_line"),
+                contentAlignment = Alignment.Center) {
+                Text(peekLine, color = c.onFull.copy(alpha = 0.9f), style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.padding(horizontal = 32.dp))
+            }
+            if (q > 0.02f) Box(Modifier.fillMaxSize().alpha(((q - 0.1f) / 0.5f).coerceIn(0f, 1f))) { Column { Tabs(c, state.tab, q) { i -> openPanel(i) } } }
+        }
         if (q > 0.02f) Box(Modifier.weight(1f).graphicsLayer {
             val k = ((q - 0.15f) / 0.85f).coerceIn(0f, 1f)
             this.alpha = k; translationY = (1f - k) * 48.dp.toPx()

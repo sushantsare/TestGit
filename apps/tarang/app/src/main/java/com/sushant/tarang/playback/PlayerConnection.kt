@@ -28,6 +28,7 @@ data class PlayerUi(
     val shuffle: Boolean = false,
     val repeat: Int = Player.REPEAT_MODE_OFF,
     val speed: Float = 1f,
+    val nextIndex: Int = -1,
 ) {
     val hasSong get() = currentId != null
     val progress get() = if (durationMs > 0) (positionMs.toFloat() / durationMs).coerceIn(0f, 1f) else 0f
@@ -58,21 +59,24 @@ class PlayerConnection(private val ctx: Context, private val scope: CoroutineSco
 
     private fun refresh() {
         val c = controller ?: return
+        val dur = c.duration.takeIf { it > 0 } ?: 0
         val ids = (0 until c.mediaItemCount).mapNotNull { c.getMediaItemAt(it).mediaId.toLongOrNull() }
         _ui.value = PlayerUi(
             connected = true,
             currentId = c.currentMediaItem?.mediaId?.toLongOrNull(),
             isPlaying = c.isPlaying || (c.playWhenReady && c.playbackState == Player.STATE_BUFFERING),
-            positionMs = c.currentPosition.coerceAtLeast(0),
-            durationMs = c.duration.takeIf { it > 0 } ?: 0,
+            positionMs = c.currentPosition.coerceAtLeast(0).let { if (dur > 0) it.coerceAtMost(dur) else it },
+            durationMs = dur,
             queueIds = ids, index = c.currentMediaItemIndex,
+            nextIndex = c.nextMediaItemIndex,
             shuffle = c.shuffleModeEnabled, repeat = c.repeatMode, speed = c.playbackParameters.speed,
         )
     }
 
     private fun refreshPosition() {
         val c = controller ?: return
-        _ui.value = _ui.value.copy(positionMs = c.currentPosition.coerceAtLeast(0), durationMs = c.duration.takeIf { it > 0 } ?: _ui.value.durationMs)
+        val dur = c.duration.takeIf { it > 0 } ?: _ui.value.durationMs
+        _ui.value = _ui.value.copy(positionMs = c.currentPosition.coerceAtLeast(0).let { if (dur > 0) it.coerceAtMost(dur) else it }, durationMs = dur)
     }
 
     private fun items(list: List<Song>) = list.map { PlaybackService.mediaItem(it) }
@@ -117,7 +121,13 @@ class PlayerConnection(private val ctx: Context, private val scope: CoroutineSco
         c.addMediaItems(items(songs))
     }
 
-    fun togglePlay() { val c = controller ?: return; if (c.isPlaying) c.pause() else { if (c.playbackState == Player.STATE_IDLE) c.prepare(); c.play() } }
+    fun togglePlay() {
+        val c = controller ?: return
+        if (c.isPlaying) { c.pause(); return }
+        if (c.playbackState == Player.STATE_IDLE) c.prepare()
+        if (c.playbackState == Player.STATE_ENDED) c.seekTo(0, 0)   // queue finished: play it again from the top
+        c.play()
+    }
     fun play() { controller?.let { if (it.playbackState == Player.STATE_IDLE) it.prepare(); it.play() } }
     fun next() { controller?.seekToNext() }
     fun previous() { controller?.seekToPrevious() }

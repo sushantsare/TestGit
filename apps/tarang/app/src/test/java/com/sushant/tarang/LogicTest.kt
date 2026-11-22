@@ -59,6 +59,14 @@ class LogicTest {
         assertTrue(s.responseDb(44_100.0, 5_000.0) < 0.5)
     }
 
+    // ---------------- play/pause morph
+    @Test fun playPauseMorphEndsOnBothIcons() {
+        // morph 0 = play triangle tip at the right middle; 1 = the right pause bar's top-right corner
+        assertEquals(0.85f, com.sushant.tarang.ui.components.playPausePoint(1, 2, 0f), 0.001f)
+        assertEquals(0.76f, com.sushant.tarang.ui.components.playPausePoint(1, 2, 1f), 0.001f)
+        assertEquals((0.85f + 0.76f) / 2, com.sushant.tarang.ui.components.playPausePoint(1, 2, 0.5f), 0.001f)
+    }
+
     // ---------------- stats
     @Test fun streakCountsDaysInARow() {
         assertEquals(3, streakDays(setOf(10, 9, 8, 5), 10))
