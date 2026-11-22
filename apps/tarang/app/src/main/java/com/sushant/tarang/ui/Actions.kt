@@ -9,6 +9,9 @@ import androidx.media3.common.util.UnstableApi
 class PlayerActions(
     val next: () -> Unit,
     val previous: () -> Unit,
+    val swipeNext: () -> Boolean,
+    val swipePrevious: () -> Boolean,
+    val toast: (String) -> Unit,
     val togglePlay: () -> Unit,
     val like: (Long) -> Unit,
     val seekTo: (Long) -> Unit,

@@ -31,6 +31,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.graphics.drawscope.clipPath
+import kotlinx.coroutines.flow.first
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.material.icons.automirrored.rounded.PlaylistAdd
 import androidx.compose.ui.geometry.Rect
@@ -130,19 +133,34 @@ fun PlayerLayer(
 
     // ---------- vertical drag: open from the mini player, close from anywhere on the full player
     var range by remember { mutableFloatStateOf(1f) }
-    var fromFull by remember { mutableStateOf(false) }
     var dragging by remember { mutableStateOf(false) }
-    val dragState = rememberDraggableState { d -> scope.launch { state.progress.snapTo(clamp01(state.progress.value - d / range)) } }
+    val drag = remember { DragTrack() }
+    fun dragStart() { drag.start = state.progress.value; drag.pos = drag.start }
+    fun dragBy(d: Float) {
+        drag.pos = clamp01(drag.pos - d / range)
+        val v = drag.pos
+        drag.job = scope.launch { state.progress.snapTo(v) }   // applied in order; settle waits for the last one
+    }
+    val dragState = rememberDraggableState { d -> dragBy(d) }
     val settle: suspend (Float) -> Unit = { v ->
-        val cur = state.progress.value
-        // released past a quarter of the way (or flicked): complete the move; otherwise spring back
-        val goFull = if (abs(v) > 900f) v < 0 else if (fromFull) cur > 0.75f else cur > 0.25f
-        state.progress.animateTo(if (goFull) 1f else 0f, spring(dampingRatio = 0.86f, stiffness = 420f), initialVelocity = -v / range)
+        drag.job?.join()                                      // no late finger update can stop the closing/opening midway
+        val moved = drag.pos - drag.start                     // + = towards full, - = towards mini
+        // once a swipe is detected it always completes in that direction
+        val goFull = when {
+            v < -150f -> true
+            v > 150f -> false
+            moved > 0.02f -> true
+            moved < -0.02f -> false
+            else -> drag.start > 0.5f                         // barely moved: stay where it was
+        }
+        state.progress.animateTo(if (goFull) 1f else 0f, spring(dampingRatio = 0.9f, stiffness = 380f), initialVelocity = -v / range)
     }
     val collapse = PlayerDrag(
-        onDelta = { d -> fromFull = true; scope.launch { state.progress.snapTo(clamp01(state.progress.value - d / range)) } },
+        onStart = { dragStart() },
+        onDelta = { d -> dragBy(d) },
         onStop = { v -> scope.launch { settle(v) } },
     )
+    val currentId = rememberUpdatedState(ui.currentId)
 
     // ---------- sideways swipe: cover follows the finger, slides out and the next cover slides in
     val swipeX = remember { Animatable(0f) }
@@ -171,7 +189,7 @@ fun PlayerLayer(
             // full player: a downward swipe anywhere closes it (children that need the gesture, like the seek bar, use it first)
             .then(if (song != null && (state.progress.value > 0.001f || dragging)) Modifier.draggable(
                 dragState, Orientation.Vertical, enabled = state.panel.value < 0.05f,
-                onDragStarted = { dragging = true; fromFull = state.progress.value > 0.5f },
+                onDragStarted = { dragging = true; dragStart() },
                 onDragStopped = { v -> dragging = false; settle(v) },
             ) else Modifier)
     ) {
@@ -198,7 +216,16 @@ fun PlayerLayer(
         val r1 = lerpF(24f, 0f, t); val r2 = lerpF(bottomR, 0f, t)
         val bg = lerp(colors.mini, colors.full, t)
         val swipeW = lerpF(g.mini.width, W, t)
-        val swipeMod = Modifier.songSwipe(swipeX, swipeW, scope, act.next, act.previous)
+        val swipeMod = Modifier.songSwipe(swipeX, swipeW, scope, { dir ->
+            val before = currentId.value
+            val changed = if (dir < 0) act.swipeNext() else act.swipePrevious()
+            if (!changed) { act.toast(if (dir < 0) "This is the last song in the queue" else "This is the first song in the queue"); false }
+            else {
+                // wait until the player has really moved on, so the new cover (not the old one) slides in
+                kotlinx.coroutines.withTimeoutOrNull(2500) { snapshotFlow { currentId.value }.first { it != before } }
+                true
+            }
+        })
 
         // ---------- the sheet box (mini player background → full player background)
         Box(
@@ -208,7 +235,7 @@ fun PlayerLayer(
                 .shadow(if (t < 0.02f) 8.dp else 0.dp, RoundedCornerShape(r1.dp, r1.dp, r2.dp, r2.dp))
                 .clip(RoundedCornerShape(r1.dp, r1.dp, r2.dp, r2.dp))
                 .background(bg)
-                .draggable(dragState, Orientation.Vertical, enabled = state.panel.value < 0.05f, onDragStarted = { fromFull = state.progress.value > 0.5f }, onDragStopped = { v -> settle(v) })
+                .draggable(dragState, Orientation.Vertical, enabled = state.panel.value < 0.05f, onDragStarted = { dragStart() }, onDragStopped = { v -> settle(v) })
                 .then(if (p < 0.05f) Modifier.clickable(onClickLabel = "Open player") { scope.launch { state.progress.animateTo(1f, spring(dampingRatio = 0.86f, stiffness = 380f)) } }.then(swipeMod) else Modifier)
                 .testTag(if (p < 0.5f) "mini_player" else "full_player")
         ) {
@@ -225,9 +252,22 @@ fun PlayerLayer(
         val swipeAlpha = 1f - (abs(sx) / swipeW.coerceAtLeast(1f)).coerceIn(0f, 1f) * 0.9f
         val cover = lerpR(g.coverMini, g.coverFull, t)
         val coverR = lerpF(g.coverMini.width / 2f, dp(32f), t)
+        // in the mini player the sliding pieces are clipped to the capsule (and stop short of the buttons)
+        val miniClip = if (t < 0.5f) Rect(box.left, box.top, lerpR(g.prevMini, g.prevFull, t).left - dp(4f), box.bottom) else null
+        val clipR = dp(r1); val clipRB = dp(r2)
+        fun Modifier.inMini(pieceLeft: Float, pieceTop: Float): Modifier = if (miniClip == null) this else this.drawWithContent {
+            val path = androidx.compose.ui.graphics.Path().apply {
+                addRoundRect(androidx.compose.ui.geometry.RoundRect(
+                    miniClip.left - pieceLeft, miniClip.top - pieceTop, miniClip.right - pieceLeft, miniClip.bottom - pieceTop,
+                    topLeftCornerRadius = androidx.compose.ui.geometry.CornerRadius(clipR), bottomLeftCornerRadius = androidx.compose.ui.geometry.CornerRadius(clipRB),
+                ))
+            }
+            clipPath(path) { this@drawWithContent.drawContent() }
+        }
         Box(
             Modifier.offset { IntOffset(cover.left.toInt(), cover.top.toInt()) }
                 .size(with(density) { cover.width.toDp() })
+                .inMini(cover.left, cover.top)
                 .graphicsLayer {
                     translationX = sx; alpha = swipeAlpha
                     rotationZ = spin.value * (1f - t)                       // spins as a record in the mini player, unwinds while opening
@@ -240,7 +280,7 @@ fun PlayerLayer(
 
         val tx = lerpF(g.titleMini.x, g.titleFull.x, t); val ty = lerpF(g.titleMini.y, g.titleFull.y, t)
         val tw = lerpF(g.titleWMini, g.titleWFull, t)
-        Column(Modifier.offset { IntOffset(tx.toInt(), ty.toInt()) }.width(with(density) { tw.toDp() }).graphicsLayer { translationX = sx * 0.6f; alpha = swipeAlpha }) {
+        Column(Modifier.offset { IntOffset(tx.toInt(), ty.toInt()) }.width(with(density) { tw.toDp() }).inMini(tx, ty).graphicsLayer { translationX = sx * 0.6f; alpha = swipeAlpha }) {
             Text(song.title, color = lerp(colors.onMini, colors.onFull, t), fontSize = lerpF(15f, 26f, t).sp, lineHeight = lerpF(20f, 32f, t).sp,
                 fontWeight = if (t > 0.5f) FontWeight.Bold else FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.testTag("player_title"))
@@ -274,7 +314,10 @@ fun PlayerLayer(
 }
 
 /** Lets the panel's bottom strip pass a downward swipe on to "close the player". */
-class PlayerDrag(val onDelta: (Float) -> Unit, val onStop: (Float) -> Unit)
+class PlayerDrag(val onStart: () -> Unit, val onDelta: (Float) -> Unit, val onStop: (Float) -> Unit)
+
+/** Where a vertical drag started and where the finger has taken it (updated at once, not after a frame). */
+private class DragTrack { var start = 0f; var pos = 0f; var job: kotlinx.coroutines.Job? = null }
 
 /** "Artist · Album" with the artist first; missing parts are left out (no stray separators). */
 fun artistLine(song: Song, artistColor: Color, albumColor: Color, showAlbum: Boolean): androidx.compose.ui.text.AnnotatedString {
@@ -294,26 +337,27 @@ fun artistLine(song: Song, artistColor: Color, albumColor: Color, showAlbum: Boo
 
 /**
  * Sideways swipe to change song: the cover follows the finger; past a quarter of the width (or a flick) it slides out,
- * the song changes and the new cover slides in from the other side. A short swipe springs back.
+ * the song really changes, and the new song's cover slides in from the other side. A short swipe springs back.
+ * [change] gets -1 for next, +1 for previous and returns false when there is no song that way.
  */
-@Composable
 private fun Modifier.songSwipe(x: Animatable<Float, AnimationVector1D>, width: Float, scope: kotlinx.coroutines.CoroutineScope,
-                               onNext: () -> Unit, onPrev: () -> Unit): Modifier = this.pointerInput(width) {
+                               onChange: suspend (Int) -> Boolean): Modifier = this.pointerInput(width) {
     val tracker = VelocityTracker()
     detectHorizontalDragGestures(
         onDragStart = { tracker.resetTracking() },
         onDragEnd = {
             val v = tracker.calculateVelocity().x
             val dx = x.value
-            val next = dx < -width * 0.25f || v < -1200f
-            val prev = dx > width * 0.25f || v > 1200f
+            val goNext = dx < -width * 0.25f || v < -1000f
+            val goPrev = dx > width * 0.25f || v > 1000f
             scope.launch {
-                if (next || prev) {
-                    val dir = if (next) -1f else 1f
-                    x.animateTo(dir * width, tween(180))
-                    if (next) onNext() else onPrev()
-                    x.snapTo(-dir * width * 0.5f)
-                    x.animateTo(0f, spring(dampingRatio = 0.8f, stiffness = 380f))
+                if (goNext || goPrev) {
+                    val dir = if (goNext) -1 else 1
+                    x.animateTo(dir * width, tween(170))
+                    if (onChange(dir)) {
+                        x.snapTo(-dir * width * 0.6f)
+                        x.animateTo(0f, spring(dampingRatio = 0.82f, stiffness = 360f))
+                    } else x.animateTo(0f, spring(dampingRatio = 0.6f, stiffness = 420f))
                 } else x.animateTo(0f, spring(dampingRatio = 0.7f, stiffness = 500f))
             }
         },
@@ -323,81 +367,6 @@ private fun Modifier.songSwipe(x: Animatable<Float, AnimationVector1D>, width: F
         tracker.addPosition(change.uptimeMillis, change.position)
         scope.launch { x.snapTo(x.value + d) }
     }
-}
-
-@Composable
-private fun RoundBtn(r: Rect, bg: Color, fg: Color, icon: androidx.compose.ui.graphics.vector.ImageVector, desc: String, iconSize: Float,
-                     shape: androidx.compose.ui.graphics.Shape, tag: String, onClick: () -> Unit) {
-    val d = LocalDensity.current
-    Box(
-        Modifier.offset { IntOffset(r.left.toInt(), r.top.toInt()) }
-            .size(with(d) { r.width.toDp() }, with(d) { r.height.toDp() })
-            .clip(shape).background(bg)
-            .clickable(onClickLabel = desc, onClick = onClick)
-            .semantics { contentDescription = desc }.testTag(tag),
-        contentAlignment = Alignment.Center,
-    ) { Icon(icon, null, tint = fg, modifier = Modifier.size(iconSize.dp)) }
-}
-
-private fun geometry(W: Float, H: Float, statusTop: Float, navBottom: Float, navVisible: Boolean, wide: Boolean, dp: (Float) -> Float): Geometry {
-    val miniW = min(W - dp(32f), dp(580f)).let { if (wide) min(it, dp(580f)) else it }
-    val miniX = (W - miniW) / 2f
-    val miniBottomGap = if (navVisible) navBottom + dp(4f) + dp(68f) + dp(4f) else navBottom + dp(14f)
-    val miniY = H - miniBottomGap - dp(72f)
-    val mini = Rect(miniX, miniY, miniX + miniW, miniY + dp(72f))
-    val full = Rect(0f, 0f, W, H)
-    val twoPane = W > H || W >= dp(840f)
-    val paneW = if (twoPane) W * 0.5f else W
-    val peekH = if (twoPane) 0f else dp(64f) + navBottom
-    val topY = statusTop
-    // full layout, top to bottom
-    val fixed = dp(56f) + dp(10f) + dp(22f) + dp(34f) + dp(30f) + dp(58f) + dp(80f) + dp(24f) + dp(68f) + dp(16f)
-    val avail = H - statusTop - fixed - peekH
-    val coverSize = min(paneW - dp(72f), avail).coerceIn(dp(120f), dp(420f))
-    val coverX = (paneW - coverSize) / 2f
-    val contentH = fixed + coverSize
-    val startY = if (twoPane) statusTop + max(0f, (H - statusTop - navBottom - contentH) / 2f) else statusTop
-    val coverY = startY + dp(56f) + dp(10f)
-    val titleY = coverY + coverSize + dp(22f)
-    val seekY = titleY + dp(34f) + dp(30f)
-    val controlsY = seekY + dp(58f)
-    // one evenly spaced row: shuffle · prev · PLAY · next · repeat (equal gaps between what you see)
-    val playW = dp(104f); val playH = dp(80f)
-    val side = dp(56f); val small = dp(24f); val margin = dp(24f)
-    val gap = ((paneW - 2 * margin - (2 * small + 2 * side + playW)) / 4f).coerceAtLeast(dp(6f))
-    val rowW = 2 * small + 2 * side + playW + 4 * gap
-    val rowX = (paneW - rowW) / 2f
-    val shuffleCx = rowX + small / 2
-    val prevX = rowX + small + gap
-    val playX = prevX + side + gap
-    val nextX = playX + playW + gap
-    val repeatCx = nextX + side + gap + small / 2
-    val sideY = controlsY + (playH - side) / 2
-    val prevFull = Rect(prevX, sideY, prevX + side, sideY + side)
-    val nextFull = Rect(nextX, sideY, nextX + side, sideY + side)
-    // mini layout (old Tarang): round cover 52, title, then prev 40 · play 48 · next 40
-    val right = mini.right - dp(12f)
-    val nextMini = Rect(right - dp(40f), mini.top + dp(16f), right, mini.top + dp(56f))
-    val playMini = Rect(nextMini.left - dp(8f) - dp(48f), mini.top + dp(12f), nextMini.left - dp(8f), mini.top + dp(60f))
-    val prevMini = Rect(playMini.left - dp(8f) - dp(40f), mini.top + dp(16f), playMini.left - dp(8f), mini.top + dp(56f))
-    return Geometry(
-        mini, full,
-        Rect(mini.left + dp(10f), mini.top + dp(10f), mini.left + dp(62f), mini.top + dp(62f)),
-        Rect(coverX, coverY, coverX + coverSize, coverY + coverSize),
-        Offset2(mini.left + dp(76f), mini.top + dp(13f)), Offset2(dp(24f), titleY),
-        prevMini.left - dp(8f) - (mini.left + dp(76f)), paneW - dp(24f) - dp(64f),
-        playMini, Rect(playX, controlsY, playX + playW, controlsY + playH), prevMini, prevFull, nextMini, nextFull,
-        seekY, controlsY, controlsY + playH + dp(24f), paneW, twoPane, startY, peekH,
-        shuffleCx, repeatCx,
-    )
-}
-
-@Composable
-private fun animateCoverColors(t: CoverColors): CoverColors {
-    val spec = tween<Color>(450)
-    @Composable fun a(c: Color) = animateColorAsState(c, spec, label = "cc").value
-    return CoverColors(a(t.full), a(t.onFull), a(t.accent), a(t.onAccent), a(t.chip), a(t.onChip), a(t.mini), a(t.miniFill), a(t.onMini),
-        a(t.onMiniVariant), a(t.panel), a(t.onPanel), a(t.onPanelVariant), a(t.outline))
 }
 
 /** Top bar, heart, wavy seek bar, shuffle/repeat and the Sleep · Speed · Sound · Playlist row. */

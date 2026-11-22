@@ -11,6 +11,7 @@ import android.os.Environment
 import android.provider.MediaStore
 import android.util.Log
 import androidx.compose.ui.test.*
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.test.junit4.createEmptyComposeRule
 import androidx.media3.common.util.UnstableApi
 import androidx.test.core.app.ActivityScenario
@@ -129,15 +130,40 @@ class WalkthroughTest {
         if (has("panel_header")) problem("ghost now-playing bar visible while the panel is closed")
         // bottom strip: just a handle and "Up next · …"
         if (waitTag("peek_line", 4000)) shot("player_peek_line")
-        // swipe left on the cover: next song
+        // swipe left / right on the cover: the song must really change (and come back)
+        fun title(): String = runCatching {
+            compose.onNodeWithTag("player_title", useUnmergedTree = true).fetchSemanticsNode().config[androidx.compose.ui.semantics.SemanticsProperties.Text].joinToString { it.text }
+        }.getOrDefault("")
+        val t0 = title()
         compose.onNodeWithTag("player_cover", useUnmergedTree = true).performTouchInput { swipeLeft(durationMillis = 250) }
-        Thread.sleep(1200); shot("player_swiped_to_next")
-        // swipe down on the cover: closes into the mini player
-        compose.onNodeWithTag("player_cover", useUnmergedTree = true).performTouchInput { swipeDown(endY = bottom * 0.95f, durationMillis = 400) }
-        if (!waitTag("mini_player", 5000, soft = true)) problem("swipe down on the cover did not close the player") else shot("after_swipe_down")
+        Thread.sleep(1500); val t1 = title(); shot("player_swiped_to_next")
+        if (t1 == t0) problem("swipe left did not change the song ($t0)")
+        compose.onNodeWithTag("player_cover", useUnmergedTree = true).performTouchInput { swipeRight(durationMillis = 250) }
+        Thread.sleep(1500)
+        if (title() != t0) problem("swipe right did not go back to the previous song")
+        // a short, slow pull down (no flick) must still close the player all the way
+        compose.onNodeWithTag("player_cover", useUnmergedTree = true).performTouchInput {
+            down(center); repeat(12) { moveBy(androidx.compose.ui.geometry.Offset(0f, 14f), delayMillis = 40) }; up()
+        }
+        Thread.sleep(1500)
+        if (!has("mini_player") || has("full_player")) problem("short pull down stopped halfway") else shot("after_short_pull_down")
+        // swipe left on the mini player: the song changes and the slide stays inside the capsule
+        val m0 = title()
+        compose.onNodeWithTag("mini_player", useUnmergedTree = true).performTouchInput {
+            down(Offset(width * 0.3f, centerY)); repeat(6) { moveBy(androidx.compose.ui.geometry.Offset(-30f, 0f), delayMillis = 30) }
+        }
+        Thread.sleep(150); shot("mini_swipe_in_progress")
+        compose.onNodeWithTag("mini_player", useUnmergedTree = true).performTouchInput { repeat(6) { moveBy(androidx.compose.ui.geometry.Offset(-40f, 0f), delayMillis = 20) }; up() }
+        Thread.sleep(1500)
+        if (title() == m0) problem("swipe on the mini player did not change the song")
+        // a short, slow pull up on the mini player must open it fully
+        compose.onNodeWithTag("mini_player", useUnmergedTree = true).performTouchInput {
+            down(center); repeat(10) { moveBy(androidx.compose.ui.geometry.Offset(0f, -14f), delayMillis = 40) }; up()
+        }
+        Thread.sleep(1500)
+        if (!has("full_player")) problem("short pull up on the mini player stopped halfway")
         // swipe down on the bottom strip also closes it
-        clickTo("mini_player", "full_player"); Thread.sleep(800)
-        compose.onNodeWithTag("peek_line", useUnmergedTree = true).performTouchInput { swipeDown(startY = centerY, endY = centerY + 900f, durationMillis = 300) }   // a real thumb-length pull
+        compose.onNodeWithTag("peek_line", useUnmergedTree = true).performTouchInput { swipeDown(startY = centerY, endY = centerY + 900f, durationMillis = 300) }
         if (!waitTag("mini_player", 5000, soft = true)) problem("swipe down on the bottom strip did not close the player")
         clickTo("mini_player", "full_player"); Thread.sleep(800)
         click("btn_next"); Thread.sleep(1200); shot("player_next_song")

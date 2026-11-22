@@ -131,6 +131,9 @@ class PlayerConnection(private val ctx: Context, private val scope: CoroutineSco
     fun play() { controller?.let { if (it.playbackState == Player.STATE_IDLE) it.prepare(); it.play() } }
     fun next() { controller?.seekToNext() }
     fun previous() { controller?.seekToPrevious() }
+    /** Swipe gestures always change the song (never restart the current one). Returns false when there is no song that way. */
+    fun swipeNext(): Boolean { val c = controller ?: return false; if (!c.hasNextMediaItem()) return false; c.seekToNextMediaItem(); return true }
+    fun swipePrevious(): Boolean { val c = controller ?: return false; if (!c.hasPreviousMediaItem()) return false; c.seekToPreviousMediaItem(); return true }
     fun seekTo(ms: Long) { controller?.seekTo(ms); _ui.value = _ui.value.copy(positionMs = ms) }
     fun playAt(index: Int) { controller?.let { it.seekTo(index, 0); it.play() } }
     fun removeAt(index: Int) { controller?.removeMediaItem(index) }

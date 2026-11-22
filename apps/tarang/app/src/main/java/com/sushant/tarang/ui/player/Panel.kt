@@ -105,7 +105,7 @@ private fun PanelImpl(g: PanelGeo, c: CoverColors, ui: PlayerUi, song: Song, sta
     // one gesture = one job: pull up (or down while open) moves the panel; pulling down on the closed strip closes the player
     var mode by remember { mutableIntStateOf(0) }   // 0 undecided, 1 panel, 2 close player
     val drag = rememberDraggableState { delta ->
-        if (mode == 0) mode = if (state.panel.value <= 0.001f && delta > 0) 2 else 1
+        if (mode == 0) { mode = if (state.panel.value <= 0.001f && delta > 0) 2 else 1; if (mode == 2) collapse.onStart() }
         if (mode == 2) collapse.onDelta(delta)
         else scope.launch { state.panel.snapTo((state.panel.value - delta / (peekTop - openTop)).coerceIn(0f, 1f)) }
     }

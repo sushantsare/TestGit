@@ -224,6 +224,7 @@ private fun Shell(vm: MainVm, activity: MainActivity) {
     val actions = remember(vm) {
         PlayerActions(
             next = vm.player::next, previous = vm.player::previous, togglePlay = vm.player::togglePlay,
+            swipeNext = vm.player::swipeNext, swipePrevious = vm.player::swipePrevious, toast = { vm.snack.tryEmit(it) },
             like = { vm.toggleLike(it) }, seekTo = vm.player::seekTo, toggleShuffle = vm.player::toggleShuffle,
             cycleRepeat = vm.player::cycleRepeat, playAt = vm.player::playAt, removeAt = vm.player::removeAt, move = vm.player::move,
             switchQueue = vm.player::switchQueue, clearQueue = vm.player::clearQueue,

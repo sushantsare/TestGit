@@ -1,5 +1,10 @@
 # Tarang changelog
 
+## 1.2.0 · 22 Nov 2026
+- Swiping left/right on the cover now always changes the song; the new cover slides in once that song has loaded.
+- Swipe down on the full player and swipe up on the mini player never stop halfway: once you swipe and let go, it completes.
+- Swiping on the mini player stays inside the mini player's rounded shape.
+
 ## 1.1.0 · 22 Nov 2026
 - Swipe down anywhere on the full player (cover, title, buttons, bottom strip) to close it; it follows your finger.
 - Swipe left/right on the cover: it slides out with your finger and the next song's cover slides in.
