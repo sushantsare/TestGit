@@ -172,6 +172,8 @@ if [ -f "$DBG" ]; then
   sleep 1
   adb shell am start -n $ACT --es route udhar >/dev/null 2>&1; sleep 2
   edgeback                              # Udhar tab -> Home tab (must look the same as every other back)
+  for r in udhar accounts reports; do tapid tab_$r; sleep 1.5; tapid tab_home; sleep 1.5; done   # tapping Home from other tabs
+  adb shell input keyevent KEYCODE_BACK; sleep 1; adb shell am start -n $ACT --es route home >/dev/null 2>&1; sleep 1.5
   adb shell am start -n $ACT --es route settings >/dev/null 2>&1; sleep 2
   edgeback cancel; edgeback            # Settings -> Home
   adb shell am start -n $ACT --es route settings >/dev/null 2>&1; sleep 2

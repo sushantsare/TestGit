@@ -16,3 +16,6 @@ First version: money in and out per bank account, credit card, cash and wallet w
 ## 1.0.3 — 22 Nov 2026
 - Back now looks the same on every screen: tabs (Udhar → Home), Settings and every page inside Settings all shrink into a card over the previous screen, like Android's own back-to-home.
 - The bottom tab bar moves with its screen, so nothing jumps when you swipe back from Settings or any other page to a tab. On tablets the side rail stays in place on every screen.
+
+## 1.0.4 — 22 Nov 2026
+- Back rebuilt from scratch: the back button, the back swipe, tapping Home and switching tabs all use the same quick fade the bottom tabs use. Opening a screen uses it too, so every move in the app looks the same.

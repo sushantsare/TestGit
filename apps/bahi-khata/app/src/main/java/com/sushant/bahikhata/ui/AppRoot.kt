@@ -3,17 +3,10 @@
 package com.sushant.bahikhata.ui
 
 import androidx.activity.compose.BackHandler
-import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.scaleOut
-import androidx.compose.animation.slideInHorizontally
-import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.core.tween
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.animation.core.animateDp
 import androidx.compose.foundation.background
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
@@ -182,32 +175,16 @@ fun AppRoot(vm: AppVm, locked: Boolean, onUnlock: () -> Unit, onLockBack: () -> 
 
 @Composable
 private fun Graph(nav: NavHostController, vm: AppVm, start: String) {
-    // Motion follows Material 3 / Android predictive back:
-    // • between bottom-bar tabs: a quick fade-through (no sliding between peers)
-    // • opening a screen: shared-axis X — the new screen comes in from the right, the old one drifts left
-    // • going back (button or gesture), from any screen including tabs: the top screen becomes a card that shrinks
-    //   with the finger over the previous screen, like Android's back-to-home. The gesture can be cancelled.
-    fun isTab(r: String?) = r?.substringBefore('?')?.substringBefore('/') in TAB_ROUTES
-    val ease = androidx.compose.animation.core.FastOutSlowInEasing
+    // One motion for every move in the app, the same one the bottom tabs use: the current screen fades out
+    // quickly and the next one fades in. Opening a screen, tapping a tab, tapping Home, the back button and the
+    // back swipe all look identical. With the swipe, the fade follows the finger and can be cancelled.
+    val fadeInSpec = fadeIn(tween(210, delayMillis = 90))
+    val fadeOutSpec = fadeOut(tween(90))
     NavHost(nav, startDestination = start,
-        enterTransition = {
-            if (isTab(initialState.destination.route) && isTab(targetState.destination.route)) fadeIn(tween(210, delayMillis = 90))
-            else slideInHorizontally(tween(300, easing = ease)) { it / 10 } + fadeIn(tween(210, delayMillis = 60))
-        },
-        exitTransition = {
-            if (isTab(initialState.destination.route) && isTab(targetState.destination.route)) fadeOut(tween(90))
-            else slideOutHorizontally(tween(300, easing = ease)) { -it / 10 } + fadeOut(tween(90))
-        },
-        // back looks the same everywhere (tabs, Settings and every screen inside it): the previous screen waits,
-        // fully visible, behind the card
-        popEnterTransition = { EnterTransition.None },
-        popExitTransition = {
-            // the card reaches its full shrink in the first 40 % of the swipe, so it clearly follows the finger
-            // (like Android's back-to-home); it stays solid and fades out only at the very end
-            scaleOut(tween(120, easing = androidx.compose.animation.core.LinearOutSlowInEasing), targetScale = 0.9f) +
-                slideOutHorizontally(tween(120, easing = androidx.compose.animation.core.LinearOutSlowInEasing)) { it / 14 } +
-                fadeOut(tween(80, delayMillis = 220))
-        },
+        enterTransition = { fadeInSpec },
+        exitTransition = { fadeOutSpec },
+        popEnterTransition = { fadeInSpec },
+        popExitTransition = { fadeOutSpec },
     ) {
         page("setup") { SetupScreen(vm) }
         page("home") { HomeScreen(vm) }
@@ -295,19 +272,17 @@ fun railShown(): Boolean {
 }
 
 /** A screen in the graph. Tab screens carry their own bottom tab bar; other screens keep clear of the gesture bar and,
- *  on wide windows, are centred at ≤ 840 dp. While a screen leaves (back gesture or button) it becomes a card with
- *  round corners that shrinks away, the same as Android's own back-to-home motion. */
+ *  on wide windows, are centred at ≤ 840 dp. */
 @OptIn(androidx.compose.animation.ExperimentalAnimationApi::class)
 private fun androidx.navigation.NavGraphBuilder.page(
     route: String, arguments: List<androidx.navigation.NamedNavArgument> = emptyList(),
     content: @Composable (androidx.navigation.NavBackStackEntry) -> Unit,
 ) = composable(route, arguments) { entry ->
-    val corner by transition.animateDp(transitionSpec = { tween(120) }, label = "corner") { st -> if (st == androidx.compose.animation.EnterExitState.PostExit) 28.dp else 0.dp }
     val me = route.substringBefore('?').substringBefore('/')
     val tab = me in TAB_ROUTES
     val rail = railShown()
     val wide = LocalConfiguration.current.screenWidthDp >= 840
-    Box(Modifier.fillMaxSize().graphicsLayer { shape = RoundedCornerShape(corner); clip = corner > 0.dp }
+    Box(Modifier.fillMaxSize()
         .background(MaterialTheme.colorScheme.background), contentAlignment = Alignment.TopCenter) {
         if (tab && !rail) Column(Modifier.fillMaxSize()) {
             Box(Modifier.weight(1f)) { content(entry) }
