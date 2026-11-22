@@ -246,7 +246,7 @@ private fun LockScreen(onUnlock: () -> Unit, onBack: () -> Unit) {
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(14.dp)) {
             androidx.compose.foundation.Image(androidx.compose.ui.res.painterResource(com.sushant.bahikhata.R.drawable.ic_app_round), null, Modifier.size(96.dp))
-            Text("Bahi Khata is locked", style = MaterialTheme.typography.headlineSmall)
+            Text("Bahi Khata is locked", style = MaterialTheme.typography.headlineSmall, color = MaterialTheme.colorScheme.onBackground)
             Text("Use fingerprint or phone PIN", color = MaterialTheme.colorScheme.onSurfaceVariant)
             Spacer(Modifier.height(16.dp))
             FilledTonalIconButton(onClick = onUnlock, modifier = Modifier.size(72.dp).testTag("unlock")) { Icon(Icons.Outlined.Fingerprint, "Unlock", Modifier.size(40.dp)) }
@@ -262,7 +262,7 @@ fun StorageLocked(onClose: () -> Unit) {
         verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) {
         Icon(Icons.Outlined.Lock, null, Modifier.size(48.dp), tint = MaterialTheme.colorScheme.primary)
         Spacer(Modifier.height(16.dp))
-        Text("Can't open your khata right now", style = MaterialTheme.typography.headlineSmall, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+        Text("Can't open your khata right now", style = MaterialTheme.typography.headlineSmall, color = MaterialTheme.colorScheme.onBackground, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
         Spacer(Modifier.height(8.dp))
         Text("The phone's secure key store didn't respond, so Bahi Khata kept your data locked instead of opening it unprotected. Nothing was lost. Restart the phone and open the app again.",
             style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = androidx.compose.ui.text.style.TextAlign.Center)

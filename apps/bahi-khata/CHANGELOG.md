@@ -8,3 +8,7 @@ First version: money in and out per bank account, credit card, cash and wallet w
 
 ## 1.0.1 — 22 Nov 2026
 - New back and open motion that follows Android's standard: going back (button or swipe) shrinks the current screen toward your finger while the previous one settles in; the swipe follows your finger and can be cancelled. Opening a screen slides it in from the right; switching bottom tabs is a quick fade.
+
+## 1.0.2 — 22 Nov 2026
+- Back swipe now really follows your finger on Android 14+ (the navigation library is back on the version proven in your other apps).
+- Lock screen: "Bahi Khata is locked" is light text in dark mode (it was black on dark).
