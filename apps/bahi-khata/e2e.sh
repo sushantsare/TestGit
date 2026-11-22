@@ -170,6 +170,8 @@ if [ -f "$DBG" ]; then
   adb shell am start -n $ACT --es route home >/dev/null 2>&1; sleep 2
   adb shell screenrecord --bit-rate 6000000 --time-limit 170 /sdcard/settings_back.mp4 & REC=$!
   sleep 1
+  adb shell am start -n $ACT --es route udhar >/dev/null 2>&1; sleep 2
+  edgeback                              # Udhar tab -> Home tab (must look the same as every other back)
   adb shell am start -n $ACT --es route settings >/dev/null 2>&1; sleep 2
   edgeback cancel; edgeback            # Settings -> Home
   adb shell am start -n $ACT --es route settings >/dev/null 2>&1; sleep 2

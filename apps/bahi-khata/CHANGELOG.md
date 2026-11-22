@@ -12,3 +12,7 @@ First version: money in and out per bank account, credit card, cash and wallet w
 ## 1.0.2 — 22 Nov 2026
 - Back swipe now really follows your finger on Android 14+ (the navigation library is back on the version proven in your other apps).
 - Lock screen: "Bahi Khata is locked" is light text in dark mode (it was black on dark).
+
+## 1.0.3 — 22 Nov 2026
+- Back now looks the same on every screen: tabs (Udhar → Home), Settings and every page inside Settings all shrink into a card over the previous screen, like Android's own back-to-home.
+- The bottom tab bar moves with its screen, so nothing jumps when you swipe back from Settings or any other page to a tab. On tablets the side rail stays in place on every screen.

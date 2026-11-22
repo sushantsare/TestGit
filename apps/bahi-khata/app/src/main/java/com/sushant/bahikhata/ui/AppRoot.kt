@@ -3,6 +3,7 @@
 package com.sushant.bahikhata.ui
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleOut
@@ -55,6 +56,8 @@ class Snack(private val host: SnackbarHostState, private val scope: CoroutineSco
 val LocalSnack = staticCompositionLocalOf<Snack> { error("no snack") }
 val LocalNav = staticCompositionLocalOf<NavHostController> { error("no nav") }
 val LocalWide = staticCompositionLocalOf { false }
+/** The bottom tab bar, drawn by each tab screen itself (given that screen's own route) so it moves with the screen during back. */
+val LocalTabBar = staticCompositionLocalOf<@Composable (String) -> Unit> { {} }
 
 data class Tab(val route: String, val label: String, val icon: androidx.compose.ui.graphics.vector.ImageVector, val selIcon: androidx.compose.ui.graphics.vector.ImageVector)
 
@@ -134,7 +137,7 @@ fun AppRoot(vm: AppVm, locked: Boolean, onUnlock: () -> Unit, onLockBack: () -> 
             // while locked the app is neither drawn nor readable by accessibility services (state is kept underneath)
             Row(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)
                 .then(if (locked) Modifier.alpha(0f).clearAndSetSemantics { } else Modifier)) {
-                if (rail && top) {
+                if (rail && route != null && route != "setup") {   // the rail stays put on every screen, so nothing jumps during back
                     NavigationRail(containerColor = MaterialTheme.colorScheme.surfaceContainerLow, header = {
                         FloatingActionButton(onClick = { nav.go("add?type=EXPENSE") }, containerColor = com.sushant.bahikhata.ui.theme.LocalBk.current.saffron,
                             contentColor = com.sushant.bahikhata.ui.theme.LocalBk.current.onSaffron, modifier = Modifier.padding(top = 12.dp).testTag("rail_add")) { Icon(Icons.Outlined.Add, "Add entry") }
@@ -150,23 +153,25 @@ fun AppRoot(vm: AppVm, locked: Boolean, onUnlock: () -> Unit, onLockBack: () -> 
                 Scaffold(
                     modifier = Modifier.weight(1f),
                     containerColor = MaterialTheme.colorScheme.background,
-                    snackbarHost = { SnackbarHost(host, Modifier.padding(bottom = if (top && rail) 0.dp else 80.dp)) }, // stay above the FAB on tabs and above Next / Save buttons elsewhere
-                    bottomBar = {
-                        if (!rail && top) NavigationBar(containerColor = MaterialTheme.colorScheme.surfaceContainerLow, tonalElevation = 0.dp) {
-                            tabs.forEach { t ->
-                                NavigationBarItem(selected = route == t.route, onClick = { nav.tab(t.route) },
-                                    icon = { BadgedBox(badge = { if (t.route == "home" && pending.isNotEmpty()) Badge { Text("${pending.size}") } }) { Icon(if (route == t.route) t.selIcon else t.icon, null) } },
-                                    label = { BarLabel(t.label) }, modifier = Modifier.testTag("tab_${t.route}"))
-                            }
-                        }
-                    },
+                    snackbarHost = { SnackbarHost(host, if (top && !rail) Modifier.navigationBarsPadding().padding(bottom = 160.dp) else Modifier.padding(bottom = if (top) 0.dp else 80.dp)) }, // above the tab bar + FAB on tabs and above Next / Save buttons elsewhere
                     contentWindowInsets = WindowInsets(0),
                 ) { pad ->
                     // screens without the bottom bar keep their Save/Next buttons above the gesture bar, and every
                     // screen shrinks above the keyboard (edge-to-edge turns off the old automatic resize)
                     // on tablets/desktop windows, screens other than the main tabs are centred at ≤ 840 dp (forms never stretch)
-                    Box(Modifier.padding(pad).fillMaxSize().then(if (top && !rail) Modifier else Modifier.navigationBarsPadding()).imePadding(), contentAlignment = Alignment.TopCenter) {
-                        Box(Modifier.fillMaxHeight().then(if (!top && width >= 840) Modifier.widthIn(max = 840.dp) else Modifier.fillMaxWidth())) { Graph(nav, vm, start) }
+                    // each screen handles its own bottom space (tab bar or gesture bar) and width cap inside page(),
+                    // so the layout never changes size in the middle of a back swipe
+                    val bar: @Composable (String) -> Unit = { me ->
+                        NavigationBar(containerColor = MaterialTheme.colorScheme.surfaceContainerLow, tonalElevation = 0.dp) {
+                            tabs.forEach { t ->
+                                NavigationBarItem(selected = me == t.route, onClick = { nav.tab(t.route) },
+                                    icon = { BadgedBox(badge = { if (t.route == "home" && pending.isNotEmpty()) Badge { Text("${pending.size}") } }) { Icon(if (me == t.route) t.selIcon else t.icon, null) } },
+                                    label = { BarLabel(t.label) }, modifier = Modifier.testTag("tab_${t.route}"))
+                            }
+                        }
+                    }
+                    CompositionLocalProvider(LocalTabBar provides bar) {
+                        Box(Modifier.padding(pad).fillMaxSize().imePadding()) { Graph(nav, vm, start) }
                     }
                 }
             }
@@ -180,8 +185,8 @@ private fun Graph(nav: NavHostController, vm: AppVm, start: String) {
     // Motion follows Material 3 / Android predictive back:
     // • between bottom-bar tabs: a quick fade-through (no sliding between peers)
     // • opening a screen: shared-axis X — the new screen comes in from the right, the old one drifts left
-    // • going back (button or gesture): the top screen shrinks toward the finger and fades while the
-    //   previous screen settles back in place. With the gesture this follows the finger and can be cancelled.
+    // • going back (button or gesture), from any screen including tabs: the top screen becomes a card that shrinks
+    //   with the finger over the previous screen, like Android's back-to-home. The gesture can be cancelled.
     fun isTab(r: String?) = r?.substringBefore('?')?.substringBefore('/') in TAB_ROUTES
     val ease = androidx.compose.animation.core.FastOutSlowInEasing
     NavHost(nav, startDestination = start,
@@ -193,14 +198,12 @@ private fun Graph(nav: NavHostController, vm: AppVm, start: String) {
             if (isTab(initialState.destination.route) && isTab(targetState.destination.route)) fadeOut(tween(90))
             else slideOutHorizontally(tween(300, easing = ease)) { -it / 10 } + fadeOut(tween(90))
         },
-        popEnterTransition = {
-            if (isTab(initialState.destination.route) && isTab(targetState.destination.route)) fadeIn(tween(210, delayMillis = 90))
-            else slideInHorizontally(tween(300, easing = ease)) { -it / 10 }   // the previous screen is fully visible behind the card
-        },
+        // back looks the same everywhere (tabs, Settings and every screen inside it): the previous screen waits,
+        // fully visible, behind the card
+        popEnterTransition = { EnterTransition.None },
         popExitTransition = {
-            if (isTab(initialState.destination.route) && isTab(targetState.destination.route)) fadeOut(tween(90))
             // while the finger drags, the card stays solid and only shrinks; it fades out only at the very end
-            else scaleOut(tween(300, easing = ease), targetScale = 0.9f) + slideOutHorizontally(tween(300, easing = ease)) { it / 12 } + fadeOut(tween(80, delayMillis = 220))
+            scaleOut(tween(300, easing = ease), targetScale = 0.9f) + slideOutHorizontally(tween(300, easing = ease)) { it / 12 } + fadeOut(tween(80, delayMillis = 220))
         },
     ) {
         page("setup") { SetupScreen(vm) }
@@ -288,13 +291,25 @@ fun railShown(): Boolean {
     return c.screenWidthDp >= 600 && c.screenHeightDp >= 480
 }
 
-/** A screen in the graph. While it leaves (back gesture or button) its corners round off like a card being put
- *  away, matching Android's predictive back look. */
+/** A screen in the graph. Tab screens carry their own bottom tab bar; other screens keep clear of the gesture bar and,
+ *  on wide windows, are centred at ≤ 840 dp. While a screen leaves (back gesture or button) it becomes a card with
+ *  round corners that shrinks away, the same as Android's own back-to-home motion. */
 @OptIn(androidx.compose.animation.ExperimentalAnimationApi::class)
 private fun androidx.navigation.NavGraphBuilder.page(
     route: String, arguments: List<androidx.navigation.NamedNavArgument> = emptyList(),
     content: @Composable (androidx.navigation.NavBackStackEntry) -> Unit,
 ) = composable(route, arguments) { entry ->
     val corner by transition.animateDp(label = "corner") { st -> if (st == androidx.compose.animation.EnterExitState.PostExit) 28.dp else 0.dp }
-    Box(Modifier.fillMaxSize().graphicsLayer { shape = RoundedCornerShape(corner); clip = corner > 0.dp }) { content(entry) }
+    val me = route.substringBefore('?').substringBefore('/')
+    val tab = me in TAB_ROUTES
+    val rail = railShown()
+    val wide = LocalConfiguration.current.screenWidthDp >= 840
+    Box(Modifier.fillMaxSize().graphicsLayer { shape = RoundedCornerShape(corner); clip = corner > 0.dp }
+        .background(MaterialTheme.colorScheme.background), contentAlignment = Alignment.TopCenter) {
+        if (tab && !rail) Column(Modifier.fillMaxSize()) {
+            Box(Modifier.weight(1f)) { content(entry) }
+            LocalTabBar.current(me)
+        } else Box(Modifier.fillMaxHeight().navigationBarsPadding().then(if (!tab && wide) Modifier.widthIn(max = 840.dp) else Modifier.fillMaxWidth())) { content(entry) }
+    }
+}
 }
