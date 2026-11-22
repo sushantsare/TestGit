@@ -78,7 +78,7 @@ class MainActivity : AppCompatActivity() {
                 )
                 onDispose { }
             }
-            BahiTheme(s.theme) {
+            BahiTheme(s.theme, s.pureBlack) {
                 AppRoot(vm = vm, locked = locked, onUnlock = { unlock() }, onLockBack = { finish() },
                     pendingRoute = pendingRoute, onRouteConsumed = { pendingRoute = null })
             }

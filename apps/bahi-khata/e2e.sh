@@ -197,6 +197,12 @@ if [ -f "$DBG" ]; then
   adb shell am start -n $ACT --es route add >/dev/null 2>&1; sleep 2; adb exec-out screencap -p > $OUT/screens/audit_T14_landscape_add.png
   adb shell input keyevent KEYCODE_BACK; adb shell settings put system user_rotation 0; sleep 2
   adb shell cmd uimode night yes; sleep 2; adb exec-out screencap -p > $OUT/screens/audit_T14_night.png
+  # Pure black (AMOLED) dark mode: switch it on from Settings, check Settings, Home and Udhar, then switch it off again
+  adb shell am start -n $ACT --es route settings >/dev/null 2>&1; sleep 2; tapid sw_pure_black; sleep 1.5
+  adb exec-out screencap -p > $OUT/screens/audit_black_settings.png
+  for r in home udhar accounts; do adb shell am start -n $ACT --es route $r >/dev/null 2>&1; sleep 2; adb exec-out screencap -p > $OUT/screens/audit_black_$r.png; done
+  adb shell am start -n $ACT --es route settings >/dev/null 2>&1; sleep 2; tapid sw_pure_black; sleep 1
+  echo "pure_black crashes=$(mycrash)" >> $A/summary.txt
   # lock screen in dark mode (text must be light on dark)
   adb shell am instrument -w -e class com.sushant.bahikhata.AuditSeed -e lockOn 1 "$INSTR" >/dev/null 2>&1
   adb shell am start -W -n $ACT >/dev/null 2>&1; sleep 3; adb exec-out screencap -p > $OUT/screens/audit_lock_dark.png

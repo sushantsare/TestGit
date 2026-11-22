@@ -19,3 +19,6 @@ First version: money in and out per bank account, credit card, cash and wallet w
 
 ## 1.0.4 — 22 Nov 2026
 - Back rebuilt from scratch: the back button, the back swipe, tapping Home and switching tabs all use the same quick fade the bottom tabs use. Opening a screen uses it too, so every move in the app looks the same.
+
+## 1.0.5 — 22 Nov 2026
+- New "Pure black" switch in Settings → Appearance (shown in dark mode): true black background for OLED screens, with near-black cards and the same warm colours.

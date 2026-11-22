@@ -93,6 +93,15 @@ private val darkBk = BkColors(
     cardFaces = lightBk.cardFaces,
 )
 
+/** "Pure black" dark mode for OLED screens: true black background, near-black cards; warm accents unchanged. */
+private val BlackColors = DarkColors.copy(
+    background = Color(0xFF000000), surface = Color(0xFF000000), surfaceDim = Color(0xFF000000),
+    surfaceContainerLowest = Color(0xFF000000), surfaceContainerLow = Color(0xFF0E0E0E), surfaceContainer = Color(0xFF0E0E0E),
+    surfaceContainerHigh = Color(0xFF1A1A1A), surfaceContainerHighest = Color(0xFF242424),
+    surfaceVariant = Color(0xFF1A1A1A), surfaceBright = Color(0xFF2A2A2A), outlineVariant = Color(0xFF2A2A2A),
+)
+private val blackBk = darkBk.copy(card = Color(0xFF0E0E0E), cardBorder = Color(0xFF262626))
+
 val LocalBk = staticCompositionLocalOf { lightBk }
 
 val Manrope = FontFamily(
@@ -128,10 +137,11 @@ val LocalSpacing = staticCompositionLocalOf { Spacing() }
 fun isDark(mode: ThemeMode): Boolean = when (mode) { ThemeMode.SYSTEM -> isSystemInDarkTheme(); ThemeMode.LIGHT -> false; ThemeMode.DARK -> true }
 
 @Composable
-fun BahiTheme(mode: ThemeMode = ThemeMode.SYSTEM, content: @Composable () -> Unit) {
+fun BahiTheme(mode: ThemeMode = ThemeMode.SYSTEM, pureBlack: Boolean = false, content: @Composable () -> Unit) {
     val dark = isDark(mode)
-    CompositionLocalProvider(LocalBk provides if (dark) darkBk else lightBk, LocalSpacing provides Spacing()) {
-        val scheme = if (dark) DarkColors else LightColors
+    val black = dark && pureBlack
+    CompositionLocalProvider(LocalBk provides if (black) blackBk else if (dark) darkBk else lightBk, LocalSpacing provides Spacing()) {
+        val scheme = if (black) BlackColors else if (dark) DarkColors else LightColors
         MaterialTheme(colorScheme = scheme, typography = AppTypography, shapes = AppShapes) {
             // text drawn outside a Surface/Scaffold (lock screen, start-up error) must follow the theme too —
             // otherwise it falls back to black and vanishes on the dark background

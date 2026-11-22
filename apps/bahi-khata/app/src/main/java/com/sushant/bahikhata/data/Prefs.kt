@@ -11,6 +11,7 @@ enum class ThemeMode { SYSTEM, LIGHT, DARK }
 data class Settings(
     val setupDone: Boolean = false,
     val theme: ThemeMode = ThemeMode.SYSTEM,
+    val pureBlack: Boolean = false,
     val hideAmounts: Boolean = false,
     val lockOn: Boolean = false,
     val lockAfterSec: Int = 60,
@@ -44,6 +45,7 @@ class Prefs(context: Context) {
     private fun read() = Settings(
         setupDone = sp.getBoolean("setupDone", false),
         theme = runCatching { ThemeMode.valueOf(sp.getString("theme", "SYSTEM")!!) }.getOrDefault(ThemeMode.SYSTEM),
+        pureBlack = sp.getBoolean("pureBlack", false),
         hideAmounts = sp.getBoolean("hideAmounts", false),
         lockOn = sp.getBoolean("lockOn", false),
         lockAfterSec = sp.getInt("lockAfterSec", 60),
@@ -68,7 +70,7 @@ class Prefs(context: Context) {
     fun update(block: (Settings) -> Settings) {
         val n = block(_s.value)
         sp.edit()
-            .putBoolean("setupDone", n.setupDone).putString("theme", n.theme.name)
+            .putBoolean("setupDone", n.setupDone).putString("theme", n.theme.name).putBoolean("pureBlack", n.pureBlack)
             .putBoolean("hideAmounts", n.hideAmounts).putBoolean("lockOn", n.lockOn).putInt("lockAfterSec", n.lockAfterSec)
             .putBoolean("secureScreens", n.secureScreens).putBoolean("smsOn", n.smsOn)
             .putBoolean("dailyReminderOn", n.dailyReminderOn).putInt("dailyReminderMin", n.dailyReminderMin)

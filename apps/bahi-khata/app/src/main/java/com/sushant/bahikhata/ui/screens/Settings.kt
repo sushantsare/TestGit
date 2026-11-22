@@ -104,6 +104,7 @@ fun SettingsScreen(vm: AppVm) {
             item { SectionLabel("Appearance") }
             item { BkCard(Modifier.padding(horizontal = 16.dp).fillMaxWidth()) {
                 SettingNav(Icons.Outlined.DarkMode, "Theme", when (s.theme) { ThemeMode.SYSTEM -> "Follow phone"; ThemeMode.LIGHT -> "Light"; ThemeMode.DARK -> "Dark" }) { themePick = true }
+                if (com.sushant.bahikhata.ui.theme.isDark(s.theme)) SettingSwitch(Icons.Outlined.Contrast, "Pure black", "Darker dark mode for OLED screens", s.pureBlack, { on -> vm.prefs.update { it.copy(pureBlack = on) } }, "pure_black")
                 SettingSwitch(Icons.Outlined.VisibilityOff, "Hide amounts", "Show ₹ •••• everywhere until you tap the eye", s.hideAmounts, { on -> vm.prefs.update { it.copy(hideAmounts = on) } }, "hide")
             } }
             item { SectionLabel("Security") }
