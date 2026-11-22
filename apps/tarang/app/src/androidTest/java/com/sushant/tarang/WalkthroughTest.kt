@@ -66,6 +66,11 @@ class WalkthroughTest {
         InstrumentationRegistry.getInstrumentation().uiAutomation.performGlobalAction(android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_BACK)
         Thread.sleep(600); compose.waitForIdle()
     }
+    /** Go to a bottom tab like a user: press back until the tab bar shows (it hides on inner screens), then tap. */
+    private fun tab(r: String, expect: String) {
+        repeat(4) { if (has("tab_$r")) return@repeat; back() }
+        clickTo("tab_$r", expect)
+    }
     private fun go(route: String, waitFor: String? = null) {
         scenario.onActivity { a -> a.startActivity(Intent(a, MainActivity::class.java).putExtra(MainActivity.EXTRA_ROUTE, route).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP)) }
         compose.waitForIdle(); waitFor?.let { waitTag(it) }; log("opened $route")
@@ -106,7 +111,7 @@ class WalkthroughTest {
         shot("home_fresh")
 
         // ---- Folders → folder → play all
-        clickTo("tab_folders", "folders"); shot("folders")
+        tab("folders", "folders"); shot("folders")
         click("chip_Most songs"); shot("folders_most_songs"); click("chip_Name")
         clickTo("folder_Bollywood", "song_list"); shot("folder_detail")
         click("play_all")
@@ -137,7 +142,7 @@ class WalkthroughTest {
         }
 
         // ---- Library
-        clickTo("tab_library", "library"); waitTag("songs_list"); shot("library_songs")
+        tab("library", "library"); waitTag("songs_list"); shot("library_songs")
         click("sort"); waitTag("dialog_ok", 2000, soft = true); shot("library_sort_dialog"); back()
         click("select"); waitTag("selection_bar"); shot("library_select"); click("select_all"); shot("library_select_all"); back()
         click("libtab_albums"); waitTag("albums_grid"); shot("library_albums")
@@ -156,9 +161,9 @@ class WalkthroughTest {
         click("libtab_songs"); click("tile_liked"); waitTag("list_header"); shot("liked_songs"); back()
 
         // ---- Stats, Home (now playing), Search
-        clickTo("tab_stats", "stats"); Thread.sleep(800); shot("stats")
+        tab("stats", "stats"); Thread.sleep(800); shot("stats")
         click("chip_All time"); shot("stats_all_time")
-        clickTo("tab_home", "home"); shot("home_playing")
+        tab("home", "home"); shot("home_playing")
         clickTo("open_search", "search"); shot("search_empty")
         type("search_field", "kes"); Thread.sleep(800); shot("search_results")
         type("search_field", "zzzz"); Thread.sleep(500); shot("search_nothing"); back(); if (has("search")) back()
@@ -182,9 +187,9 @@ class WalkthroughTest {
         suffix = "_dark"
         app.prefs.update { it.copy(themeMode = ThemeMode.DARK) }
         go(com.sushant.tarang.ui.R0.HOME, "home"); Thread.sleep(800); shot("home")
-        clickTo("tab_folders", "folders"); shot("folders")
-        clickTo("tab_library", "library"); shot("library")
-        clickTo("tab_stats", "stats"); shot("stats")
+        tab("folders", "folders"); shot("folders")
+        tab("library", "library"); shot("library")
+        tab("stats", "stats"); shot("stats")
         clickTo("mini_player", "full_player"); Thread.sleep(800); shot("player_full")
         click("tab_up_next"); waitTag("queue_list"); shot("player_up_next"); back(); click("collapse"); waitTag("mini_player")
         go(com.sushant.tarang.ui.R0.SETTINGS, "settings"); shot("settings")
