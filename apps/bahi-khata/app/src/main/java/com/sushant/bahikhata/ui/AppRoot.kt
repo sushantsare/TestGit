@@ -195,11 +195,12 @@ private fun Graph(nav: NavHostController, vm: AppVm, start: String) {
         },
         popEnterTransition = {
             if (isTab(initialState.destination.route) && isTab(targetState.destination.route)) fadeIn(tween(210, delayMillis = 90))
-            else slideInHorizontally(tween(300, easing = ease)) { -it / 10 } + fadeIn(tween(210))
+            else slideInHorizontally(tween(300, easing = ease)) { -it / 10 }   // the previous screen is fully visible behind the card
         },
         popExitTransition = {
             if (isTab(initialState.destination.route) && isTab(targetState.destination.route)) fadeOut(tween(90))
-            else scaleOut(tween(300, easing = ease), targetScale = 0.9f) + slideOutHorizontally(tween(300, easing = ease)) { it / 12 } + fadeOut(tween(250, delayMillis = 50))
+            // while the finger drags, the card stays solid and only shrinks; it fades out only at the very end
+            else scaleOut(tween(300, easing = ease), targetScale = 0.9f) + slideOutHorizontally(tween(300, easing = ease)) { it / 12 } + fadeOut(tween(80, delayMillis = 220))
         },
     ) {
         page("setup") { SetupScreen(vm) }
