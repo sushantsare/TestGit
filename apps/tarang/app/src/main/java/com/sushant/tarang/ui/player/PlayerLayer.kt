@@ -367,46 +367,64 @@ fun PlayerLayer(
                     }
                 }
 
-                // ⏮ ⏯ ⏭: separate circles in the mini player, one joined group in the full player and in the bar
-                val group = t * (1f - inBar) + inBar          // 0 = separate circles, 1 = joined group
+                // ⏮ ⏯ ⏭: separate circles in the mini player, three pills in the full player, a joined group in the bar
                 val prevInt = remember { MutableInteractionSource() }
                 val playInt = remember { MutableInteractionSource() }
                 val nextInt = remember { MutableInteractionSource() }
                 val prevPressed by prevInt.collectIsPressedAsState()
                 val playPressed by playInt.collectIsPressedAsState()
                 val nextPressed by nextInt.collectIsPressedAsState()
-                // pressed button widens, its neighbours squeeze (full player only)
+                // Pressed button widens and its neighbours squeeze (full player only), PixelPlayer-style:
+                // the effect holds briefly after the tap (0.22 s for play/pause, 0.6 s for skips), then all spring back to equal.
                 val squish = t * (1f - inBar)
-                val prevGrow by androidx.compose.animation.core.animateFloatAsState(if (prevPressed) 1f else if (playPressed || nextPressed) -0.5f else 0f, spring(0.55f, 600f), label = "pg")
-                val playGrow by androidx.compose.animation.core.animateFloatAsState(if (playPressed) 1f else if (prevPressed || nextPressed) -0.5f else 0f, spring(0.55f, 600f), label = "ppg")
-                val nextGrow by androidx.compose.animation.core.animateFloatAsState(if (nextPressed) 1f else if (prevPressed || playPressed) -0.5f else 0f, spring(0.55f, 600f), label = "ng")
-                val w = dp(16f) * squish
+                var lastTap by remember { mutableIntStateOf(0) }          // 0 none, 1 prev, 2 play, 3 next
+                var tapCount by remember { mutableIntStateOf(0) }
+                LaunchedEffect(lastTap, tapCount) {
+                    if (lastTap != 0) { kotlinx.coroutines.delay(if (lastTap == 2) 220L else 600L); lastTap = 0 }
+                }
+                val active = when { prevPressed -> 1; playPressed -> 2; nextPressed -> 3; else -> lastTap }
+                val weightSpec = spring<Float>(dampingRatio = 0.7f, stiffness = 520f)
+                fun target(b: Int) = when (active) { 0 -> 1f; b -> 1.1f; else -> 0.65f }
+                val wPrev by androidx.compose.animation.core.animateFloatAsState(target(1), weightSpec, label = "wPrev")
+                val wPlay by androidx.compose.animation.core.animateFloatAsState(target(2), weightSpec, label = "wPlay")
+                val wNext by androidx.compose.animation.core.animateFloatAsState(target(3), weightSpec, label = "wNext")
                 var prev = at(g.prevMini, g.prevFull, g.prevBar)
                 var play = at(g.playMini, g.playFull, g.playBar)
                 var next = at(g.nextMini, g.nextFull, g.nextBar)
-                // keep the group's outer edges fixed while sizes change
-                prev = Rect(prev.left, prev.top, prev.right + w * prevGrow, prev.bottom)
-                play = Rect(play.left + w * prevGrow, play.top, play.right + w * prevGrow + w * playGrow, play.bottom)
-                next = Rect(next.left + w * prevGrow + w * playGrow, next.top, next.right, next.bottom)
+                run {
+                    // keep the group's outer edges and gaps fixed; share the inner width by weight
+                    val gap1 = play.left - prev.right; val gap2 = next.left - play.right
+                    val bw = floatArrayOf(prev.width, play.width, next.width)
+                    val k = floatArrayOf(1f + (wPrev - 1f) * squish, 1f + (wPlay - 1f) * squish, 1f + (wNext - 1f) * squish)
+                    val total = bw.sum(); val weighted = bw[0] * k[0] + bw[1] * k[1] + bw[2] * k[2]
+                    val nw = FloatArray(3) { bw[it] * k[it] * total / weighted }
+                    val l0 = prev.left
+                    prev = Rect(l0, prev.top, l0 + nw[0], prev.bottom)
+                    play = Rect(prev.right + gap1, play.top, prev.right + gap1 + nw[1], play.bottom)
+                    next = Rect(play.right + gap2, next.top, play.right + gap2 + nw[2], next.bottom)
+                }
                 val outerR = { r: Rect -> min(r.width, r.height) / 2f }
                 val innerR = dp(10f)
-                GroupBtn(prev, colors.chip, lerp(colors.onMini, colors.onChip, t), Icons.Rounded.SkipPrevious, "Previous", lerpF(20f, 28f, big), "btn_prev",
-                    outerR(prev), lerpF(outerR(prev), innerR, group), prevInt) { haptic(HapticFeedbackType.ContextClick); act.previous() }
-                val (morph, round) = rememberPlayMorph(ui.isPlaying)
-                val squareR = lerpF(dp(16f), dp(30f), big)
+                GroupBtn(prev, colors.chip, lerp(colors.onMini, colors.onChip, t), Icons.Rounded.SkipPrevious, "Previous", lerpF(20f, 30f, big), "btn_prev",
+                    outerR(prev), lerpF(outerR(prev), innerR, inBar), prevInt) { haptic(HapticFeedbackType.ContextClick); lastTap = 1; tapCount++; act.previous() }
+                // after a skip, the play/pause button waits until the squeeze has finished before it changes (no flicker)
+                var shownPlaying by remember { mutableStateOf(ui.isPlaying) }
+                LaunchedEffect(ui.isPlaying, lastTap) { if (lastTap != 1 && lastTap != 3) shownPlaying = ui.isPlaying }
+                val (morph, round) = rememberPlayMorph(shownPlaying)
+                val squareR = lerpF(dp(16f), dp(26f), big)
                 val playR = squareR + (min(play.width, play.height) / 2 - squareR) * round
                 Box(
                     Modifier.offset { IntOffset(play.left.roundToInt(), play.top.roundToInt()) }
                         .size(with(density) { play.width.toDp() }, with(density) { play.height.toDp() })
                         .clip(RoundedCornerShape(with(density) { playR.toDp() })).background(colors.accent)
                         .clickable(interactionSource = playInt, indication = androidx.compose.material3.ripple(), onClickLabel = if (ui.isPlaying) "Pause" else "Play") {
-                            haptic(HapticFeedbackType.ContextClick); act.togglePlay()
+                            haptic(HapticFeedbackType.ContextClick); lastTap = 2; tapCount++; act.togglePlay()
                         }
                         .semantics { contentDescription = if (ui.isPlaying) "Pause" else "Play" }.testTag("btn_play"),
                     contentAlignment = Alignment.Center,
-                ) { PlayPauseGlyph(morph, colors.onAccent, lerpF(24f, 44f, big).dp) }
-                GroupBtn(next, colors.chip, lerp(colors.onMini, colors.onChip, t), Icons.Rounded.SkipNext, "Next", lerpF(20f, 28f, big), "btn_next",
-                    lerpF(outerR(next), innerR, group), outerR(next), nextInt) { haptic(HapticFeedbackType.ContextClick); act.next() }
+                ) { PlayPauseGlyph(morph, colors.onAccent, lerpF(24f, 38f, big).dp) }
+                GroupBtn(next, colors.chip, lerp(colors.onMini, colors.onChip, t), Icons.Rounded.SkipNext, "Next", lerpF(20f, 30f, big), "btn_next",
+                    lerpF(outerR(next), innerR, inBar), outerR(next), nextInt) { haptic(HapticFeedbackType.ContextClick); lastTap = 3; tapCount++; act.next() }
 
                 // ---------- Up next / Lyrics page
                 if (p > 0.55f) Panel(g, colors, ui, song, state, clamp01((p - 0.55f) / 0.45f), scope, collapse, lyrics, ::dp)
@@ -419,7 +437,7 @@ fun PlayerLayer(
 class PlayerDrag(val onStart: () -> Unit, val onDelta: (Float) -> Unit, val onStop: (Float) -> Unit)
 
 /** Where a vertical drag started and where the finger has taken it (updated at once, not after a frame). */
-private class DragTrack { var start = 0f; var pos = 0f; var job: kotlinx.coroutines.Job? = null; var active by mutableStateOf(false) }
+internal class DragTrack { var start = 0f; var pos = 0f; var job: kotlinx.coroutines.Job? = null; var active by mutableStateOf(false) }
 
 /** "Artist · Album" with the artist first; missing parts are left out (no stray separators). */
 fun artistLine(song: Song, artistColor: Color, albumColor: Color, showAlbum: Boolean): androidx.compose.ui.text.AnnotatedString {
@@ -557,15 +575,14 @@ private fun geometry(W: Float, H: Float, statusTop: Float, navBottom: Float, nav
     val toolbarY = controlsY + dp(88f) + dp(22f)
     val lyricY = toolbarY + dp(64f) + dp(8f)
     // controls row: shuffle · [prev | PLAY | next] · repeat
-    val margin = dp(18f); val toggle = dp(48f); val tgap = dp(10f); val joint = dp(5f)
-    val avail2 = paneW - 2 * margin - 2 * toggle - 2 * tgap
-    val playW = (avail2 * 0.47f).coerceAtMost(dp(132f))
-    val side = ((avail2 - 2 * joint - playW) / 2f).coerceAtMost(dp(72f))
-    val groupW = side * 2 + playW + 2 * joint
-    val gx = (paneW - groupW) / 2f
-    val prevFull = Rect(gx, controlsY + dp(4f), gx + side, controlsY + dp(84f))
-    val playFull = Rect(prevFull.right + joint, controlsY, prevFull.right + joint + playW, controlsY + dp(88f))
-    val nextFull = Rect(playFull.right + joint, controlsY + dp(4f), playFull.right + joint + side, controlsY + dp(84f))
+    // ⏮ ⏯ ⏭ fill the middle in three equal parts (80dp tall, 6dp apart); the tapped one widens while the others squeeze
+    val margin = dp(18f); val toggle = dp(48f); val tgap = dp(10f); val joint = dp(6f)
+    val avail2 = min(paneW - 2 * margin - 2 * toggle - 2 * tgap, dp(420f))
+    val third = (avail2 - 2 * joint) / 3f
+    val gx = (paneW - avail2) / 2f
+    val prevFull = Rect(gx, controlsY + dp(4f), gx + third, controlsY + dp(84f))
+    val playFull = Rect(prevFull.right + joint, controlsY + dp(4f), prevFull.right + joint + third, controlsY + dp(84f))
+    val nextFull = Rect(playFull.right + joint, controlsY + dp(4f), playFull.right + joint + third, controlsY + dp(84f))
     val toggleY = controlsY + dp(20f)
     val shuffle = Rect(margin, toggleY, margin + toggle, toggleY + toggle)
     val repeat = Rect(paneW - margin - toggle, toggleY, paneW - margin, toggleY + toggle)

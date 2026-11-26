@@ -45,8 +45,8 @@ fun FoldersScreen() {
     Box(Modifier.fillMaxSize()) {
     LazyColumn(Modifier.fillMaxSize().testTag("folders"), state = listState, contentPadding = PaddingValues(bottom = LocalDockPadding.current)) {
         item {
-            PageHeader("Folders", Modifier.statusBarsPadding()) {
-                IconButton(onClick = { nav.go(R0.SEARCH) }) { Icon(Icons.Rounded.Search, "Search") }
+            PageHeader("Folders", Modifier.statusBarsPadding(), inlineTitle = true) {
+                TopActions(TopAction(Icons.Rounded.Search, "Search", "open_search") { nav.go(R0.SEARCH) })
             }
         }
         if (!lib.loaded) { items(6) { ShimmerRow(cs.surfaceContainerHigh) }; return@LazyColumn }

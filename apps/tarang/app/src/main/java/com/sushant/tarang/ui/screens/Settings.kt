@@ -141,11 +141,7 @@ fun SettingsScreen() {
                 GroupRow("Reset stats", "Clear all listening history", Icons.Rounded.RestartAlt, Tone.GREY, "set_reset") { dialog = "reset" }
             }
 
-            Row(Modifier.fillMaxWidth().padding(16.dp).clip(RoundedCornerShape(24.dp)).background(cs.secondaryContainer).padding(16.dp)) {
-                Icon(Icons.Rounded.Shield, null, tint = cs.onSecondaryContainer)
-                Spacer(Modifier.width(14.dp))
-                Text("Tarang has no internet access. Your music, stats and lyrics never leave your phone.", style = MaterialTheme.typography.bodyMedium, color = cs.onSecondaryContainer)
-            }
+            Spacer(Modifier.height(16.dp))
             SettingsGroup {
                 GroupRow("About", "Version, developer", Icons.Rounded.Info, Tone.GREY, "set_about") { nav.go(R0.ABOUT) }
             }
@@ -229,18 +225,17 @@ fun AboutScreen() {
     val cs = MaterialTheme.colorScheme
     Column(Modifier.fillMaxSize().testTag("about")) {
         InnerTopBar("About", nav::back)
-        Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(24.dp).padding(bottom = LocalDockPadding.current), horizontalAlignment = Alignment.CenterHorizontally) {
+        // no page padding on the sides: the cards keep the same 14dp edges as on every other page
+        Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(top = 24.dp, bottom = 24.dp).padding(bottom = LocalDockPadding.current), horizontalAlignment = Alignment.CenterHorizontally) {
             AppIcon(112.dp)
             Spacer(Modifier.height(16.dp))
             Text("Tarang", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
-            Spacer(Modifier.height(6.dp))
-            Text("Your offline music player", style = MaterialTheme.typography.bodyLarge, textAlign = TextAlign.Center, color = cs.onSurfaceVariant)
             Spacer(Modifier.height(28.dp))
             // tapping Version 5 times opens Diagnostics (not mentioned anywhere in the app)
             var taps by remember { mutableIntStateOf(0) }
             var lastTap by remember { mutableLongStateOf(0L) }
-            SettingsGroup(Modifier.padding(horizontal = 0.dp)) {
-                GroupRow("Version", "${BuildConfig.VERSION_NAME} (build ${BuildConfig.VERSION_CODE})", Icons.Rounded.NewReleases, Tone.GREY, "about_version") {
+            SettingsGroup(Modifier.testTag("about_cards")) {
+                GroupRow("Version", "${BuildConfig.VERSION_NAME} (build ${BuildConfig.VERSION_CODE})", Icons.Rounded.Tag, Tone.GREY, "about_version") {
                     val now = System.currentTimeMillis()
                     taps = if (now - lastTap < 1500) taps + 1 else 1
                     lastTap = now
@@ -251,9 +246,6 @@ fun AboutScreen() {
                     runCatching { ctx.startActivity(Intent(Intent.ACTION_SENDTO, Uri.parse("mailto:sushant.sare@gmail.com")).putExtra(Intent.EXTRA_SUBJECT, "Tarang")) }
                 }
             }
-            Spacer(Modifier.height(20.dp))
-            Text("Built with Jetpack Compose, Media3 and Room. Song details editing uses jaudiotagger (LGPL). Fonts: Google Sans Flex (OFL).",
-                style = MaterialTheme.typography.bodySmall, color = cs.onSurfaceVariant, textAlign = TextAlign.Center)
         }
     }
 }

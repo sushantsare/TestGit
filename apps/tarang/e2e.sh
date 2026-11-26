@@ -120,9 +120,23 @@ else
   GEST=FAILED; echo "gestures: full player did not open" >> $LOG
 fi
 echo "gestures=$GEST" >> $LOG
+adb shell input keyevent KEYCODE_MEDIA_PAUSE; sleep 2
+# ---------- quit and come back: the mini player shows the same song, paused, at the same spot (no banner)
+desc() { adb shell dumpsys media_session | tr -d '\r' | grep -A40 "$PKG" | grep -m1 -o "description=[^,]*"; }
+pos() { adb shell dumpsys media_session | tr -d '\r' | grep -A40 "$PKG" | grep -m1 -oE "position=[0-9]+" | grep -oE "[0-9]+"; }
+D0=$(desc); P0=$(pos)
+adb shell am force-stop $PKG; sleep 1; adb shell am start -W -n $ACT >/dev/null 2>&1; sleep 6; shot resume_after_quit
+D1=$(desc); P1=$(pos); S1=$(state)
+RES=FAILED
+if hasid mini_player && ! hasid continue_card && [ -n "$D0" ] && [ "$D0" = "$D1" ] && [ "$S1" != "3" ]; then
+  # position within 6 s of where it stopped (it is saved on pause)
+  if [ -n "$P0" ] && [ -n "$P1" ] && [ $(( P1 > P0 ? P1 - P0 : P0 - P1 )) -le 6000 ]; then RES=PASSED; fi
+fi
+echo "resume song0='$D0' song1='$D1' pos0=$P0 pos1=$P1 state=$S1 mini=$(hasid mini_player && echo yes || echo no)" >> $LOG
+echo "resume=$RES" >> $LOG
+# ▶ continues from there
+tapid btn_play; sleep 3; S2=$(state); echo "resume_play state=$S2" >> $LOG; shot resume_playing
 adb shell input keyevent KEYCODE_MEDIA_PAUSE; sleep 1
-# fresh start after the app was closed: "Continue listening" card, no mini player
-adb shell am force-stop $PKG; adb shell am start -W -n $ACT >/dev/null 2>&1; sleep 5; shot continue_listening
 
 # ---------- monkey (random taps everywhere)
 adb logcat -c
@@ -187,5 +201,5 @@ if [ $MAIN = 1 ]; then
   $BT/aapt dump badging $REL | head -3 > $A/badging.txt 2>&1
   cat $A/summary.txt >> $LOG
 fi
-grep -q "launch=PASSED" $LOG && grep -q "playback=PASSED" $LOG && grep -q "gestures=PASSED" $LOG && grep -q "setup_guide=PASSED" $LOG && grep -q "monkey_crashes_$TAG=0" $LOG && echo PASSED > $OUT/E2E || echo FAILED > $OUT/E2E
+grep -q "launch=PASSED" $LOG && grep -q "playback=PASSED" $LOG && grep -q "gestures=PASSED" $LOG && grep -q "resume=PASSED" $LOG && grep -q "setup_guide=PASSED" $LOG && grep -q "monkey_crashes_$TAG=0" $LOG && echo PASSED > $OUT/E2E || echo FAILED > $OUT/E2E
 exit 0

@@ -90,7 +90,7 @@ fun SongListScreen(kind: ListKind) {
         else InnerTopBar(if (reorder) "Reorder" else "", { if (reorder) reorder = false else nav.back() }) {
             if (reorder) TextButton(onClick = { playlist?.let { vm.reorderPlaylist(it.id, order.map { s -> s.id }) }; reorder = false }, Modifier.testTag("reorder_done")) { Text("Done") }
             else if (kind is ListKind.PlaylistList || kind is ListKind.FolderList) Box {
-                IconButton(onClick = { menu = true }, Modifier.testTag("list_menu")) { Icon(Icons.Rounded.MoreVert, "More options") }
+                TopActions(TopAction(Icons.Rounded.MoreVert, "More options", "list_menu") { menu = true })
                 DropdownMenu(menu, { menu = false }) {
                     if (kind is ListKind.PlaylistList) {
                         DropdownMenuItem(text = { Text("Rename") }, leadingIcon = { Icon(Icons.Rounded.Edit, null) }, onClick = { menu = false; renaming = true })
@@ -105,7 +105,7 @@ fun SongListScreen(kind: ListKind) {
         val rowH = with(LocalDensity.current) { 60.dp.toPx() }
         var dragFrom by remember { mutableIntStateOf(-1) }
         var dragY by remember { mutableFloatStateOf(0f) }
-        LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = LocalDockPadding.current)) {
+        LazyColumn(Modifier.fillMaxSize().testTag("song_rows"), contentPadding = PaddingValues(bottom = LocalDockPadding.current)) {
             item {
                 // header card
                 Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp).clip(RoundedCornerShape(28.dp)).background(cs.surfaceContainer).padding(20.dp).testTag("list_header")) {
@@ -148,7 +148,7 @@ fun SongListScreen(kind: ListKind) {
                             }, onDragCancel = { dragFrom = -1; dragY = 0f }) { c, a -> c.consume(); dragY += a.y }
                     }.testTag("drag_$i"), contentAlignment = Alignment.Center) { Icon(Icons.Rounded.DragHandle, "Drag to reorder") }
                 } else SongRow(
-                    s, playing = s.id == ui.currentId, number = if (model.numbered) i + 1 else null, selected = s.id in selected,
+                    s, index = i, count = rows.size, number = if (model.numbered) i + 1 else null, selected = s.id in selected,
                     onClick = { if (selected.isNotEmpty()) selected = if (s.id in selected) selected - s.id else selected + s.id else vm.player.tapSong(s, model.songs, model.kind, label) },
                     onLongClick = { selected = selected + s.id },
                     onMore = { nav.songMenu(s, (kind as? ListKind.PlaylistList)?.id) },

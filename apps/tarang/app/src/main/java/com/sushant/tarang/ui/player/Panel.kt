@@ -32,6 +32,7 @@ import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -48,6 +49,8 @@ import com.sushant.tarang.ui.LocalPlayerActions
 import com.sushant.tarang.ui.LocalVm
 import com.sushant.tarang.ui.components.Cover
 import com.sushant.tarang.ui.components.DancingBars
+import com.sushant.tarang.ui.components.TopAction
+import com.sushant.tarang.ui.components.TopActions
 import com.sushant.tarang.ui.theme.CoverColors
 import com.sushant.tarang.ui.theme.RoundTitle
 import kotlinx.coroutines.Dispatchers
@@ -98,13 +101,19 @@ private fun PanelImpl(g: PanelGeo, c: CoverColors, ui: PlayerUi, song: Song, sta
     val top = peekTop + (openTop - peekTop) * q
     // one gesture = one job: pull up (or down while open) moves the page; pulling down on the closed strip closes the player
     var mode by remember { mutableIntStateOf(0) }   // 0 undecided, 1 page, 2 close player
+    // the finger's position is tracked here; the panel follows it, and on release it always finishes the move
+    val track = remember { DragTrack() }
     val drag = rememberDraggableState { delta ->
         if (mode == 0) {
             mode = if (state.panel.value <= 0.001f && delta > 0) 2 else 1
-            if (mode == 2) collapse.onStart() else if (state.panel.value <= 0.001f) state.tab = 0
+            if (mode == 2) collapse.onStart() else { if (state.panel.value <= 0.001f) state.tab = 0; track.start = state.panel.value; track.pos = track.start }
         }
         if (mode == 2) collapse.onDelta(delta)
-        else scope.launch { state.panel.snapTo((state.panel.value - delta / (peekTop - openTop)).coerceIn(0f, 1f)) }
+        else {
+            track.pos = (track.pos - delta / (peekTop - openTop)).coerceIn(0f, 1f)
+            val v = track.pos
+            track.job = scope.launch { state.panel.snapTo(v) }
+        }
     }
     val openTab: (Int) -> Unit = { i -> state.tab = i; scope.launch { state.panel.animateTo(1f, snapSpec()) } }
 
@@ -123,9 +132,18 @@ private fun PanelImpl(g: PanelGeo, c: CoverColors, ui: PlayerUi, song: Song, sta
             .background(c.panel.copy(alpha = q))                    // no sheet at all while closed: it sits on the player's colour
             .draggable(drag, Orientation.Vertical, onDragStarted = { mode = 0 }, onDragStopped = { v ->
                 if (mode == 2) collapse.onStop(v)
-                else {
-                    val open = if (kotlin.math.abs(v) > 600f) v < 0 else state.panel.value > 0.4f
-                    state.panel.animateTo(if (open) 1f else 0f, snapSpec())
+                else if (mode == 1) {
+                    track.job?.join()                          // no late finger update can stop the move halfway
+                    val moved = track.pos - track.start        // + = opening, - = closing
+                    // finger speed first, then the way it moved: once you let go it always goes all the way
+                    val open = when {
+                        v < -150f -> true
+                        v > 150f -> false
+                        moved > 0.02f -> true
+                        moved < -0.02f -> false
+                        else -> track.start > 0.5f
+                    }
+                    state.panel.animateTo(if (open) 1f else 0f, snapSpec(), initialVelocity = -v / (peekTop - openTop))
                 }
                 mode = 0
             })
@@ -170,11 +188,10 @@ private fun UpNext(c: CoverColors, ui: PlayerUi) {
                 if (ui.queueIds.isEmpty()) "The queue is empty" else "Playing from ${ctxLabel.ifEmpty { "your music" }} · ${ui.index + 1} of ${ui.queueIds.size}" +
                     if (ui.shuffle) " · shuffled" else "",
                 color = c.onPanelVariant, style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
-            IconButton(onClick = { scope.launch { listState.animateScrollToItem((ui.index - 1).coerceAtLeast(0)) } }, modifier = Modifier.testTag("queue_locate")) {
-                Icon(Icons.Rounded.MyLocation, "Jump to the song playing now", tint = c.onPanelVariant)
-            }
             Box {
-                IconButton(onClick = { menu = true }, modifier = Modifier.testTag("queue_menu")) { Icon(Icons.Rounded.MoreVert, "Queue options", tint = c.onPanelVariant) }
+                TopActions(TopAction(Icons.Rounded.MyLocation, "Jump to the song playing now", "queue_locate") { scope.launch { listState.animateScrollToItem((ui.index - 1).coerceAtLeast(0)) } },
+                    TopAction(Icons.Rounded.MoreVert, "Queue options", "queue_menu") { menu = true },
+                    container = c.chip.compositeOver(c.panel), content = c.onPanel)
                 DropdownMenu(menu, { menu = false }) {
                     DropdownMenuItem(text = { Text("Save as playlist") }, leadingIcon = { Icon(Icons.AutoMirrored.Rounded.PlaylistAdd, null) },
                         onClick = { menu = false; act.saveQueueAsPlaylist() }, modifier = Modifier.testTag("queue_save"))
@@ -191,23 +208,29 @@ private fun UpNext(c: CoverColors, ui: PlayerUi) {
                 val s = lib.byId[id] ?: return@itemsIndexed
                 val now = i == ui.index
                 val first = i == 0; val last = i == ui.queueIds.lastIndex
-                val shape = RoundedCornerShape(if (first) 24.dp else 6.dp, if (first) 24.dp else 6.dp, if (last) 24.dp else 6.dp, if (last) 24.dp else 6.dp)
+                // grouped cards; the song playing now becomes a pill with a round cover
+                val shape = if (now) RoundedCornerShape(40.dp) else RoundedCornerShape(if (first) 24.dp else 4.dp, if (first) 24.dp else 4.dp, if (last) 24.dp else 4.dp, if (last) 24.dp else 4.dp)
                 val dismiss = rememberSwipeToDismissBoxState()
                 LaunchedEffect(dismiss.currentValue) { if (dismiss.currentValue != SwipeToDismissBoxValue.Settled) act.removeAt(i) }
                 SwipeToDismissBox(dismiss, enableDismissFromStartToEnd = !now, enableDismissFromEndToStart = !now, modifier = Modifier.padding(bottom = 3.dp), backgroundContent = {
-                    Box(Modifier.fillMaxSize().clip(shape).background(MaterialTheme.colorScheme.errorContainer).padding(horizontal = 24.dp), contentAlignment = Alignment.CenterEnd) {
-                        Icon(Icons.Rounded.Delete, "Remove", tint = MaterialTheme.colorScheme.onErrorContainer)
+                    // the red "remove" layer exists only while the row is being swiped, so it never shows through the card
+                    if (dismiss.dismissDirection != SwipeToDismissBoxValue.Settled) {
+                        val toEnd = dismiss.dismissDirection == SwipeToDismissBoxValue.StartToEnd
+                        Box(Modifier.fillMaxSize().clip(shape).background(MaterialTheme.colorScheme.errorContainer).padding(horizontal = 24.dp),
+                            contentAlignment = if (toEnd) Alignment.CenterStart else Alignment.CenterEnd) {
+                            Icon(Icons.Rounded.Delete, "Remove", tint = MaterialTheme.colorScheme.onErrorContainer)
+                        }
                     }
                 }) {
                     Row(
                         Modifier.fillMaxWidth().height(63.dp)
                             .graphicsLayer { if (dragFrom == i) { translationY = dragY; shadowElevation = 12f } }
                             .clip(shape)
-                            .background(if (now) lerp(c.chip, c.accent, 0.16f) else c.chip)
+                            .background(c.chip.compositeOver(c.panel).let { solid -> if (now) lerp(solid, c.accent, 0.24f) else solid })
                             .clickable { act.playAt(i) }.padding(start = 14.dp, end = 4.dp).testTag("queue_row_$i"),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Cover(s, 46.dp, RoundedCornerShape(14.dp))
+                        Cover(s, 46.dp, if (now) CircleShape else RoundedCornerShape(14.dp))
                         Spacer(Modifier.width(14.dp))
                         Column(Modifier.weight(1f)) {
                             Text(s.title, style = RoundTitle, fontSize = 15.sp, color = if (now) c.accent else c.onPanel, maxLines = 1, overflow = TextOverflow.Ellipsis)

@@ -34,7 +34,7 @@ fun SoundSheetContent() {
     Column(Modifier.fillMaxWidth().testTag("sound")) {
         Row(Modifier.fillMaxWidth().padding(start = 24.dp, end = 12.dp), verticalAlignment = Alignment.CenterVertically) {
             Text("Sound", style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
-            IconButton(onClick = { confirmReset = true }, Modifier.testTag("sound_reset")) { Icon(Icons.Rounded.RestartAlt, "Reset sound") }
+            TopActions(TopAction(Icons.Rounded.RestartAlt, "Reset sound", "sound_reset") { confirmReset = true })
         }
         Column(Modifier.fillMaxWidth()) {
             ListItemRow("Equalizer", if (s.eqEnabled) "On · ${s.eqPreset}" else "Off", Icons.Rounded.Equalizer, iconTone = 0,

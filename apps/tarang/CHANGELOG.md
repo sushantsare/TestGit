@@ -1,5 +1,16 @@
 # Tarang changelog
 
+## 1.4.0 · 27 Nov 2026
+- Every song list (Library, folders, albums, artists, playlists, Liked songs, search, Most played, Top songs, Up next) uses connected cards: round at the top of the first card and the bottom of the last.
+- The song playing now is clearly marked in every list, wherever you started it: it turns into an accent pill with a round cover and dancing bars that freeze while paused.
+- ⏮ ⏯ ⏭ fill the row between shuffle and repeat; tapping one widens it while the others squeeze, then they spring back.
+- The Up next / Lyrics page never stops halfway: once you let go it finishes opening or closing.
+- Up next rows no longer show a faint trash icon behind the drag handle.
+- Reopening the app shows the last song in the mini player, paused where you left off; the "Continue listening" banner is gone.
+- Top-bar buttons: a single icon sits in a circle; two side by side form one connected pill.
+- Folders and Library titles sit on the same row as their buttons.
+- About: removed the tagline and the "Built with" line, the cards are as wide as everywhere else, and Version has a # icon. Settings: removed the no-internet card.
+
 ## 1.3.0 · 27 Nov 2026
 - New first-launch welcome and step-by-step setup (music access, notifications, folders to skip, theme).
 - New full player: "Now playing" top bar, round buttons, cover carousel (with an optional peek of the next cover), round heart, thicker wavy seek bar, joined ⏮ ⏯ ⏭ that squish when pressed, Sleep · Lyrics · Playlist toolbar.

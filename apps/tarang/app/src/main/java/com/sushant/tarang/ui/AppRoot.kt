@@ -158,7 +158,6 @@ private fun Shell(vm: MainVm, activity: MainActivity) {
     val ui by vm.player.ui.collectAsState()
     val song by vm.currentSong.collectAsState()
     val liked by vm.liked.collectAsState()
-    val played by vm.hub.playedThisSession.collectAsState()
     val sleepEnds by vm.hub.sleepEndsAt.collectAsState()
     val sleepAfter by vm.hub.sleepAfterSong.collectAsState()
     val entry by nav.currentBackStackEntryAsState()
@@ -166,8 +165,8 @@ private fun Shell(vm: MainVm, activity: MainActivity) {
     val wide = LocalConfiguration.current.screenWidthDp >= 600
     val onTab = route in R0.TABS
     val navVisible = !wide && onTab
-    // mini player shows once something has played in this session; before that Home shows "Continue listening"
-    val miniVisible = song != null && ui.hasSong && (played || ui.isPlaying)
+    // the last song is remembered across app restarts: the mini player shows it (paused, at the saved spot) right away
+    val miniVisible = song != null && ui.hasSong
     // keep showing the last song while the full player is open (e.g. after switching to an empty queue)
     var lastSong by remember { mutableStateOf<Song?>(null) }
     LaunchedEffect(song) { if (song != null) lastSong = song }
@@ -259,7 +258,8 @@ private fun Shell(vm: MainVm, activity: MainActivity) {
     val sysBottom = WindowInsets.systemBars.asPaddingValues().calculateBottomPadding()
     val dock: Dp = sysBottom + (if (navVisible) 76.dp else 0.dp) + (if (miniVisible) (if (navVisible) 76.dp else 86.dp) else 0.dp) + 12.dp
 
-    CompositionLocalProvider(LocalNav provides appNav, LocalPlayerActions provides actions, LocalDockPadding provides dock) {
+    CompositionLocalProvider(LocalNav provides appNav, LocalPlayerActions provides actions, LocalDockPadding provides dock,
+        com.sushant.tarang.ui.components.LocalNowPlaying provides com.sushant.tarang.ui.components.NowPlaying(if (miniVisible) ui.currentId else null, ui.isPlaying)) {
         Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
             // the screen behind shrinks a little while the player opens (finished by 70% of the way)
             val p = sheetState.progress.value

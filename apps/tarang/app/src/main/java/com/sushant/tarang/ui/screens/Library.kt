@@ -60,9 +60,9 @@ fun LibraryScreen() {
     Box(Modifier.fillMaxSize()) {
     Column(Modifier.fillMaxSize().testTag("library")) {
         if (selecting) SelectionBar(selected, lib.songs.map { it.id }, onClear = { selected = emptySet() }, onAll = { selected = lib.songs.map { it.id }.toSet() })
-        else PageHeader("Library", Modifier.statusBarsPadding()) {
-            IconButton(onClick = { nav.go(R0.SEARCH) }) { Icon(Icons.Rounded.Search, "Search") }
-            if (tab != 3) IconButton(onClick = { sortDialog = true }, Modifier.testTag("sort")) { Icon(Icons.Rounded.Sort, "Sort") }
+        else PageHeader("Library", Modifier.statusBarsPadding(), inlineTitle = true) {
+            TopActions(TopAction(Icons.Rounded.Search, "Search", "open_search") { nav.go(R0.SEARCH) },
+                if (tab != 3) TopAction(Icons.Rounded.Sort, "Sort", "sort") { sortDialog = true } else null)
         }
         PrimaryTabRow(selectedTabIndex = tab, containerColor = MaterialTheme.colorScheme.background) {
             LIB_TABS.forEachIndexed { i, t -> Tab(tab == i, { tab = i; selected = emptySet() }, text = { Text(t) }, modifier = Modifier.testTag("libtab_${t.lowercase()}")) }
@@ -155,7 +155,7 @@ private fun SongsTab(songs: List<Song>, sort: SongSort, selected: Set<Long>, set
         }
         itemsIndexed(songs, key = { _, s -> s.id }) { i, s ->
             Box {
-                SongRow(s, playing = s.id == ui.currentId, selected = s.id in selected,
+                SongRow(s, index = i, count = songs.size, selected = s.id in selected,
                     onClick = { if (selected.isNotEmpty()) setSelected(if (s.id in selected) selected - s.id else selected + s.id) else vm.player.tapSong(s, songs, "Library", "All songs") },
                     onLongClick = { if (selected.isNotEmpty()) setSelected(selected + s.id) else longFor = s.id },
                     onMore = { nav.songMenu(s) })

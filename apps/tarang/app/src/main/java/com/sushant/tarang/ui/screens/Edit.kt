@@ -131,7 +131,7 @@ fun LyricsEditScreen(songId: Long) {
     BackHandler(changed) { leave = true }
     Column(Modifier.fillMaxSize().imePadding().testTag("lyrics_edit")) {
         InnerTopBar("Lyrics", { if (changed) leave = true else nav.back() }) {
-            if (!original.isNullOrBlank()) IconButton(onClick = { remove = true }) { Icon(Icons.Rounded.DeleteOutline, "Remove lyrics") }
+            if (!original.isNullOrBlank()) TopActions(TopAction(Icons.Rounded.DeleteOutline, "Remove lyrics", "lyrics_remove") { remove = true })
             TextButton(onClick = { vm.saveLyrics(song.id, text.orEmpty(), "Typed in Tarang"); nav.back() }, enabled = changed, modifier = Modifier.testTag("lyrics_save")) { Text("Save") }
         }
         Text(song.title + " · " + song.artist, style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(horizontal = 20.dp))

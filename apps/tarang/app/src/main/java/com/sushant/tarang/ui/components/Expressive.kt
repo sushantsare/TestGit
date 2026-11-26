@@ -27,17 +27,19 @@ import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.sin
 
-/** Three little bars that dance next to the song playing now (still when paused). */
+/** Three little bars that dance next to the song playing now (frozen in place when paused). */
 @Composable
 fun DancingBars(color: Color, playing: Boolean, modifier: Modifier = Modifier, height: Dp = 18.dp) {
     val tr = rememberInfiniteTransition(label = "bars")
     val a by tr.animateFloat(0.3f, 1f, infiniteRepeatable(tween(420, easing = FastOutSlowInEasing), RepeatMode.Reverse), label = "a")
     val b by tr.animateFloat(1f, 0.25f, infiniteRepeatable(tween(520, easing = FastOutSlowInEasing), RepeatMode.Reverse), label = "b")
     val c by tr.animateFloat(0.45f, 0.95f, infiniteRepeatable(tween(360, easing = FastOutSlowInEasing), RepeatMode.Reverse), label = "c")
-    val hs = if (playing) listOf(a, b, c) else listOf(0.45f, 0.8f, 0.35f)
-    Canvas(modifier.size(height * 1.1f, height).semantics { contentDescription = "Playing now" }.testTag("dancing_bars")) {
+    // when paused, the bars stop exactly where they were (frozen), and carry on from there when it plays again
+    val last = remember { floatArrayOf(0.45f, 0.8f, 0.35f) }
+    Canvas(modifier.size(height * 1.1f, height).semantics { contentDescription = if (playing) "Playing now" else "Paused" }.testTag(if (playing) "dancing_bars" else "dancing_bars_paused")) {
+        if (playing) { last[0] = a; last[1] = b; last[2] = c }
         val w = size.width / 5f
-        hs.forEachIndexed { i, f ->
+        last.forEachIndexed { i, f ->
             val bh = size.height * f
             drawRoundRect(color, Offset(i * 2 * w, size.height - bh), Size(w, bh), CornerRadius(w / 2, w / 2))
         }

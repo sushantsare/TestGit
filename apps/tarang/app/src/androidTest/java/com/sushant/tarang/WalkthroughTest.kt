@@ -110,6 +110,25 @@ class WalkthroughTest {
     private fun isFull() = has("full_player") && !has("mini_player")
     private fun isMini() = has("mini_player") && !has("full_player")
     private fun settle() { Thread.sleep(1300); compose.waitForIdle() }
+    private val playingNow = SemanticsMatcher.expectValue(androidx.compose.ui.semantics.SemanticsProperties.StateDescription, "Playing now")
+    /** The song playing now must be marked as playing in this list, wherever it was started from. */
+    private fun checkMarked(listTag: String, where: String) {
+        val id = current() ?: return
+        runCatching { compose.onNodeWithTag(listTag, useUnmergedTree = true).performScrollToNode(hasTestTag("song_$id")) }
+        compose.waitForIdle(); Thread.sleep(300)
+        val ok = compose.onAllNodes(hasTestTag("song_$id") and playingNow, useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty()
+        if (!ok) problem("playing song not marked in $where") else shot("marked_in_${where.replace(' ', '_')}")
+        val others = compose.onAllNodes(playingNow, useUnmergedTree = true).fetchSemanticsNodes().size
+        if (others > 1) problem("more than one song marked as playing in $where")
+    }
+    /** Big title and the top-bar buttons share one row. */
+    private fun checkInlineTitle(where: String, buttonTag: String) {
+        val t = bounds("page_title"); val b = bounds(buttonTag)
+        if (t == null || b == null) { problem("$where: title or $buttonTag missing"); return }
+        val c = (t.top + t.bottom) / 2f
+        if (c < b.top || c > b.bottom) problem("$where: big title is not on the same row as the buttons")
+        if (t.right > b.left + 1f) problem("$where: title overlaps the buttons")
+    }
 
     /** While the player moves between full and mini, the cover must stay inside the player (never cut off mid-screen). */
     private fun checkCoverInside(at: String) {
@@ -161,16 +180,20 @@ class WalkthroughTest {
         if (app.repo.library.value.songs.any { it.folderName == "WhatsApp Audio" }) problem("WhatsApp audio should be hidden by default")
         if (has("tab_stats")) problem("Stats tab should be gone from the dock")
         waitTag("greeting_icon")
+        if (has("continue_card")) problem("the Continue listening banner should be gone")
+        if (!has("open_search") || !has("open_settings")) problem("Home: Search / Settings buttons missing")
         shot("home_fresh")
 
         // ---- Folders → folder → play all
         tab("folders", "folders"); shot("folders")
+        checkInlineTitle("Folders", "open_search")
         click("chip_Most songs"); shot("folders_most_songs"); click("chip_Name")
         clickTo("folder_Bollywood", "song_list"); Thread.sleep(700); shot("folder_detail")
         waitTag("grow_cover", 3000, soft = true)
         click("play_all")
         if (!waitTag("mini_player", 10_000)) return
         Thread.sleep(2500); shot("folder_playing_mini")
+        checkMarked("song_rows", "folder")
         song("Kesariya.mp3")?.let { s -> click("more_${s.id}"); waitTag("sheet"); shot("song_menu"); back() }
 
         // ---- full player
@@ -186,6 +209,30 @@ class WalkthroughTest {
         if (has("panel_header")) problem("ghost bar visible while Up next / Lyrics is closed")
         if (waitTag("peek_line", 4000)) shot("player_strip_up_next")
         waitTag("player_toolbar"); if (!has("extra_lyrics")) problem("Lyrics button missing in the toolbar")
+
+        // ---- ⏮ ⏯ ⏭: three equal parts; holding one widens it and squeezes its neighbours
+        val w0 = listOf("btn_prev", "btn_play", "btn_next").map { bounds(it)?.width ?: 0f }
+        if (w0.any { it <= 0f }) problem("player buttons missing")
+        else if (w0.max() - w0.min() > 3f) problem("⏮ ⏯ ⏭ should be equal widths at rest ($w0)")
+        if (!has("shuffle") || !has("repeat")) problem("shuffle / repeat should stay at the ends of the row")
+        compose.onNodeWithTag("btn_next", useUnmergedTree = true).performTouchInput { down(center) }
+        Thread.sleep(400); compose.waitForIdle()
+        val w1 = listOf("btn_prev", "btn_play", "btn_next").map { bounds(it)?.width ?: 0f }
+        shot("buttons_pressing_next")
+        if (!(w1[2] > w0[2] * 1.04f && w1[0] < w0[0] * 0.95f && w1[1] < w0[1] * 0.95f)) problem("holding Next did not widen it and squeeze the others ($w0 → $w1)")
+        val outer0 = (bounds("btn_next")?.right ?: 0f) - (bounds("btn_prev")?.left ?: 0f)
+        compose.onNodeWithTag("btn_next", useUnmergedTree = true).performTouchInput { up() }
+        settle()
+        compose.onNodeWithTag("btn_play", useUnmergedTree = true).performTouchInput { down(center) }
+        Thread.sleep(400); compose.waitForIdle()
+        val w2 = listOf("btn_prev", "btn_play", "btn_next").map { bounds(it)?.width ?: 0f }
+        val outer1 = (bounds("btn_next")?.right ?: 0f) - (bounds("btn_prev")?.left ?: 0f)
+        shot("buttons_pressing_play")
+        compose.onNodeWithTag("btn_play", useUnmergedTree = true).performTouchInput { up() }
+        if (!(w2[1] > w0[1] * 1.04f && w2[0] < w0[0] * 0.95f)) problem("holding Play did not widen it ($w0 → $w2)")
+        if (kotlin.math.abs(outer1 - outer0) > 3f) problem("the button group's outer edges moved while pressing")
+        settle()
+        if (!playing()) { click("btn_play"); settle() }
 
         // ---- cover carousel: every swipe changes the song exactly once
         val t0 = title(); val c0 = current()
@@ -280,7 +327,43 @@ class WalkthroughTest {
 
         // ---- Up next (one queue) and its tools
         click("btn_next"); Thread.sleep(1200); shot("player_next_song")
+        val closedTop = bounds("panel")?.top
         click("peek_line"); waitTag("queue_list"); Thread.sleep(700); shot("player_up_next")
+        if (compose.onAllNodesWithContentDescription("Remove", useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty())
+            problem("a remove (trash) icon is drawn behind Up next rows")
+        if (!has("queue_locate") || !has("queue_menu")) problem("Up next header buttons missing")
+        val openTop = bounds("panel")?.top
+        back(); settle()
+        if (closedTop != null && openTop != null) {
+            // short slow pull up, let go: it must open fully
+            compose.onNodeWithTag("peek_line", useUnmergedTree = true).performTouchInput {
+                down(center); repeat(10) { moveBy(Offset(0f, -14f), delayMillis = 40) }; Thread.sleep(300); up()
+            }
+            settle(); shot("panel_after_short_pull_up")
+            val t1 = bounds("panel")?.top ?: closedTop
+            if (kotlin.math.abs(t1 - openTop) > 8f) problem("Up next stopped halfway after a short pull up ($t1 vs $openTop)")
+            // drag about half way up slowly and hold before letting go: still opens fully
+            back(); settle()
+            val half = (closedTop - openTop) * 0.45f
+            compose.onNodeWithTag("peek_line", useUnmergedTree = true).performTouchInput {
+                down(center); repeat(20) { moveBy(Offset(0f, -half / 20f), delayMillis = 30) }
+            }
+            Thread.sleep(150); compose.waitForIdle(); shot("panel_half_way")
+            compose.onNodeWithTag("peek_line", useUnmergedTree = true).performTouchInput { Thread.sleep(400); up() }
+            settle()
+            val t2 = bounds("panel")?.top ?: closedTop
+            if (kotlin.math.abs(t2 - openTop) > 8f) problem("Up next stopped halfway after a slow half pull ($t2 vs $openTop)")
+            // short pull down on the open page: closes fully
+            compose.onNodeWithTag("panel", useUnmergedTree = true).performTouchInput {
+                down(Offset(centerX, 30f)); repeat(10) { moveBy(Offset(0f, 14f), delayMillis = 40) }; Thread.sleep(300); up()
+            }
+            settle(); shot("panel_after_short_pull_down")
+            val t3 = bounds("panel")?.top ?: openTop
+            if (kotlin.math.abs(t3 - closedTop) > 8f) problem("Up next stopped halfway after a short pull down ($t3 vs $closedTop)")
+            if (kotlin.math.abs(t3 - closedTop) > 8f) back()
+            settle()
+            click("peek_line"); waitTag("queue_list"); Thread.sleep(500)
+        }
         if (has("queue_2")) problem("old Queue 2 still shown")
         click("queue_locate"); click("queue_menu"); waitTag("queue_save"); shot("queue_menu"); back()
         back(); settle()
@@ -321,6 +404,18 @@ class WalkthroughTest {
 
         // ---- Library + floating selection toolbar
         tab("library", "library"); waitTag("songs_list"); shot("library_songs")
+        checkInlineTitle("Library", "open_search")
+        if (!has("sort")) problem("Library: Sort button missing")
+        checkMarked("songs_list", "library")
+        // the playing song is marked on its album and artist pages too
+        val curSong = app.repo.library.value.byId[current()]
+        curSong?.let { cs ->
+            app.repo.library.value.albums.firstOrNull { a -> a.songs.any { it.id == cs.id } }?.let { a ->
+                go(com.sushant.tarang.ui.R0.album(a.id), "song_list"); Thread.sleep(800); checkMarked("song_rows", "album"); back() }
+            app.repo.library.value.artists.firstOrNull { a -> a.songs.any { it.id == cs.id } }?.let { a ->
+                go(com.sushant.tarang.ui.R0.artist(a.name), "song_list"); Thread.sleep(800); checkMarked("song_rows", "artist"); back() }
+            tab("library", "library")
+        }
         click("sort"); waitTag("dialog_ok", 2000, soft = true); shot("library_sort_dialog"); back()
         click("select"); waitTag("selection_toolbar"); shot("library_select"); click("select_all"); Thread.sleep(400); shot("library_select_all")
         if (!has("selected_count_${app.repo.library.value.songs.size}") && compose.onAllNodesWithText("${app.repo.library.value.songs.size} selected", substring = true, useUnmergedTree = true).fetchSemanticsNodes().isEmpty()) problem("Select all did not select every song")
@@ -349,6 +444,7 @@ class WalkthroughTest {
         Thread.sleep(700); if (!has("collapsed_title")) problem("big title did not collapse into the top bar"); shot("home_scrolled")
         clickTo("open_search", "search"); shot("search_empty")
         type("search_field", "kes"); Thread.sleep(800); shot("search_results")
+        app.repo.library.value.byId[current()]?.let { cs -> type("search_field", cs.title.take(6)); Thread.sleep(800); checkMarked("search_list", "search") }
         type("search_field", "zzzz"); Thread.sleep(500); shot("search_nothing"); back(); if (has("search")) back()
 
         // ---- Settings (Stats card on top), Stats, About (hidden Diagnostics)
@@ -361,8 +457,14 @@ class WalkthroughTest {
         click("set_crossfade"); shot("settings_crossfade"); back()
         click("set_carousel"); shot("settings_carousel"); back()
         compose.onNodeWithTag("set_about").performScrollTo(); shot("settings_bottom")
+        if (compose.onAllNodesWithText("no internet access", substring = true, useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty()) problem("the no-internet card should be gone from Settings")
+        val settingsLeft = bounds("set_about")?.left; val settingsRight = bounds("set_about")?.right
         clickTo("set_folders", "scan_folders"); shot("scan_folders"); back()
         clickTo("set_about", "about"); shot("about")
+        if (compose.onAllNodesWithText("offline music player", substring = true, useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty()) problem("About: the tagline should be gone")
+        if (compose.onAllNodesWithText("Built with", substring = true, useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty()) problem("About: the 'Built with' line should be gone")
+        bounds("about_version")?.let { v -> if (settingsLeft != null && settingsRight != null && (kotlin.math.abs(v.left - settingsLeft) > 2f || kotlin.math.abs(v.right - settingsRight) > 2f))
+            problem("About cards are not the same width as Settings cards (${v.left}..${v.right} vs $settingsLeft..$settingsRight)") }
         repeat(5) { compose.onNodeWithTag("about_version", useUnmergedTree = true).performClick(); Thread.sleep(120) }
         if (!waitTag("diagnostics", 4000, soft = true)) problem("5 taps on Version did not open Diagnostics") else { shot("diagnostics"); back() }
         back()

@@ -6,6 +6,7 @@ import android.content.Intent
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -87,7 +88,7 @@ fun StatsScreen() {
     LazyColumn(Modifier.fillMaxSize().testTag("stats"), contentPadding = PaddingValues(bottom = LocalDockPadding.current)) {
         item {
             PageHeader("Your stats", Modifier.statusBarsPadding(), onBack = nav::back) {
-                if (data != null && data.totalMs > 0) IconButton(onClick = {
+                if (data != null && data.totalMs > 0) TopActions(TopAction(Icons.Rounded.Share, "Share my stats", "share_stats") {
                     val text = buildString {
                         append("My music this ${PERIODS[kind].lowercase()} on Tarang\n")
                         append("Listened: ${formatListen(data.totalMs)} · ${plural(data.plays, "play")}\n")
@@ -96,7 +97,7 @@ fun StatsScreen() {
                         if (data.streak > 1) append("Streak: ${data.streak} days in a row\n")
                     }
                     ctx.startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, text), "Share my stats"))
-                }, Modifier.testTag("share_stats")) { Icon(Icons.Rounded.Share, "Share my stats") }
+                })
             }
         }
         item { SegmentedRow(PERIODS, kind, { kind = it }) }
@@ -133,8 +134,8 @@ fun StatsScreen() {
         data.topHour?.let { h -> item { ListItemRow("Your favourite time", hourLabel(h), Icons.Rounded.Schedule, iconTone = 1, modifier = Modifier.padding(top = 8.dp)) } }
         if (data.topSongs.isNotEmpty()) {
             item { SectionLabel("Top songs") }
-            items(data.topSongs, key = { "ts${it.first.id}" }) { (s, n) ->
-                SongRow(s, false, onClick = { vm.player.tapSong(s, data.topSongs.map { it.first }, "Mix", "Top songs") }, onMore = { nav.songMenu(s) }, meta = "${s.artist} · ${plural(n, "play")}")
+            itemsIndexed(data.topSongs, key = { _, it -> "ts${it.first.id}" }) { i, (s, n) ->
+                SongRow(s, index = i, count = data.topSongs.size, onClick = { vm.player.tapSong(s, data.topSongs.map { it.first }, "Mix", "Top songs") }, onMore = { nav.songMenu(s) }, meta = "${s.artist} · ${plural(n, "play")}")
             }
         }
         if (data.topArtists.isNotEmpty()) {

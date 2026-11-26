@@ -4,6 +4,7 @@ package com.sushant.tarang.ui.screens
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -47,14 +48,14 @@ fun SearchScreen() {
 
     Column(Modifier.fillMaxSize().statusBarsPadding().testTag("search")) {
         Row(Modifier.fillMaxWidth().padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
-            IconButton(onClick = nav::back) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, "Back") }
+            TopActions(TopAction(Icons.AutoMirrored.Rounded.ArrowBack, "Back", "back", nav::back))
             TextField(q, { q = it }, Modifier.weight(1f).focusRequester(focus).testTag("search_field"),
                 placeholder = { Text("Songs, artists, albums, folders") }, singleLine = true, shape = RoundedCornerShape(28.dp),
                 colors = TextFieldDefaults.colors(focusedIndicatorColor = cs.surfaceContainerHigh.copy(alpha = 0f), unfocusedIndicatorColor = cs.surfaceContainerHigh.copy(alpha = 0f)),
                 trailingIcon = { if (q.isNotEmpty()) IconButton(onClick = { q = "" }) { Icon(Icons.Rounded.Close, "Clear search") } },
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search), keyboardActions = KeyboardActions(onSearch = { vm.rememberSearch(q); kb?.hide() }))
         }
-        LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = LocalDockPadding.current)) {
+        LazyColumn(Modifier.fillMaxSize().testTag("search_list"), contentPadding = PaddingValues(bottom = LocalDockPadding.current)) {
             if (q.isBlank()) {
                 if (recent.isNotEmpty()) {
                     item { SectionLabel("Recent searches") }
@@ -69,8 +70,8 @@ fun SearchScreen() {
             if (res.empty) { item { EmptyState(Icons.Rounded.SearchOff, "Nothing found", "No songs, artists, albums or folders match “$q”.") }; return@LazyColumn }
             if (res.songs.isNotEmpty()) {
                 item { SectionLabel("Songs") }
-                items(res.songs, key = { "s${it.id}" }) { s ->
-                    SongRow(s, s.id == ui.currentId, onClick = { vm.rememberSearch(q); vm.player.tapSong(s, res.songs, "Search", "“$q”") }, onMore = { nav.songMenu(s) })
+                itemsIndexed(res.songs, key = { _, it -> "s${it.id}" }) { i, s ->
+                    SongRow(s, index = i, count = res.songs.size, onClick = { vm.rememberSearch(q); vm.player.tapSong(s, res.songs, "Search", "“$q”") }, onMore = { nav.songMenu(s) })
                 }
             }
             if (res.artists.isNotEmpty()) {

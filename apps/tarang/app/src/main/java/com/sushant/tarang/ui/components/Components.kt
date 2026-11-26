@@ -3,6 +3,7 @@
 package com.sushant.tarang.ui.components
 
 import androidx.compose.foundation.*
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -30,6 +31,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
@@ -69,7 +71,19 @@ fun CoverPlaceholder(title: String, modifier: Modifier = Modifier) {
 }
 
 @Composable
-fun PageHeader(title: String, modifier: Modifier = Modifier, onBack: (() -> Unit)? = null, titleTrailing: (@Composable () -> Unit)? = null, actions: @Composable RowScope.() -> Unit = {}) {
+fun PageHeader(title: String, modifier: Modifier = Modifier, onBack: (() -> Unit)? = null, titleTrailing: (@Composable () -> Unit)? = null,
+               inlineTitle: Boolean = false, actions: @Composable RowScope.() -> Unit = {}) {
+    if (inlineTitle) {
+        // big title and the top-bar buttons share one row (no empty band above the title)
+        Row(modifier.fillMaxWidth().heightIn(min = 72.dp).padding(start = 20.dp, top = 6.dp, bottom = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+            androidx.compose.foundation.text.BasicText(title, Modifier.weight(1f).semantics { heading() }.testTag("page_title"),
+                style = PageTitle.copy(color = MaterialTheme.colorScheme.onSurface), maxLines = 1,
+                autoSize = androidx.compose.foundation.text.TextAutoSize.StepBased(minFontSize = 18.sp, maxFontSize = PageTitle.fontSize))
+            Spacer(Modifier.width(12.dp))
+            actions()
+        }
+        return
+    }
     Column(modifier.fillMaxWidth()) {
         Row(Modifier.fillMaxWidth().height(56.dp).padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
             if (onBack != null) Box(Modifier.padding(start = 8.dp).size(44.dp).clip(CircleShape).background(MaterialTheme.colorScheme.surfaceContainerHigh)
@@ -81,6 +95,45 @@ fun PageHeader(title: String, modifier: Modifier = Modifier, onBack: (() -> Unit
         Row(Modifier.padding(start = 20.dp, end = 20.dp, top = 4.dp, bottom = 14.dp), verticalAlignment = Alignment.CenterVertically) {
             Text(title, style = PageTitle, color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.weight(1f, fill = false).semantics { heading() })
             if (titleTrailing != null) { Spacer(Modifier.width(12.dp)); titleTrailing() }
+        }
+    }
+}
+
+/** One icon button in a page's top bar. */
+data class TopAction(val icon: ImageVector, val desc: String, val tag: String? = null, val onClick: () -> Unit)
+
+/**
+ * Top-bar icon buttons: one icon sits in a filled circle; two or more side by side become a connected button group
+ * (one pill split into parts: round outer ends, small inner corners, a small gap). The pressed part squishes a little.
+ */
+@Composable
+fun TopActions(vararg actions: TopAction?, modifier: Modifier = Modifier, container: Color = Color.Unspecified, content: Color = Color.Unspecified) {
+    val list = actions.filterNotNull()
+    if (list.isEmpty()) return
+    val cs = MaterialTheme.colorScheme
+    val bgc = if (container == Color.Unspecified) cs.surfaceContainerHigh else container
+    val fgc = if (content == Color.Unspecified) cs.onSurface else content
+    Row(modifier.padding(end = 8.dp), horizontalArrangement = Arrangement.spacedBy(3.dp), verticalAlignment = Alignment.CenterVertically) {
+        list.forEachIndexed { i, a ->
+            val src = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
+            val pressed by src.collectIsPressedAsState()
+            val press by androidx.compose.animation.core.animateFloatAsState(if (pressed) 1f else 0f,
+                androidx.compose.animation.core.spring(dampingRatio = 0.6f, stiffness = 600f), label = "press")
+            val single = list.size == 1
+            val outer = 22.dp
+            val inner = 6.dp + (22.dp - 6.dp) * press          // a pressed part rounds out its inner corners
+            val start = if (single || i == 0) outer else inner
+            val end = if (single || i == list.lastIndex) outer else inner
+            Box(
+                Modifier.size(if (single) 44.dp else 52.dp, 44.dp)
+                    .graphicsLayer { val k = 1f - 0.06f * press; scaleX = k; scaleY = 1f - 0.03f * press }
+                    .clip(RoundedCornerShape(topStart = start, bottomStart = start, topEnd = end, bottomEnd = end))
+                    .background(bgc)
+                    .clickable(interactionSource = src, indication = androidx.compose.material3.ripple(), onClickLabel = a.desc, onClick = a.onClick)
+                    .semantics { contentDescription = a.desc }
+                    .let { m -> if (a.tag != null) m.testTag(a.tag) else m },
+                contentAlignment = Alignment.Center,
+            ) { Icon(a.icon, null, tint = fgc, modifier = Modifier.size(22.dp)) }
         }
     }
 }
@@ -113,7 +166,7 @@ fun rememberCollapse(state: androidx.compose.foundation.lazy.LazyListState): Flo
 fun InnerTopBar(title: String, onBack: () -> Unit, actions: @Composable RowScope.() -> Unit = {}) {
     TopAppBar(
         title = { Text(title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-        navigationIcon = { IconButton(onClick = onBack, modifier = Modifier.testTag("back")) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, "Back") } },
+        navigationIcon = { TopActions(TopAction(Icons.AutoMirrored.Rounded.ArrowBack, "Back", "back", onBack), modifier = Modifier.padding(start = 8.dp)) },
         actions = actions,
         colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background),
         windowInsets = WindowInsets.statusBars,   // sits below the clock, never under it
@@ -126,41 +179,80 @@ fun SectionLabel(text: String, modifier: Modifier = Modifier) =
         modifier = modifier.padding(start = 20.dp, end = 20.dp, top = 22.dp, bottom = 6.dp).semantics { heading() })
 
 @OptIn(ExperimentalFoundationApi::class)
+/** Which song plays now and whether it is playing (given once at the app root, read by every song card). */
+val LocalNowPlaying = compositionLocalOf { NowPlaying(null, false) }
+data class NowPlaying(val songId: Long?, val isPlaying: Boolean)
+
+/**
+ * Corners for one card of a grouped (connected) list: the first card is round on top, the last round at the bottom,
+ * the ones between have small corners, and a lone card is round all over.
+ */
+fun groupCorners(index: Int, count: Int, big: Dp = 24.dp, small: Dp = 4.dp): List<Dp> {
+    val top = if (index <= 0) big else small
+    val bottom = if (index >= count - 1) big else small
+    return listOf(top, top, bottom, bottom)
+}
+
+/**
+ * One song as a card in a grouped list. The song playing now (wherever it was started from) turns into an
+ * accent-coloured pill with a round cover and dancing bars (bars freeze while paused).
+ */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun SongRow(
-    song: Song, playing: Boolean, onClick: () -> Unit, onMore: () -> Unit, modifier: Modifier = Modifier,
+    song: Song, playing: Boolean = false, onClick: () -> Unit, onMore: () -> Unit, modifier: Modifier = Modifier,
     number: Int? = null, meta: String? = null, selected: Boolean = false, onLongClick: (() -> Unit)? = null,
-    trailing: (@Composable () -> Unit)? = null,
+    trailing: (@Composable () -> Unit)? = null, index: Int = 0, count: Int = 1,
 ) {
     val cs = MaterialTheme.colorScheme
+    val now = LocalNowPlaying.current
+    val isNow = playing || song.id == now.songId
+    val spec = androidx.compose.animation.core.spring<Float>(dampingRatio = 1f, stiffness = 500f)
+    val p by androidx.compose.animation.core.animateFloatAsState(if (isNow) 1f else 0f, spec, label = "now")
+    val sel by androidx.compose.animation.core.animateFloatAsState(if (selected) 1f else 0f, spec, label = "sel")
+    val corners = groupCorners(index, count)
+    val pill = 40.dp
+    fun mix(a: Dp, t: Float) = a + (pill - a) * t
+    val shape = RoundedCornerShape(mix(corners[0], p), mix(corners[1], p), mix(corners[3], p), mix(corners[2], p))
+    val base = cs.surfaceContainerLow
+    val bg = androidx.compose.ui.graphics.lerp(androidx.compose.ui.graphics.lerp(base, cs.primaryContainer, p), cs.secondaryContainer, sel)
+    val fg = androidx.compose.ui.graphics.lerp(cs.onSurface, cs.onPrimaryContainer, p)
+    val fg2 = androidx.compose.ui.graphics.lerp(cs.onSurfaceVariant, cs.onPrimaryContainer.copy(alpha = 0.8f), p)
     Row(
-        modifier.fillMaxWidth()
-            .background(if (selected) cs.secondaryContainer else Color.Transparent)
+        modifier.fillMaxWidth().padding(horizontal = 12.dp).padding(bottom = 3.dp)
+            .graphicsLayer { val k = 1f - 0.03f * sel; scaleX = k; scaleY = k }
+            .clip(shape).background(bg)
+            .then(if (sel > 0f) Modifier.border(1.5.dp, cs.primary.copy(alpha = sel), shape) else Modifier)
             .combinedClickable(onClick = onClick, onLongClick = onLongClick, onClickLabel = "Play")
-            .heightIn(min = if (number != null) 60.dp else 68.dp)
-            .padding(start = 16.dp, end = 4.dp, top = 6.dp, bottom = 6.dp)
+            .heightIn(min = if (number != null) 62.dp else 70.dp)
+            .padding(start = 12.dp, end = 2.dp, top = 8.dp, bottom = 8.dp)
+            .semantics { if (isNow) stateDescription = "Playing now" }
             .testTag("song_${song.id}"),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         when {
-            selected -> Box(Modifier.size(if (number != null) 28.dp else 52.dp).clip(CircleShape).background(cs.primary), contentAlignment = Alignment.Center) {
+            selected -> Box(Modifier.size(if (number != null) 30.dp else 52.dp).clip(CircleShape).background(cs.primary), contentAlignment = Alignment.Center) {
                 Icon(Icons.Rounded.Check, "Selected", tint = cs.onPrimary)
             }
-            number != null -> Box(Modifier.width(28.dp), contentAlignment = Alignment.Center) {
-                if (playing) DancingBars(cs.primary, true, height = 16.dp)
+            number != null -> Box(Modifier.width(30.dp), contentAlignment = Alignment.Center) {
+                if (isNow) DancingBars(cs.primary, now.isPlaying, height = 16.dp)
                 else Text("$number", style = MaterialTheme.typography.bodyLarge, color = cs.onSurfaceVariant)
             }
-            else -> Cover(song, 52.dp, RoundedCornerShape(14.dp))
+            else -> {
+                val r = 14.dp + (26.dp - 14.dp) * p
+                Cover(song, 52.dp, RoundedCornerShape(r))
+            }
         }
         Spacer(Modifier.width(14.dp))
         Column(Modifier.weight(1f)) {
-            Text(song.title, style = MaterialTheme.typography.bodyLarge, fontWeight = if (playing) FontWeight.SemiBold else FontWeight.Medium,
-                color = if (playing) cs.primary else cs.onSurface, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Text(meta ?: song.artist, style = MaterialTheme.typography.bodyMedium, color = cs.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(song.title, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold, color = fg, maxLines = 1,
+                overflow = if (isNow) TextOverflow.Clip else TextOverflow.Ellipsis,
+                modifier = if (isNow) Modifier.basicMarquee(iterations = Int.MAX_VALUE, initialDelayMillis = 1500) else Modifier)
+            Text(meta ?: song.artist, style = MaterialTheme.typography.bodyMedium, color = fg2, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
         if (trailing != null) trailing()
-        if (playing && number == null) DancingBars(cs.primary, true, Modifier.padding(horizontal = 6.dp), height = 16.dp)
-        IconButton(onClick = onMore, modifier = Modifier.testTag("more_${song.id}")) { Icon(Icons.Rounded.MoreVert, "More options for ${song.title}", tint = cs.onSurfaceVariant) }
+        if (isNow && number == null) DancingBars(cs.primary, now.isPlaying, Modifier.padding(horizontal = 6.dp), height = 16.dp)
+        IconButton(onClick = onMore, modifier = Modifier.testTag("more_${song.id}")) { Icon(Icons.Rounded.MoreVert, "More options for ${song.title}", tint = fg2) }
     }
 }
 

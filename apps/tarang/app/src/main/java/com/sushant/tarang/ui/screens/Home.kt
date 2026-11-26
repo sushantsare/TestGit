@@ -7,6 +7,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -72,7 +73,6 @@ fun HomeScreen() {
     val scanning by vm.scanning.collectAsState()
     val ui by vm.player.ui.collectAsState()
     val song by vm.currentSong.collectAsState()
-    val played by vm.hub.playedThisSession.collectAsState()
     val counts by vm.counts.collectAsState()
     val liked by vm.liked.collectAsState()
     val cs = MaterialTheme.colorScheme
@@ -83,8 +83,8 @@ fun HomeScreen() {
     LazyColumn(Modifier.fillMaxSize().testTag("home"), state = listState, contentPadding = PaddingValues(bottom = LocalDockPadding.current)) {
         item {
             PageHeader(greeting(), Modifier.statusBarsPadding(), titleTrailing = { GreetingIcon() }) {
-                IconButton(onClick = { nav.go(R0.SEARCH) }, Modifier.testTag("open_search")) { Icon(Icons.Rounded.Search, "Search") }
-                IconButton(onClick = { nav.go(R0.SETTINGS) }, Modifier.testTag("open_settings")) { Icon(Icons.Rounded.Settings, "Settings") }
+                TopActions(TopAction(Icons.Rounded.Search, "Search", "open_search") { nav.go(R0.SEARCH) },
+                    TopAction(Icons.Rounded.Settings, "Settings", "open_settings") { nav.go(R0.SETTINGS) })
             }
         }
         if (!lib.loaded || (scanning && lib.songs.isEmpty())) {
@@ -101,25 +101,6 @@ fun HomeScreen() {
                 }
             }
             return@LazyColumn
-        }
-        // fresh start: pick up where you left off (the mini player stays hidden until something plays)
-        val s = song
-        if (s != null && ui.hasSong && !played && !ui.isPlaying) item {
-            Card(
-                Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp).clickable { vm.player.play() }.testTag("continue_card"),
-                shape = RoundedCornerShape(28.dp), colors = CardDefaults.cardColors(cs.primaryContainer, cs.onPrimaryContainer),
-            ) {
-                Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Cover(s, 72.dp, RoundedCornerShape(18.dp))
-                    Spacer(Modifier.width(16.dp))
-                    Column(Modifier.weight(1f)) {
-                        Text("Continue listening", style = MaterialTheme.typography.labelLarge)
-                        Text(s.title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        Text("${s.artist} · ${formatDuration(ui.positionMs)} of ${formatDuration(s.durationMs)}", style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    }
-                    PlayPauseButton(ui.isPlaying, { vm.player.play() }, cs.primary, cs.onPrimary, 56.dp, squareRadius = 18.dp, iconSize = 30.dp, tag = "continue_play")
-                }
-            }
         }
         // mixes
         item { SectionLabel("Made for you") }
@@ -156,8 +137,8 @@ fun HomeScreen() {
         val top = counts.values.sortedByDescending { it.plays }.mapNotNull { lib.byId[it.songId] }.take(5)
         if (top.isNotEmpty()) {
             item { SectionLabel("Most played") }
-            items(top, key = { "top${it.id}" }) { t ->
-                SongRow(t, playing = t.id == ui.currentId, onClick = { vm.player.tapSong(t, top, "Mix", "Most played") }, onMore = { nav.songMenu(t) },
+            itemsIndexed(top, key = { _, it -> "top${it.id}" }) { i, t ->
+                SongRow(t, index = i, count = top.size, onClick = { vm.player.tapSong(t, top, "Mix", "Most played") }, onMore = { nav.songMenu(t) },
                     meta = "${t.artist} · ${plural(counts[t.id]?.plays ?: 0, "play")}")
             }
         }
