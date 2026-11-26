@@ -27,7 +27,7 @@ jobs:
       - uses: actions/checkout@v4
         with: { sparse-checkout: apps, sparse-checkout-cone-mode: true }
       - name: SDK probe
-        run: $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --list 2>/dev/null | grep -iE "android-3[67]" | head -40
+        run: $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --list 2>/dev/null | grep -iE "system-images;android-3[67]" | grep -E "x86_64"
       - name: Read build target and plan emulator runs
         id: t
         run: |
