@@ -140,7 +140,7 @@ if [ -f "$DBG" ]; then
   seed 0
   # T9 process death mid-form: type an amount, leave, let the system kill the process, come back
   adb logcat -c; adb shell am start -n $ACT --es route add >/dev/null 2>&1; sleep 3
-  adb shell input keyevent KEYCODE_7 KEYCODE_5 KEYCODE_0; sleep 1   # typed with the keyboard support of the amount step
+  sleep 1; for k in 7 5 0; do adb shell input keyevent KEYCODE_$k; sleep 0.4; done; sleep 1   # typed with the keyboard support of the amount step
   adb exec-out screencap -p > $OUT/screens/audit_T9_before_kill.png
   adb shell input keyevent KEYCODE_HOME; sleep 1; adb shell am kill $PKG; sleep 1
   adb shell am start -a android.intent.action.MAIN -c android.intent.category.LAUNCHER -n $ACT >/dev/null 2>&1; sleep 4   # like tapping it in Recents
@@ -216,7 +216,7 @@ if [ -f "$DBG" ]; then
   # tablet: Add entry opens as a side panel over the list
   adb shell am start -n $ACT --es route add >/dev/null 2>&1; sleep 3; adb exec-out screencap -p > $OUT/screens/audit_tablet_add_panel.png
   adb shell uiautomator dump /sdcard/ui.xml >/dev/null 2>&1; adb shell cat /sdcard/ui.xml > /tmp/ui.xml
-  echo "tablet_side_panel=$(grep -c 'resource-id=\"side_panel\"' /tmp/ui.xml)" >> $A/summary.txt
+  echo "tablet_side_panel=$(grep -c 'Step 1 of 3' /tmp/ui.xml) list_behind=$(grep -c 'Swiggy' /tmp/ui.xml)" >> $A/summary.txt
   adb shell input keyevent KEYCODE_BACK; sleep 1
   adb shell wm size reset; adb shell wm density reset; sleep 2
   echo "T14 crashes=$(mycrash)" >> $A/summary.txt

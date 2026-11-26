@@ -21,7 +21,7 @@ object Insights {
             var t = raw.trim().trim('.', '-', ':')
             if (t.isEmpty()) return@mapNotNull null
             var price = -1L
-            val tail = Regex("""(?i)(?:₹|rs\.?|inr)?\s*([0-9]+(?:\.[0-9]{1,2})?)\s*(?:₹|rs\.?|rupees?|/-)?$""").find(t)
+            val tail = Regex("""(?i)(?:₹|rs\.?|inr)?\s*([0-9]+(?:\.[0-9]{1,2})?)\s*(?:₹|rs\.?|rupees?|/-?)?$""").find(t)
             val head = Regex("""(?i)^(?:₹|rs\.?|inr)\s*([0-9]+(?:\.[0-9]{1,2})?)\s+""").find(t)
             when {
                 tail != null && tail.range.first > 0 -> { price = Money.parse(tail.groupValues[1]) ?: -1L; t = t.substring(0, tail.range.first).trim().trimEnd('-', ':', '=', '@') }

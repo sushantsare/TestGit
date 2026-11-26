@@ -286,7 +286,7 @@ private fun SidePanel(content: @Composable () -> Unit) {
     val back = androidx.activity.compose.LocalOnBackPressedDispatcherOwner.current?.onBackPressedDispatcher
     Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.scrim.copy(alpha = 0.32f))
         .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { back?.onBackPressed() }, contentAlignment = Alignment.CenterEnd) {
-        Box(Modifier.fillMaxHeight().widthIn(max = 460.dp).fillMaxWidth(0.5f)
+        Box(Modifier.fillMaxHeight().widthIn(min = 360.dp, max = 440.dp).fillMaxWidth()
             .clip(androidx.compose.foundation.shape.RoundedCornerShape(topStart = 28.dp, bottomStart = 28.dp))
             .background(MaterialTheme.colorScheme.background)
             .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { }

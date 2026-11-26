@@ -38,7 +38,7 @@ class MigrationTest {
             "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'd2d889298b03659b771c1c69a6254459')"
     )
 
-    @Test fun oneToTwoKeepsEverything() = runBlocking {
+    @Test fun oneToTwoKeepsEverything(): Unit = runBlocking {
         val ctx = ApplicationProvider.getApplicationContext<android.content.Context>()
         val name = "migration-test.db"
         ctx.deleteDatabase(name)

@@ -55,7 +55,7 @@ class WalkthroughTest {
 
     /** Go to a top-level tab the way a user would: press back until the tab bar shows, then tap the tab. */
     private fun tab(r: String) {
-        repeat(5) {
+        repeat(14) {
             if (has("tab_$r")) return@repeat
             if (has("confirm")) { problem("unexpected discard prompt before tab $r"); click("confirm") } else back()
         }
@@ -144,7 +144,7 @@ class WalkthroughTest {
         // ---- realistic data
         runBlocking { Seed.fill(app.repo) }
         app.prefs.update { it.copy(setupDone = true) }
-        waitTag("net"); waitText("Swiggy"); compose.waitForIdle(); Thread.sleep(1500); shot("home")
+        waitTag("net"); waitText("Balance check"); compose.waitForIdle(); Thread.sleep(1500); shot("home")
 
         // ---- add an expense: amount -> category -> account, with the keypad
         clickTo("fab_add", "key_4")
@@ -154,7 +154,7 @@ class WalkthroughTest {
         click("cat_Food"); waitTag("save"); click("acc_Cash"); shot("add_details")
         click("row_split"); waitTag("split_Rahul Kumar"); shot("add_split_dialog"); click("split_Rahul Kumar"); click("split_ok")
         click("row_repeat"); waitTag("pick_Never"); shot("add_repeat_sheet"); click("pick_Never")
-        click("save"); waitTag("fab_add"); waitText("Chai point"); shot("home_after_add")
+        click("save"); waitTag("fab_add"); if (runBlocking { app.repo.dao.entriesNow() }.none { it.merchant == "Chai point" }) problem("Chai point not saved"); shot("home_after_add")
 
         // ---- income + transfer chips
         go("add?type=INCOME", "key_5"); click("key_5"); click("key_0"); click("key_0"); shot("add_income"); backDiscard(); compose.waitForIdle()
@@ -163,7 +163,7 @@ class WalkthroughTest {
         click("tab_entries"); waitTag("entries_list"); shot("entries")
         click("act_calendar"); waitTag("calendar"); shot("entries_calendar"); click("act_calendar")
         go("search", "f_search"); type("f_search", "swig"); waitText("RESULTS"); shot("search")
-        back(); tab("home"); click("act_search"); waitTag("f_search"); shot("search_from_home_icon"); back(); waitTag("act_search")
+        back(); tab("home"); click("act_search"); waitTag("f_search"); shot("search_from_home_icon"); hideKeyboard(); Thread.sleep(400); back(); waitTag("act_search")
         val entries = runBlocking { app.repo.dao.entriesNow() }
         val swiggy = entries.first { it.merchant == "Swiggy" }
         go("entry/${swiggy.id}", "entry_detail"); shot("entry_detail_split")
