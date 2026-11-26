@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.sushant.tarang.LogicTest" tests="9" skipped="0" failures="0" errors="0" timestamp="2026-11-26T20:58:06.374Z" hostname="runnervm0hi8g" time="0.099">
+  <properties/>
+  <testcase name="unshuffleBringsBackTheOldOrder" classname="com.sushant.tarang.LogicTest" time="0.021"/>
+  <testcase name="lrcRepeatedStampsAndPlainText" classname="com.sushant.tarang.LogicTest" time="0.025"/>
+  <testcase name="formatting" classname="com.sushant.tarang.LogicTest" time="0.028"/>
+  <testcase name="lrcSyncedLinesSortedWithOffset" classname="com.sushant.tarang.LogicTest" time="0.001"/>
+  <testcase name="artistsSplit" classname="com.sushant.tarang.LogicTest" time="0.001"/>
+  <testcase name="streakCountsDaysInARow" classname="com.sushant.tarang.LogicTest" time="0.004"/>
+  <testcase name="statsSumRealListeningAndRankSongs" classname="com.sushant.tarang.LogicTest" time="0.013"/>
+  <testcase name="playPauseMorphEndsOnBothIcons" classname="com.sushant.tarang.LogicTest" time="0.001"/>
+  <testcase name="biquadPeakingHitsGainAtCentre" classname="com.sushant.tarang.LogicTest" time="0.001"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

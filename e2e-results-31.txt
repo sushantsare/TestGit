@@ -1,0 +1,15 @@
+== Tarang e2e on Android 12 (API 31) ==
+songs_on_phone=14
+Performing Streamed Install
+Success
+launch=PASSED
+setup_guide=PASSED
+playback open=3 background=3 paused=2 resumed=3 after_next=3 (3=playing 2=paused)
+playback=PASSED
+cover_swipe=PASSED
+pull_down=PASSED
+flick_up=PASSED
+flick_down=PASSED
+gesture_frames total=258 Janky frames: 238 (92.25%) p50=32ms p90=101ms
+gestures=PASSED
+monkey_crashes_31=0
