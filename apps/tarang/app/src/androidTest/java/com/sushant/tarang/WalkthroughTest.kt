@@ -308,8 +308,12 @@ class WalkthroughTest {
         // ---- Library + floating selection toolbar
         tab("library", "library"); waitTag("songs_list"); shot("library_songs")
         click("sort"); waitTag("dialog_ok", 2000, soft = true); shot("library_sort_dialog"); back()
-        click("select"); waitTag("selection_toolbar"); shot("library_select"); click("select_all"); shot("library_select_all")
-        click("sel_delete"); waitTag("confirm", 3000, soft = true); shot("library_delete_confirm"); back(); back()
+        click("select"); waitTag("selection_toolbar"); shot("library_select"); click("select_all"); Thread.sleep(400); shot("library_select_all")
+        if (!has("selected_count_${app.repo.library.value.songs.size}") && compose.onAllNodesWithText("${app.repo.library.value.songs.size} selected", substring = true, useUnmergedTree = true).fetchSemanticsNodes().isEmpty()) problem("Select all did not select every song")
+        click("sel_delete")
+        if (!waitTag("confirm", 3000, soft = true)) problem("Delete on the selection toolbar did not ask to confirm") else { shot("library_delete_confirm"); back(); Thread.sleep(400) }
+        if (has("selection_toolbar")) back()
+        Thread.sleep(500); if (!has("library")) { problem("leaving selection left the Library"); tab("library", "library") }
         click("libtab_albums"); waitTag("albums_grid"); shot("library_albums")
         app.repo.library.value.albums.firstOrNull()?.let { a -> click("album_${a.id}"); waitTag("list_header"); shot("album_detail"); back() }
         click("libtab_artists"); waitTag("artists_list"); shot("library_artists")

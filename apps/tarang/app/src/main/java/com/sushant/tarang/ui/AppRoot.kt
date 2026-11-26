@@ -277,7 +277,8 @@ private fun Shell(vm: MainVm, activity: MainActivity) {
                 onPlaylist = { song?.let { sheet = Sheet.AddToPlaylist(listOf(it.id)) } },
                 navBar = { m, tint -> BottomBar(route, miniVisible, m, if (miniVisible) tint else null) { appNav.tab(it) } },
             )
-            SnackbarHost(snackHost, Modifier.align(Alignment.BottomCenter).padding(bottom = if (sheetState.progress.value > 0.5f) sysBottom + 80.dp else dock))
+            SnackbarHost(snackHost, Modifier.align(Alignment.BottomCenter).padding(bottom = if (sheetState.progress.value > 0.5f) sysBottom + 80.dp
+                else dock + (if (com.sushant.tarang.ui.screens.SelectionBarState.shown) 68.dp else 0.dp)))
             SheetHost(sheet, vm) { sheet = it }
             if (saveQueue) com.sushant.tarang.ui.components.TextInputDialog("Save queue as playlist", "", "Save", { saveQueue = false },
                 onConfirm = { name -> vm.saveQueueAsPlaylist(name) }, label = "Playlist name")

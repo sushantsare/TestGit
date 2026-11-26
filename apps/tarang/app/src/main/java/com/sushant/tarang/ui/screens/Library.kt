@@ -95,6 +95,9 @@ fun SelectionBar(selected: Set<Long>, @Suppress("UNUSED_PARAMETER") all: List<Lo
 }
 
 /** Floating toolbar at the bottom while songs are selected (in thumb reach); Delete is the red one. */
+/** Whether the floating selection toolbar is on screen (the app lifts snackbars above it). */
+object SelectionBarState { var shown by androidx.compose.runtime.mutableStateOf(false) }
+
 @Composable
 fun SelectionToolbar(selected: Set<Long>, all: List<Long>, onClear: () -> Unit, onAll: () -> Unit, modifier: Modifier = Modifier) {
     val vm = LocalVm.current
@@ -103,6 +106,8 @@ fun SelectionToolbar(selected: Set<Long>, all: List<Long>, onClear: () -> Unit, 
     val cs = MaterialTheme.colorScheme
     val songs = all.filter { it in selected }.mapNotNull { lib.byId[it] }
     var confirm by remember { mutableStateOf(false) }
+    // lift messages (snackbars) above this toolbar while it is shown, so they never cover its buttons
+    androidx.compose.runtime.DisposableEffect(Unit) { SelectionBarState.shown = true; onDispose { SelectionBarState.shown = false } }
     Box(modifier.fillMaxWidth().padding(bottom = LocalDockPadding.current), contentAlignment = Alignment.Center) {
         Row(Modifier.shadow(10.dp, androidx.compose.foundation.shape.CircleShape).clip(androidx.compose.foundation.shape.CircleShape)
             .background(cs.inverseSurface).padding(6.dp).testTag("selection_toolbar"), horizontalArrangement = Arrangement.spacedBy(2.dp)) {
