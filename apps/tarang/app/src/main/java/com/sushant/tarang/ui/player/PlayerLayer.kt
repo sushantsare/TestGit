@@ -234,8 +234,10 @@ fun PlayerLayer(
         if (pager.currentPage != i) { if (abs(pager.currentPage - i) > 2) pager.scrollToPage(i) else pager.animateScrollToPage(i, animationSpec = snapSpec()) }
     }
     LaunchedEffect(pager) {
-        snapshotFlow { pager.settledPage }.collect { pg ->
-            if (pg != currentIndex.value && pg in 0 until pager.pageCount && state.progress.value > 0.99f) { haptic(HapticFeedbackType.SegmentTick); act.playAt(pg) }
+        withContext(Dispatchers.Main) {
+            snapshotFlow { pager.settledPage }.collect { pg ->
+                if (pg != currentIndex.value && pg in 0 until pager.pageCount && state.progress.value > 0.99f) { haptic(HapticFeedbackType.SegmentTick); act.playAt(pg) }
+            }
         }
     }
 

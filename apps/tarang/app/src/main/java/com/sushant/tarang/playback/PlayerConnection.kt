@@ -47,6 +47,11 @@ data class QueueSnapshot(
 class PlayerConnection(private val ctx: Context, private val scope: CoroutineScope) {
     private val app get() = ctx.applicationContext as TarangApp
     private var controller: MediaController? = null
+    private val mainHandler = android.os.Handler(android.os.Looper.getMainLooper())
+    /** MediaController may only be used on the main thread; calls from anywhere else are moved there. */
+    private inline fun onMain(crossinline block: () -> Unit) {
+        if (android.os.Looper.myLooper() == android.os.Looper.getMainLooper()) block() else mainHandler.post { block() }
+    }
     private val _ui = MutableStateFlow(PlayerUi())
     val ui: StateFlow<PlayerUi> = _ui.asStateFlow()
     private var ticker: Job? = null
@@ -177,20 +182,20 @@ class PlayerConnection(private val ctx: Context, private val scope: CoroutineSco
         if (c.playbackState == Player.STATE_ENDED) c.seekTo(0, 0)   // queue finished: play it again from the top
         c.play()
     }
-    fun play() { controller?.let { if (it.playbackState == Player.STATE_IDLE) it.prepare(); it.play() } }
-    fun next() { controller?.seekToNext() }
-    fun previous() { controller?.seekToPrevious() }
+    fun play() = onMain { controller?.let { if (it.playbackState == Player.STATE_IDLE) it.prepare(); it.play() } }
+    fun next() = onMain { controller?.seekToNext() }
+    fun previous() = onMain { controller?.seekToPrevious() }
     /** Swipe gestures always change the song (never restart the current one). Returns false when there is no song that way. */
     fun swipeNext(): Boolean { val c = controller ?: return false; if (!c.hasNextMediaItem()) return false; c.seekToNextMediaItem(); return true }
     fun swipePrevious(): Boolean { val c = controller ?: return false; if (!c.hasPreviousMediaItem()) return false; c.seekToPreviousMediaItem(); return true }
     fun seekTo(ms: Long) { controller?.seekTo(ms); _ui.value = _ui.value.copy(positionMs = ms) }
-    fun playAt(index: Int) { controller?.let { if (index in 0 until it.mediaItemCount) { it.seekTo(index, 0); it.play() } } }
-    fun removeAt(index: Int) { controller?.let { if (index in 0 until it.mediaItemCount) it.removeMediaItem(index) } }
-    fun move(from: Int, to: Int) { controller?.let { if (from in 0 until it.mediaItemCount && to in 0 until it.mediaItemCount) it.moveMediaItem(from, to) } }
+    fun playAt(index: Int) = onMain { controller?.let { if (index in 0 until it.mediaItemCount) { it.seekTo(index, 0); it.play() } } }
+    fun removeAt(index: Int) = onMain { controller?.let { if (index in 0 until it.mediaItemCount) it.removeMediaItem(index) } }
+    fun move(from: Int, to: Int) = onMain { controller?.let { if (from in 0 until it.mediaItemCount && to in 0 until it.mediaItemCount) it.moveMediaItem(from, to) } }
     /** Shuffle on = the queue really gets reordered (current song stays); off = the earlier order comes back. */
     fun toggleShuffle() { shuffleCmd("toggle") }
-    fun cycleRepeat() { controller?.let { it.repeatMode = when (it.repeatMode) { Player.REPEAT_MODE_OFF -> Player.REPEAT_MODE_ALL; Player.REPEAT_MODE_ALL -> Player.REPEAT_MODE_ONE; else -> Player.REPEAT_MODE_OFF } } }
-    fun setSpeed(speed: Float, keepPitch: Boolean) { controller?.playbackParameters = PlaybackParameters(speed, if (keepPitch) 1f else speed) }
+    fun cycleRepeat() = onMain { controller?.let { it.repeatMode = when (it.repeatMode) { Player.REPEAT_MODE_OFF -> Player.REPEAT_MODE_ALL; Player.REPEAT_MODE_ALL -> Player.REPEAT_MODE_ONE; else -> Player.REPEAT_MODE_OFF } } }
+    fun setSpeed(speed: Float, keepPitch: Boolean) = onMain { controller?.playbackParameters = PlaybackParameters(speed, if (keepPitch) 1f else speed) }
 
     private fun cmd(name: String, b: Bundle = Bundle.EMPTY) = controller?.sendCustomCommand(SessionCommand(name, Bundle.EMPTY), b)
     /** Removes every song from the queue except the one playing now. */
