@@ -1,7 +1,7 @@
 name: Build APK
 # Parallel pipeline: the release build, the debug + test APK build, unit tests and lint run
 # at the same time on separate runners. Then every emulator run (walkthrough, audit,
-# Android 14 and 15 checks) gets its own emulator, all at once, booting from a cached
+# Android 17 and 16 checks) gets its own emulator, all at once, booting from a cached
 # AVD snapshot and installing the APKs built above instead of recompiling.
 # Results are merged and published to the apk-builds branch in the same layout as before.
 on:
@@ -33,15 +33,16 @@ jobs:
           APP_DIR=$(head -n1 .build-target | tr -d '[:space:]')
           echo "dir=$APP_DIR" >> "$GITHUB_OUTPUT"
           echo "name=$(basename "$APP_DIR")" >> "$GITHUB_OUTPUT"
-          # An app can list its own emulator runs in emulators.json (e.g. the three newest Android
-          # versions plus an older smoke run). The first "ui" entry is the primary walkthrough.
+          # Emulators run ONLY on the two newest stable Android versions (Nov 2026: Android 17 = API
+          # "37.0", Android 16 = API 36). Nothing older. An app can list its own runs in emulators.json
+          # (same two versions only). The first "ui" entry is the primary walkthrough.
           if [ -f "$APP_DIR/emulators.json" ]; then
             M=$(jq -c '{include: .}' "$APP_DIR/emulators.json")
             P=$(jq -r '[.[] | select(.role=="ui")][0].api // ""' "$APP_DIR/emulators.json")
           elif [ -f "$APP_DIR/e2e.sh" ]; then
-            M='{"include":[{"role":"ui","api":35},{"role":"audit","api":35},{"role":"e2e","api":33},{"role":"e2e","api":34}]}'; P=35
+            M='{"include":[{"role":"ui","api":"37.0"},{"role":"ui","api":36},{"role":"audit","api":36},{"role":"e2e","api":"37.0"}]}'; P=37.0
           else
-            M='{"include":[{"role":"ui","api":33}]}'; P=33
+            M='{"include":[{"role":"ui","api":"37.0"},{"role":"ui","api":36}]}'; P=37.0
           fi
           echo "matrix=$M" >> "$GITHUB_OUTPUT"
           echo "primary=$P" >> "$GITHUB_OUTPUT"
