@@ -76,7 +76,10 @@ echo "playback=$PLAY" >> $LOG
 # ---------- real finger gestures on the player (Android's own input, not the test framework) + frame timing
 # play a whole folder (several songs) so a cover swipe has a next song, then open the full player
 adb shell am start -n $ACT >/dev/null 2>&1; sleep 3
-tapid tab_folders; sleep 2; tapid folder_Bollywood; sleep 2; tapid play_all; sleep 3
+hasid full_player && { adb shell input keyevent KEYCODE_BACK; sleep 2; }
+tapid tab_folders || echo "e2e: Folders tab not found" >> $LOG; sleep 2
+tapid folder_Bollywood || echo "e2e: Bollywood folder not found" >> $LOG; sleep 2
+tapid play_all || echo "e2e: Play all not found" >> $LOG; sleep 3
 tapid mini_player; sleep 2
 GEST=PASSED
 if hasid full_player; then
