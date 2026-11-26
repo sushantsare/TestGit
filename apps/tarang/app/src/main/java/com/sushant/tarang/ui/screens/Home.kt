@@ -190,3 +190,48 @@ private fun GreetingIcon() {
 fun PixelLoader(size: androidx.compose.ui.unit.Dp) {
     ContainedLoadingIndicator(Modifier.size(size).testTag("pixel_loader"))
 }
+
+@Composable
+private fun MixCard(title: String, sub: String, icon: ImageVector?, tone: Int, cover: Song?, tag: String, onClick: () -> Unit) {
+    val cs = MaterialTheme.colorScheme
+    val (bg, fg) = listOf(cs.primaryContainer to cs.onPrimaryContainer, cs.secondaryContainer to cs.onSecondaryContainer, cs.tertiaryContainer to cs.onTertiaryContainer)[tone % 3]
+    Column(Modifier.width(156.dp).clip(RoundedCornerShape(24.dp)).background(bg).clickable(onClick = onClick).padding(12.dp).testTag(tag)) {
+        Box(Modifier.size(132.dp).clip(RoundedCornerShape(18.dp)).background(fg.copy(alpha = 0.08f)), contentAlignment = Alignment.Center) {
+            if (cover != null) Cover(cover, 132.dp, RoundedCornerShape(18.dp))
+            else if (icon != null) Icon(icon, null, tint = fg, modifier = Modifier.size(48.dp))
+        }
+        Spacer(Modifier.height(10.dp))
+        Text(title, color = fg, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text(sub, color = fg.copy(alpha = 0.8f), style = MaterialTheme.typography.bodySmall, maxLines = 2, minLines = 2, overflow = TextOverflow.Ellipsis)
+    }
+}
+
+/** Up to three covers fanned out (folder / playlist art). */
+@Composable
+fun CoverStack(songs: List<Song>, size: androidx.compose.ui.unit.Dp) {
+    val picks = songs.distinctBy { it.albumId }.take(3)
+    Box(Modifier.size(size)) {
+        if (picks.size >= 3) {
+            Box(Modifier.align(Alignment.TopEnd).size(size * 0.62f)) { Cover(picks[2], size * 0.62f, RoundedCornerShape(16.dp)) }
+            Box(Modifier.align(Alignment.BottomStart).size(size * 0.62f)) { Cover(picks[1], size * 0.62f, RoundedCornerShape(16.dp)) }
+            Box(Modifier.align(Alignment.Center).size(size * 0.64f).clip(RoundedCornerShape(18.dp)).background(MaterialTheme.colorScheme.background).padding(3.dp)) {
+                Cover(picks[0], size * 0.64f - 6.dp, RoundedCornerShape(16.dp))
+            }
+        } else if (picks.isNotEmpty()) Cover(picks[0], size, RoundedCornerShape(20.dp))
+        else Box(Modifier.fillMaxSize().clip(RoundedCornerShape(20.dp)).background(MaterialTheme.colorScheme.surfaceContainerHigh), contentAlignment = Alignment.Center) {
+            Icon(Icons.Rounded.MusicNote, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+}
+
+
+/** The launcher icon drawn from its two vector layers. */
+@Composable
+fun AppIcon(size: androidx.compose.ui.unit.Dp) {
+    Box(Modifier.size(size).clip(RoundedCornerShape(size / 3))) {
+        Image(painterResource(R.drawable.ic_launcher_background), null, Modifier.fillMaxSize(), contentScale = androidx.compose.ui.layout.ContentScale.Crop)
+        Image(painterResource(R.drawable.ic_launcher_foreground), null, Modifier.fillMaxSize().graphicsLayerScale(1.5f))
+    }
+}
+
+private fun Modifier.graphicsLayerScale(s: Float) = this.then(Modifier.graphicsLayer { scaleX = s; scaleY = s })
