@@ -445,7 +445,11 @@ class WalkthroughTest {
         Thread.sleep(700); if (!has("collapsed_title")) problem("big title did not collapse into the top bar"); shot("home_scrolled")
         clickTo("open_search", "search"); shot("search_empty")
         type("search_field", "kes"); Thread.sleep(800); shot("search_results")
-        app.repo.library.value.byId[current()]?.let { cs -> type("search_field", cs.title.take(6)); Thread.sleep(800); checkMarked("search_list", "search") }
+        // pause first (the test songs are under a minute, so the song could change mid-check); the mark must stay while paused
+        if (vm().player.ui.value.isPlaying) { scenario.onActivity { it.vm.player.togglePlay() }; Thread.sleep(800) }
+        app.repo.library.value.byId[current()]?.let { cs -> type("search_field", cs.title.take(6)); Thread.sleep(800); checkMarked("search_list", "search")
+            if (!has("dancing_bars_paused")) problem("paused: the bars should stay (frozen) on the playing song in search") }
+        scenario.onActivity { it.vm.player.togglePlay() }
         type("search_field", "zzzz"); Thread.sleep(500); shot("search_nothing"); back(); if (has("search")) back()
 
         // ---- Settings (Stats card on top), Stats, About (hidden Diagnostics)
