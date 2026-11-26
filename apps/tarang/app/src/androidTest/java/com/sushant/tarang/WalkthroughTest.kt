@@ -307,6 +307,10 @@ class WalkthroughTest {
 
         // ---- song with a synced .lrc next to it: the live line follows the music
         song("Raataan Lambiyan.mp3")?.let { s ->
+            // Android 13+ hides .lrc text files from apps unless a lyrics folder is picked, so add it the way a user does (Add .lrc file)
+            val lrc = InstrumentationRegistry.getInstrumentation().context.assets.open("media/Bollywood/Raataan Lambiyan.lrc").bufferedReader().readText()
+            vm().saveLyrics(s.id, lrc, ".lrc file")
+            Thread.sleep(800)
             go(com.sushant.tarang.ui.R0.folder(s.folderPath), "song_list")
             click("song_${s.id}"); Thread.sleep(1200)
             clickTo("mini_player", "full_player")
