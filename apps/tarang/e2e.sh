@@ -106,6 +106,19 @@ if hasid full_player; then
     adb shell input swipe $CX $CY $CX $(( CY + 900 )) 600; sleep 2
   fi
   hasid mini_player && ! hasid full_player && echo "pull_down=PASSED" >> $LOG || { echo "pull_down=FAILED" >> $LOG; GEST=FAILED; }
+  # hold a finger on Next in the full player: Next widens, Previous and Play squeeze (Android 11+)
+  if [ "$API" -ge 30 ]; then
+    tapid mini_player; sleep 2
+    W() { B=$(boundsof $1); set -- $B; echo $(( $3 - $1 )); }
+    PW0=$(W btn_prev); NW0=$(W btn_next)
+    B=$(boundsof btn_next); set -- $B; NX=$(( ($1 + $3) / 2 )); NY=$(( ($2 + $4) / 2 ))
+    adb shell input motionevent DOWN $NX $NY; sleep 0.5
+    PW1=$(W btn_prev); NW1=$(W btn_next); shot gesture_hold_next
+    adb shell input motionevent UP $NX $NY; sleep 2
+    echo "hold_next prev $PW0→$PW1 next $NW0→$NW1" >> $LOG
+    [ -n "$NW1" ] && [ "$NW1" -gt "$NW0" ] && [ "$PW1" -lt "$PW0" ] && echo "button_squeeze=PASSED" >> $LOG || { echo "button_squeeze=FAILED" >> $LOG; GEST=FAILED; }
+    adb shell input keyevent KEYCODE_BACK; sleep 2
+  fi
   shot gesture_after_pull_down
   # fast flick up on the mini player opens it, fast flick down closes it
   B=$(boundsof mini_player); set -- $B; MX=$(( ($1 + $3) / 2 )); MY=$(( ($2 + $4) / 2 ))
@@ -123,7 +136,7 @@ echo "gestures=$GEST" >> $LOG
 adb shell input keyevent KEYCODE_MEDIA_PAUSE; sleep 2
 # ---------- quit and come back: the mini player shows the same song, paused, at the same spot (no banner)
 desc() { adb shell dumpsys media_session | tr -d '\r' | grep -A40 "$PKG" | grep -m1 -o "description=[^,]*"; }
-pos() { adb shell dumpsys media_session | tr -d '\r' | grep -A40 "$PKG" | grep -m1 -oE "position=[0-9]+" | grep -oE "[0-9]+"; }
+pos() { adb shell dumpsys media_session | tr -d '\r' | grep -A40 "$PKG" | grep -m1 -oE "position=[0-9]+" | head -1 | grep -oE "[0-9]+"; }
 D0=$(desc); P0=$(pos)
 adb shell am force-stop $PKG; sleep 1; adb shell am start -W -n $ACT >/dev/null 2>&1; sleep 6; shot resume_after_quit
 D1=$(desc); P1=$(pos); S1=$(state)

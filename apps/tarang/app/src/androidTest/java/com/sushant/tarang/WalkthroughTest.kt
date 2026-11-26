@@ -216,7 +216,7 @@ class WalkthroughTest {
         else if (w0.max() - w0.min() > 3f) problem("⏮ ⏯ ⏭ should be equal widths at rest ($w0)")
         if (!has("shuffle") || !has("repeat")) problem("shuffle / repeat should stay at the ends of the row")
         compose.onNodeWithTag("btn_next", useUnmergedTree = true).performTouchInput { down(center) }
-        Thread.sleep(400); compose.waitForIdle()
+        compose.mainClock.advanceTimeBy(500); compose.waitForIdle()
         val w1 = listOf("btn_prev", "btn_play", "btn_next").map { bounds(it)?.width ?: 0f }
         shot("buttons_pressing_next")
         if (!(w1[2] > w0[2] * 1.04f && w1[0] < w0[0] * 0.95f && w1[1] < w0[1] * 0.95f)) problem("holding Next did not widen it and squeeze the others ($w0 → $w1)")
@@ -224,7 +224,7 @@ class WalkthroughTest {
         compose.onNodeWithTag("btn_next", useUnmergedTree = true).performTouchInput { up() }
         settle()
         compose.onNodeWithTag("btn_play", useUnmergedTree = true).performTouchInput { down(center) }
-        Thread.sleep(400); compose.waitForIdle()
+        compose.mainClock.advanceTimeBy(500); compose.waitForIdle()
         val w2 = listOf("btn_prev", "btn_play", "btn_next").map { bounds(it)?.width ?: 0f }
         val outer1 = (bounds("btn_next")?.right ?: 0f) - (bounds("btn_prev")?.left ?: 0f)
         shot("buttons_pressing_play")
@@ -349,7 +349,8 @@ class WalkthroughTest {
                 down(center); repeat(20) { moveBy(Offset(0f, -half / 20f), delayMillis = 30) }
             }
             Thread.sleep(150); compose.waitForIdle(); shot("panel_half_way")
-            compose.onNodeWithTag("peek_line", useUnmergedTree = true).performTouchInput { Thread.sleep(400); up() }
+            // the strip fades out as the page rises, so the finger is lifted through the page itself (same gesture)
+            compose.onNodeWithTag("panel", useUnmergedTree = true).performTouchInput { advanceEventTime(400); up() }
             settle()
             val t2 = bounds("panel")?.top ?: closedTop
             if (kotlin.math.abs(t2 - openTop) > 8f) problem("Up next stopped halfway after a slow half pull ($t2 vs $openTop)")
