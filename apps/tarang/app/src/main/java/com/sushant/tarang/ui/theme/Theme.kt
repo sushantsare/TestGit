@@ -32,14 +32,22 @@ val Gsf = FontFamily(
     Font(R.font.gsf_title, FontWeight.Bold),
 )
 
+/** Google Sans Flex with its rounded setting (Pixel style) for titles, buttons and the player. */
+val GsfRound = FontFamily(
+    Font(R.font.gsf_round_semibold, FontWeight.SemiBold),
+    Font(R.font.gsf_round_bold, FontWeight.Bold),
+    Font(R.font.gsf_round_bold, FontWeight.ExtraBold),
+)
+val RoundTitle = TextStyle(fontFamily = GsfRound, fontWeight = FontWeight.Bold)
+
 private val base = Typography()
 val TarangType = Typography(
     displayLarge = base.displayLarge.copy(fontFamily = Gsf), displayMedium = base.displayMedium.copy(fontFamily = Gsf),
     displaySmall = base.displaySmall.copy(fontFamily = Gsf),
-    headlineLarge = base.headlineLarge.copy(fontFamily = Gsf, fontWeight = FontWeight.Bold),
-    headlineMedium = base.headlineMedium.copy(fontFamily = Gsf, fontWeight = FontWeight.SemiBold),
-    headlineSmall = base.headlineSmall.copy(fontFamily = Gsf, fontWeight = FontWeight.SemiBold),
-    titleLarge = base.titleLarge.copy(fontFamily = Gsf, fontWeight = FontWeight.SemiBold),
+    headlineLarge = base.headlineLarge.copy(fontFamily = GsfRound, fontWeight = FontWeight.Bold),
+    headlineMedium = base.headlineMedium.copy(fontFamily = GsfRound, fontWeight = FontWeight.SemiBold),
+    headlineSmall = base.headlineSmall.copy(fontFamily = GsfRound, fontWeight = FontWeight.SemiBold),
+    titleLarge = base.titleLarge.copy(fontFamily = GsfRound, fontWeight = FontWeight.SemiBold),
     titleMedium = base.titleMedium.copy(fontFamily = Gsf, fontWeight = FontWeight.Medium),
     titleSmall = base.titleSmall.copy(fontFamily = Gsf, fontWeight = FontWeight.Medium),
     bodyLarge = base.bodyLarge.copy(fontFamily = Gsf), bodyMedium = base.bodyMedium.copy(fontFamily = Gsf),
@@ -50,7 +58,7 @@ val TarangType = Typography(
 )
 
 /** The one title style for every top-level page (Home greeting, Folders, Library, Stats, Settings). */
-val PageTitle = TextStyle(fontFamily = Gsf, fontWeight = FontWeight.Bold, fontSize = 34.sp, lineHeight = 40.sp, letterSpacing = (-0.5).sp)
+val PageTitle = TextStyle(fontFamily = GsfRound, fontWeight = FontWeight.ExtraBold, fontSize = 36.sp, lineHeight = 42.sp, letterSpacing = (-0.6).sp)
 
 val Shapes = Shapes(
     extraSmall = androidx.compose.foundation.shape.RoundedCornerShape(4.dp),
@@ -60,6 +68,7 @@ val Shapes = Shapes(
     extraLarge = androidx.compose.foundation.shape.RoundedCornerShape(28.dp),
 )
 
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun TarangTheme(mode: ThemeMode, pureBlack: Boolean, wallpaper: Boolean, content: @Composable () -> Unit) {
     val dark = when (mode) { ThemeMode.SYSTEM -> isSystemInDarkTheme(); ThemeMode.LIGHT -> false; ThemeMode.DARK -> true }
@@ -71,7 +80,7 @@ fun TarangTheme(mode: ThemeMode, pureBlack: Boolean, wallpaper: Boolean, content
     }
     if (dark && pureBlack) scheme = scheme.pureBlack()
     androidx.compose.runtime.CompositionLocalProvider(LocalIsDark provides dark) {
-        MaterialTheme(colorScheme = scheme, typography = TarangType, shapes = Shapes) {
+        MaterialTheme(colorScheme = scheme, motionScheme = MotionScheme.expressive(), shapes = Shapes, typography = TarangType) {
             SystemBarIcons(light = !dark)
             androidx.compose.material3.Surface(color = scheme.background, contentColor = scheme.onBackground, content = content)
         }

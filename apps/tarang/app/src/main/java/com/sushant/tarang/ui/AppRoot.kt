@@ -23,6 +23,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.indication
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.testTagsAsResourceId
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -33,6 +34,8 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
+import com.sushant.tarang.ui.components.LocalHapticsOn
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalConfiguration
@@ -74,7 +77,7 @@ object R0 {
     fun mix(kind: String) = "mix/$kind"
     fun edit(id: Long) = "edit/$id"
     fun lyrics(id: Long) = "lyrics/$id"
-    val TABS = listOf(HOME, FOLDERS, LIBRARY, STATS)
+    val TABS = listOf(HOME, FOLDERS, LIBRARY)
 }
 
 /** Everything a screen needs to move around and open sheets. */
@@ -114,6 +117,7 @@ fun hasAudioPermission(ctx: android.content.Context) = ContextCompat.checkSelfPe
     ctx, if (Build.VERSION.SDK_INT >= 33) Manifest.permission.READ_MEDIA_AUDIO else Manifest.permission.READ_EXTERNAL_STORAGE,
 ) == PackageManager.PERMISSION_GRANTED
 
+@OptIn(androidx.compose.ui.ExperimentalComposeUiApi::class)
 @Composable
 fun AppRoot(vm: MainVm, activity: MainActivity) {
     val ctx = LocalContext.current
@@ -127,12 +131,19 @@ fun AppRoot(vm: MainVm, activity: MainActivity) {
     val perm = if (Build.VERSION.SDK_INT >= 33) Manifest.permission.READ_MEDIA_AUDIO else Manifest.permission.READ_EXTERNAL_STORAGE
     val permanentlyDenied = askedOnce && !granted && !activity.shouldShowRequestPermissionRationale(perm)
 
-    CompositionLocalProvider(LocalCovers provides vm.repo.covers, LocalVm provides vm) {
-        if (!granted) {
+    var setupDone by remember { mutableStateOf(vm.prefs.setupDone) }
+    val settings by vm.settings.collectAsState()
+    CompositionLocalProvider(LocalCovers provides vm.repo.covers, LocalVm provides vm, LocalHapticsOn provides settings.haptics) {
+      // test tags double as resource ids so the real-device checks (e2e.sh) can find buttons
+      Box(Modifier.fillMaxSize().semantics { testTagsAsResourceId = true }) {
+        if (!setupDone) {
+            SetupGuide(onDone = { vm.prefs.setupDone = true; setupDone = true; granted = hasAudioPermission(ctx) })
+        } else if (!granted) {
             WelcomeScreen(denied = askedOnce, permanentlyDenied = permanentlyDenied,
                 onAllow = { launcher.launch(perm) },
                 onOpenSettings = { ctx.startActivity(Intent(AndroidSettings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.fromParts("package", ctx.packageName, null))) })
         } else Shell(vm, activity)
+      }
     }
 }
 
@@ -148,8 +159,6 @@ private fun Shell(vm: MainVm, activity: MainActivity) {
     val song by vm.currentSong.collectAsState()
     val liked by vm.liked.collectAsState()
     val played by vm.hub.playedThisSession.collectAsState()
-    val ctxKind by vm.hub.contextKind.collectAsState()
-    val ctxLabel by vm.hub.contextLabel.collectAsState()
     val sleepEnds by vm.hub.sleepEndsAt.collectAsState()
     val sleepAfter by vm.hub.sleepAfterSong.collectAsState()
     val entry by nav.currentBackStackEntryAsState()
@@ -166,6 +175,15 @@ private fun Shell(vm: MainVm, activity: MainActivity) {
     val appNav = remember(nav) { AppNav(nav, { sheet = it }, sheetState, openPlayer, scope) }
 
     LaunchedEffect(Unit) { vm.snack.collect { snackHost.currentSnackbarData?.dismiss(); snackHost.showSnackbar(it) } }
+    // tapping a song replaced the queue: offer Undo for a few seconds
+    LaunchedEffect(Unit) {
+        vm.player.replaced.collect { snap ->
+            snackHost.currentSnackbarData?.dismiss()
+            val r = snackHost.showSnackbar("Queue replaced", actionLabel = "Undo", duration = SnackbarDuration.Short)
+            if (r == SnackbarResult.ActionPerformed) vm.player.undoReplace(snap) { id -> vm.library.value.byId[id] }
+        }
+    }
+    var saveQueue by remember { mutableStateOf(false) }
 
     // requests from the notification, the widget or other apps
     val pending by activity.pendingIntent.collectAsState()
@@ -195,6 +213,8 @@ private fun Shell(vm: MainVm, activity: MainActivity) {
     val senderLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) { r ->
         when (val a = vm.systemAsk.value) {
             is SystemAsk.Delete -> if (r.resultCode == Activity.RESULT_OK) vm.afterDelete(a.song) else vm.snack.tryEmit("Nothing was deleted")
+            is SystemAsk.DeleteMany -> if (r.resultCode == Activity.RESULT_OK) vm.afterDeleteMany(a.songs) else vm.snack.tryEmit("Nothing was deleted")
+            is SystemAsk.WriteLyrics -> if (r.resultCode == Activity.RESULT_OK) vm.writeLyricsToFile(a.song, a.text) else vm.snack.tryEmit("Nothing was changed")
             is SystemAsk.Write -> if (r.resultCode == Activity.RESULT_OK) vm.writeTags(a.song, a.edit) else vm.snack.tryEmit("Nothing was changed")
             else -> {}
         }
@@ -204,17 +224,19 @@ private fun Shell(vm: MainVm, activity: MainActivity) {
         val a = vm.systemAsk.value as? SystemAsk.LegacyWrite
         if (a != null) {
             if (!ok) vm.snack.tryEmit("Tarang needs storage access to change files on this Android version")
-            else if (a.edit == null) vm.deleteLegacy(a.song) else vm.writeTags(a.song, a.edit)
+            else legacyDo(vm, a)
         }
         vm.systemAsk.value = null
     }
     LaunchedEffect(ask) {
         when (val a = ask) {
             is SystemAsk.Delete -> senderLauncher.launch(IntentSenderRequest.Builder(a.sender).build())
+            is SystemAsk.DeleteMany -> senderLauncher.launch(IntentSenderRequest.Builder(a.sender).build())
+            is SystemAsk.WriteLyrics -> senderLauncher.launch(IntentSenderRequest.Builder(a.sender).build())
             is SystemAsk.Write -> senderLauncher.launch(IntentSenderRequest.Builder(a.sender).build())
             is SystemAsk.LegacyWrite -> {
                 if (ContextCompat.checkSelfPermission(ctx, Manifest.permission.WRITE_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED) {
-                    if (a.edit == null) vm.deleteLegacy(a.song) else vm.writeTags(a.song, a.edit); vm.systemAsk.value = null
+                    legacyDo(vm, a); vm.systemAsk.value = null
                 } else legacyLauncher.launch(Manifest.permission.WRITE_EXTERNAL_STORAGE)
             }
             null -> {}
@@ -227,7 +249,7 @@ private fun Shell(vm: MainVm, activity: MainActivity) {
             swipeNext = vm.player::swipeNext, swipePrevious = vm.player::swipePrevious, toast = { vm.snack.tryEmit(it) },
             like = { vm.toggleLike(it) }, seekTo = vm.player::seekTo, toggleShuffle = vm.player::toggleShuffle,
             cycleRepeat = vm.player::cycleRepeat, playAt = vm.player::playAt, removeAt = vm.player::removeAt, move = vm.player::move,
-            switchQueue = vm.player::switchQueue, clearQueue = vm.player::clearQueue,
+            clearQueue = { vm.player.clearQueue() }, saveQueueAsPlaylist = { saveQueue = true },
             openLyricsEditor = { id -> appNav.goFromPlayer(R0.lyrics(id)) },
             openEdit = { id -> appNav.goFromPlayer(R0.edit(id)) },
         )
@@ -249,14 +271,16 @@ private fun Shell(vm: MainVm, activity: MainActivity) {
             PlayerLayer(
                 state = sheetState, ui = ui, song = if (miniVisible) song else if (sheetState.progress.value > 0f) (song ?: lastSong) else null,
                 liked = song?.id?.let { it in liked } == true, navVisible = navVisible, wide = wide,
-                contextLine = ctxKind to ctxLabel, sleepActive = sleepEnds > System.currentTimeMillis() || sleepAfter,
+                sleepActive = sleepEnds > System.currentTimeMillis() || sleepAfter,
                 onOpenMenu = { (song ?: lastSong)?.let { sheet = Sheet.PlayerMenu(it) } },
-                onSleep = { sheet = Sheet.Sleep }, onSpeed = { sheet = Sheet.Speed }, onSound = { sheet = Sheet.Sound },
+                onSleep = { sheet = Sheet.Sleep },
                 onPlaylist = { song?.let { sheet = Sheet.AddToPlaylist(listOf(it.id)) } },
-                navBar = { m -> BottomBar(route, miniVisible, m) { appNav.tab(it) } },
+                navBar = { m, tint -> BottomBar(route, miniVisible, m, if (miniVisible) tint else null) { appNav.tab(it) } },
             )
             SnackbarHost(snackHost, Modifier.align(Alignment.BottomCenter).padding(bottom = if (sheetState.progress.value > 0.5f) sysBottom + 80.dp else dock))
             SheetHost(sheet, vm) { sheet = it }
+            if (saveQueue) com.sushant.tarang.ui.components.TextInputDialog("Save queue as playlist", "", "Save", { saveQueue = false },
+                onConfirm = { name -> vm.saveQueueAsPlaylist(name) }, label = "Playlist name")
         }
     }
 }
@@ -292,19 +316,30 @@ private val TAB_ITEMS = listOf(
     TabItem(R0.HOME, "Home", Icons.Rounded.Home, Icons.Outlined.Home),
     TabItem(R0.FOLDERS, "Folders", Icons.Rounded.Folder, Icons.Outlined.Folder),
     TabItem(R0.LIBRARY, "Library", Icons.Rounded.LibraryMusic, Icons.Outlined.LibraryMusic),
-    TabItem(R0.STATS, "Stats", Icons.Rounded.Insights, Icons.Outlined.Insights),
 )
+
+/** Android 8–9: after the storage permission was granted. */
+private fun legacyDo(vm: MainVm, a: SystemAsk.LegacyWrite) {
+    when {
+        a.many.isNotEmpty() -> vm.deleteLegacyMany(a.many)
+        a.lyrics != null -> vm.writeLyricsToFile(a.song, a.lyrics)
+        a.edit == null -> vm.deleteLegacy(a.song)
+        else -> vm.writeTags(a.song, a.edit)
+    }
+}
 
 /** Bottom part of the capsule dock (old-Tarang shape): flat-ish top that meets the mini player, round bottom. */
 @Composable
-private fun BottomBar(route: String, miniVisible: Boolean, modifier: Modifier, onTab: (String) -> Unit) {
+private fun BottomBar(route: String, miniVisible: Boolean, modifier: Modifier, tint: androidx.compose.ui.graphics.Color?, onTab: (String) -> Unit) {
     val cs = MaterialTheme.colorScheme
     val sysBottom = WindowInsets.systemBars.asPaddingValues().calculateBottomPadding()
     val top = if (miniVisible) 10.dp else 34.dp
     Box(modifier.fillMaxWidth().padding(bottom = sysBottom + 4.dp, start = 16.dp, end = 16.dp), contentAlignment = Alignment.BottomCenter) {
         Row(
             Modifier.widthIn(max = 580.dp).fillMaxWidth().height(68.dp)
-                .clip(RoundedCornerShape(top, top, 34.dp, 34.dp)).background(cs.surfaceContainerHigh.copy(alpha = 0.95f)).testTag("nav_bar"),
+                // same height as the mini player: its own shadow, the same base colour (picks up the song's colour)
+                .shadow(3.dp, RoundedCornerShape(top, top, 34.dp, 34.dp), clip = false)
+                .clip(RoundedCornerShape(top, top, 34.dp, 34.dp)).background(tint ?: cs.surfaceContainerHigh).testTag("nav_bar"),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             TAB_ITEMS.forEach { t ->

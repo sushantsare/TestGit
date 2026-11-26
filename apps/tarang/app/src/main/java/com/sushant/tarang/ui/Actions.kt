@@ -20,8 +20,8 @@ class PlayerActions(
     val playAt: (Int) -> Unit,
     val removeAt: (Int) -> Unit,
     val move: (Int, Int) -> Unit,
-    val switchQueue: (Int) -> Unit,
-    val clearQueue: (Int) -> Unit,
+    val clearQueue: () -> Unit,
+    val saveQueueAsPlaylist: () -> Unit,
     val openLyricsEditor: (Long) -> Unit,
     val openEdit: (Long) -> Unit,
 )

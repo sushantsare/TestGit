@@ -20,6 +20,7 @@ import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
@@ -68,14 +69,43 @@ fun CoverPlaceholder(title: String, modifier: Modifier = Modifier) {
 }
 
 @Composable
-fun PageHeader(title: String, modifier: Modifier = Modifier, actions: @Composable RowScope.() -> Unit = {}) {
+fun PageHeader(title: String, modifier: Modifier = Modifier, onBack: (() -> Unit)? = null, titleTrailing: (@Composable () -> Unit)? = null, actions: @Composable RowScope.() -> Unit = {}) {
     Column(modifier.fillMaxWidth()) {
         Row(Modifier.fillMaxWidth().height(56.dp).padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+            if (onBack != null) Box(Modifier.padding(start = 8.dp).size(44.dp).clip(CircleShape).background(MaterialTheme.colorScheme.surfaceContainerHigh)
+                .clickable(onClickLabel = "Back", onClick = onBack).testTag("back"), contentAlignment = Alignment.Center) {
+                Icon(Icons.AutoMirrored.Rounded.ArrowBack, "Back")
+            }
             Spacer(Modifier.weight(1f)); actions()
         }
-        Text(title, style = PageTitle, color = MaterialTheme.colorScheme.onSurface,
-            modifier = Modifier.padding(start = 20.dp, end = 20.dp, top = 4.dp, bottom = 14.dp).semantics { heading() })
+        Row(Modifier.padding(start = 20.dp, end = 20.dp, top = 4.dp, bottom = 14.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text(title, style = PageTitle, color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.weight(1f, fill = false).semantics { heading() })
+            if (titleTrailing != null) { Spacer(Modifier.width(12.dp)); titleTrailing() }
+        }
     }
+}
+
+/**
+ * The big page title shrinks into a small bar at the top once it has scrolled away (collapsing title).
+ * [collapsed] = 0 (big title visible) … 1 (scrolled past it).
+ */
+@Composable
+fun CollapsedTitleBar(title: String, collapsed: Float, modifier: Modifier = Modifier) {
+    if (collapsed <= 0.01f) return
+    val cs = MaterialTheme.colorScheme
+    Box(modifier.fillMaxWidth().graphicsLayer { alpha = collapsed }.background(cs.background).statusBarsPadding().height(56.dp).testTag("collapsed_title"),
+        contentAlignment = Alignment.Center) {
+        Text(title, style = com.sushant.tarang.ui.theme.RoundTitle, fontSize = 18.sp, color = cs.onSurface,
+            modifier = Modifier.graphicsLayer { translationY = (1f - collapsed) * 12.dp.toPx() })
+    }
+}
+
+/** How far the first item (the big title) of a list has scrolled away, 0..1. */
+@Composable
+fun rememberCollapse(state: androidx.compose.foundation.lazy.LazyListState): Float {
+    val px = with(LocalDensity.current) { 90.dp.toPx() }
+    val v by remember(state) { derivedStateOf { if (state.firstVisibleItemIndex > 0) 1f else (state.firstVisibleItemScrollOffset / px).coerceIn(0f, 1f) } }
+    return v
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -117,7 +147,7 @@ fun SongRow(
                 Icon(Icons.Rounded.Check, "Selected", tint = cs.onPrimary)
             }
             number != null -> Box(Modifier.width(28.dp), contentAlignment = Alignment.Center) {
-                if (playing) Icon(Icons.Rounded.GraphicEq, "Playing now", tint = cs.primary, modifier = Modifier.size(20.dp))
+                if (playing) DancingBars(cs.primary, true, height = 16.dp)
                 else Text("$number", style = MaterialTheme.typography.bodyLarge, color = cs.onSurfaceVariant)
             }
             else -> Cover(song, 52.dp, RoundedCornerShape(14.dp))
@@ -129,6 +159,7 @@ fun SongRow(
             Text(meta ?: song.artist, style = MaterialTheme.typography.bodyMedium, color = cs.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
         if (trailing != null) trailing()
+        if (playing && number == null) DancingBars(cs.primary, true, Modifier.padding(horizontal = 6.dp), height = 16.dp)
         IconButton(onClick = onMore, modifier = Modifier.testTag("more_${song.id}")) { Icon(Icons.Rounded.MoreVert, "More options for ${song.title}", tint = cs.onSurfaceVariant) }
     }
 }
@@ -247,6 +278,23 @@ fun FilterChipRow(options: List<String>, selected: Int, onSelect: (Int) -> Unit,
             FilterChip(selected = i == selected, onClick = { onSelect(i) }, label = { Text(o) },
                 leadingIcon = if (i == selected) { { Icon(Icons.Rounded.Check, null, Modifier.size(18.dp)) } } else null,
                 modifier = Modifier.testTag("chip_$o"))
+        }
+    }
+}
+
+/** Connected segmented buttons (Material 3 Expressive): outer ends fully round, tight inner corners. */
+@Composable
+fun SegmentedRow(options: List<String>, selected: Int, onSelect: (Int) -> Unit, modifier: Modifier = Modifier) {
+    val cs = MaterialTheme.colorScheme
+    Row(modifier.fillMaxWidth().padding(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+        options.forEachIndexed { i, o ->
+            val on = i == selected
+            val l = if (i == 0) 22.dp else 8.dp; val r = if (i == options.lastIndex) 22.dp else 8.dp
+            Row(Modifier.weight(1f).height(44.dp).clip(RoundedCornerShape(l, r, r, l)).background(if (on) cs.primary else cs.surfaceContainerHigh)
+                .clickable { onSelect(i) }.testTag("chip_$o"), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
+                if (on) { Icon(Icons.Rounded.Check, null, tint = cs.onPrimary, modifier = Modifier.size(16.dp)); Spacer(Modifier.width(4.dp)) }
+                Text(o, style = MaterialTheme.typography.labelLarge, color = if (on) cs.onPrimary else cs.onSurface, maxLines = 1)
+            }
         }
     }
 }

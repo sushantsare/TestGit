@@ -2,6 +2,7 @@
 
 package com.sushant.tarang.ui.screens
 
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -76,16 +77,20 @@ fun HomeScreen() {
     val liked by vm.liked.collectAsState()
     val cs = MaterialTheme.colorScheme
 
-    LazyColumn(Modifier.fillMaxSize().testTag("home"), contentPadding = PaddingValues(bottom = LocalDockPadding.current)) {
+    val listState = androidx.compose.foundation.lazy.rememberLazyListState()
+    val collapse = rememberCollapse(listState)
+    Box(Modifier.fillMaxSize()) {
+    LazyColumn(Modifier.fillMaxSize().testTag("home"), state = listState, contentPadding = PaddingValues(bottom = LocalDockPadding.current)) {
         item {
-            PageHeader(greeting(), Modifier.statusBarsPadding()) {
+            PageHeader(greeting(), Modifier.statusBarsPadding(), titleTrailing = { GreetingIcon() }) {
                 IconButton(onClick = { nav.go(R0.SEARCH) }, Modifier.testTag("open_search")) { Icon(Icons.Rounded.Search, "Search") }
                 IconButton(onClick = { nav.go(R0.SETTINGS) }, Modifier.testTag("open_settings")) { Icon(Icons.Rounded.Settings, "Settings") }
             }
         }
         if (!lib.loaded || (scanning && lib.songs.isEmpty())) {
-            item { Box(Modifier.fillMaxWidth().padding(64.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator() } }
+            item { Box(Modifier.fillMaxWidth().padding(top = 32.dp, bottom = 12.dp), contentAlignment = Alignment.Center) { PixelLoader(72.dp) } }
             item { Text("Finding your music…", Modifier.fillMaxWidth(), textAlign = TextAlign.Center, color = cs.onSurfaceVariant) }
+            items(6) { ShimmerRow(cs.surfaceContainerHigh) }
             return@LazyColumn
         }
         if (lib.songs.isEmpty()) {
@@ -157,49 +162,31 @@ fun HomeScreen() {
             }
         }
     }
-}
-
-@Composable
-private fun MixCard(title: String, sub: String, icon: ImageVector?, tone: Int, cover: Song?, tag: String, onClick: () -> Unit) {
-    val cs = MaterialTheme.colorScheme
-    val (bg, fg) = listOf(cs.primaryContainer to cs.onPrimaryContainer, cs.secondaryContainer to cs.onSecondaryContainer, cs.tertiaryContainer to cs.onTertiaryContainer)[tone % 3]
-    Column(Modifier.width(156.dp).clip(RoundedCornerShape(24.dp)).background(bg).clickable(onClick = onClick).padding(12.dp).testTag(tag)) {
-        Box(Modifier.size(132.dp).clip(RoundedCornerShape(18.dp)).background(fg.copy(alpha = 0.08f)), contentAlignment = Alignment.Center) {
-            if (cover != null) Cover(cover, 132.dp, RoundedCornerShape(18.dp))
-            else if (icon != null) Icon(icon, null, tint = fg, modifier = Modifier.size(48.dp))
-        }
-        Spacer(Modifier.height(10.dp))
-        Text(title, color = fg, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-        Text(sub, color = fg.copy(alpha = 0.8f), style = MaterialTheme.typography.bodySmall, maxLines = 2, minLines = 2, overflow = TextOverflow.Ellipsis)
+    CollapsedTitleBar(greeting(), collapse)
     }
 }
 
-/** Up to three covers fanned out (folder / playlist art). */
+/** A small playful icon for the time of day, in a Pixel "cookie" shape, next to the greeting. */
 @Composable
-fun CoverStack(songs: List<Song>, size: androidx.compose.ui.unit.Dp) {
-    val picks = songs.distinctBy { it.albumId }.take(3)
-    Box(Modifier.size(size)) {
-        if (picks.size >= 3) {
-            Box(Modifier.align(Alignment.TopEnd).size(size * 0.62f)) { Cover(picks[2], size * 0.62f, RoundedCornerShape(16.dp)) }
-            Box(Modifier.align(Alignment.BottomStart).size(size * 0.62f)) { Cover(picks[1], size * 0.62f, RoundedCornerShape(16.dp)) }
-            Box(Modifier.align(Alignment.Center).size(size * 0.64f).clip(RoundedCornerShape(18.dp)).background(MaterialTheme.colorScheme.background).padding(3.dp)) {
-                Cover(picks[0], size * 0.64f - 6.dp, RoundedCornerShape(16.dp))
-            }
-        } else if (picks.isNotEmpty()) Cover(picks[0], size, RoundedCornerShape(20.dp))
-        else Box(Modifier.fillMaxSize().clip(RoundedCornerShape(20.dp)).background(MaterialTheme.colorScheme.surfaceContainerHigh), contentAlignment = Alignment.Center) {
-            Icon(Icons.Rounded.MusicNote, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
+private fun GreetingIcon() {
+    val h = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
+    val (icon, bg, fg) = when (h) {
+        in 5..11 -> Triple(Icons.Rounded.WbSunny, androidx.compose.ui.graphics.Color(0xFFFFE08A), androidx.compose.ui.graphics.Color(0xFF7A4B00))
+        in 12..16 -> Triple(Icons.Rounded.LightMode, androidx.compose.ui.graphics.Color(0xFFFFD49A), androidx.compose.ui.graphics.Color(0xFF7A3E00))
+        in 17..21 -> Triple(Icons.Rounded.WbTwilight, androidx.compose.ui.graphics.Color(0xFFFFCFB0), androidx.compose.ui.graphics.Color(0xFF8A3A12))
+        else -> Triple(Icons.Rounded.Bedtime, androidx.compose.ui.graphics.Color(0xFFCFD6FF), androidx.compose.ui.graphics.Color(0xFF26306B))
+    }
+    val spin by androidx.compose.animation.core.rememberInfiniteTransition(label = "gi").animateFloat(0f, 360f,
+        androidx.compose.animation.core.infiniteRepeatable(androidx.compose.animation.core.tween(24000, easing = androidx.compose.animation.core.LinearEasing)), label = "r")
+    Box(Modifier.size(46.dp).testTag("greeting_icon"), contentAlignment = Alignment.Center) {
+        Box(Modifier.fillMaxSize().graphicsLayer { rotationZ = spin }.clip(CookieShape(9, 0.08f)).background(bg))
+        Icon(icon, null, tint = fg, modifier = Modifier.size(26.dp))
     }
 }
 
-
-/** The launcher icon drawn from its two vector layers. */
+/** Pixel's own loader: a shape that keeps changing form while it spins (Material 3 Expressive). */
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-fun AppIcon(size: androidx.compose.ui.unit.Dp) {
-    Box(Modifier.size(size).clip(RoundedCornerShape(size / 3))) {
-        Image(painterResource(R.drawable.ic_launcher_background), null, Modifier.fillMaxSize(), contentScale = androidx.compose.ui.layout.ContentScale.Crop)
-        Image(painterResource(R.drawable.ic_launcher_foreground), null, Modifier.fillMaxSize().graphicsLayerScale(1.5f))
-    }
+fun PixelLoader(size: androidx.compose.ui.unit.Dp) {
+    ContainedLoadingIndicator(Modifier.size(size).testTag("pixel_loader"))
 }
-
-private fun Modifier.graphicsLayerScale(s: Float) = this.then(Modifier.graphicsLayer { scaleX = s; scaleY = s })

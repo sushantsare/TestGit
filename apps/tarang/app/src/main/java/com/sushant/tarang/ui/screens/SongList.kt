@@ -84,6 +84,7 @@ fun SongListScreen(kind: ListKind) {
     val label = model.title
     val play: (Int, Boolean) -> Unit = { i, shuffle -> vm.player.playList(model.songs, i, shuffle, model.kind, label) }
 
+    Box(Modifier.fillMaxSize()) {
     Column(Modifier.fillMaxSize().testTag("song_list")) {
         if (selected.isNotEmpty()) SelectionBar(selected, model.songs.map { it.id }, onClear = { selected = emptySet() }, onAll = { selected = model.songs.map { it.id }.toSet() })
         else InnerTopBar(if (reorder) "Reorder" else "", { if (reorder) reorder = false else nav.back() }) {
@@ -109,9 +110,9 @@ fun SongListScreen(kind: ListKind) {
                 // header card
                 Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp).clip(RoundedCornerShape(28.dp)).background(cs.surfaceContainer).padding(20.dp).testTag("list_header")) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        if (model.icon != null && kind !is ListKind.Mix) Box(Modifier.size(112.dp).clip(RoundedCornerShape(24.dp)).background(cs.primaryContainer), contentAlignment = Alignment.Center) {
+                        if (model.icon != null && kind !is ListKind.Mix) GrowIn { Box(Modifier.size(112.dp).clip(RoundedCornerShape(24.dp)).background(cs.primaryContainer), contentAlignment = Alignment.Center) {
                             if (kind is ListKind.ArtistList) LetterAvatar(model.title, 96.dp) else Icon(model.icon, null, tint = cs.onPrimaryContainer, modifier = Modifier.size(48.dp))
-                        } else CoverStack(model.songs, 112.dp)
+                        } } else GrowIn { CoverStack(model.songs, 112.dp) }
                         Spacer(Modifier.width(18.dp))
                         Column(Modifier.weight(1f)) {
                             Text(model.title, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, maxLines = 2, overflow = TextOverflow.Ellipsis)
@@ -156,6 +157,9 @@ fun SongListScreen(kind: ListKind) {
             }
         }
     }
+    if (selected.isNotEmpty()) SelectionToolbar(selected, model.songs.map { it.id }, onClear = { selected = emptySet() }, onAll = { selected = model.songs.map { it.id }.toSet() },
+        modifier = Modifier.align(Alignment.BottomCenter))
+    }
     if (renaming && playlist != null) TextInputDialog("Rename playlist", playlist.name, "Rename", onDismiss = { renaming = false }, onConfirm = { n -> renaming = false; if (n.isNotBlank()) vm.renamePlaylist(playlist.id, n) })
     if (deleting && playlist != null) ConfirmDialog("Delete “${playlist.name}”?", "Only the playlist is deleted. The songs stay on your phone.", "Delete",
         { deleting = false }, { deleting = false; vm.deletePlaylist(playlist.id); nav.back() })
@@ -168,4 +172,12 @@ fun SongListScreen(kind: ListKind) {
             }
             nav.back()
         }, destructive = false)
+}
+
+/** The page's cover grows in from smaller when the page opens. */
+@Composable
+fun GrowIn(content: @Composable () -> Unit) {
+    val k = remember { androidx.compose.animation.core.Animatable(0f) }
+    LaunchedEffect(Unit) { k.animateTo(1f, androidx.compose.animation.core.spring(dampingRatio = 0.72f, stiffness = 260f)) }
+    Box(Modifier.graphicsLayer { val sc = 0.6f + 0.4f * k.value; scaleX = sc; scaleY = sc; alpha = k.value.coerceIn(0f, 1f) }.testTag("grow_cover")) { content() }
 }

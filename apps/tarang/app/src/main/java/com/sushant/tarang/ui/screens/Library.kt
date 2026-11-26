@@ -25,6 +25,8 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -55,6 +57,7 @@ fun LibraryScreen() {
     val selecting = selected.isNotEmpty()
     BackHandler(selecting) { selected = emptySet() }
 
+    Box(Modifier.fillMaxSize()) {
     Column(Modifier.fillMaxSize().testTag("library")) {
         if (selecting) SelectionBar(selected, lib.songs.map { it.id }, onClear = { selected = emptySet() }, onAll = { selected = lib.songs.map { it.id }.toSet() })
         else PageHeader("Library", Modifier.statusBarsPadding()) {
@@ -71,6 +74,9 @@ fun LibraryScreen() {
             else -> PlaylistsTab()
         }
     }
+    if (selecting) SelectionToolbar(selected, lib.songs.map { it.id }, onClear = { selected = emptySet() }, onAll = { selected = lib.songs.map { it.id }.toSet() },
+        modifier = Modifier.align(Alignment.BottomCenter))
+    }
     if (sortDialog) when (tab) {
         0 -> ChoiceDialog("Sort songs", SongSort.entries, songSort, { it.label }, { sortDialog = false }) { songSort = it; sortDialog = false }
         1 -> ChoiceDialog("Sort albums", listOf(0, 1, 2), albumSort, { listOf("Name A–Z", "Artist", "Newest year first")[it] }, { sortDialog = false }) { albumSort = it; sortDialog = false }
@@ -79,22 +85,43 @@ fun LibraryScreen() {
 }
 
 @Composable
-fun SelectionBar(selected: Set<Long>, all: List<Long>, onClear: () -> Unit, onAll: () -> Unit) {
+fun SelectionBar(selected: Set<Long>, @Suppress("UNUSED_PARAMETER") all: List<Long>, onClear: () -> Unit, @Suppress("UNUSED_PARAMETER") onAll: () -> Unit) {
+    Row(Modifier.fillMaxWidth().statusBarsPadding().height(64.dp).padding(horizontal = 12.dp).testTag("selection_bar"), verticalAlignment = Alignment.CenterVertically) {
+        Box(Modifier.size(44.dp).clip(androidx.compose.foundation.shape.CircleShape).background(MaterialTheme.colorScheme.surfaceContainerHigh)
+            .clickable(onClickLabel = "Stop selecting", onClick = onClear), contentAlignment = Alignment.Center) { Icon(Icons.Rounded.Close, "Stop selecting") }
+        Spacer(Modifier.width(12.dp))
+        Text("${selected.size} selected", style = com.sushant.tarang.ui.theme.RoundTitle, fontSize = 22.sp, modifier = Modifier.weight(1f))
+    }
+}
+
+/** Floating toolbar at the bottom while songs are selected (in thumb reach); Delete is the red one. */
+@Composable
+fun SelectionToolbar(selected: Set<Long>, all: List<Long>, onClear: () -> Unit, onAll: () -> Unit, modifier: Modifier = Modifier) {
     val vm = LocalVm.current
     val nav = LocalNav.current
     val lib by vm.library.collectAsState()
+    val cs = MaterialTheme.colorScheme
     val songs = all.filter { it in selected }.mapNotNull { lib.byId[it] }
-    Row(Modifier.fillMaxWidth().statusBarsPadding().height(64.dp).padding(horizontal = 4.dp).testTag("selection_bar"), verticalAlignment = Alignment.CenterVertically) {
-        IconButton(onClick = onClear) { Icon(Icons.Rounded.Close, "Stop selecting") }
-        Text("${selected.size} selected", style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
-        IconButton(onClick = onAll, Modifier.testTag("select_all")) { Icon(Icons.Rounded.SelectAll, "Select all") }
-        IconButton(onClick = { vm.player.playList(songs, kind = "Library", label = "Selected songs"); onClear() }, Modifier.testTag("sel_play")) { Icon(Icons.Rounded.PlayArrow, "Play selected") }
-        IconButton(onClick = { vm.player.addToQueue(songs); vm.snack.tryEmit("Added ${plural(songs.size, "song")} to the queue"); onClear() }, Modifier.testTag("sel_queue")) {
-            Icon(Icons.AutoMirrored.Rounded.QueueMusic, "Add to queue")
+    var confirm by remember { mutableStateOf(false) }
+    Box(modifier.fillMaxWidth().padding(bottom = LocalDockPadding.current), contentAlignment = Alignment.Center) {
+        Row(Modifier.shadow(10.dp, androidx.compose.foundation.shape.CircleShape).clip(androidx.compose.foundation.shape.CircleShape)
+            .background(cs.inverseSurface).padding(6.dp).testTag("selection_toolbar"), horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+            @Composable fun Btn(icon: androidx.compose.ui.graphics.vector.ImageVector, desc: String, tag: String, danger: Boolean = false, onClick: () -> Unit) {
+                Box(Modifier.size(48.dp).clip(androidx.compose.foundation.shape.CircleShape).background(if (danger) cs.error else androidx.compose.ui.graphics.Color.Transparent)
+                    .clickable(onClickLabel = desc, onClick = onClick).testTag(tag), contentAlignment = Alignment.Center) {
+                    Icon(icon, desc, tint = if (danger) cs.onError else cs.inverseOnSurface)
+                }
+            }
+            Btn(Icons.Rounded.PlayArrow, "Play selected", "sel_play") { vm.player.playList(songs, kind = "Library", label = "Selected songs"); onClear() }
+            Btn(Icons.AutoMirrored.Rounded.QueueMusic, "Add to queue", "sel_queue") { vm.player.addToQueue(songs); vm.snack.tryEmit("Added ${plural(songs.size, "song")} to the queue"); onClear() }
+            Btn(Icons.AutoMirrored.Rounded.PlaylistAdd, "Add to playlist", "sel_playlist") { nav.sheet(Sheet.AddToPlaylist(songs.map { it.id })); onClear() }
+            Btn(Icons.Rounded.FavoriteBorder, "Like selected", "sel_like") { vm.likeMany(songs.map { it.id }, true); onClear() }
+            Btn(Icons.Rounded.SelectAll, "Select all", "select_all") { onAll() }
+            Btn(Icons.Rounded.Delete, "Delete selected", "sel_delete", danger = true) { confirm = true }
         }
-        IconButton(onClick = { nav.sheet(Sheet.AddToPlaylist(songs.map { it.id })); onClear() }, Modifier.testTag("sel_playlist")) { Icon(Icons.AutoMirrored.Rounded.PlaylistAdd, "Add to playlist") }
-        IconButton(onClick = { vm.likeMany(songs.map { it.id }, true); onClear() }, Modifier.testTag("sel_like")) { Icon(Icons.Rounded.FavoriteBorder, "Like selected") }
     }
+    if (confirm) ConfirmDialog("Delete ${plural(songs.size, "song")}?", "The song files are removed from your phone for good. This can't be undone.", "Delete",
+        { confirm = false }, { confirm = false; vm.requestDeleteMany(songs); onClear() }, icon = Icons.Rounded.Delete)
 }
 
 @Composable

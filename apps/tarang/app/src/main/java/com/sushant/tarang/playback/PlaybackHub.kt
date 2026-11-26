@@ -4,10 +4,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 
 /** Small shared state between the playback service and the screens (same process). */
 class PlaybackHub {
-    /** Which of the 3 saved queues is playing (1..3). */
-    val activeQueue = MutableStateFlow(1)
-    /** Song count per queue slot 1..3. */
-    val queueSizes = MutableStateFlow(listOf(0, 0, 0))
+    /** Shuffle on/off. Shuffle really reorders the queue (current song first), so Up next always shows what plays. */
+    val shuffle = MutableStateFlow(false)
     /** "Bollywood" in "Playing from folder · Bollywood". */
     val contextKind = MutableStateFlow("Folder")
     val contextLabel = MutableStateFlow("")
@@ -25,9 +23,9 @@ object Cmd {
     const val LIKE = "tarang.LIKE"
     const val SHUFFLE = "tarang.SHUFFLE"
     const val REPEAT = "tarang.REPEAT"
-    const val SWITCH_QUEUE = "tarang.SWITCH_QUEUE"     // arg "slot"
     const val SLEEP = "tarang.SLEEP"                   // args "minutes" (0 = cancel), "afterSong", "fade"
     const val END_QUEUE = "tarang.END_QUEUE"
     const val CONTEXT = "tarang.CONTEXT"               // args "kind", "label"
-    const val CLEAR_QUEUE = "tarang.CLEAR_QUEUE"       // arg "slot"
+    const val CLEAR_QUEUE = "tarang.CLEAR_QUEUE"       // removes everything except the song playing now
+    const val SET_SHUFFLE = "tarang.SET_SHUFFLE"       // arg "mode": "toggle" | "apply" (shuffle the new list) | "off" (forget shuffle, keep order)
 }

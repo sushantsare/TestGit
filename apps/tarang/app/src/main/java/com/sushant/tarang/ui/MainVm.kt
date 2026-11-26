@@ -25,7 +25,9 @@ import java.io.File
 sealed class SystemAsk {
     data class Delete(val sender: IntentSender, val song: Song) : SystemAsk()
     data class Write(val sender: IntentSender, val song: Song, val edit: TagEdit) : SystemAsk()
-    data class LegacyWrite(val song: Song, val edit: TagEdit?) : SystemAsk()
+    data class LegacyWrite(val song: Song, val edit: TagEdit?, val lyrics: String? = null, val many: List<Song> = emptyList()) : SystemAsk()
+    data class DeleteMany(val sender: IntentSender, val songs: List<Song>) : SystemAsk()
+    data class WriteLyrics(val sender: IntentSender, val song: Song, val text: String) : SystemAsk()
 }
 
 
@@ -124,6 +126,61 @@ class MainVm(application: Application) : AndroidViewModel(application) {
         } else snack.tryEmit("“${song.title}” was not deleted")
     }
 
+    /** Deletes several song files with one Android "Allow" prompt (Android 11+). */
+    fun requestDeleteMany(songs: List<Song>) = viewModelScope.launch {
+        if (songs.isEmpty()) return@launch
+        if (songs.size == 1) { requestDelete(songs[0]); return@launch }
+        val cr = app.contentResolver
+        when {
+            Build.VERSION.SDK_INT >= 30 -> systemAsk.value = SystemAsk.DeleteMany(MediaStore.createDeleteRequest(cr, songs.map { it.uri }).intentSender, songs)
+            Build.VERSION.SDK_INT == 29 -> songs.forEach { requestDelete(it).join() }
+            else -> systemAsk.value = SystemAsk.LegacyWrite(songs[0], null, null, songs)
+        }
+    }
+    fun deleteLegacyMany(songs: List<Song>) = viewModelScope.launch {
+        var n = 0
+        songs.forEach { song ->
+            val ok = withContext(Dispatchers.IO) { runCatching { app.contentResolver.delete(song.uri, null, null) > 0 || File(song.path).delete() }.getOrDefault(false) }
+            if (ok) { player.dropSong(song.id); repo.forgetSong(song.id); n++ }
+        }
+        snack.tryEmit(if (n == songs.size) "Deleted ${plural(n, "song")}" else "Deleted $n of ${songs.size} songs")
+    }
+    fun afterDeleteMany(songs: List<Song>) = viewModelScope.launch {
+        var n = 0
+        songs.forEach { song ->
+            val gone = withContext(Dispatchers.IO) {
+                app.contentResolver.query(song.uri, arrayOf(MediaStore.Audio.Media._ID), null, null, null)?.use { it.count == 0 } ?: true
+            }
+            if (gone) { player.dropSong(song.id); repo.forgetSong(song.id); n++ }
+        }
+        snack.tryEmit(if (n == songs.size) "Deleted ${plural(n, "song")}" else "Deleted $n of ${songs.size} songs")
+    }
+
+    /** Lyrics written into the song file itself (Android asks to Allow the change first on Android 11+). */
+    fun requestSaveLyricsToFile(song: Song, text: String) = viewModelScope.launch {
+        val cr = app.contentResolver
+        when {
+            Build.VERSION.SDK_INT >= 30 -> systemAsk.value = SystemAsk.WriteLyrics(MediaStore.createWriteRequest(cr, listOf(song.uri)).intentSender, song, text)
+            Build.VERSION.SDK_INT == 29 -> runCatching { cr.openFileDescriptor(song.uri, "rw")?.close() }.fold(
+                onSuccess = { writeLyricsToFile(song, text) },
+                onFailure = { e -> if (e is RecoverableSecurityException) systemAsk.value = SystemAsk.WriteLyrics(e.userAction.actionIntent.intentSender, song, text) else snack.tryEmit("Can't change this file") })
+            else -> systemAsk.value = SystemAsk.LegacyWrite(song, null, text)
+        }
+    }
+    fun writeLyricsToFile(song: Song, text: String) = viewModelScope.launch {
+        val res = withContext(Dispatchers.IO) { TagWriter.writeLyrics(app, song, text) }
+        if (res == null) { repo.lyrics.save(song.id, text, "Lyrics saved inside the song"); snack.tryEmit("Lyrics saved into the song file") }
+        else snack.tryEmit(res)
+    }
+
+    /** Current queue → a new playlist. */
+    fun saveQueueAsPlaylist(name: String) = viewModelScope.launch {
+        val ids = player.ui.value.queueIds.distinct()
+        if (ids.isEmpty()) { snack.tryEmit("The queue is empty"); return@launch }
+        val id = repo.createPlaylist(name); repo.addToPlaylist(id, ids)
+        snack.tryEmit("Saved the queue as “${name.trim()}”")
+    }
+
     // ---- edit details written into the file
     fun requestEdit(song: Song, edit: TagEdit) = viewModelScope.launch {
         val cr = app.contentResolver
@@ -152,11 +209,15 @@ class MainVm(application: Application) : AndroidViewModel(application) {
     // ---- lyrics
     fun saveLyrics(songId: Long, text: String, source: String) = viewModelScope.launch {
         repo.lyrics.save(songId, text, source); snack.tryEmit(if (text.isBlank()) "Lyrics removed" else "Lyrics saved")
+        if (text.isNotBlank() && prefs.now.alwaysSaveLyrics) library.value.byId[songId]?.let { requestSaveLyricsToFile(it, text) }
     }
     fun importLrc(songId: Long, uri: Uri) = viewModelScope.launch {
         val text = withContext(Dispatchers.IO) { runCatching { app.contentResolver.openInputStream(uri)?.bufferedReader()?.use { it.readText() } }.getOrNull() }
         if (text.isNullOrBlank() || LrcParser.parse(text, "") == null) snack.tryEmit("That file has no lyrics in it")
-        else { repo.lyrics.save(songId, text, "Imported .lrc file"); snack.tryEmit("Lyrics added") }
+        else {
+            repo.lyrics.save(songId, text, "Imported .lrc file"); snack.tryEmit("Lyrics added")
+            if (prefs.now.alwaysSaveLyrics) library.value.byId[songId]?.let { requestSaveLyricsToFile(it, text) }
+        }
     }
 
     fun resetStats() = viewModelScope.launch { repo.resetStats(); snack.tryEmit("Stats cleared") }

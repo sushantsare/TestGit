@@ -4,7 +4,9 @@ package com.sushant.tarang.ui.sheets
 
 import android.content.Intent
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -43,6 +45,7 @@ sealed class Sheet {
     data object Speed : Sheet()
     data object Sound : Sheet()
     data class AddToPlaylist(val ids: List<Long>) : Sheet()
+    data class Info(val song: Song) : Sheet()
 }
 
 fun shareSong(ctx: android.content.Context, song: Song) {
@@ -68,6 +71,7 @@ fun SheetHost(sheet: Sheet?, vm: MainVm, set: (Sheet?) -> Unit) {
                 Sheet.Speed -> SpeedSheet(vm)
                 Sheet.Sound -> com.sushant.tarang.ui.screens.SoundSheetContent()
                 is Sheet.AddToPlaylist -> AddToPlaylistSheet(sheet.ids, vm, close)
+                is Sheet.Info -> InfoSheet(sheet.song, vm, close)
             }
         }
     }
@@ -76,11 +80,19 @@ fun SheetHost(sheet: Sheet?, vm: MainVm, set: (Sheet?) -> Unit) {
 @Composable
 private fun MenuItem(icon: ImageVector, text: String, tag: String, danger: Boolean = false, onClick: () -> Unit) {
     val cs = MaterialTheme.colorScheme
-    Row(Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 24.dp, vertical = 14.dp).testTag(tag), verticalAlignment = Alignment.CenterVertically) {
-        Icon(icon, null, tint = if (danger) cs.error else cs.onSurfaceVariant)
-        Spacer(Modifier.width(20.dp))
-        Text(text, style = MaterialTheme.typography.bodyLarge, color = if (danger) cs.error else cs.onSurface)
+    Row(Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 16.dp, vertical = 10.dp).testTag(tag), verticalAlignment = Alignment.CenterVertically) {
+        Box(Modifier.size(36.dp).clip(androidx.compose.foundation.shape.CircleShape).background(if (danger) cs.errorContainer else cs.secondaryContainer), contentAlignment = Alignment.Center) {
+            Icon(icon, null, tint = if (danger) cs.onErrorContainer else cs.onSecondaryContainer, modifier = Modifier.size(20.dp))
+        }
+        Spacer(Modifier.width(16.dp))
+        Text(text, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium, color = if (danger) cs.error else cs.onSurface)
     }
+}
+
+/** Android 16-style group: big rounded outer corners, tight inner ones, 3 dp between rows. */
+@Composable
+private fun MenuGroup(content: @Composable ColumnScope.() -> Unit) {
+    Column(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 5.dp).clip(RoundedCornerShape(22.dp)).background(MaterialTheme.colorScheme.surfaceContainerHigh), content = content)
 }
 
 @Composable
@@ -101,25 +113,34 @@ private fun SongMenu(song: Song, playlistId: Long?, vm: MainVm, close: () -> Uni
             Text(song.artist, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
     }
-    HorizontalDivider(Modifier.padding(vertical = 8.dp))
-    if (!fromPlayer) {
+    Spacer(Modifier.height(6.dp))
+    if (fromPlayer) MenuGroup {
+        MenuItem(Icons.Rounded.Speed, "Speed", "menu_speed") { set(Sheet.Speed) }
+        MenuItem(Icons.Rounded.Tune, "Sound", "menu_sound") { set(Sheet.Sound) }
+        MenuItem(Icons.Rounded.Info, "Info", "menu_info") { set(Sheet.Info(song)) }
+        MenuItem(Icons.Rounded.Edit, "Edit details", "menu_edit") { go(R0.edit(song.id)) }
+    } else MenuGroup {
         MenuItem(Icons.AutoMirrored.Rounded.PlaylistPlay, "Play next", "menu_play_next") { vm.player.playNext(listOf(song)); vm.snack.tryEmit("Plays next"); close() }
         MenuItem(Icons.AutoMirrored.Rounded.QueueMusic, "Add to queue", "menu_add_queue") { vm.player.addToQueue(listOf(song)); vm.snack.tryEmit("Added to the queue"); close() }
         MenuItem(Icons.AutoMirrored.Rounded.PlaylistAdd, "Add to playlist", "menu_add_playlist") { set(Sheet.AddToPlaylist(listOf(song.id))) }
         MenuItem(if (isLiked) Icons.Rounded.Favorite else Icons.Rounded.FavoriteBorder, if (isLiked) "Remove from Liked" else "Like", "menu_like") { vm.toggleLike(song.id); close() }
+        MenuItem(Icons.Rounded.Edit, "Edit details", "menu_edit") { go(R0.edit(song.id)) }
     }
-    MenuItem(Icons.Rounded.Album, "Go to album", "menu_album") { go(R0.album(song.albumId)) }
-    MenuItem(Icons.Rounded.Person, if (song.artists.size > 1) "Go to artist…" else "Go to artist", "menu_artist") {
-        if (song.artists.size > 1) pickArtist = true else go(R0.artist(song.artists.firstOrNull() ?: song.artist))
+    MenuGroup {
+        MenuItem(Icons.Rounded.Folder, "Go to folder", "menu_folder") { go(R0.folder(song.folderPath)) }
+        MenuItem(Icons.Rounded.Album, "Go to album", "menu_album") { go(R0.album(song.albumId)) }
+        MenuItem(Icons.Rounded.Person, if (song.artists.size > 1) "Go to artist…" else "Go to artist", "menu_artist") {
+            if (song.artists.size > 1) pickArtist = true else go(R0.artist(song.artists.firstOrNull() ?: song.artist))
+        }
     }
-    MenuItem(Icons.Rounded.Folder, "Go to folder", "menu_folder") { go(R0.folder(song.folderPath)) }
-    if (!fromPlayer) MenuItem(Icons.Rounded.Edit, "Edit details", "menu_edit") { go(R0.edit(song.id)) }
-    MenuItem(Icons.Rounded.Share, "Share", "menu_share") { close(); shareSong(ctx, song) }
-    if (playlistId != null) MenuItem(Icons.Rounded.RemoveCircleOutline, "Remove from this playlist", "menu_remove_pl") { vm.removeFromPlaylist(playlistId, song.id); close() }
-    if (fromPlayer) MenuItem(Icons.Rounded.StopCircle, "End the queue", "menu_end_queue") {
-        vm.player.endQueue(); close(); nav.collapsePlayer()
+    MenuGroup {
+        MenuItem(Icons.Rounded.Share, "Share", "menu_share") { close(); shareSong(ctx, song) }
+        if (playlistId != null) MenuItem(Icons.Rounded.RemoveCircleOutline, "Remove from this playlist", "menu_remove_pl") { vm.removeFromPlaylist(playlistId, song.id); close() }
+        if (fromPlayer) MenuItem(Icons.Rounded.StopCircle, "End the queue", "menu_end_queue") {
+            vm.player.endQueue(); close(); nav.collapsePlayer()
+        }
+        MenuItem(Icons.Rounded.DeleteOutline, "Delete from phone", "menu_delete", danger = true) { confirmDelete = true }
     }
-    MenuItem(Icons.Rounded.DeleteOutline, "Delete from phone", "menu_delete", danger = true) { confirmDelete = true }
 
     if (confirmDelete) ConfirmDialog("Delete “${song.title}”?", "The song file is removed from your phone for good. This can't be undone.", "Delete",
         onDismiss = { confirmDelete = false }, onConfirm = { confirmDelete = false; close(); vm.requestDelete(song) }, icon = Icons.Rounded.DeleteOutline)
@@ -185,6 +206,15 @@ private fun SpeedSheet(vm: MainVm) {
         }
         Switch(s.keepPitch, { apply(speed, it) })
     }
+}
+
+@Composable
+private fun InfoSheet(song: Song, @Suppress("UNUSED_PARAMETER") vm: MainVm, close: () -> Unit) {
+    Text("Info", style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp).testTag("info"))
+    Text(song.title, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(horizontal = 24.dp))
+    Spacer(Modifier.height(8.dp))
+    com.sushant.tarang.ui.player.InfoRows(song, MaterialTheme.colorScheme.onSurface, MaterialTheme.colorScheme.onSurfaceVariant, MaterialTheme.colorScheme.outlineVariant)
+    TextButton(onClick = close, modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) { Text("Close") }
 }
 
 @Composable

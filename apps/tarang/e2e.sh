@@ -1,8 +1,8 @@
 #!/bin/bash
 # Real-device-style checks + automated audit evidence for Tarang.
 # Usage: e2e.sh [api-tag]   (no tag = main audit run). Never calls ./gradlew (emulator jobs have no Gradle).
-TAG=${1:-35}
 MAIN=0; [ -z "$1" ] && MAIN=1
+TAG=${1:-$(adb shell getprop ro.build.version.sdk | tr -d '\r')}
 OUT=/tmp/out; mkdir -p $OUT/screens $OUT/audit
 A=$OUT/audit
 PKG=com.sushant.tarang
@@ -15,6 +15,10 @@ echo "== Tarang e2e on Android $(adb shell getprop ro.build.version.release | tr
 adb shell settings put global hide_error_dialogs 1 >/dev/null 2>&1
 mycrash() { adb logcat -d | grep -A3 "FATAL EXCEPTION" | grep -c "Process: $PKG"; }
 shot() { sleep 1; adb exec-out screencap -p > "$OUT/screens/e2e_${TAG}_$1.png"; }
+# find a button by its test tag (the app exposes test tags as resource ids): prints "left top right bottom"
+boundsof() { adb exec-out uiautomator dump /dev/tty 2>/dev/null | tr '>' '\n' | grep "resource-id=\"$1\"" | head -1 | sed -n 's/.*bounds="\[\([0-9]*\),\([0-9]*\)\]\[\([0-9]*\),\([0-9]*\)\]".*/\1 \2 \3 \4/p'; }
+hasid() { [ -n "$(boundsof "$1")" ]; }
+tapid() { local b; b=$(boundsof "$1"); [ -z "$b" ] && return 1; set -- $b; adb shell input tap $(( ($1 + $3) / 2 )) $(( ($2 + $4) / 2 )); }
 perm() { if [ "$API" -ge 33 ]; then echo android.permission.READ_MEDIA_AUDIO; else echo android.permission.READ_EXTERNAL_STORAGE; fi; }
 # playback state of Tarang's session: 3 = playing, 2 = paused (Android 13 prints "state=3", 14+ "state=PLAYING(3)")
 state() { adb shell dumpsys media_session | tr -d '\r' | grep -A40 "$PKG" | grep -m1 -oE "state=(PlaybackState \{state=)?[A-Z_]*\(?[0-9]+" | grep -oE "[0-9]+$"; }
@@ -38,8 +42,16 @@ adb logcat -c
 adb shell am start -W -n $ACT > /tmp/start.txt 2>&1; sleep 4
 if adb shell pidof $PKG >/dev/null && [ "$(mycrash)" = "0" ]; then echo "launch=PASSED" >> $LOG; else echo "launch=FAILED" >> $LOG; adb logcat -d | grep -A 25 "FATAL EXCEPTION" | head -60 >> $LOG; fi
 shot welcome
-# permission prompt appears in context when the user taps Allow
-adb shell input tap 540 2100 >/dev/null 2>&1; sleep 2; shot permission_prompt
+# first-launch setup guide: Welcome → Music access (asked in context) → … → Done
+SETUP=FAILED
+if hasid setup; then
+  tapid setup_next; sleep 2; shot setup_music
+  tapid allow_music; sleep 2; shot permission_prompt
+  adb shell pm grant $PKG $(perm); adb shell input keyevent KEYCODE_BACK; sleep 2
+  for i in 1 2 3 4 5 6; do hasid setup || break; tapid setup_next; sleep 2; shot setup_$i; done
+  hasid setup || SETUP=PASSED
+fi
+echo "setup_guide=$SETUP" >> $LOG
 adb shell pm grant $PKG $(perm); adb shell am force-stop $PKG
 adb shell am start -W -n $ACT >/dev/null 2>&1; sleep 6; shot home_with_songs
 
@@ -58,9 +70,51 @@ if [ -n "$ID" ]; then
   adb shell input keyevent KEYCODE_MEDIA_NEXT; sleep 3; S5=$(state)
   echo "playback open=$S1 background=$S2 paused=$S3 resumed=$S4 after_next=$S5 (3=playing 2=paused)" >> $LOG
   [ "$S1" = "3" ] && [ "$S2" = "3" ] && [ "$S3" = "2" ] && [ "$S4" = "3" ] && PLAY=PASSED
-  adb shell input keyevent KEYCODE_MEDIA_PAUSE; sleep 1
 fi
 echo "playback=$PLAY" >> $LOG
+
+# ---------- real finger gestures on the player (Android's own input, not the test framework) + frame timing
+adb shell am start -n $ACT --ez open_player true >/dev/null 2>&1; sleep 3
+GEST=PASSED
+if hasid full_player; then
+  shot gesture_full
+  B=$(boundsof player_cover); set -- $B; CX=$(( ($1 + $3) / 2 )); CY=$(( ($2 + $4) / 2 ))
+  adb shell dumpsys gfxinfo $PKG reset >/dev/null
+  # cover swipe left: the song changes
+  T0=$(adb shell dumpsys media_session | tr -d '\r' | grep -A40 "$PKG" | grep -m1 -o "description=[^,]*")
+  adb shell input swipe $((CX + 300)) $CY $((CX - 300)) $CY 180; sleep 2
+  T1=$(adb shell dumpsys media_session | tr -d '\r' | grep -A40 "$PKG" | grep -m1 -o "description=[^,]*")
+  [ "$T0" != "$T1" ] && echo "cover_swipe=PASSED" >> $LOG || { echo "cover_swipe=FAILED ($T0)" >> $LOG; GEST=FAILED; }
+  shot gesture_after_cover_swipe
+  # slow pull down in steps with pictures at 25/50/75 % (Android 11+ can hold the finger down between steps)
+  if [ "$API" -ge 30 ]; then
+    H=$(adb shell wm size | grep -o '[0-9]*x[0-9]*' | tail -1 | cut -dx -f2)
+    STEP=$(( H * 19 / 100 )); Y=$CY
+    adb shell input motionevent DOWN $CX $Y
+    for p in 25 50 75; do
+      for k in 1 2 3 4 5 6 7 8; do Y=$(( Y + STEP / 8 )); adb shell input motionevent MOVE $CX $Y; done
+      sleep 0.4; shot gesture_pull_down_$p
+    done
+    adb shell input motionevent UP $CX $Y; sleep 2
+  else
+    adb shell input swipe $CX $CY $CX $(( CY + 900 )) 600; sleep 2
+  fi
+  hasid mini_player && ! hasid full_player && echo "pull_down=PASSED" >> $LOG || { echo "pull_down=FAILED" >> $LOG; GEST=FAILED; }
+  shot gesture_after_pull_down
+  # fast flick up on the mini player opens it, fast flick down closes it
+  B=$(boundsof mini_player); set -- $B; MX=$(( ($1 + $3) / 2 )); MY=$(( ($2 + $4) / 2 ))
+  adb shell input swipe $MX $MY $MX $(( MY - 700 )) 90; sleep 2
+  hasid full_player && echo "flick_up=PASSED" >> $LOG || { echo "flick_up=FAILED" >> $LOG; GEST=FAILED; }
+  B=$(boundsof player_title); set -- $B; TX=$(( ($1 + $3) / 2 )); TY=$(( ($2 + $4) / 2 ))
+  adb shell input swipe $TX $TY $TX $(( TY + 900 )) 90; sleep 2
+  hasid mini_player && ! hasid full_player && echo "flick_down=PASSED" >> $LOG || { echo "flick_down=FAILED" >> $LOG; GEST=FAILED; }
+  adb shell dumpsys gfxinfo $PKG > $A/gestures_gfxinfo_$TAG.txt
+  echo "gesture_frames total=$(grep -m1 'Total frames rendered' $A/gestures_gfxinfo_$TAG.txt | awk '{print $4}') $(grep -m1 'Janky frames' $A/gestures_gfxinfo_$TAG.txt) p50=$(grep -m1 '50th percentile' $A/gestures_gfxinfo_$TAG.txt | awk '{print $3}') p90=$(grep -m1 '90th percentile' $A/gestures_gfxinfo_$TAG.txt | awk '{print $3}')" >> $LOG
+else
+  GEST=FAILED; echo "gestures: full player did not open" >> $LOG
+fi
+echo "gestures=$GEST" >> $LOG
+adb shell input keyevent KEYCODE_MEDIA_PAUSE; sleep 1
 # fresh start after the app was closed: "Continue listening" card, no mini player
 adb shell am force-stop $PKG; adb shell am start -W -n $ACT >/dev/null 2>&1; sleep 5; shot continue_listening
 
@@ -91,7 +145,7 @@ if [ $MAIN = 1 ]; then
   echo "T7 frames=$(grep -m1 'Total frames rendered' $A/T7_gfxinfo.txt | awk '{print $4}') $(grep -m1 'Janky frames' $A/T7_gfxinfo.txt)" >> $A/summary.txt
   # T8 memory
   adb shell dumpsys meminfo $PKG | grep -E "TOTAL PSS|TOTAL:" | head -2 > $A/T8_mem1.txt
-  for r in folders library stats home; do adb shell am start -n $ACT --es route $r >/dev/null; sleep 2; done
+  for r in folders library settings stats home; do adb shell am start -n $ACT --es route $r >/dev/null; sleep 2; done
   adb shell dumpsys meminfo $PKG | grep -E "TOTAL PSS|TOTAL:" | head -2 > $A/T8_mem2.txt
   echo "T8 before=$(head -1 $A/T8_mem1.txt | tr -s ' ') after=$(head -1 $A/T8_mem2.txt | tr -s ' ')" >> $A/summary.txt
   # T10 offline: the app has no internet permission at all
@@ -127,5 +181,5 @@ if [ $MAIN = 1 ]; then
   $BT/aapt dump badging $REL | head -3 > $A/badging.txt 2>&1
   cat $A/summary.txt >> $LOG
 fi
-grep -q "launch=PASSED" $LOG && grep -q "playback=PASSED" $LOG && grep -q "monkey_crashes_$TAG=0" $LOG && echo PASSED > $OUT/E2E || echo FAILED > $OUT/E2E
+grep -q "launch=PASSED" $LOG && grep -q "playback=PASSED" $LOG && grep -q "gestures=PASSED" $LOG && grep -q "setup_guide=PASSED" $LOG && grep -q "monkey_crashes_$TAG=0" $LOG && echo PASSED > $OUT/E2E || echo FAILED > $OUT/E2E
 exit 0

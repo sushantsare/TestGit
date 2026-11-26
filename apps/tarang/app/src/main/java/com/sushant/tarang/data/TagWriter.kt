@@ -47,6 +47,27 @@ object TagWriter {
         } finally { tmp.delete() }
     }
 
+    /** Writes [text] (.lrc or plain lyrics) into the song file's lyrics field, so any player can show them. */
+    fun writeLyrics(ctx: Context, song: Song, text: String): String? {
+        TagOptionSingleton.getInstance().isAndroid = true
+        val ext = song.fileName.substringAfterLast('.', "mp3").lowercase()
+        if (ext !in setOf("mp3", "m4a", "mp4", "flac", "ogg", "opus", "wma", "aif", "aiff", "dsf")) return "This file type can't hold lyrics"
+        val dir = File(ctx.cacheDir, "tagedit").apply { mkdirs() }
+        val tmp = File(dir, "lyrics.$ext")
+        return try {
+            ctx.contentResolver.openInputStream(song.uri)?.use { inp -> tmp.outputStream().use { inp.copyTo(it) } } ?: return "Couldn't open the file"
+            val af = AudioFileIO.read(tmp)
+            val tag = af.tagOrCreateAndSetDefault
+            if (text.isBlank()) runCatching { tag.deleteField(FieldKey.LYRICS) } else tag.setField(FieldKey.LYRICS, text.trim())
+            af.commit()
+            ctx.contentResolver.openOutputStream(song.uri, "wt")?.use { out -> tmp.inputStream().use { it.copyTo(out) } } ?: return "Couldn't save the file"
+            if (song.path.isNotEmpty()) MediaScannerConnection.scanFile(ctx, arrayOf(song.path), null, null)
+            null
+        } catch (t: Throwable) {
+            "Couldn't save: ${t.message?.take(80) ?: "unknown problem"}"
+        } finally { tmp.delete() }
+    }
+
     private fun coverBytes(ctx: Context, uri: Uri): ByteArray? = runCatching {
         val src = ctx.contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it) } ?: return null
         val side = minOf(src.width, src.height)

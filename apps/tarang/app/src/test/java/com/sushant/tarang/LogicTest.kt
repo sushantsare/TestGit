@@ -96,4 +96,14 @@ class LogicTest {
         assertEquals(210_000L, st.bars[1].second)
         assertEquals(1, st.songsHeard)
     }
+
+    @Test fun unshuffleBringsBackTheOldOrder() {
+        // queue was 1,2,3,4,5; shuffled with 3 playing first: 3,5,1,4,2; song 9 added while shuffled
+        val now = listOf("3", "5", "1", "4", "2", "9")
+        val order = com.sushant.tarang.playback.QueueOrder.restore(now, listOf(1L, 2L, 3L, 4L, 5L))
+        assertEquals(listOf("1", "2", "3", "4", "5", "9"), order.map { now[it] })
+        // duplicates are matched one by one
+        val dup = listOf("2", "1", "2")
+        assertEquals(listOf("1", "2", "2"), com.sushant.tarang.playback.QueueOrder.restore(dup, listOf(1L, 2L, 2L)).map { dup[it] })
+    }
 }

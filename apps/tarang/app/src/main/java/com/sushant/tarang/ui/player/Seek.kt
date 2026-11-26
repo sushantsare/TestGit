@@ -50,7 +50,7 @@ fun WavySeekBar(positionMs: Long, durationMs: Long, playing: Boolean, active: Co
     ) {
         val h = size.height; val mid = h / 2; val w = size.width
         val px = w * frac
-        val stroke = 4.dp.toPx(); val a = 3.2.dp.toPx() * amp
+        val stroke = 5.dp.toPx(); val a = 3.6.dp.toPx() * amp
         val waveLen = 22.dp.toPx()
         if (px > 0f) {
             val path = Path()
@@ -60,6 +60,6 @@ fun WavySeekBar(positionMs: Long, durationMs: Long, playing: Boolean, active: Co
             drawPath(path, active, style = Stroke(stroke, cap = StrokeCap.Round))
         }
         if (px + 10.dp.toPx() < w) drawLine(track, Offset(px + 10.dp.toPx(), mid), Offset(w, mid), stroke, StrokeCap.Round)
-        drawLine(active, Offset(px, mid - 10.dp.toPx()), Offset(px, mid + 10.dp.toPx()), 4.dp.toPx(), StrokeCap.Round)
+        drawLine(active, Offset(px, mid - 12.dp.toPx()), Offset(px, mid + 12.dp.toPx()), 6.dp.toPx(), StrokeCap.Round)
     }
 }

@@ -18,7 +18,7 @@ import com.sushant.tarang.ui.theme.TarangTheme
 import kotlinx.coroutines.flow.MutableStateFlow
 
 class MainActivity : AppCompatActivity() {
-    private val vm: MainVm by viewModels()
+    internal val vm: MainVm by viewModels()
     /** Incoming request from a notification, widget or another app (open player / play a file). */
     val pendingIntent = MutableStateFlow<Intent?>(null)
 

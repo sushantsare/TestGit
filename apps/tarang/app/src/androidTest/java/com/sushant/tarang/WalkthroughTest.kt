@@ -100,96 +100,216 @@ class WalkthroughTest {
         org.junit.Assert.assertTrue("Walkthrough problems: " + problems.joinToString("; "), problems.isEmpty())
     }
 
+    private fun vm(): com.sushant.tarang.ui.MainVm { var v: com.sushant.tarang.ui.MainVm? = null; scenario.onActivity { v = it.vm }; return v!! }
+    private fun queue(): List<Long> = vm().player.ui.value.queueIds
+    private fun current(): Long? = vm().player.ui.value.currentId
+    private fun title(): String = runCatching {
+        compose.onAllNodesWithTag("player_title", useUnmergedTree = true).onFirst().fetchSemanticsNode().config[androidx.compose.ui.semantics.SemanticsProperties.Text].joinToString { it.text }
+    }.getOrDefault("")
+    private fun bounds(tag: String) = runCatching { compose.onAllNodesWithTag(tag, useUnmergedTree = true).onFirst().fetchSemanticsNode().boundsInRoot }.getOrNull()
+    private fun isFull() = has("full_player") && !has("mini_player")
+    private fun isMini() = has("mini_player") && !has("full_player")
+    private fun settle() { Thread.sleep(1300); compose.waitForIdle() }
+
+    /** While the player moves between full and mini, the cover must stay inside the player (never cut off mid-screen). */
+    private fun checkCoverInside(at: String) {
+        val c = bounds("player_cover"); val sheet = bounds("full_player") ?: bounds("mini_player")
+        if (c == null || sheet == null) return
+        val slack = 2f
+        if (c.left < sheet.left - slack || c.right > sheet.right + slack || c.top < sheet.top - slack || c.bottom > sheet.bottom + slack)
+            problem("cover outside the player at $at ($c vs $sheet)")
+    }
+
+    /** Pull the full player down part of the way, screenshot at 25/50/75 %, and let go. */
+    private fun pullDownInSteps(startTag: String, name: String) {
+        val node = compose.onAllNodesWithTag(startTag, useUnmergedTree = true).onFirst()
+        val h = InstrumentationRegistry.getInstrumentation().targetContext.resources.displayMetrics.heightPixels.toFloat()
+        node.performTouchInput { down(center) }
+        listOf(25, 50, 75).forEach { pct ->
+            node.performTouchInput { repeat(8) { moveBy(Offset(0f, h * 0.19f / 8f), delayMillis = 16) } }
+            compose.waitForIdle(); checkCoverInside("$pct%"); shot("${name}_$pct")
+        }
+        node.performTouchInput { up() }
+        settle()
+    }
+
+    private fun setupGuide() {
+        app.prefs.setupDone = false
+        scenario = ActivityScenario.launch(MainActivity::class.java)
+        waitTag("setup"); Thread.sleep(1200); shot("setup_welcome")
+        var guard = 0
+        while (has("setup") && guard++ < 8) {
+            click("setup_next"); Thread.sleep(900)
+            if (has("setup")) shot("setup_step_$guard")
+        }
+        if (has("setup")) problem("setup guide did not finish")
+        if (!app.prefs.setupDone) problem("setup guide not remembered")
+        runCatching { scenario.close() }
+    }
+
     private fun walk() {
         MediaSeed.run(app)
         app.prefs.update { Settings(themeMode = ThemeMode.LIGHT) }
+        // ---- first launch: animation + step-by-step setup guide
+        setupGuide()
+        app.prefs.setupDone = true
         scenario = ActivityScenario.launch(MainActivity::class.java)
 
-        // ---- Home (fresh install: nothing played yet, so no mini player)
+        // ---- Home (nothing played yet, so no mini player)
         waitTag("home")
         runCatching { compose.waitUntil(20_000) { app.repo.library.value.songs.size >= 10 } }.onFailure { problem("library did not load the test songs") }
         if (app.repo.library.value.songs.any { it.folderName == "WhatsApp Audio" }) problem("WhatsApp audio should be hidden by default")
+        if (has("tab_stats")) problem("Stats tab should be gone from the dock")
+        waitTag("greeting_icon")
         shot("home_fresh")
 
         // ---- Folders → folder → play all
         tab("folders", "folders"); shot("folders")
         click("chip_Most songs"); shot("folders_most_songs"); click("chip_Name")
-        clickTo("folder_Bollywood", "song_list"); shot("folder_detail")
+        clickTo("folder_Bollywood", "song_list"); Thread.sleep(700); shot("folder_detail")
+        waitTag("grow_cover", 3000, soft = true)
         click("play_all")
         if (!waitTag("mini_player", 10_000)) return
         Thread.sleep(2500); shot("folder_playing_mini")
         song("Kesariya.mp3")?.let { s -> click("more_${s.id}"); waitTag("sheet"); shot("song_menu"); back() }
 
-        // ---- full player and its panels
-        clickTo("mini_player", "full_player"); Thread.sleep(800); shot("player_full")
-        // ⋮ must open the menu and never pause the music
+        // ---- full player
+        clickTo("mini_player", "full_player"); Thread.sleep(1200); shot("player_full")
+        if (!has("now_playing")) problem("top bar should say Now playing")
+        if (!has("cover_carousel")) problem("cover carousel missing in the full player")
         fun playing() = compose.onAllNodesWithContentDescription("Pause", useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty()
         val wasPlaying = playing()
-        click("player_menu"); if (!waitTag("menu_end_queue", 4000)) problem("⋮ did not open the menu"); back(); Thread.sleep(500)
+        click("player_menu"); if (!waitTag("menu_speed", 4000)) problem("⋮ did not open the menu with Speed"); shot("player_menu")
+        if (!has("menu_sound") || !has("menu_info") || !has("menu_edit")) problem("⋮ menu is missing Sound / Info / Edit details")
+        back(); Thread.sleep(500)
         if (wasPlaying && !playing()) problem("⋮ paused the music")
-        if (has("panel_header")) problem("ghost now-playing bar visible while the panel is closed")
-        // bottom strip: just a handle and "Up next · …"
-        if (waitTag("peek_line", 4000)) shot("player_peek_line")
-        // swipe left / right on the cover: the song must really change (and come back)
-        fun title(): String = runCatching {
-            compose.onNodeWithTag("player_title", useUnmergedTree = true).fetchSemanticsNode().config[androidx.compose.ui.semantics.SemanticsProperties.Text].joinToString { it.text }
-        }.getOrDefault("")
-        val t0 = title()
-        compose.onNodeWithTag("player_cover", useUnmergedTree = true).performTouchInput { swipeLeft(durationMillis = 250) }
-        Thread.sleep(1500); val t1 = title(); shot("player_swiped_to_next")
+        if (has("panel_header")) problem("ghost bar visible while Up next / Lyrics is closed")
+        if (waitTag("peek_line", 4000)) shot("player_strip_up_next")
+        waitTag("player_toolbar"); if (!has("extra_lyrics")) problem("Lyrics button missing in the toolbar")
+
+        // ---- cover carousel: every swipe changes the song exactly once
+        val t0 = title(); val c0 = current()
+        compose.onAllNodesWithTag("player_cover", useUnmergedTree = true).onFirst().performTouchInput { swipeLeft(durationMillis = 220) }
+        settle(); val t1 = title(); shot("carousel_after_swipe_left")
         if (t1 == t0) problem("swipe left did not change the song ($t0)")
-        compose.onNodeWithTag("player_cover", useUnmergedTree = true).performTouchInput { swipeRight(durationMillis = 250) }
-        Thread.sleep(1500)
-        if (title() != t0) problem("swipe right did not go back to the previous song")
-        // a short, slow pull down (no flick) must still close the player all the way
-        compose.onNodeWithTag("player_cover", useUnmergedTree = true).performTouchInput {
-            down(center); repeat(12) { moveBy(androidx.compose.ui.geometry.Offset(0f, 14f), delayMillis = 40) }; up()
+        val i1 = queue().indexOf(current())
+        compose.onAllNodesWithTag("player_cover", useUnmergedTree = true).onFirst().performTouchInput { swipeRight(durationMillis = 220) }
+        settle()
+        if (current() != c0) problem("swipe right did not go back to the previous song")
+        // slow drag let go halfway: snaps back, song stays
+        compose.onAllNodesWithTag("player_cover", useUnmergedTree = true).onFirst().performTouchInput {
+            down(center); repeat(6) { moveBy(Offset(-12f, 0f), delayMillis = 30) }; Thread.sleep(200); up()
         }
-        Thread.sleep(1500)
-        if (!has("mini_player") || has("full_player")) problem("short pull down stopped halfway") else shot("after_short_pull_down")
-        // swipe left on the mini player: the song changes and the slide stays inside the capsule
+        settle(); if (current() != c0) problem("a tiny sideways drag changed the song")
+        // mid-swipe picture (old cover squeezed out, new one opening)
+        compose.onAllNodesWithTag("player_cover", useUnmergedTree = true).onFirst().performTouchInput { down(center); repeat(10) { moveBy(Offset(-24f, 0f), delayMillis = 16) } }
+        shot("carousel_mid_swipe")
+        compose.onAllNodesWithTag("cover_carousel", useUnmergedTree = true).onFirst().performTouchInput { repeat(10) { moveBy(Offset(-24f, 0f), delayMillis = 16) }; up() }
+        settle()
+        val i2 = queue().indexOf(current())
+        if (i2 != i1) problem("a long slow swipe should move exactly one song (from ${i1 - 1} to $i2)")
+        // two quick swipes = two songs
+        repeat(2) { compose.onAllNodesWithTag("player_cover", useUnmergedTree = true).onFirst().performTouchInput { swipeLeft(durationMillis = 140) }; Thread.sleep(700) }
+        settle()
+        val i3 = queue().indexOf(current())
+        if (i3 != i2 + 2) problem("two quick swipes should move two songs ($i2 → $i3)")
+        compose.onAllNodesWithTag("player_cover", useUnmergedTree = true).onFirst().performTouchInput { swipeRight(durationMillis = 160) }; settle()
+        compose.onAllNodesWithTag("player_cover", useUnmergedTree = true).onFirst().performTouchInput { swipeRight(durationMillis = 160) }; settle()
+        compose.onAllNodesWithTag("player_cover", useUnmergedTree = true).onFirst().performTouchInput { swipeRight(durationMillis = 160) }; settle()
+
+        // ---- swipe down to the mini player: slow, in steps (screenshots at 25/50/75 %), fast, short, from different spots
+        pullDownInSteps("player_cover", "pull_down_cover")
+        if (!isMini()) { problem("slow pull down from the cover did not reach the mini player"); click("mini_player") } else shot("after_pull_down")
+        clickTo("mini_player", "full_player"); settle()
+        compose.onAllNodesWithTag("player_title", useUnmergedTree = true).onFirst().performTouchInput { swipeDown(startY = centerY, endY = centerY + 1400f, durationMillis = 120) }
+        settle(); if (!isMini()) { problem("fast flick down from the title did not close the player"); click("collapse") }
+        clickTo("mini_player", "full_player"); settle()
+        compose.onAllNodesWithTag("now_playing", useUnmergedTree = true).onFirst().performTouchInput {
+            down(center); repeat(10) { moveBy(Offset(0f, 14f), delayMillis = 40) }; up()
+        }
+        settle(); if (!isMini()) { problem("short slow pull down from the top bar stopped halfway"); click("collapse") }
+        clickTo("mini_player", "full_player"); settle()
+        // let go halfway: finishes in the drag direction (down)
+        val sheetH = InstrumentationRegistry.getInstrumentation().targetContext.resources.displayMetrics.heightPixels.toFloat()
+        compose.onAllNodesWithTag("player_cover", useUnmergedTree = true).onFirst().performTouchInput {
+            down(center); repeat(20) { moveBy(Offset(0f, sheetH * 0.4f / 20f), delayMillis = 16) }; Thread.sleep(400); up()
+        }
+        settle(); if (!isMini()) problem("letting go halfway did not finish closing")
+        // ---- mini player: sideways swipe stays inside the capsule; short pull up opens fully; fast flick up too
         val m0 = title()
         compose.onNodeWithTag("mini_player", useUnmergedTree = true).performTouchInput {
-            down(Offset(width * 0.3f, centerY)); repeat(6) { moveBy(androidx.compose.ui.geometry.Offset(-30f, 0f), delayMillis = 30) }
+            down(Offset(width * 0.3f, centerY)); repeat(6) { moveBy(Offset(-30f, 0f), delayMillis = 30) }
         }
         Thread.sleep(150); shot("mini_swipe_in_progress")
-        compose.onNodeWithTag("mini_player", useUnmergedTree = true).performTouchInput { repeat(6) { moveBy(androidx.compose.ui.geometry.Offset(-40f, 0f), delayMillis = 20) }; up() }
-        Thread.sleep(1500)
+        compose.onNodeWithTag("mini_player", useUnmergedTree = true).performTouchInput { repeat(6) { moveBy(Offset(-40f, 0f), delayMillis = 20) }; up() }
+        settle()
         if (title() == m0) problem("swipe on the mini player did not change the song")
-        // a short, slow pull up on the mini player must open it fully
         compose.onNodeWithTag("mini_player", useUnmergedTree = true).performTouchInput {
-            down(center); repeat(10) { moveBy(androidx.compose.ui.geometry.Offset(0f, -14f), delayMillis = 40) }; up()
+            down(center); repeat(10) { moveBy(Offset(0f, -14f), delayMillis = 40) }; up()
         }
-        Thread.sleep(1500)
-        if (!has("full_player")) problem("short pull up on the mini player stopped halfway")
-        // swipe down on the bottom strip also closes it
+        settle(); if (!isFull()) problem("short pull up on the mini player stopped halfway")
+        click("collapse"); settle()
+        compose.onNodeWithTag("mini_player", useUnmergedTree = true).performTouchInput { swipeUp(startY = centerY, endY = centerY - 900f, durationMillis = 120) }
+        settle(); if (!isFull()) problem("fast flick up on the mini player did not open it")
+        // pulling the bottom strip down also closes it
         compose.onNodeWithTag("peek_line", useUnmergedTree = true).performTouchInput { swipeDown(startY = centerY, endY = centerY + 900f, durationMillis = 300) }
         if (!waitTag("mini_player", 5000, soft = true)) problem("swipe down on the bottom strip did not close the player")
-        clickTo("mini_player", "full_player"); Thread.sleep(800)
+        clickTo("mini_player", "full_player"); settle()
+
+        // ---- shuffle and repeat
+        val before = queue(); val cur = current()
+        click("shuffle"); Thread.sleep(1500)
+        val shuffled = queue()
+        if (!vm().player.ui.value.shuffle) problem("shuffle did not turn on")
+        if (current() != cur) problem("shuffle changed the song playing now")
+        if (shuffled.firstOrNull() != cur) problem("after shuffle the current song should be first in Up next")
+        if (shuffled.sorted() != before.sorted()) problem("shuffle lost or added songs")
+        shot("player_shuffle_on")
+        click("peek_line"); waitTag("queue_list"); Thread.sleep(600); shot("up_next_shuffled"); back(); settle()
+        click("shuffle"); Thread.sleep(1500)
+        if (vm().player.ui.value.shuffle) problem("shuffle did not turn off")
+        if (queue() != before) problem("turning shuffle off did not bring back the original order")
+        if (current() != cur) problem("shuffle off changed the song playing now")
+        click("repeat"); Thread.sleep(600)
+        if (vm().player.ui.value.repeat != androidx.media3.common.Player.REPEAT_MODE_ALL) problem("repeat did not turn to Repeat all")
+        click("repeat"); Thread.sleep(600)
+        if (vm().player.ui.value.repeat != androidx.media3.common.Player.REPEAT_MODE_ONE) problem("repeat did not turn to Repeat this song")
+        shot("player_repeat_one")
+        click("repeat"); Thread.sleep(600)
+        if (vm().player.ui.value.repeat != androidx.media3.common.Player.REPEAT_MODE_OFF) problem("repeat did not turn off")
+
+        // ---- Up next (one queue) and its tools
         click("btn_next"); Thread.sleep(1200); shot("player_next_song")
-        click("peek_line"); waitTag("queue_list"); shot("player_up_next")
-        click("queue_2"); Thread.sleep(800); shot("player_queue_2_empty"); click("queue_1"); Thread.sleep(800)
-        click("tab_info"); waitTag("info"); shot("player_info")
-        click("tab_lyrics"); Thread.sleep(1500); shot("player_lyrics")
-        back()                                                              // closes the panel
+        click("peek_line"); waitTag("queue_list"); Thread.sleep(700); shot("player_up_next")
+        if (has("queue_2")) problem("old Queue 2 still shown")
+        click("queue_locate"); click("queue_menu"); waitTag("queue_save"); shot("queue_menu"); back()
+        back(); settle()
+        // ---- Lyrics (button) — a song without lyrics shows the add page
+        click("extra_lyrics"); Thread.sleep(1500); shot("player_lyrics")
+        if (!has("lyrics") && !has("lyrics_empty")) problem("Lyrics button did not open lyrics")
+        back(); settle()
         click("extra_sleep"); waitTag("sleep_30"); shot("sheet_sleep"); back()
-        click("extra_speed"); waitTag("speed_slider"); shot("sheet_speed"); back()
-        click("extra_sound"); waitTag("sound"); shot("sheet_sound"); click("eq_switch"); click("preset_Bollywood"); shot("sheet_sound_eq_on"); back()
+        click("player_menu"); click("menu_speed"); waitTag("speed_slider"); shot("sheet_speed"); back()
+        click("player_menu"); click("menu_sound"); waitTag("sound"); shot("sheet_sound"); click("eq_switch"); click("preset_Bollywood"); shot("sheet_sound_eq_on"); back()
+        click("player_menu"); click("menu_info"); waitTag("info"); shot("sheet_info"); back()
         click("extra_playlist"); waitTag("new_playlist"); shot("sheet_add_to_playlist"); back()
-        click("player_menu"); waitTag("menu_end_queue"); shot("player_menu"); back()
+        click("like"); Thread.sleep(500); shot("player_liked")
         click("collapse"); waitTag("mini_player"); Thread.sleep(600)
 
-        // ---- song with lyrics inside the file
+        // ---- song with lyrics inside the file: live line + lyrics page
         song("Tum Se Hi.mp3")?.let { s ->
             go(com.sushant.tarang.ui.R0.folder(s.folderPath), "song_list")
             click("song_${s.id}"); Thread.sleep(1500)
-            clickTo("mini_player", "full_player"); click("peek_line"); Thread.sleep(600); click("tab_lyrics"); Thread.sleep(2000); shot("player_lyrics_embedded"); back(); click("collapse"); waitTag("mini_player")
+            if (waitTag("mini_player", 4000, soft = true)) shot("queue_replaced_undo")
+            clickTo("mini_player", "full_player"); Thread.sleep(2500); shot("player_live_lyric")
+            click("extra_lyrics"); Thread.sleep(2000); shot("player_lyrics_embedded"); back(); click("collapse"); waitTag("mini_player")
         }
 
-        // ---- Library
+        // ---- Library + floating selection toolbar
         tab("library", "library"); waitTag("songs_list"); shot("library_songs")
         click("sort"); waitTag("dialog_ok", 2000, soft = true); shot("library_sort_dialog"); back()
-        click("select"); waitTag("selection_bar"); shot("library_select"); click("select_all"); shot("library_select_all"); back()
+        click("select"); waitTag("selection_toolbar"); shot("library_select"); click("select_all"); shot("library_select_all")
+        click("sel_delete"); waitTag("confirm", 3000, soft = true); shot("library_delete_confirm"); back(); back()
         click("libtab_albums"); waitTag("albums_grid"); shot("library_albums")
         app.repo.library.value.albums.firstOrNull()?.let { a -> click("album_${a.id}"); waitTag("list_header"); shot("album_detail"); back() }
         click("libtab_artists"); waitTag("artists_list"); shot("library_artists")
@@ -205,23 +325,29 @@ class WalkthroughTest {
         }
         click("libtab_songs"); click("tile_liked"); waitTag("list_header"); shot("liked_songs"); back()
 
-        // ---- Stats, Home (now playing), Search
-        tab("stats", "stats"); Thread.sleep(800); shot("stats")
-        click("chip_All time"); shot("stats_all_time")
+        // ---- Home (now playing), Search
         tab("home", "home"); shot("home_playing")
+        compose.onNodeWithTag("home").performTouchInput { swipeUp(startY = bottom * 0.8f, endY = bottom * 0.2f, durationMillis = 400) }
+        Thread.sleep(700); if (!has("collapsed_title")) problem("big title did not collapse into the top bar"); shot("home_scrolled")
         clickTo("open_search", "search"); shot("search_empty")
         type("search_field", "kes"); Thread.sleep(800); shot("search_results")
         type("search_field", "zzzz"); Thread.sleep(500); shot("search_nothing"); back(); if (has("search")) back()
 
-        // ---- Settings and every page under it
+        // ---- Settings (Stats card on top), Stats, About (hidden Diagnostics)
         go(com.sushant.tarang.ui.R0.SETTINGS, "settings"); shot("settings")
+        if (has("set_diagnostics")) problem("Diagnostics should not be listed in Settings")
+        clickTo("set_stats", "stats"); Thread.sleep(1200); shot("stats")
+        click("chip_All time"); Thread.sleep(1000); shot("stats_all_time"); back()
         click("set_theme"); shot("settings_theme_dialog"); back()
         click("set_buttons"); shot("settings_notif_buttons"); back()
         click("set_crossfade"); shot("settings_crossfade"); back()
+        click("set_carousel"); shot("settings_carousel"); back()
         compose.onNodeWithTag("set_about").performScrollTo(); shot("settings_bottom")
         clickTo("set_folders", "scan_folders"); shot("scan_folders"); back()
-        clickTo("set_diagnostics", "diagnostics"); shot("diagnostics"); back()
-        clickTo("set_about", "about"); shot("about"); back()
+        clickTo("set_about", "about"); shot("about")
+        repeat(5) { compose.onNodeWithTag("about_version", useUnmergedTree = true).performClick(); Thread.sleep(120) }
+        if (!waitTag("diagnostics", 4000, soft = true)) problem("5 taps on Version did not open Diagnostics") else { shot("diagnostics"); back() }
+        back()
         song("Kesariya.mp3")?.let { s ->
             go(com.sushant.tarang.ui.R0.edit(s.id), "edit_details"); Thread.sleep(800); shot("edit_details")
             type("edit_title", "Kesariya (edit)"); back()   // first back closes the keyboard
@@ -236,10 +362,11 @@ class WalkthroughTest {
         go(com.sushant.tarang.ui.R0.HOME, "home"); Thread.sleep(800); shot("home")
         tab("folders", "folders"); shot("folders")
         tab("library", "library"); shot("library")
-        tab("stats", "stats"); shot("stats")
         clickTo("mini_player", "full_player"); Thread.sleep(800); shot("player_full")
         click("peek_line"); waitTag("queue_list"); shot("player_up_next"); back(); click("collapse"); waitTag("mini_player")
         go(com.sushant.tarang.ui.R0.SETTINGS, "settings"); shot("settings")
+        go(com.sushant.tarang.ui.R0.STATS, "stats"); Thread.sleep(1000); shot("stats")
+        go(com.sushant.tarang.ui.R0.SETTINGS, "settings")
         if (!has("set_pure_black")) problem("pure black switch missing in dark mode")
         click("set_pure_black"); suffix = "_pureblack"; shot("settings"); go(com.sushant.tarang.ui.R0.HOME, "home"); shot("home")
         clickTo("mini_player", "full_player"); Thread.sleep(800); shot("player_full"); click("collapse")

@@ -33,7 +33,7 @@ import kotlinx.coroutines.guava.future
 
 /**
  * Plays the music (Media3 ExoPlayer) in the background with the media notification, lock screen and Bluetooth controls.
- * Also owns: the 3 saved queues, sleep timer, crossfade, the sound processing (EQ), listening stats and the widget.
+ * Also owns: the one saved queue (with real shuffle), sleep timer, crossfade, the sound processing (EQ), listening stats and the widget.
  */
 @UnstableApi
 class PlaybackService : MediaSessionService() {
@@ -88,8 +88,16 @@ class PlaybackService : MediaSessionService() {
             .apply { setSmallIcon(R.drawable.ic_notification) })
 
         exo.addListener(Listener())
-        hub.activeQueue.value = app.prefs.activeQueue
-        scope.launch { restore(app.prefs.activeQueue, play = false); restored.complete(Unit); refreshQueueSizes() }
+        exo.shuffleModeEnabled = false                       // shuffle is a real reordering (see shuffleNow)
+        exo.repeatMode = app.prefs.repeatMode
+        hub.shuffle.value = app.prefs.shuffleOn
+        scope.launch {
+            // 1.3.0 has one queue: the queue that was active (any of the old 3) becomes the queue
+            val oldSlot = app.prefs.activeQueue
+            restore(oldSlot, play = false)
+            restored.complete(Unit)
+            if (oldSlot != 1) { app.prefs.activeQueue = 1; saveQueueNow() }
+        }
         scope.launch {
             app.prefs.settings.collectLatest { s ->
                 fx.update(FxParams(s.eqEnabled, s.eqBands, s.bassBoost, s.virtualizer))
@@ -122,7 +130,7 @@ class PlaybackService : MediaSessionService() {
     private inner class Callback : MediaSession.Callback {
         override fun onConnect(session: MediaSession, controller: MediaSession.ControllerInfo): MediaSession.ConnectionResult {
             val cmds = MediaSession.ConnectionResult.DEFAULT_SESSION_COMMANDS.buildUpon().apply {
-                listOf(Cmd.LIKE, Cmd.SHUFFLE, Cmd.REPEAT, Cmd.SWITCH_QUEUE, Cmd.SLEEP, Cmd.END_QUEUE, Cmd.CONTEXT, Cmd.CLEAR_QUEUE)
+                listOf(Cmd.LIKE, Cmd.SHUFFLE, Cmd.REPEAT, Cmd.SLEEP, Cmd.END_QUEUE, Cmd.CONTEXT, Cmd.CLEAR_QUEUE, Cmd.SET_SHUFFLE)
                     .forEach { add(SessionCommand(it, Bundle.EMPTY)) }
             }.build()
             return MediaSession.ConnectionResult.AcceptedResultBuilder(session)
@@ -141,7 +149,7 @@ class PlaybackService : MediaSessionService() {
 
         override fun onPlaybackResumption(mediaSession: MediaSession, controller: MediaSession.ControllerInfo, isForPlayback: Boolean): ListenableFuture<MediaSession.MediaItemsWithStartPosition> =
             scope.future {
-                val q = repo.dao.queue(app.prefs.activeQueue)
+                val q = repo.dao.queue(1)
                 val items = q?.ids?.split(",")?.mapNotNull { it.toLongOrNull() }?.mapNotNull { itemFor(it) }.orEmpty()
                 if (items.isEmpty()) throw UnsupportedOperationException("Nothing to resume")
                 MediaSession.MediaItemsWithStartPosition(items, q!!.index.coerceIn(0, items.lastIndex), q.positionMs)
@@ -159,9 +167,9 @@ class PlaybackService : MediaSessionService() {
     private suspend fun handle(action: String, args: Bundle) {
         when (action) {
             Cmd.LIKE -> currentId()?.let { repo.toggleLike(it) }
-            Cmd.SHUFFLE -> exo.shuffleModeEnabled = !exo.shuffleModeEnabled
+            Cmd.SHUFFLE -> setShuffle("toggle")
+            Cmd.SET_SHUFFLE -> setShuffle(args.getString("mode") ?: "toggle")
             Cmd.REPEAT -> exo.repeatMode = when (exo.repeatMode) { Player.REPEAT_MODE_OFF -> Player.REPEAT_MODE_ALL; Player.REPEAT_MODE_ALL -> Player.REPEAT_MODE_ONE; else -> Player.REPEAT_MODE_OFF }
-            Cmd.SWITCH_QUEUE -> switchQueue(args.getInt("slot", 1))
             Cmd.SLEEP -> {
                 val min = args.getInt("minutes", 0)
                 hub.sleepFade.value = args.getBoolean("fade", true)
@@ -171,28 +179,67 @@ class PlaybackService : MediaSessionService() {
             Cmd.END_QUEUE -> {
                 flushStats(); exo.stop(); exo.clearMediaItems()
                 hub.contextLabel.value = ""; hub.sleepEndsAt.value = 0; hub.sleepAfterSong.value = false
-                saveQueueNow(); refreshQueueSizes()
+                setShuffle("off"); saveQueueNow()
             }
             Cmd.CONTEXT -> { hub.contextKind.value = args.getString("kind") ?: "Folder"; hub.contextLabel.value = args.getString("label") ?: "" }
             Cmd.CLEAR_QUEUE -> {
-                val slot = args.getInt("slot", 0)
-                if (slot == hub.activeQueue.value) { exo.stop(); exo.clearMediaItems(); saveQueueNow() }
-                else repo.dao.putQueue(QueueEntity(slot, "", 0, 0, ""))
-                refreshQueueSizes()
+                // keep only the song playing now
+                val n = exo.mediaItemCount; val cur = exo.currentMediaItemIndex
+                if (n > 0 && cur >= 0) {
+                    if (cur + 1 < n) exo.removeMediaItems(cur + 1, n)
+                    if (cur > 0) exo.removeMediaItems(0, cur)
+                }
+                if (hub.shuffle.value) app.prefs.orderBeforeShuffle = listOfNotNull(currentId())
+                saveQueueNow()
             }
         }
         updateButtons()
     }
 
-    // ------------------------------------------------------------------ queues
-    private suspend fun switchQueue(slot: Int) {
-        if (slot == hub.activeQueue.value || slot !in 1..3) return
-        val wasPlaying = exo.isPlaying
-        flushStats(); saveQueueNow()
-        app.prefs.activeQueue = slot; hub.activeQueue.value = slot
-        restore(slot, play = wasPlaying)
-        refreshQueueSizes()
+    // ------------------------------------------------------------------ shuffle (a real reordering, so Up next shows the true order)
+    private fun setShuffle(mode: String) {
+        when (mode) {
+            "toggle" -> if (hub.shuffle.value) unshuffle() else shuffleNow()
+            "apply" -> shuffleNow()
+            "off" -> { hub.shuffle.value = false; app.prefs.shuffleOn = false; app.prefs.orderBeforeShuffle = emptyList() }
+        }
+        updateButtons()
     }
+
+    /** Current song stays playing and moves to the top; everything else is shuffled after it. The old order is kept. */
+    private fun shuffleNow() {
+        val n = exo.mediaItemCount
+        if (n > 1) {
+            val cur = exo.currentMediaItemIndex.coerceIn(0, n - 1)
+            val items = (0 until n).map { exo.getMediaItemAt(it) }
+            app.prefs.orderBeforeShuffle = items.mapNotNull { it.mediaId.toLongOrNull() }
+            val rest = items.filterIndexed { i, _ -> i != cur }.shuffled()
+            if (cur + 1 < n) exo.removeMediaItems(cur + 1, n)
+            if (cur > 0) exo.removeMediaItems(0, cur)
+            exo.addMediaItems(rest)
+        } else app.prefs.orderBeforeShuffle = (0 until n).mapNotNull { exo.getMediaItemAt(it).mediaId.toLongOrNull() }
+        hub.shuffle.value = true; app.prefs.shuffleOn = true
+        saveQueueNow()
+    }
+
+    /** Puts the queue back in the order it had before shuffling; songs added meanwhile stay, after the others. */
+    private fun unshuffle() {
+        val n = exo.mediaItemCount
+        val before = app.prefs.orderBeforeShuffle
+        hub.shuffle.value = false; app.prefs.shuffleOn = false; app.prefs.orderBeforeShuffle = emptyList()
+        if (n <= 1 || before.isEmpty()) { saveQueueNow(); return }
+        val cur = exo.currentMediaItemIndex.coerceIn(0, n - 1)
+        val items = (0 until n).map { exo.getMediaItemAt(it) }
+        val order = QueueOrder.restore(items.map { it.mediaId }, before)
+        val k = order.indexOf(cur)
+        if (cur + 1 < n) exo.removeMediaItems(cur + 1, n)
+        if (cur > 0) exo.removeMediaItems(0, cur)
+        if (k > 0) exo.addMediaItems(0, order.subList(0, k).map { items[it] })
+        if (k + 1 < order.size) exo.addMediaItems(order.subList(k + 1, order.size).map { items[it] })
+        saveQueueNow()
+    }
+
+    // ------------------------------------------------------------------ the queue
 
     private suspend fun restore(slot: Int, play: Boolean) {
         val q = repo.dao.queue(slot)
@@ -208,7 +255,7 @@ class PlaybackService : MediaSessionService() {
 
     private fun queueEntity(): QueueEntity {
         val ids = (0 until exo.mediaItemCount).joinToString(",") { exo.getMediaItemAt(it).mediaId }
-        return QueueEntity(hub.activeQueue.value, ids, exo.currentMediaItemIndex.coerceAtLeast(0), exo.currentPosition.coerceAtLeast(0),
+        return QueueEntity(1, ids, exo.currentMediaItemIndex.coerceAtLeast(0), exo.currentPosition.coerceAtLeast(0),
             "${hub.contextKind.value}|${hub.contextLabel.value}")
     }
 
@@ -219,13 +266,6 @@ class PlaybackService : MediaSessionService() {
         lastSave = SystemClock.elapsedRealtime()
     }
 
-    private suspend fun refreshQueueSizes() {
-        val sizes = (1..3).map { s ->
-            if (s == hub.activeQueue.value) exo.mediaItemCount
-            else repo.dao.queue(s)?.ids?.split(",")?.count { it.isNotBlank() } ?: 0
-        }
-        hub.queueSizes.value = sizes
-    }
 
     // ------------------------------------------------------------------ player events
     private inner class Listener : Player.Listener {
@@ -242,10 +282,10 @@ class PlaybackService : MediaSessionService() {
             updateWidget()
         }
         override fun onTimelineChanged(timeline: Timeline, reason: Int) {
-            if (reason == Player.TIMELINE_CHANGE_REASON_PLAYLIST_CHANGED) { saveQueueNow(); scope.launch { refreshQueueSizes() } }
+            if (reason == Player.TIMELINE_CHANGE_REASON_PLAYLIST_CHANGED) saveQueueNow()
         }
         override fun onShuffleModeEnabledChanged(shuffleModeEnabled: Boolean) = updateButtons()
-        override fun onRepeatModeChanged(repeatMode: Int) = updateButtons()
+        override fun onRepeatModeChanged(repeatMode: Int) { app.prefs.repeatMode = repeatMode; updateButtons() }
         override fun onPlayerError(error: PlaybackException) {
             val title = exo.currentMediaItem?.mediaMetadata?.title ?: "this song"
             hub.error.value = "Couldn't play $title. Skipping to the next song."
@@ -320,8 +360,8 @@ class PlaybackService : MediaSessionService() {
             val builder = when (b) {
                 NotifButton.LIKE -> CommandButton.Builder(if (liked) CommandButton.ICON_HEART_FILLED else CommandButton.ICON_HEART_UNFILLED)
                     .setDisplayName(if (liked) "Unlike" else "Like").setSessionCommand(SessionCommand(Cmd.LIKE, Bundle.EMPTY))
-                NotifButton.SHUFFLE -> CommandButton.Builder(if (exo.shuffleModeEnabled) CommandButton.ICON_SHUFFLE_ON else CommandButton.ICON_SHUFFLE_OFF)
-                    .setDisplayName(if (exo.shuffleModeEnabled) "Shuffle on" else "Shuffle off").setSessionCommand(SessionCommand(Cmd.SHUFFLE, Bundle.EMPTY))
+                NotifButton.SHUFFLE -> CommandButton.Builder(if (hub.shuffle.value) CommandButton.ICON_SHUFFLE_ON else CommandButton.ICON_SHUFFLE_OFF)
+                    .setDisplayName(if (hub.shuffle.value) "Shuffle on" else "Shuffle off").setSessionCommand(SessionCommand(Cmd.SHUFFLE, Bundle.EMPTY))
                 NotifButton.REPEAT -> CommandButton.Builder(when (exo.repeatMode) { Player.REPEAT_MODE_ONE -> CommandButton.ICON_REPEAT_ONE; Player.REPEAT_MODE_ALL -> CommandButton.ICON_REPEAT_ALL; else -> CommandButton.ICON_REPEAT_OFF })
                     .setDisplayName("Repeat").setSessionCommand(SessionCommand(Cmd.REPEAT, Bundle.EMPTY))
             }
@@ -373,5 +413,22 @@ class PlaybackService : MediaSessionService() {
             .setMediaMetadata(MediaMetadata.Builder().setTitle(s.title).setArtist(s.artist).setAlbumTitle(s.album)
                 .setAlbumArtist(s.albumArtist).setIsPlayable(true).setIsBrowsable(false).build())
             .build()
+    }
+}
+
+/** Pure queue-order helpers (unit tested). */
+object QueueOrder {
+    /**
+     * Positions of the current queue items ([ids]) in the order they had before shuffling ([before]).
+     * Songs added while shuffled (not in [before]) keep their relative order at the end. Duplicates are matched one by one.
+     */
+    fun restore(ids: List<String>, before: List<Long>): List<Int> {
+        val pool = LinkedHashMap<String, ArrayDeque<Int>>()
+        ids.forEachIndexed { i, id -> pool.getOrPut(id) { ArrayDeque() }.addLast(i) }
+        val order = ArrayList<Int>(ids.size)
+        val used = BooleanArray(ids.size)
+        before.forEach { id -> pool[id.toString()]?.removeFirstOrNull()?.let { order += it; used[it] = true } }
+        ids.indices.forEach { if (!used[it]) order += it }
+        return order
     }
 }

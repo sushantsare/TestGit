@@ -31,6 +31,10 @@ data class Settings(
     val virtualizer: Int = 0,
     val myPreset: List<Float>? = null,
     val lyricsTree: String? = null,
+    val haptics: Boolean = true,
+    val persistentShuffle: Boolean = false,
+    val carouselPeek: Boolean = false,
+    val alwaysSaveLyrics: Boolean = false,
 )
 
 /** Settings live in SharedPreferences and are exposed as one StateFlow; every change applies at once. */
@@ -66,6 +70,10 @@ class Prefs(ctx: Context) {
         virtualizer = p.getInt("virtualizer", 0),
         myPreset = floats(p.getString("myPreset", null)),
         lyricsTree = p.getString("lyricsTree", null),
+        haptics = p.getBoolean("haptics", true),
+        persistentShuffle = p.getBoolean("persistentShuffle", false),
+        carouselPeek = p.getBoolean("carouselPeek", false),
+        alwaysSaveLyrics = p.getBoolean("alwaysSaveLyrics", false),
     )
 
     fun update(f: (Settings) -> Settings) {
@@ -81,6 +89,8 @@ class Prefs(ctx: Context) {
             .putBoolean("eqEnabled", n.eqEnabled).putString("eqPreset", n.eqPreset)
             .putString("eqBands", n.eqBands.joinToString(",")).putInt("bassBoost", n.bassBoost).putInt("virtualizer", n.virtualizer)
             .putString("myPreset", n.myPreset?.joinToString(",")).putString("lyricsTree", n.lyricsTree)
+            .putBoolean("haptics", n.haptics).putBoolean("persistentShuffle", n.persistentShuffle)
+            .putBoolean("carouselPeek", n.carouselPeek).putBoolean("alwaysSaveLyrics", n.alwaysSaveLyrics)
             .apply()
         _s.value = n
     }
@@ -98,6 +108,20 @@ class Prefs(ctx: Context) {
     var welcomeDone: Boolean
         get() = p.getBoolean("welcomeDone", false)
         set(v) { p.edit().putBoolean("welcomeDone", v).apply() }
+    /** Shuffle is a real reordering of the one queue; the order before shuffling is kept here (song ids). */
+    var shuffleOn: Boolean
+        get() = p.getBoolean("shuffleOn", false)
+        set(v) { p.edit().putBoolean("shuffleOn", v).apply() }
+    var orderBeforeShuffle: List<Long>
+        get() = p.getString("orderBeforeShuffle", "")!!.split(",").mapNotNull { it.toLongOrNull() }
+        set(v) { p.edit().putString("orderBeforeShuffle", v.joinToString(",")).apply() }
+    var repeatMode: Int
+        get() = p.getInt("repeatMode", 0)
+        set(v) { p.edit().putInt("repeatMode", v).apply() }
+    /** The first-launch setup guide was finished. */
+    var setupDone: Boolean
+        get() = p.getBoolean("setupDone", false)
+        set(v) { p.edit().putBoolean("setupDone", v).apply() }
     var recentSearches: List<String>
         get() = p.getString("recentSearches", "")!!.split("\n").filter { it.isNotBlank() }
         set(v) { p.edit().putString("recentSearches", v.take(8).joinToString("\n")).apply() }

@@ -20,6 +20,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
@@ -65,46 +66,90 @@ fun SettingsScreen() {
     }
     val fmt = SimpleDateFormat("d MMM, h:mm a", Locale.ENGLISH)
 
+    // this week's listening for the Stats card at the top
+    val period0 = remember { vm.repo.statsPeriod(0) }
+    val rows by remember { vm.repo.dao.playsSince(minOf(period0.prevFrom, System.currentTimeMillis() - 400L * 86_400_000L)) }.collectAsState(null)
+    val week = remember(rows, lib) { rows?.let { buildStats(it, period0, 0, lib.byId, System.currentTimeMillis()) } }
+    val cs = MaterialTheme.colorScheme
+
     Column(Modifier.fillMaxSize().testTag("settings")) {
-        InnerTopBar("Settings", nav::back)
         Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(bottom = LocalDockPadding.current)) {
-            SectionLabel("Appearance")
-            ListItemRow("Theme", s.themeMode.label, Icons.Rounded.Contrast, onClick = { dialog = "theme" }, modifier = Modifier.testTag("set_theme"))
-            if (dark) SwitchRow("Pure black", "Darker dark mode for OLED screens", s.pureBlack, "set_pure_black", Icons.Rounded.DarkMode) { v -> vm.setSettings { it.copy(pureBlack = v) } }
-            if (Build.VERSION.SDK_INT >= 31) SwitchRow("Use wallpaper colours", "The app takes its colours from your wallpaper", s.wallpaperColors, "set_wallpaper", Icons.Rounded.Palette) { v -> vm.setSettings { it.copy(wallpaperColors = v) } }
+            PageHeader("Settings", Modifier.statusBarsPadding(), onBack = nav::back)
+            // ---- Stats card (Stats lives here now)
+            Row(Modifier.fillMaxWidth().padding(horizontal = 14.dp).clip(RoundedCornerShape(32.dp)).background(cs.primaryContainer)
+                .clickable(onClickLabel = "Open stats") { nav.go(R0.STATS) }.padding(horizontal = 20.dp, vertical = 18.dp).testTag("set_stats"),
+                verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Rounded.Insights, null, tint = cs.onPrimaryContainer, modifier = Modifier.size(20.dp)); Spacer(Modifier.width(8.dp))
+                        Text("Your stats", style = MaterialTheme.typography.titleSmall, color = cs.onPrimaryContainer)
+                    }
+                    Text(week?.let { formatListen(it.totalMs) } ?: "…", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.ExtraBold, color = cs.onPrimaryContainer)
+                    Text("listened this week" + (week?.streak?.takeIf { it > 1 }?.let { " · $it-day streak" } ?: ""), style = MaterialTheme.typography.bodySmall, color = cs.onPrimaryContainer)
+                }
+                week?.bars?.takeIf { it.isNotEmpty() }?.let { b -> Box(Modifier.width(96.dp)) { Bars(b, cs.primary, cs.onPrimaryContainer, height = 56.dp, labels = false) } }
+                Icon(Icons.Rounded.ChevronRight, null, tint = cs.onPrimaryContainer, modifier = Modifier.padding(start = 8.dp))
+            }
 
             SectionLabel("Playback")
-            SwitchRow("Gapless playback", "No silence between songs of the same album", s.gapless, "set_gapless", Icons.Rounded.LinearScale) { v -> vm.setSettings { it.copy(gapless = v, crossfadeSec = if (v) 0 else it.crossfadeSec) } }
-            ListItemRow("Crossfade", if (s.crossfadeSec == 0) "Off" else "Fade out and in over ${s.crossfadeSec} s", Icons.Rounded.Gradient,
-                onClick = { dialog = "crossfade" }, modifier = Modifier.testTag("set_crossfade"))
-            SwitchRow("Resume on headphones", "Start playing when headphones or Bluetooth connect", s.resumeOnConnect, "set_resume", Icons.Rounded.Headphones) { v -> vm.setSettings { it.copy(resumeOnConnect = v) } }
+            SettingsGroup {
+                GroupSwitch("Gapless playback", "No silence between songs of the same album", s.gapless, "set_gapless", Icons.Rounded.LinearScale, Tone.BLUE) { v -> vm.setSettings { it.copy(gapless = v, crossfadeSec = if (v) 0 else it.crossfadeSec) } }
+                GroupRow("Crossfade", if (s.crossfadeSec == 0) "Off" else "Fade out and in over ${s.crossfadeSec} s", Icons.Rounded.Gradient, Tone.BLUE, "set_crossfade") { dialog = "crossfade" }
+                GroupSwitch("Resume on headphones", "Start playing when headphones or Bluetooth connect", s.resumeOnConnect, "set_resume", Icons.Rounded.Headphones, Tone.BLUE) { v -> vm.setSettings { it.copy(resumeOnConnect = v) } }
+                GroupSwitch("Keep shuffle on", "Shuffle stays on for new lists and after closing the app", s.persistentShuffle, "set_persistent_shuffle", Icons.Rounded.Shuffle, Tone.BLUE) { v -> vm.setSettings { it.copy(persistentShuffle = v) } }
+            }
 
-            SectionLabel("Library")
-            ListItemRow("Folders to scan", "${plural(lib.folders.size, "folder")} shown", Icons.Rounded.FolderOpen, onClick = { nav.go(R0.SCAN_FOLDERS) }, modifier = Modifier.testTag("set_folders"))
-            ListItemRow("Skip short audio", if (s.skipShortSec == 0) "Show every file" else "Hide files shorter than ${s.skipShortSec} s", Icons.Rounded.ContentCut,
-                onClick = { dialog = "short" }, modifier = Modifier.testTag("set_short"))
-            ListItemRow("Default sort", s.defaultSort.label, Icons.Rounded.Sort, onClick = { dialog = "sort" }, modifier = Modifier.testTag("set_sort"))
-            ListItemRow("Lyrics folder", if (s.lyricsTree == null) "Pick the folder where your .lrc files are" else Uri.parse(s.lyricsTree).lastPathSegment?.substringAfter(':')?.ifBlank { "Phone storage" } ?: "Set",
-                Icons.AutoMirrored.Rounded.Notes, onClick = { treePicker.launch(null) }, modifier = Modifier.testTag("set_lyrics_folder"),
-                trailing = if (s.lyricsTree != null) { { IconButton(onClick = { vm.setSettings { it.copy(lyricsTree = null) } }) { Icon(Icons.Rounded.Close, "Forget lyrics folder") } } } else null)
-            ListItemRow("Rescan now", if (scanning) "Scanning…" else vm.prefs.lastScanAt.takeIf { it > 0 }?.let { "Last scan ${fmt.format(Date(it))} · ${plural(lib.songs.size, "song")}" } ?: "Look for new songs",
-                Icons.Rounded.Refresh, onClick = { vm.rescan() }, enabled = !scanning, modifier = Modifier.testTag("set_rescan"))
+            SectionLabel("Lyrics")
+            SettingsGroup {
+                GroupSwitch("Always save lyrics into the song file", "Lyrics you add are written into the song, so other players show them too", s.alwaysSaveLyrics, "set_always_save_lyrics", Icons.Rounded.Save, Tone.PURPLE) { v -> vm.setSettings { it.copy(alwaysSaveLyrics = v) } }
+                GroupRow("Lyrics folder", if (s.lyricsTree == null) "Pick the folder where your .lrc files are" else Uri.parse(s.lyricsTree).lastPathSegment?.substringAfter(':')?.ifBlank { "Phone storage" } ?: "Set",
+                    Icons.AutoMirrored.Rounded.Notes, Tone.PURPLE, "set_lyrics_folder",
+                    trailing = if (s.lyricsTree != null) { { IconButton(onClick = { vm.setSettings { it.copy(lyricsTree = null) } }) { Icon(Icons.Rounded.Close, "Forget lyrics folder") } } } else null) { treePicker.launch(null) }
+            }
+
+            SectionLabel("Appearance")
+            SettingsGroup {
+                GroupRow("Theme", s.themeMode.label, Icons.Rounded.Contrast, Tone.PINK, "set_theme") { dialog = "theme" }
+                if (dark) GroupSwitch("Pure black", "Darker dark mode for OLED screens", s.pureBlack, "set_pure_black", Icons.Rounded.DarkMode, Tone.PINK) { v -> vm.setSettings { it.copy(pureBlack = v) } }
+                if (Build.VERSION.SDK_INT >= 31) GroupSwitch("Use wallpaper colours", "The app takes its colours from your wallpaper", s.wallpaperColors, "set_wallpaper", Icons.Rounded.Palette, Tone.PINK) { v -> vm.setSettings { it.copy(wallpaperColors = v) } }
+                GroupRow("Cover swipe", if (s.carouselPeek) "One peek: the next cover shows at the edge" else "No peek: one cover at a time", Icons.Rounded.ViewCarousel, Tone.PINK, "set_carousel") { dialog = "carousel" }
+            }
+
+            SectionLabel("Library & folders")
+            SettingsGroup {
+                GroupRow("Folders to scan", "${plural(lib.folders.size, "folder")} shown", Icons.Rounded.FolderOpen, Tone.GREEN, "set_folders") { nav.go(R0.SCAN_FOLDERS) }
+                GroupRow("Skip short audio", if (s.skipShortSec == 0) "Show every file" else "Hide files shorter than ${s.skipShortSec} s", Icons.Rounded.ContentCut, Tone.GREEN, "set_short") { dialog = "short" }
+                GroupRow("Default sort", s.defaultSort.label, Icons.Rounded.Sort, Tone.GREEN, "set_sort") { dialog = "sort" }
+                GroupRow("Rescan now", if (scanning) "Scanning…" else vm.prefs.lastScanAt.takeIf { it > 0 }?.let { "Last scan ${fmt.format(Date(it))} · ${plural(lib.songs.size, "song")}" } ?: "Look for new songs",
+                    Icons.Rounded.Refresh, Tone.GREEN, "set_rescan", enabled = !scanning) { vm.rescan() }
+            }
 
             SectionLabel("Notification")
-            ListItemRow("Extra buttons", s.notifButtons.joinToString(" · ") { it.label }, Icons.Rounded.Notifications, onClick = { dialog = "buttons" }, modifier = Modifier.testTag("set_buttons"))
-            SwitchRow("Cover on lock screen", "Show the song's cover on the lock screen", s.lockCover, "set_lock_cover", Icons.Rounded.Lock) { v -> vm.setSettings { it.copy(lockCover = v) } }
+            SettingsGroup {
+                GroupRow("Extra buttons", s.notifButtons.joinToString(" · ") { it.label }, Icons.Rounded.Notifications, Tone.AMBER, "set_buttons") { dialog = "buttons" }
+                GroupSwitch("Cover on lock screen", "Show the song's cover on the lock screen", s.lockCover, "set_lock_cover", Icons.Rounded.Lock, Tone.AMBER) { v -> vm.setSettings { it.copy(lockCover = v) } }
+            }
+
+            SectionLabel("Feel")
+            SettingsGroup {
+                GroupSwitch("Haptics", "Small taps when you press buttons and change songs", s.haptics, "set_haptics", Icons.Rounded.Vibration, Tone.GREY) { v -> vm.setSettings { it.copy(haptics = v) } }
+            }
 
             SectionLabel("Stats")
-            ListItemRow("When a play counts", "After 30 seconds of real listening", Icons.Rounded.Timer)
-            ListItemRow("Reset stats", "Clear all listening history", Icons.Rounded.RestartAlt, onClick = { dialog = "reset" }, modifier = Modifier.testTag("set_reset"))
-
-            Row(Modifier.fillMaxWidth().padding(16.dp).clip(RoundedCornerShape(20.dp)).background(MaterialTheme.colorScheme.secondaryContainer).padding(16.dp)) {
-                Icon(Icons.Rounded.Shield, null, tint = MaterialTheme.colorScheme.onSecondaryContainer)
-                Spacer(Modifier.width(14.dp))
-                Text("Tarang has no internet access. Your music, stats and lyrics never leave your phone.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSecondaryContainer)
+            SettingsGroup {
+                GroupRow("When a play counts", "After 30 seconds of real listening", Icons.Rounded.Timer, Tone.GREY, "set_count_info", onClick = null)
+                GroupRow("Reset stats", "Clear all listening history", Icons.Rounded.RestartAlt, Tone.GREY, "set_reset") { dialog = "reset" }
             }
-            ListItemRow("Diagnostics", "App details and crash reports", Icons.Rounded.BugReport, onClick = { nav.go(R0.DIAGNOSTICS) }, modifier = Modifier.testTag("set_diagnostics"))
-            ListItemRow("About", "Version ${BuildConfig.VERSION_NAME}", Icons.Rounded.Info, onClick = { nav.go(R0.ABOUT) }, modifier = Modifier.testTag("set_about"))
+
+            Row(Modifier.fillMaxWidth().padding(16.dp).clip(RoundedCornerShape(24.dp)).background(cs.secondaryContainer).padding(16.dp)) {
+                Icon(Icons.Rounded.Shield, null, tint = cs.onSecondaryContainer)
+                Spacer(Modifier.width(14.dp))
+                Text("Tarang has no internet access. Your music, stats and lyrics never leave your phone.", style = MaterialTheme.typography.bodyMedium, color = cs.onSecondaryContainer)
+            }
+            SettingsGroup {
+                GroupRow("About", "Version, developer", Icons.Rounded.Info, Tone.GREY, "set_about") { nav.go(R0.ABOUT) }
+            }
+            Spacer(Modifier.height(16.dp))
         }
     }
 
@@ -115,6 +160,7 @@ fun SettingsScreen() {
         }
         "short" -> ChoiceDialog("Skip short audio", listOf(0, 10, 30, 60), s.skipShortSec, { if (it == 0) "Show every file" else "Shorter than $it seconds" }, { dialog = "" }) { v -> vm.setSettings { it.copy(skipShortSec = v) }; dialog = "" }
         "sort" -> ChoiceDialog("Default sort", SongSort.entries, s.defaultSort, { it.label }, { dialog = "" }) { v -> vm.setSettings { it.copy(defaultSort = v) }; dialog = "" }
+        "carousel" -> ChoiceDialog("Cover swipe", listOf(false, true), s.carouselPeek, { if (it) "One peek (next cover at the edge)" else "No peek (one cover at a time)" }, { dialog = "" }) { v -> vm.setSettings { it.copy(carouselPeek = v) }; dialog = "" }
         "reset" -> ConfirmDialog("Reset stats?", "All listening history, play counts and streaks are cleared. Your songs and playlists stay.", "Reset", { dialog = "" }, { dialog = ""; vm.resetStats() })
         "buttons" -> {
             var pick by remember { mutableStateOf(s.notifButtons.toSet()) }
@@ -187,15 +233,23 @@ fun AboutScreen() {
             AppIcon(112.dp)
             Spacer(Modifier.height(16.dp))
             Text("Tarang", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
-            Text("Version ${BuildConfig.VERSION_NAME}", style = MaterialTheme.typography.bodyMedium, color = cs.onSurfaceVariant)
-            Spacer(Modifier.height(12.dp))
-            Text("An offline music player for the songs on your phone.", style = MaterialTheme.typography.bodyLarge, textAlign = TextAlign.Center, color = cs.onSurfaceVariant)
+            Spacer(Modifier.height(6.dp))
+            Text("Your offline music player", style = MaterialTheme.typography.bodyLarge, textAlign = TextAlign.Center, color = cs.onSurfaceVariant)
             Spacer(Modifier.height(28.dp))
-            Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(24.dp)).background(cs.surfaceContainer)) {
-                ListItemRow("Developed by", "Sushant Kumar", Icons.Rounded.Person)
-                ListItemRow("Email", "sushant.sare@gmail.com", Icons.Rounded.Email, modifier = Modifier.testTag("about_email"), onClick = {
+            // tapping Version 5 times opens Diagnostics (not mentioned anywhere in the app)
+            var taps by remember { mutableIntStateOf(0) }
+            var lastTap by remember { mutableLongStateOf(0L) }
+            SettingsGroup(Modifier.padding(horizontal = 0.dp)) {
+                GroupRow("Version", "${BuildConfig.VERSION_NAME} (build ${BuildConfig.VERSION_CODE})", Icons.Rounded.NewReleases, Tone.GREY, "about_version") {
+                    val now = System.currentTimeMillis()
+                    taps = if (now - lastTap < 1500) taps + 1 else 1
+                    lastTap = now
+                    if (taps >= 5) { taps = 0; nav.go(R0.DIAGNOSTICS) }
+                }
+                GroupRow("Developed by", "Sushant Kumar", Icons.Rounded.Person, Tone.GREY, "about_dev", onClick = null)
+                GroupRow("Email", "sushant.sare@gmail.com", Icons.Rounded.Email, Tone.GREY, "about_email") {
                     runCatching { ctx.startActivity(Intent(Intent.ACTION_SENDTO, Uri.parse("mailto:sushant.sare@gmail.com")).putExtra(Intent.EXTRA_SUBJECT, "Tarang")) }
-                })
+                }
             }
             Spacer(Modifier.height(20.dp))
             Text("Built with Jetpack Compose, Media3 and Room. Song details editing uses jaudiotagger (LGPL). Fonts: Google Sans Flex (OFL).",
@@ -203,3 +257,50 @@ fun AboutScreen() {
         }
     }
 }
+
+/** Colour pairs for the round icons in Settings (Android 16 style). */
+enum class Tone { BLUE, PURPLE, PINK, GREEN, AMBER, GREY }
+
+@Composable
+private fun toneColors(t: Tone): Pair<androidx.compose.ui.graphics.Color, androidx.compose.ui.graphics.Color> {
+    val dark = LocalIsDark.current
+    fun c(v: Long) = androidx.compose.ui.graphics.Color(v)
+    return when (t) {
+        Tone.BLUE -> if (dark) c(0xFF1F3A5C) to c(0xFFB9D7FF) else c(0xFFCDE6FF) to c(0xFF0A4A7A)
+        Tone.PURPLE -> if (dark) c(0xFF3D2A55) to c(0xFFE6C9FF) else c(0xFFF3D9FF) to c(0xFF5A2A7A)
+        Tone.PINK -> if (dark) c(0xFF55283A) to c(0xFFFFC9DC) else c(0xFFFFD8E4) to c(0xFF7A1E3E)
+        Tone.GREEN -> if (dark) c(0xFF1F4430) to c(0xFFB5EDC6) else c(0xFFD2E8D4) to c(0xFF1F4A2F)
+        Tone.AMBER -> if (dark) c(0xFF4A3414) to c(0xFFFFD9A8) else c(0xFFFFDDB0) to c(0xFF7A3E00)
+        Tone.GREY -> if (dark) c(0xFF2E3030) to c(0xFFDADADA) else c(0xFFE3E3E3) to c(0xFF333333)
+    }
+}
+
+/** A group of settings rows: big rounded outer corners, tight inner ones, small gaps (Android 16 style). */
+@Composable
+fun SettingsGroup(modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) {
+    Column(modifier.fillMaxWidth().padding(horizontal = 14.dp).clip(RoundedCornerShape(26.dp)), verticalArrangement = Arrangement.spacedBy(3.dp), content = content)
+}
+
+@Composable
+private fun GroupRow(title: String, sub: String?, icon: androidx.compose.ui.graphics.vector.ImageVector, tone: Tone, tag: String, enabled: Boolean = true,
+                     trailing: (@Composable () -> Unit)? = null, onClick: (() -> Unit)?) {
+    val cs = MaterialTheme.colorScheme
+    val (bg, fg) = toneColors(tone)
+    Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(6.dp)).background(cs.surfaceContainer)
+        .let { if (onClick != null) it.clickable(enabled = enabled, onClick = onClick) else it }
+        .heightIn(min = 72.dp).padding(horizontal = 16.dp, vertical = 10.dp).testTag(tag), verticalAlignment = Alignment.CenterVertically) {
+        Box(Modifier.size(40.dp).clip(androidx.compose.foundation.shape.CircleShape).background(bg), contentAlignment = Alignment.Center) {
+            Icon(icon, null, tint = fg, modifier = Modifier.size(22.dp))
+        }
+        Spacer(Modifier.width(16.dp))
+        Column(Modifier.weight(1f).alpha(if (enabled) 1f else 0.4f)) {
+            Text(title, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium, color = cs.onSurface)
+            if (sub != null) Text(sub, style = MaterialTheme.typography.bodyMedium, color = cs.onSurfaceVariant)
+        }
+        if (trailing != null) { Spacer(Modifier.width(8.dp)); trailing() }
+    }
+}
+
+@Composable
+private fun GroupSwitch(title: String, sub: String?, on: Boolean, tag: String, icon: androidx.compose.ui.graphics.vector.ImageVector, tone: Tone, onChange: (Boolean) -> Unit) =
+    GroupRow(title, sub, icon, tone, tag, trailing = { Switch(on, onChange) }) { onChange(!on) }

@@ -86,7 +86,7 @@ fun StatsScreen() {
 
     LazyColumn(Modifier.fillMaxSize().testTag("stats"), contentPadding = PaddingValues(bottom = LocalDockPadding.current)) {
         item {
-            PageHeader("Stats", Modifier.statusBarsPadding()) {
+            PageHeader("Your stats", Modifier.statusBarsPadding(), onBack = nav::back) {
                 if (data != null && data.totalMs > 0) IconButton(onClick = {
                     val text = buildString {
                         append("My music this ${PERIODS[kind].lowercase()} on Tarang\n")
@@ -99,7 +99,7 @@ fun StatsScreen() {
                 }, Modifier.testTag("share_stats")) { Icon(Icons.Rounded.Share, "Share my stats") }
             }
         }
-        item { FilterChipRow(PERIODS, kind, { kind = it }) }
+        item { SegmentedRow(PERIODS, kind, { kind = it }) }
         if (data == null) { item { Box(Modifier.fillMaxWidth().padding(48.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator() } }; return@LazyColumn }
         if (data.totalMs == 0L) {
             item { EmptyState(Icons.Rounded.Insights, "No listening yet", "Play music and Tarang counts the real time you listen. A song counts as played after 30 seconds.", Modifier.testTag("stats_empty")) }
@@ -108,7 +108,9 @@ fun StatsScreen() {
         item {
             Column(Modifier.fillMaxWidth().padding(16.dp).clip(RoundedCornerShape(28.dp)).background(cs.primaryContainer).padding(20.dp)) {
                 Text("You listened for", style = MaterialTheme.typography.titleSmall, color = cs.onPrimaryContainer)
-                Text(formatListen(data.totalMs), style = MaterialTheme.typography.displaySmall, fontWeight = FontWeight.Bold, color = cs.onPrimaryContainer, modifier = Modifier.testTag("stats_total"))
+                // numbers count up when the page opens or the period changes
+                val total = countUp(data.totalMs.toFloat(), kind)
+                Text(formatListen(total.toLong()), style = MaterialTheme.typography.displaySmall, fontWeight = FontWeight.Bold, color = cs.onPrimaryContainer, modifier = Modifier.testTag("stats_total"))
                 if (kind != 3) {
                     val diff = data.totalMs - data.prevMs
                     val prevName = listOf("last week", "last month", "last year")[kind]
@@ -124,8 +126,8 @@ fun StatsScreen() {
         item {
             Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 StatTile(Icons.Rounded.LocalFireDepartment, if (data.streak > 0) plural(data.streak, "day") else "—", "Streak", Modifier.weight(1f))
-                StatTile(Icons.Rounded.PlayCircle, "%,d".format(data.plays), "Plays", Modifier.weight(1f))
-                StatTile(Icons.Rounded.MusicNote, "%,d".format(data.songsHeard), "Songs", Modifier.weight(1f))
+                StatTile(Icons.Rounded.PlayCircle, "%,d".format(countUp(data.plays.toFloat(), kind).toInt()), "Plays", Modifier.weight(1f))
+                StatTile(Icons.Rounded.MusicNote, "%,d".format(countUp(data.songsHeard.toFloat(), kind).toInt()), "Songs", Modifier.weight(1f))
             }
         }
         data.topHour?.let { h -> item { ListItemRow("Your favourite time", hourLabel(h), Icons.Rounded.Schedule, iconTone = 1, modifier = Modifier.padding(top = 8.dp)) } }
@@ -153,17 +155,20 @@ fun StatsScreen() {
 }
 
 @Composable
-private fun Bars(bars: List<Pair<String, Long>>, bar: androidx.compose.ui.graphics.Color, label: androidx.compose.ui.graphics.Color) {
+fun Bars(bars: List<Pair<String, Long>>, bar: androidx.compose.ui.graphics.Color, label: androidx.compose.ui.graphics.Color, height: androidx.compose.ui.unit.Dp = 96.dp, labels: Boolean = true) {
     val max = (bars.maxOfOrNull { it.second } ?: 0L).coerceAtLeast(1L)
+    // bars spring up from the bottom
+    val grow = remember(bars) { androidx.compose.animation.core.Animatable(0f) }
+    LaunchedEffect(bars) { grow.animateTo(1f, androidx.compose.animation.core.spring(dampingRatio = 0.7f, stiffness = 120f)) }
     Column {
-        Canvas(Modifier.fillMaxWidth().height(96.dp).semantics { contentDescription = bars.joinToString { "${it.first}: ${formatListen(it.second)}" } }) {
+        Canvas(Modifier.fillMaxWidth().height(height).semantics { contentDescription = bars.joinToString { "${it.first}: ${formatListen(it.second)}" } }) {
             val n = bars.size; val slot = size.width / n; val w = (slot * 0.56f).coerceAtMost(28.dp.toPx())
             bars.forEachIndexed { i, (_, v) ->
-                val h = if (v == 0L) 4.dp.toPx() else (size.height * v / max).coerceAtLeast(6.dp.toPx())
+                val h = (if (v == 0L) 4.dp.toPx() else (size.height * v / max).coerceAtLeast(6.dp.toPx())) * grow.value.coerceAtLeast(0.02f)
                 drawRoundRect(if (v == 0L) bar.copy(alpha = 0.25f) else bar, Offset(i * slot + (slot - w) / 2, size.height - h), Size(w, h), CornerRadius(w / 2))
             }
         }
-        Row(Modifier.fillMaxWidth().padding(top = 6.dp)) {
+        if (labels) Row(Modifier.fillMaxWidth().padding(top = 6.dp)) {
             bars.forEach { (l, _) -> Text(l, Modifier.weight(1f), style = MaterialTheme.typography.labelSmall, color = label, textAlign = TextAlign.Center) }
         }
     }
@@ -178,4 +183,12 @@ private fun StatTile(icon: androidx.compose.ui.graphics.vector.ImageVector, valu
         Text(value, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
         Text(label, style = MaterialTheme.typography.bodySmall, color = cs.onSurfaceVariant)
     }
+}
+
+/** A number that counts up from 0 (restarts when [key] changes). */
+@Composable
+fun countUp(target: Float, key: Any): Float {
+    val a = remember(key) { androidx.compose.animation.core.Animatable(0f) }
+    LaunchedEffect(key, target) { a.animateTo(target, androidx.compose.animation.core.tween(900, easing = androidx.compose.animation.core.FastOutSlowInEasing)) }
+    return a.value
 }
