@@ -23,6 +23,7 @@ jobs:
       dir: ${{ steps.t.outputs.dir }}
       name: ${{ steps.t.outputs.name }}
       matrix: ${{ steps.t.outputs.matrix }}
+      primary: ${{ steps.t.outputs.primary }}
     steps:
       - uses: actions/checkout@v4
         with: { sparse-checkout: apps, sparse-checkout-cone-mode: true }
@@ -32,12 +33,18 @@ jobs:
           APP_DIR=$(head -n1 .build-target | tr -d '[:space:]')
           echo "dir=$APP_DIR" >> "$GITHUB_OUTPUT"
           echo "name=$(basename "$APP_DIR")" >> "$GITHUB_OUTPUT"
-          if [ -f "$APP_DIR/e2e.sh" ]; then
-            M='{"include":[{"role":"ui","api":35},{"role":"audit","api":35},{"role":"e2e","api":33},{"role":"e2e","api":34}]}'
+          # An app can list its own emulator runs in emulators.json (e.g. the three newest Android
+          # versions plus an older smoke run). The first "ui" entry is the primary walkthrough.
+          if [ -f "$APP_DIR/emulators.json" ]; then
+            M=$(jq -c '{include: .}' "$APP_DIR/emulators.json")
+            P=$(jq -r '[.[] | select(.role=="ui")][0].api // ""' "$APP_DIR/emulators.json")
+          elif [ -f "$APP_DIR/e2e.sh" ]; then
+            M='{"include":[{"role":"ui","api":35},{"role":"audit","api":35},{"role":"e2e","api":33},{"role":"e2e","api":34}]}'; P=35
           else
-            M='{"include":[{"role":"ui","api":33}]}'
+            M='{"include":[{"role":"ui","api":33}]}'; P=33
           fi
           echo "matrix=$M" >> "$GITHUB_OUTPUT"
+          echo "primary=$P" >> "$GITHUB_OUTPUT"
 
   build-release:
     needs: target
@@ -223,6 +230,7 @@ jobs:
         uses: reactivecircus/android-emulator-runner@v2
         env:
           CI_SPLIT: '1'   # tells e2e.sh that lint and the walkthrough log are handled by other jobs
+          UI_PRIMARY: ${{ needs.target.outputs.primary }}   # other ui runs keep their results under their API number
         with:
           api-level: ${{ matrix.api }}
           arch: x86_64
@@ -262,6 +270,13 @@ jobs:
           [ -f STATUS ] || echo FAILED > STATUS
           [ -f UNIT_TESTS ] || echo FAILED > UNIT_TESTS
           [ -f UI_TESTS ] || echo NOT_RUN > UI_TESTS
+          # extra walkthrough runs on other Android versions: any failure fails the whole UI result
+          for f in UI_TESTS_*; do
+            case $f in *SUMMARY*) continue;; esac
+            [ -f "$f" ] || continue
+            echo "$f=$(cat $f) $(cat ${f/UI_TESTS_/UI_TESTS_SUMMARY_} 2>/dev/null)" >> UI_TESTS_ALL
+            grep -q PASSED "$f" || echo FAILED > UI_TESTS
+          done
           for f in build.log debug-build.log unit-tests.log ui-tests.log; do
             [ -f $f ] && tail -c 80000 $f > $f.tmp && mv $f.tmp $f
           done

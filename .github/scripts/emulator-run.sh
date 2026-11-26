@@ -49,8 +49,19 @@ run_ui() {
   if [ ! -f e2e.sh ]; then adb logcat -d -s GrabbitE2E:I > $OUT/e2e-results.txt || true; fi
 }
 
+keep_ui_by_api() {
+  # A second/third walkthrough on another Android version keeps its results apart from the primary one.
+  [ -z "$UI_PRIMARY" ] || [ "$API" = "$UI_PRIMARY" ] && return
+  mv $OUT/UI_TESTS $OUT/UI_TESTS_$API 2>/dev/null
+  mv $OUT/UI_TESTS_SUMMARY $OUT/UI_TESTS_SUMMARY_$API 2>/dev/null
+  mv $OUT/ui-tests.log $OUT/ui-tests-$API.log 2>/dev/null
+  mv $OUT/walk-log.txt $OUT/walk-log-$API.txt 2>/dev/null
+  mv $OUT/logcat.txt $OUT/logcat-$API.txt 2>/dev/null
+  mkdir -p $OUT/screens-api$API && mv $OUT/screens/* $OUT/screens-api$API/ 2>/dev/null
+}
+
 case $ROLE in
-  ui)    run_ui ;;
+  ui)    run_ui; keep_ui_by_api ;;
   audit) bash e2e.sh || true; adb logcat -d -t 3000 > $OUT/logcat-audit.txt || true ;;
   e2e)   bash e2e.sh "$API" || true ;;
   *)     echo "unknown role: $ROLE"; exit 1 ;;

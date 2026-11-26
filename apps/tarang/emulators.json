@@ -1,0 +1,7 @@
+[
+  {"role": "ui", "api": 37},
+  {"role": "ui", "api": 36},
+  {"role": "ui", "api": 35},
+  {"role": "audit", "api": 36},
+  {"role": "e2e", "api": 31}
+]
