@@ -1,5 +1,18 @@
 # Tarang changelog
 
+## 1.3.0 · 27 Nov 2026
+- New first-launch welcome and step-by-step setup (music access, notifications, folders to skip, theme).
+- New full player: "Now playing" top bar, round buttons, cover carousel (with an optional peek of the next cover), round heart, thicker wavy seek bar, joined ⏮ ⏯ ⏭ that squish when pressed, Sleep · Lyrics · Playlist toolbar.
+- A live lyric line follows the music for songs with synced lyrics; the bottom strip shows what plays next and opens Up next.
+- Lyrics page: add a .lrc file or type lyrics, save lyrics into the song file, and an "Always save lyrics" setting.
+- Swipe down to the mini player is fixed: the cover never gets cut off or tilted mid-way, and a short pull finishes the move.
+- One queue. Tapping a song plays that list (with Undo); Play next moves a song that is already queued; Save queue as playlist; Clear queue.
+- Real shuffle: Up next shows the true shuffled order, and turning it off brings back the earlier order. New "Keep shuffle on" setting. Shuffle and repeat are remembered.
+- Material 3 Expressive look: collapsing titles, shimmer while loading, dancing bars on the playing song, grouped Settings with a haptics switch.
+- Stats moved into Settings; the dock has Home · Folders · Library and sits level with the mini player, tinted with the song's colour.
+- Select many songs and act on them from a floating toolbar, including deleting them.
+- Smoother app icon.
+
 ## 1.2.0 · 22 Nov 2026
 - Swiping left/right on the cover now always changes the song; the new cover slides in once that song has loaded.
 - Swipe down on the full player and swipe up on the mini player never stop halfway: once you swipe and let go, it completes.

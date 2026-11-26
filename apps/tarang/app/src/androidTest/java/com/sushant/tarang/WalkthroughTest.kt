@@ -305,6 +305,16 @@ class WalkthroughTest {
             click("extra_lyrics"); Thread.sleep(2000); shot("player_lyrics_embedded"); back(); click("collapse"); waitTag("mini_player")
         }
 
+        // ---- song with a synced .lrc next to it: the live line follows the music
+        song("Raataan Lambiyan.mp3")?.let { s ->
+            go(com.sushant.tarang.ui.R0.folder(s.folderPath), "song_list")
+            click("song_${s.id}"); Thread.sleep(1200)
+            clickTo("mini_player", "full_player")
+            if (!waitTag("live_lyric", 8000, soft = true)) problem("live lyric line missing for a song with a synced .lrc file")
+            Thread.sleep(2500); shot("player_live_lyric_synced")
+            click("collapse"); waitTag("mini_player")
+        }
+
         // ---- Library + floating selection toolbar
         tab("library", "library"); waitTag("songs_list"); shot("library_songs")
         click("sort"); waitTag("dialog_ok", 2000, soft = true); shot("library_sort_dialog"); back()
