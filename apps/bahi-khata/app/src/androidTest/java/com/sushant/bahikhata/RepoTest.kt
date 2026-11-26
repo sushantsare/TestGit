@@ -135,4 +135,102 @@ class RepoTest {
         val b = Ledger.cardBill(repo.dao.account(card)!!, nets()[card]!!, repo.dao.entriesNow(), today)
         assertEquals(1_500_00L, b.bill); assertEquals(2_200_00L, b.outstanding)
     }
+
+    // ---------------- 1.1
+
+    private fun sms(key: String, amount: Long, debit: Boolean, acc: Long?, kind: String = if (debit) "DEBIT" else "CREDIT", flags: String = "", vpa: String = "", merchant: String = "") =
+        SmsItem(key = key, sender = "VM-SBIUPI-S", body = "test $key", receivedAt = System.currentTimeMillis(), status = SmsStatus.PENDING, kind = kind,
+            amountPaise = amount, debit = debit, accountId = acc, confidence = 100, flags = flags, vpa = vpa, merchant = merchant)
+
+    @Test fun transferSuggestionMovesMoneyWithoutSpending() = runBlocking {
+        val a = repo.saveAccount(Account(type = AccType.BANK, name = "A", openingPaise = 10_000_00))
+        val b = repo.saveAccount(Account(type = AccType.BANK, name = "B", openingPaise = 0))
+        val id = repo.dao.insertSms(sms("t1", 1_500_00, true, a, kind = "TRANSFER", flags = "FROM:$a,TO:$b"))
+        repo.acceptSms(repo.dao.smsItem(id)!!, a, null, "")
+        val n = nets()
+        assertEquals(8_500_00L, n[a]); assertEquals(1_500_00L, n[b])
+        val r = Dates.monthRange(java.time.YearMonth.now())
+        assertEquals(0L, Ledger.spent(repo.dao.entriesNow(), r)); assertEquals(0L, Ledger.received(repo.dao.entriesNow(), r))
+    }
+
+    @Test fun udharSettleFromSms() = runBlocking {
+        val a = repo.saveAccount(Account(type = AccType.BANK, name = "A", openingPaise = 0))
+        val p = repo.savePerson(Person(name = "Rahul", openingPaise = 800_00))
+        val id = repo.dao.insertSms(sms("u1", 500_00, false, a, flags = "PERSON:$p"))
+        repo.acceptSms(repo.dao.smsItem(id)!!, a, null, "Rahul", kind = "UDHAR")
+        assertEquals(300_00L, Ledger.personBalance(repo.dao.person(p)!!, repo.dao.udharNow()))
+        assertEquals(500_00L, nets()[a])
+        assertEquals(0L, Ledger.received(repo.dao.entriesNow(), Dates.monthRange(java.time.YearMonth.now())))
+    }
+
+    @Test fun refundLinksToPurchaseAndLowersSpending() = runBlocking {
+        val a = repo.saveAccount(Account(type = AccType.CARD, name = "Card", openingPaise = 0))
+        val shop = repo.dao.categoriesNow().first { it.name == "Shopping" }.id
+        repo.saveEntry(Repo.SaveRequest(Entry(type = EType.EXPENSE, amountPaise = 1_299_00, accountId = a, categoryId = shop, merchant = "Amazon", time = System.currentTimeMillis() - 86_400_000L)))
+        val id = repo.dao.insertSms(sms("r1", 599_00, false, a, kind = "REFUND", merchant = "Amazon"))
+        val eid = repo.acceptSms(repo.dao.smsItem(id)!!, a, null, "Amazon")
+        val refund = repo.dao.entry(eid)!!
+        assertNotNull(refund.refundOf); assertEquals(shop, refund.categoryId)
+        val r = Dates.monthRange(java.time.YearMonth.now()).let { (it.first - 40L * 86_400_000L)..it.last }
+        assertEquals(700_00L, Ledger.spent(repo.dao.entriesNow(), r))
+        assertEquals(0L, Ledger.received(repo.dao.entriesNow(), r))
+    }
+
+    @Test fun cancelledEntryCountsNowhere() = runBlocking {
+        val a = repo.saveAccount(Account(type = AccType.BANK, name = "A", openingPaise = 1_000_00))
+        val id = repo.saveEntry(Repo.SaveRequest(Entry(type = EType.EXPENSE, amountPaise = 400_00, accountId = a, merchant = "Myntra")))
+        repo.setCancelled(repo.dao.entry(id)!!, true)
+        assertEquals(1_000_00L, nets()[a])
+        assertEquals(0L, Ledger.spent(repo.dao.entriesNow(), 0L..Long.MAX_VALUE))
+        repo.setCancelled(repo.dao.entry(id)!!, false)
+        assertEquals(600_00L, nets()[a])
+    }
+
+    @Test fun itemsFromSmsAreSavedWithTheEntry() = runBlocking {
+        val a = repo.saveAccount(Account(type = AccType.BANK, name = "A", openingPaise = 1_000_00))
+        val id = repo.dao.insertSms(sms("i1", 100_00, true, a, merchant = "Ravi Kirana").copy(itemsText = "milk 60, bread 40"))
+        val eid = repo.acceptSms(repo.dao.smsItem(id)!!, a, null, "Ravi Kirana")
+        val items = repo.dao.itemsOf(eid)
+        assertEquals(listOf("Milk" to 60_00L, "Bread" to 40_00L), items.map { it.name to it.pricePaise })
+        assertEquals("ravi kirana", items.first().shopKey)
+    }
+
+    @Test fun namingUpiUpdatesWaitingSuggestionsAndEntries() = runBlocking {
+        val a = repo.saveAccount(Account(type = AccType.BANK, name = "A", openingPaise = 1_000_00))
+        repo.saveEntry(Repo.SaveRequest(Entry(type = EType.EXPENSE, amountPaise = 50_00, accountId = a, merchant = "Paytmqr2810", vpa = "paytmqr2810@paytm")))
+        val sid = repo.dao.insertSms(sms("n1", 80_00, true, a, vpa = "paytmqr2810@paytm", merchant = "Paytmqr2810"))
+        val groc = repo.dao.categoriesNow().first { it.name == "Groceries" }.id
+        repo.nameUpi(UpiName(key = "vpa:paytmqr2810@paytm", display = "Sharma Kirana", categoryId = groc))
+        assertEquals("Sharma Kirana", repo.dao.smsItem(sid)!!.merchant)
+        assertEquals(groc, repo.dao.smsItem(sid)!!.categoryId)
+        assertTrue(repo.dao.entriesNow().all { it.merchant == "Sharma Kirana" })
+    }
+
+    @Test fun accountDeleteCanBeUndone() = runBlocking {
+        val a = repo.saveAccount(Account(type = AccType.BANK, name = "A", openingPaise = 1_000_00))
+        val id = repo.saveEntry(Repo.SaveRequest(Entry(type = EType.EXPENSE, amountPaise = 100_00, accountId = a, merchant = "Shop")))
+        repo.setItems(id, listOf("Pen" to 100_00))
+        val b = repo.deleteAccount(repo.dao.account(a)!!)
+        assertNull(repo.dao.account(a)); assertTrue(repo.dao.entriesNow().isEmpty())
+        repo.undoDeleteAccount(b)
+        assertNotNull(repo.dao.account(a)); assertEquals(1, repo.dao.entriesNow().size); assertEquals(1, repo.dao.itemsOf(id).size)
+        assertEquals(900_00L, nets()[a])
+    }
+
+    @Test fun matchBankUsesTheSmsMoment() = runBlocking {
+        val now = System.currentTimeMillis()
+        val a = repo.saveAccount(Account(type = AccType.BANK, name = "A", openingPaise = 1_000_00))
+        repo.saveAccount(repo.dao.account(a)!!.copy(bankBalPaise = 1_200_00, bankBalAt = now - 60_000))
+        repo.saveEntry(Repo.SaveRequest(Entry(type = EType.EXPENSE, amountPaise = 100_00, accountId = a, merchant = "After", time = now)))
+        repo.matchBank(repo.dao.account(a)!!)
+        val acc = repo.dao.account(a)!!
+        assertEquals(1_200_00L, Ledger.netAt(acc, repo.dao.entriesNow(), acc.bankBalAt))
+        assertEquals(1_100_00L, nets()[a])
+    }
+
+    @Test fun newCategoriesAddedForOlderInstalls() = runBlocking {
+        assertTrue(repo.dao.categoriesNow().any { it.name == "Bank charges" && it.kind == "EXPENSE" })
+        assertTrue(repo.dao.categoriesNow().any { it.name == "Cashback" && it.kind == "INCOME" })
+        assertEquals(1, repo.dao.categoriesNow().count { it.name == "Insurance" })
+    }
 }

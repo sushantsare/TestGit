@@ -55,11 +55,42 @@ object Seed {
             status = SmsStatus.PENDING, kind = "DEBIT", amountPaise = 412_00, debit = true, last4 = "8812", accountId = hdfc, merchant = "Zomato", categoryId = cat("Food"), confidence = 100))
         repo.dao.insertSms(SmsItem(key = "s2", sender = "JD-SBIUPI-S", body = "Dear UPI user A/C X4417 debited by 230.0 on date 21Nov26 trf to RAVI KIRANA Refno 532511234567. If not u? call 1800111109. -SBI", receivedAt = now - 7_200_000,
             status = SmsStatus.PENDING, kind = "DEBIT", amountPaise = 230_00, debit = true, last4 = "4417", accountId = sbi, merchant = "Ravi Kirana", upiApp = "PhonePe", categoryId = cat("Groceries"), confidence = 100,
-            note = "Already added? You saved ₹230 at 7:00 PM"))
+            note = "Already added? You saved ₹230 at 7:00 PM", vpa = "ravikirana@ybl", flags = "ASK"))
         repo.dao.insertSms(SmsItem(key = "s3", sender = "AD-ICICIT-T", body = "Rs 599.00 credited to your ICICI Bank Credit Card XX3301 towards refund on 20-Nov-26.", receivedAt = now - 86_400_000,
             status = SmsStatus.PENDING, kind = "REFUND", amountPaise = 599_00, debit = false, last4 = "3301", accountId = icici, categoryId = cat("Refund", "INCOME"), confidence = 90))
         repo.dao.insertSms(SmsItem(key = "s4", sender = "AX-UCOBNK-T", body = "A/c XX9021 Dr INR 1,150.00 on 19/11 Ref 4471 Avl 8,240", receivedAt = now - 2 * 86_400_000,
             status = SmsStatus.LOOK, kind = "UNKNOWN_MONEY", amountPaise = 1_150_00, debit = true, last4 = "9021", confidence = 65))
+        // ---- 1.1: SMS insights, UPI names, items, reminders, transfers, cancelled / refunded payments
+        val ent = cat("Entertainment"); val chg = cat("Bank charges"); val ins = cat("Insurance")
+        listOf(2L, 32L, 62L).forEach { d -> repo.saveEntry(Repo.SaveRequest(Entry(type = EType.EXPENSE, amountPaise = 649_00, accountId = hdfc, categoryId = ent, merchant = "Netflix", time = t(d, 6)))) }
+        repo.saveEntry(Repo.SaveRequest(Entry(type = EType.EXPENSE, amountPaise = 17_70, accountId = sbi, categoryId = chg, merchant = "SMS alert charges", time = t(9))))
+        repo.saveEntry(Repo.SaveRequest(Entry(type = EType.EXPENSE, amountPaise = 2_400_00, accountId = sbi, categoryId = ins, merchant = "LIC premium", time = t(11))))
+        repo.saveEntry(Repo.SaveRequest(Entry(type = EType.INVEST, amountPaise = 1_000_00, accountId = sbi, merchant = "Groww SIP", time = t(5, 8))))
+        repo.saveEntry(Repo.SaveRequest(Entry(type = EType.EXPENSE, amountPaise = 999_00, accountId = hdfc, categoryId = cat("Shopping"), merchant = "Myntra", time = t(1, 15), cancelled = true, note = "Payment failed")))
+        val amazon = repo.dao.entriesNow().first { it.merchant == "Amazon" }
+        repo.saveEntry(Repo.SaveRequest(Entry(type = EType.INCOME, amountPaise = 599_00, accountId = icici, categoryId = amazon.categoryId, merchant = "Amazon", refundOf = amazon.id, note = "Refund for Amazon", time = t(2, 11))))
+        val kirana = repo.dao.entriesNow().first { it.merchant == "Ravi Kirana" }
+        repo.dao.upsertEntry(kirana.copy(vpa = "ravikirana@ybl"))
+        repo.setItems(kirana.id, listOf("Milk" to 60_00, "Bread" to 40_00, "Eggs" to 72_00))
+        val oldKirana = repo.saveEntry(Repo.SaveRequest(Entry(type = EType.EXPENSE, amountPaise = 96_00, accountId = sbi, categoryId = cat("Groceries"), merchant = "Ravi Kirana", vpa = "ravikirana@ybl", time = t(16, 19))))
+        repo.setItems(oldKirana, listOf("Milk" to 56_00, "Bread" to 40_00))
+        repo.nameUpi(UpiName(key = "vpa:ravikirana@ybl", display = "Ravi Kirana", categoryId = cat("Groceries")))
+        repo.nameUpi(UpiName(key = "vpa:rahulk@okaxis", display = "Rahul Kumar", isPerson = true, personId = rahul))
+        val ep = today.toEpochDay()
+        repo.dao.upsertReminder(Reminder(key = "r1", kind = RemindKind.RECHARGE, title = "Jio plan", dueEpochDay = ep + 1))
+        repo.dao.upsertReminder(Reminder(key = "r2", kind = RemindKind.UTILITY, title = "Electricity bill", amountPaise = 1_240_00, dueEpochDay = ep + 3))
+        repo.dao.upsertReminder(Reminder(key = "r3", kind = RemindKind.EMI, title = "EMI · Bajaj Finance", amountPaise = 2_150_00, dueEpochDay = ep + 6, accountId = sbi))
+        repo.dao.account(sbi)?.let { repo.saveAccount(it.copy(bankBalPaise = 33_000_00, bankBalAt = now - 2 * 3_600_000L)) }
+        repo.dao.account(hdfc)?.let { repo.saveAccount(it.copy(availLimitPaise = 42_300_00, availLimitAt = now - 5 * 3_600_000L)) }
+        repo.dao.insertSms(SmsItem(key = "s6", sender = "JD-SBIUPI-S", body = "Dear UPI user A/C X4417 debited by 140.0 on date 22Nov26 trf to paytmqr28100505 Refno 532611234999 -SBI", receivedAt = now - 1_800_000,
+            status = SmsStatus.PENDING, kind = "DEBIT", amountPaise = 140_00, debit = true, last4 = "4417", accountId = sbi, merchant = "Paytmqr28100505", upiApp = "Paytm", confidence = 100,
+            vpa = "paytmqr28100505@paytm", flags = "ASK"))
+        repo.dao.insertSms(SmsItem(key = "s7", sender = "JD-SBIUPI-S", body = "Dear SBI UPI User, ur A/cX4417 credited by Rs500 on 22Nov26 by (Ref no 532612345111) from rahulk@okaxis", receivedAt = now - 2_400_000,
+            status = SmsStatus.PENDING, kind = "CREDIT", amountPaise = 500_00, debit = false, last4 = "4417", accountId = sbi, merchant = "Rahul Kumar", confidence = 100,
+            vpa = "rahulk@okaxis", flags = "PERSON:$rahul"))
+        repo.dao.insertSms(SmsItem(key = "s8", sender = "VM-KOTAKB-S", body = "Sent Rs.1,500.00 from Kotak Bank AC X2290 to your SBI a/c on 22-11-26. UPI Ref 532612399999", receivedAt = now - 5_400_000,
+            status = SmsStatus.PENDING, kind = "TRANSFER", amountPaise = 1_500_00, debit = true, last4 = "2290", accountId = kotak, merchant = "Kotak 811 → SBI Savings", confidence = 100,
+            flags = "FROM:$kotak,TO:$sbi", note = "Between your accounts — not counted as spending"))
         repo.dao.insertSms(SmsItem(key = "s5", sender = "VM-PAYTMB-S", body = "Rs.60 paid to Chai Point from Paytm Wallet. Txn ID 41234567890.", receivedAt = now - 3 * 86_400_000,
             status = SmsStatus.IGNORED, kind = "DEBIT", amountPaise = 60_00, debit = true, merchant = "Chai Point", confidence = 85))
     }

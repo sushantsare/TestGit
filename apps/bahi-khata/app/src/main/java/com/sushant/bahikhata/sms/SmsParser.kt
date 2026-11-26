@@ -10,7 +10,7 @@ import java.util.Locale
  * Anything that looks like money but can't be fully read is returned as [SmsKind.UNKNOWN_MONEY]
  * so the engine puts it in "Needs a look" instead of dropping it.
  */
-enum class SmsKind { DEBIT, CREDIT, REFUND, ATM, CARD_PAYMENT, BILL, DUE, FAILED, AUTOPAY_SETUP, BALANCE, OTP, PROMO, UNKNOWN_MONEY, NOT_FINANCIAL }
+enum class SmsKind { DEBIT, CREDIT, REFUND, ATM, CARD_PAYMENT, BILL, DUE, FAILED, AUTOPAY_SETUP, BALANCE, REMINDER, OTP, PROMO, UNKNOWN_MONEY, NOT_FINANCIAL }
 
 data class Parsed(
     val kind: SmsKind,
@@ -31,6 +31,12 @@ data class Parsed(
     val senderKey: String = "",
     val categoryHint: String = "",
     val confidence: Int = 0,
+    /** What else the SMS says about the money: SALARY, CHARGE, CASHBACK, INTEREST, INVEST, INSURANCE, FASTAG, WALLET, INTL, SELF, REVERSAL, EMI. */
+    val tags: Set<String> = emptySet(),
+    /** REMINDER only: RECHARGE / UTILITY / EMI / AUTOPAY, the date it's due and a short title ("Jio plan", "Electricity bill"). */
+    val remindKind: String = "",
+    val remindDate: LocalDate? = null,
+    val remindTitle: String = "",
 ) {
     /** A real money movement that should become a suggested entry. */
     val isTransaction get() = kind in setOf(SmsKind.DEBIT, SmsKind.CREDIT, SmsKind.REFUND, SmsKind.ATM, SmsKind.CARD_PAYMENT)
@@ -144,6 +150,28 @@ object SmsParser {
     private val cardPayWords = Regex("""(?i)(payment\s+of\s+.{0,25}(?:has\s+been\s+|is\s+)?received|received\s+(?:your\s+)?payment|thank\s+you\s+for\s+(?:your\s+)?payment|payment\s+.{0,30}credited\s+to\s+your\s+(?:credit\s+)?card|we\s+have\s+received\s+.{0,30}payment)""")
     private val mandateWords = Regex("""(?i)(mandate|autopay|auto[\s-]?pay|standing\s+instruction|e-?nach|\bsi\b).{0,60}(created|registered|set\s*up|activated|successfully\s+setup|approved)""")
     private val cardWords = Regex("""(?i)(credit\s+card|\bcard\b|\bcc\b)""")
+    private val doneWords = Regex("""(?i)\b(has\s+been|was|is|were)\s+(successfully\s+)?(debited|deducted|paid|credited|received|processed|completed)\b|\b(debited|credited)\s+(from|to|with|by|for)\b""")
+    private val rechargeRx = Regex("""(?i)\byour\b.{0,60}\b(plan|pack|validity|recharge|subscription|services?|connection)\b.{0,60}(expir|will\s+end|ends?\s+on|ending\s+on|valid\s+(?:till|upto|until)|will\s+be\s+(?:discontinued|deactivated|barred))""")
+    private val telecomRx = Regex("""(?i)\b(jio|airtel|vodafone|\bvi\b|idea|bsnl|mtnl|tata\s*play|dish\s*tv|d2h|sun\s*direct|airtel\s*dth|act\s*fibernet|hathway|excitel|prepaid|dth)\b""")
+    private val utilityRx = Regex("""(?i)\b(electricity|bijli|power\s+bill|discom|energy\s+bill|consumer\s*(?:no|number|id|a/c)|k\.?\s*no|ca\s+no|broadband|fibre|fiber|gas\s+bill|png|piped\s+gas|lpg|water\s+bill|postpaid\s+bill|landline|nbpdcl|sbpdcl|bses|tata\s+power|msedcl|uppcl|torrent\s+power)\b""")
+    private val billDueRx = Regex("""(?i)(\bdue\b|pay\s+by|last\s+date|bill\s+(?:amount|amt|of|for|is)|amount\s+payable|payable\s+by|before)""")
+    private val emiRx = Regex("""(?i)\b(emi|instal+ment|auto[\s-]?debit|autopay|auto[\s-]?pay|e-?nach|nach|mandate|standing\s+instruction|\bsi\b|sip)\b""")
+    private val upcomingRx = Regex("""(?i)(is\s+due|due\s+on|due\s+date|will\s+be\s+(?:debited|deducted|presented|processed|auto[\s-]?debited)|scheduled\s+(?:for|on)|to\s+be\s+debited|upcoming|is\s+scheduled|ensure\s+(?:sufficient|adequate)\s+(?:balance|funds))""")
+    private val tagRx = listOf(
+        "SALARY" to Regex("""(?i)\b(salary|sal\b|payroll|sal\s+for|wages)"""),
+        "CASHBACK" to Regex("""(?i)\b(cash\s*back|cashback|reward\s+credited|scratch\s+card)"""),
+        "INTEREST" to Regex("""(?i)\b(interest\s+(?:credited|paid|cr)|int\.?\s*(?:pd|paid|cr|credit)|savings\s+int|sb\s+int|interest\s+of|int\s+credited)"""),
+        "CHARGE" to Regex("""(?i)\b(charges?\b|fees?\b|gst\b|penalty|annual\s+fee|amc\b|sms\s+(?:alert\s+)?charges|min(?:imum)?\.?\s+bal|non[-\s]?maintenance|service\s+charge|late\s+(?:payment\s+)?fee|cheque\s+book|card\s+(?:annual|issuance|replacement)|finance\s+charge|processing\s+fee|ecs\s+return|bounce)"""),
+        "INVEST" to Regex("""(?i)\b(sip\b|mutual\s+fund|\bmf\b|groww|zerodha|upstox|kuvera|paytm\s+money|angel\s+one|iccl|indian\s+clearing|bse\s*star|nse\s*clearing|cams\b|kfin|nps\b|ppf\b|sukanya|digital\s+gold|safegold|augmont|fixed\s+deposit|\bfd\b|recurring\s+deposit|\brd\b|smallcase|demat)"""),
+        "INSURANCE" to Regex("""(?i)\b(insurance|premium|lic\b|policy\s*(?:no|number)|hdfc\s*life|sbi\s*life|icici\s*pru|star\s*health|max\s*life|tata\s*aia|bajaj\s*allianz|acko|go\s*digit|care\s+health|niva\s+bupa|pmjjby|pmsby)"""),
+        "FASTAG" to Regex("""(?i)(fastag|toll\s+plaza|\bnhai\b|\btoll\b|netc)"""),
+        "WALLET" to Regex("""(?i)\b(wallet|paytm\s+balance|amazon\s+pay\s+balance|mobikwik\s+balance|gift\s+card\s+balance)"""),
+        "INTL" to Regex("""(?i)(\binternational\b|\busd\b|\$\s*\d|\beur\b|\bgbp\b|\baed\b|\bsgd\b|forex|cross[-\s]border|outside\s+india|\bfx\b)"""),
+        "SELF" to Regex("""(?i)(self\s+transfer|to\s+self\b|own\s+account|your\s+own\s+a/?c|between\s+your\s+accounts)"""),
+        "REVERSAL" to Regex("""(?i)\b(reversed|reversal|reverted|credited\s+back|refunded\s+to\s+your\s+a/?c\s+for\s+failed)"""),
+        "EMI" to Regex("""(?i)\b(emi|loan\s+(?:a/?c|account|repayment)|instal+ment)\b"""),
+    )
+
     private val moneyWords = Regex("""(?i)(rs\.?\s*\d|inr\s*\d|₹\s*\d|\bdebit|\bcredit|\ba/?c\b|\bupi\b|\bbal(?:ance)?\b|\bpaid\b|\btxn\b)""")
 
     fun parse(sender: String, body: String): Parsed {
@@ -162,6 +190,7 @@ object SmsParser {
             otpWords.containsMatchIn(text) && !Regex("(?i)\\b(debited|credited)\\b").containsMatchIn(text) -> SmsKind.OTP
             failedWords.containsMatchIn(text) && (!refundWords.containsMatchIn(text) || Regex("(?i)(will\\s+be\\s+(reversed|refunded|credited)|if\\s+debited)").containsMatchIn(text)) -> SmsKind.FAILED
             mandateWords.containsMatchIn(text) && !Regex("(?i)\\b(debited|deducted|paid)\\b").containsMatchIn(text) -> SmsKind.AUTOPAY_SETUP
+            reminderOf(text, key) != null -> SmsKind.REMINDER
             cardPayWords.containsMatchIn(text) -> SmsKind.CARD_PAYMENT
             refundWords.containsMatchIn(text) && amount > 0 -> SmsKind.REFUND
             billWords.containsMatchIn(text) && cardWords.containsMatchIn(text) && !Regex("(?i)\\b(debited|spent)\\b").containsMatchIn(text) -> SmsKind.BILL
@@ -177,6 +206,11 @@ object SmsParser {
         }
         if (kind == SmsKind.NOT_FINANCIAL || kind == SmsKind.OTP || kind == SmsKind.PROMO) {
             return Parsed(kind = kind, bank = bank, senderKey = key)
+        }
+        if (kind == SmsKind.REMINDER) {
+            val (rk, rd, rt) = reminderOf(text, key)!!
+            return Parsed(kind = kind, amountPaise = amount, bank = bank, senderKey = key, remindKind = rk, remindDate = rd, remindTitle = rt,
+                last4 = findLast4(text), confidence = 80)
         }
 
         // ---- fields
@@ -221,16 +255,61 @@ object SmsParser {
         if (merchant.isNotEmpty() || vpa.isNotEmpty() || kind == SmsKind.ATM || kind == SmsKind.CARD_PAYMENT) conf += 10
         if (bank.isNotEmpty()) conf += 10
 
+        val tags = tagRx.filter { (_, rx) -> rx.containsMatchIn(text) }.map { it.first }.toMutableSet()
+        // tags only make sense in the right direction (a salary is never a debit, a charge never a credit)
+        if (debit) tags.removeAll(setOf("SALARY", "CASHBACK", "INTEREST")) else tags.removeAll(setOf("CHARGE", "INVEST", "INSURANCE"))
+        if (tags.contains("CHARGE") && (merchant.isNotBlank() && !Regex("(?i)charge|fee|gst|bank").containsMatchIn(merchant))) tags.remove("CHARGE")
+        if (kind == SmsKind.REFUND && !refundWords.containsMatchIn(text)) tags.remove("REVERSAL")
+        val hint = when {
+            "SALARY" in tags -> "Salary"; "CASHBACK" in tags -> "Cashback"; "INTEREST" in tags -> "Interest"
+            "CHARGE" in tags -> "Bank charges"; "INSURANCE" in tags -> "Insurance"; "FASTAG" in tags && debit -> "Travel"
+            else -> categoryFor(merchant + " " + vpa + " " + lower)
+        }
         return Parsed(
-            kind = kind, amountPaise = if (kind == SmsKind.BILL || kind == SmsKind.DUE) maxOf(billP, 0) else amount,
+            tags = tags, kind = kind, amountPaise = if (kind == SmsKind.BILL || kind == SmsKind.DUE) maxOf(billP, 0) else amount,
             debit = debit, last4 = last4, merchant = merchant, vpa = vpa, upiApp = upiApp, ref = ref,
             balancePaise = balance, availLimitPaise = limit, billPaise = billP, minDuePaise = minP, dueDate = due,
-            txnDate = txnDate, bank = bank, senderKey = key, categoryHint = categoryFor(merchant + " " + vpa + " " + lower),
+            txnDate = txnDate, bank = bank, senderKey = key, categoryHint = hint,
             confidence = conf.coerceAtMost(100),
         )
     }
 
     private fun firstIndex(rx: Regex, s: String) = rx.find(s)?.range?.first ?: Int.MAX_VALUE
+
+    /** An SMS about something coming up (no money moved yet): plan expiry, a utility bill, an EMI / AutoPay debit. */
+    fun reminderOf(text: String, senderKey: String = ""): Triple<String, LocalDate, String>? {
+        if (doneWords.containsMatchIn(text) || failedWords.containsMatchIn(text)) return null
+        val date = (findDueDate(text) ?: return null).takeIf { !it.isBefore(LocalDate.now().minusDays(1)) } ?: return null
+        val tl = telecomRx.find(text)?.value?.trim()?.lowercase(Locale.ROOT)
+        val telecom = tl != null || Regex("JIO|AIRTEL|VICARE|VFCARE|BSNL|TATASKY|TPLAY|DISHTV").containsMatchIn(senderKey)
+        if (rechargeRx.containsMatchIn(text) && telecom) {
+            val op = when {
+                tl == null -> Senders.bankFor(senderKey).ifBlank { senderKey.lowercase(Locale.ROOT).replaceFirstChar { it.titlecase(Locale.ROOT) } }
+                tl.contains("jio") -> "Jio"; tl.contains("airtel") -> "Airtel"; tl.contains("vodafone") || tl == "vi" || tl == "idea" -> "Vi"
+                tl.contains("bsnl") -> "BSNL"; tl.contains("tata") -> "Tata Play"; tl.contains("dish") || tl.contains("d2h") -> "Dish TV"
+                else -> tl.replaceFirstChar { it.titlecase(Locale.ROOT) }
+            }
+            return Triple("RECHARGE", date, "$op plan")
+        }
+        val u = utilityRx.find(text)
+        if (u != null && billDueRx.containsMatchIn(text) && firstAmount(text) > 0 && !cardWords.containsMatchIn(text)) {
+            val w = u.value.lowercase(Locale.ROOT)
+            val title = when {
+                Regex("electric|bijli|power|discom|energy|consumer|k\\.?\\s*no|ca\\s+no|nbpdcl|sbpdcl|bses|msedcl|uppcl|torrent").containsMatchIn(w) -> "Electricity bill"
+                Regex("broadband|fib").containsMatchIn(w) -> "Broadband bill"
+                Regex("gas|png|lpg").containsMatchIn(w) -> "Gas bill"
+                w.contains("water") -> "Water bill"
+                else -> "Phone bill"
+            }
+            return Triple("UTILITY", date, title)
+        }
+        if (emiRx.containsMatchIn(text) && upcomingRx.containsMatchIn(text)) {
+            val emi = Regex("(?i)\\b(emi|instal+ment|loan)\\b").containsMatchIn(text)
+            val who = Senders.bankFor(senderKey)
+            return Triple(if (emi) "EMI" else "AUTOPAY", date, (if (emi) "EMI" else "AutoPay") + (if (who.isNotBlank()) " · $who" else ""))
+        }
+        return null
+    }
 
     fun toPaise(s: String): Long? {
         val t = s.replace(",", "").trim().trimEnd('.')

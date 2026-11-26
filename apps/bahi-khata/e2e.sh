@@ -99,6 +99,9 @@ if [ -f "$DBG" ]; then
   echo "handled_once_total=$HANDLED (expected 5)" >> $LOG
   if [ "$R1" -ge 1 ] && [ "$R2" -ge 1 ] && [ "$HANDLED" = "5" ]; then SMSOK=PASSED; else SMSOK=FAILED; fi
   echo "sms_e2e=$SMSOK" >> $LOG
+  # a saved or ignored suggestion must clear its notification
+  N0=$(adb shell dumpsys notification --noredact | grep -c "pkg=$PKG")
+  echo "notifications_after_open=$N0" >> $LOG
   echo $SMSOK > $OUT/SMS_E2E_$TAG
 fi
 if [ $MAIN = 0 ]; then
@@ -210,6 +213,11 @@ if [ -f "$DBG" ]; then
   adb shell wm size 1600x2560; adb shell wm density 320; sleep 3; adb shell am start -n $ACT --es route entries >/dev/null 2>&1; sleep 3
   adb exec-out screencap -p > $OUT/screens/audit_T14_tablet.png
   adb shell wm size 2560x1600; sleep 3; adb exec-out screencap -p > $OUT/screens/audit_T14_tablet_landscape.png
+  # tablet: Add entry opens as a side panel over the list
+  adb shell am start -n $ACT --es route add >/dev/null 2>&1; sleep 3; adb exec-out screencap -p > $OUT/screens/audit_tablet_add_panel.png
+  adb shell uiautomator dump /sdcard/ui.xml >/dev/null 2>&1; adb shell cat /sdcard/ui.xml > /tmp/ui.xml
+  echo "tablet_side_panel=$(grep -c 'resource-id=\"side_panel\"' /tmp/ui.xml)" >> $A/summary.txt
+  adb shell input keyevent KEYCODE_BACK; sleep 1
   adb shell wm size reset; adb shell wm density reset; sleep 2
   echo "T14 crashes=$(mycrash)" >> $A/summary.txt
   adb logcat -d | grep -B2 -A25 "FATAL EXCEPTION" | head -60 > $A/T14_crash.txt

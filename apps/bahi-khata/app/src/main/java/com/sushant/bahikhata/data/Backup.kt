@@ -18,12 +18,14 @@ import java.util.zip.ZipOutputStream
 
 @Serializable
 data class BackupData(
-    val version: Int = 1,
+    val version: Int = 2,
     val createdAt: Long = System.currentTimeMillis(),
     val accounts: List<Account>, val categories: List<Category>, val entries: List<Entry>, val attachments: List<Attachment>,
     val merchants: List<Merchant>, val recurring: List<Recurring>, val people: List<Person>, val udhar: List<Udhar>,
     val budgets: List<Budget>, val goals: List<Goal>, val sms: List<SmsItem>, val learned: List<Learned>,
     val settings: Map<String, String>,
+    // added in 1.1; older backup files simply don't have them
+    val upiNames: List<UpiName> = emptyList(), val items: List<EntryItem> = emptyList(), val reminders: List<Reminder> = emptyList(),
 )
 
 /** Encrypted backup file: zip(data.json + attachments) sealed with a password (AES-GCM, PBKDF2). */
@@ -37,8 +39,8 @@ object Backup {
         val data = BackupData(
             accounts = d.accountsNow(), categories = d.categoriesNow(), entries = d.entriesNow(), attachments = d.attachmentsNow(),
             merchants = d.merchantsNow(), recurring = d.recurringNow(), people = d.peopleNow(), udhar = d.udharNow(),
-            budgets = d.budgetsNow(), goals = d.goalsNow(), sms = d.smsNow().filter { it.status != SmsStatus.INFO }, learned = d.learned(),
-            settings = app.prefs.exportMap(),
+            budgets = d.budgetsNow(), goals = d.goalsNow(), sms = d.smsNow().filter { it.status != SmsStatus.INFO && it.status != SmsStatus.HISTORY }, learned = d.learned(),
+            settings = app.prefs.exportMap(), upiNames = d.upiNamesNow(), items = d.itemsNow(), reminders = d.remindersNow(),
         )
         val bos = ByteArrayOutputStream()
         ZipOutputStream(bos).use { z ->
@@ -77,6 +79,8 @@ object Backup {
         app.db.withTransaction {
             dao.clearEntries(); dao.clearAttachments(); dao.clearAccounts(); dao.clearCategories(); dao.clearMerchants(); dao.clearRecurring()
             dao.clearPeople(); dao.clearUdhar(); dao.clearBudgets(); dao.clearGoals(); dao.clearSms(); dao.clearLearned()
+            dao.clearUpiNames(); dao.clearItems(); dao.clearReminders()
+            d.upiNames.forEach { dao.upsertUpiName(it) }; d.items.forEach { dao.insertItem(it) }; d.reminders.forEach { dao.upsertReminder(it) }
             d.accounts.forEach { dao.upsertAccount(it) }; d.categories.forEach { dao.upsertCategory(it) }; d.entries.forEach { dao.upsertEntry(it) }
             d.merchants.forEach { dao.upsertMerchant(it) }; d.recurring.forEach { dao.upsertRecurring(it) }; d.people.forEach { dao.upsertPerson(it) }
             d.udhar.forEach { dao.upsertUdhar(it) }; d.budgets.forEach { dao.upsertBudget(it) }; d.goals.forEach { dao.upsertGoal(it) }

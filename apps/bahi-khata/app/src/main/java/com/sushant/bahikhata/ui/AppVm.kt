@@ -57,5 +57,20 @@ class AppVm(app: Application) : AndroidViewModel(app) {
     fun background(block: suspend () -> Unit) = a.appScope.launch { guarded(block)() }
 
     fun setTheme(t: ThemeMode) = prefs.update { it.copy(theme = t) }
-    fun toggleHide() = prefs.update { it.copy(hideAmounts = !it.hideAmounts) }
+    /** Hiding is one tap; showing again needs fingerprint / phone PIN when "Ask for fingerprint to show" is on. */
+    fun toggleHide(c: android.content.Context) {
+        if (!prefs.now.hideAmounts) { prefs.update { it.copy(hideAmounts = true) }; return }
+        guardedChange(c, "Show amounts") { prefs.update { it.copy(hideAmounts = false) } }
+    }
+
+    /** Anything that shows more (hiding off, an area off, the fingerprint rule off) asks first while hiding is on. */
+    fun guardedChange(c: android.content.Context, title: String, change: () -> Unit) {
+        val s = prefs.now
+        if (s.hideAmounts && s.hideAskAuth) Auth.ask(c, title) { change() } else change()
+    }
+
+    val upiNames = repo.upiNames.st(emptyList())
+    val items = repo.items.st(emptyList())
+    val reminders = repo.reminders.st(emptyList())
+    val historySms = kotlinx.coroutines.flow.flow { emit(repo.dao.smsWithStatus(SmsStatus.HISTORY)) }.st(emptyList())
 }

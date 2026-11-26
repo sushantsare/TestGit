@@ -54,6 +54,8 @@ class App : Application() {
             Workers.schedule(this@App)
             sms.startObserver()
             repo.ensureCategories()
+            // 1.1: older bank SMS are read once (subscriptions, payday, reminders) — never turned into suggestions
+            runCatching { sms.historyScan() }
             File(cacheDir, "open").deleteRecursively()
             File(cacheDir, "share").deleteRecursively()
         }

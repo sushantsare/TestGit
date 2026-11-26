@@ -170,7 +170,16 @@ fun AccountDetailContent(vm: AppVm, id: Long, embedded: Boolean) {
                             }
                         }
                     }
-                    if (a.limitPaise > 0) Bar(b.outstanding.toFloat() / a.limitPaise, bk.expense, Modifier.padding(16.dp, 12.dp))
+                    if (a.limitPaise > 0) {
+                        val pct = (b.outstanding * 100 / a.limitPaise).toInt()
+                        Row(Modifier.padding(16.dp, 12.dp, 16.dp, 0.dp)) {
+                            Text("Limit used", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1f))
+                            Text(if (LocalHide.current) "••%" else "$pct%", style = MaterialTheme.typography.labelLarge, color = if (pct >= 80) bk.expense else MaterialTheme.colorScheme.onSurface, modifier = Modifier.testTag("limit_used"))
+                        }
+                        Bar(b.outstanding.toFloat() / a.limitPaise, if (pct >= 80) bk.expense else if (pct >= 30) bk.saffron else MaterialTheme.colorScheme.primary, Modifier.padding(16.dp, 6.dp, 16.dp, 12.dp))
+                        if (a.availLimitPaise >= 0 && a.availLimitAt > 0) Text("Bank's SMS on ${Dates.short(a.availLimitAt)}: ${hm(a.availLimitPaise)} available", style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(horizontal = 18.dp))
+                    }
                 }
                 item {
                     BkCard(Modifier.padding(16.dp, 10.dp).fillMaxWidth()) {
@@ -207,6 +216,19 @@ fun AccountDetailContent(vm: AppVm, id: Long, embedded: Boolean) {
                         if (a.upiApps.isNotBlank()) Text("UPI: " + a.upiApps.replace(",", ", "), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
+                if (a.bankBalAt > 0 && a.bankBalPaise >= 0) item {
+                    val appThen = Ledger.netAt(a, entries, a.bankBalAt)
+                    val diff = a.bankBalPaise - appThen
+                    val ok = kotlin.math.abs(diff) < 100
+                    BkCard(Modifier.padding(16.dp, 10.dp, 16.dp, 0.dp).fillMaxWidth().testTag("balance_check")) {
+                        ListRow(if (ok) "Matches the bank" else "Doesn't match the bank", "Bank's SMS ${Dates.short(a.bankBalAt)}: ${hm(a.bankBalPaise)} · app then: ${hm(appThen)}",
+                            leading = { Icon(if (ok) Icons.Outlined.CheckCircle else Icons.Outlined.ErrorOutline, null, tint = if (ok) bk.income else bk.warn) })
+                        if (!ok) Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp), horizontalArrangement = Arrangement.End) {
+                            TextButton(onClick = { nav.go("sms") }) { Text("Find missing") }
+                            TextButton(onClick = { vm.launch { vm.repo.matchBank(a); snack.show("${a.name} now matches the bank") } }, modifier = Modifier.testTag("match_bank")) { Text("Match bank") }
+                        }
+                    }
+                }
                 item {
                     Row(Modifier.padding(16.dp, 10.dp).horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         OutlinedPillButton("Adjust balance", Icons.Outlined.Tune, { adjust = true }, tag = "adjust")
@@ -239,7 +261,10 @@ fun AccountDetailContent(vm: AppVm, id: Long, embedded: Boolean) {
         Money.parse(t)?.let { p -> vm.launch { vm.repo.adjustBalance(a, p); snack.show("Balance updated to ${Money.fmt(p)}") } }
     }, { adjust = false }, hint = "Type what your bank app shows. The difference is saved as an adjustment.", kb = KeyboardType.Decimal)
     if (confirmDelete) ConfirmDialog("Delete ${a.name}?", "This also deletes its ${mine.size} entries. Archive it instead if you want to keep them in reports.", "Delete",
-        onConfirm = { vm.launch { vm.repo.deleteAccount(a) }; nav.popBackStack() }, onDismiss = { confirmDelete = false })
+        onConfirm = {
+            vm.launch { val b = vm.repo.deleteAccount(a); snack.show("${a.name} deleted", "Undo") { vm.launch { vm.repo.undoDeleteAccount(b); snack.show("${a.name} is back with its ${b.entries.size} entries") } } }
+            if (!embedded) nav.popBackStack()
+        }, onDismiss = { confirmDelete = false })
 }
 
 @OptIn(ExperimentalLayoutApi::class)

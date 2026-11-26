@@ -84,6 +84,33 @@ class SmsEngine(private val context: Context, private val repo: Repo, private va
         st
     }
 
+    /** One time (after the 1.1 update, or right after SMS access is given): reads up to 13 months of older bank SMS
+     *  that were never processed, only to learn subscriptions, payday and upcoming reminders. They never become
+     *  suggestions and never change a balance. */
+    suspend fun historyScan(): Int = lock.withLock {
+        if (!enabled() || repo.prefs.historyDone) return 0
+        val now = System.currentTimeMillis()
+        val from = now - 400L * 86_400_000L; val until = now - 90L * 86_400_000L
+        val st = Stats()
+        runCatching {
+            context.contentResolver.query(
+                Telephony.Sms.Inbox.CONTENT_URI, arrayOf(Telephony.Sms.ADDRESS, Telephony.Sms.BODY, Telephony.Sms.DATE),
+                "${Telephony.Sms.DATE} > ? AND ${Telephony.Sms.DATE} < ?", arrayOf(from.toString(), until.toString()), "${Telephony.Sms.DATE} ASC"
+            )?.use { c ->
+                while (c.moveToNext()) {
+                    val addr = c.getString(0) ?: continue; val body = c.getString(1) ?: continue; val date = c.getLong(2)
+                    val key = key(addr, body, date)
+                    if ((-1..1).any { dao.seen(key(addr, body, date, it)) }) continue
+                    handle(addr, body, date, st, key, history = true)
+                    dao.markSeen(SmsSeen(key, System.currentTimeMillis()))
+                }
+            }
+        }.onFailure { Log.w(TAG, "history scan failed", it); return 0 }
+        repo.prefs.historyDone = true
+        Log.i(TAG, "history read=${st.info} ignored=${st.ignored}")
+        st.info
+    }
+
     /** Called by the SMS_RECEIVED receiver with the full (multi-part joined) message. */
     suspend fun onReceived(sender: String, body: String, time: Long) = lock.withLock {
         if (!enabled()) return@withLock
@@ -120,7 +147,7 @@ class SmsEngine(private val context: Context, private val repo: Repo, private va
         return r
     }
 
-    private suspend fun handle(sender: String, body: String, time: Long, st: Stats, key: String): SmsItem? {
+    private suspend fun handle(sender: String, body: String, time: Long, st: Stats, key: String, history: Boolean = false): SmsItem? {
         var p = SmsParser.parse(sender, body)
         if (p.kind == SmsKind.NOT_FINANCIAL || p.kind == SmsKind.OTP || p.kind == SmsKind.PROMO) { st.ignored++; return null }
 
@@ -137,14 +164,33 @@ class SmsEngine(private val context: Context, private val repo: Repo, private va
                 debit = learned.debit, merchant = p.merchant.ifBlank { learned.merchant }, confidence = maxOf(p.confidence, 80))
         }
 
-        val account = accFor(p.last4) ?: learned?.accountId?.let { id -> accounts.firstOrNull { it.id == id } }
+        var account = accFor(p.last4) ?: learned?.accountId?.let { id -> accounts.firstOrNull { it.id == id } }
+        // FASTag and wallet SMS rarely carry an account number: match a wallet account by its name
+        if (account == null && ("FASTAG" in p.tags || "WALLET" in p.tags || Senders.upiApps.containsKey(p.senderKey))) {
+            val want = when { "FASTAG" in p.tags -> "fastag"; else -> Senders.bankFor(p.senderKey).lowercase(Locale.ROOT).substringBefore(' ') }
+            if (want.isNotBlank()) account = accounts.firstOrNull { it.type == AccType.WALLET && it.name.lowercase(Locale.ROOT).contains(want) }
+        }
+
+        // older SMS read once for insights: only real money movements (kept out of suggestions) and future reminders
+        if (history) {
+            if (p.kind == SmsKind.REMINDER) { saveReminder(p, account, key); return null }
+            if (!p.isTransaction || p.amountPaise <= 0) { st.ignored++; return null }
+            val named = upiNameFor(p.vpa, p.merchant)
+            st.info++
+            return insert(SmsItem(key = key, sender = sender, body = body, receivedAt = time, status = SmsStatus.HISTORY, kind = p.kind.name,
+                amountPaise = p.amountPaise, debit = p.debit, last4 = p.last4, accountId = account?.id, merchant = named?.display?.takeIf { it.isNotBlank() } ?: p.merchant,
+                upiApp = p.upiApp, ref = p.ref, vpa = p.vpa.lowercase(Locale.ROOT), flags = p.tags.joinToString(","), confidence = p.confidence))
+        }
+
+        // the bank's own balance line: kept per account so the app can check itself against it
+        if (account != null) recordBankFigures(account, p, time)
 
         when (p.kind) {
             SmsKind.BILL, SmsKind.DUE -> {
                 val card = account?.takeIf { it.type == AccType.CARD } ?: accounts.singleOrNull { it.type == AccType.CARD && p.last4.isBlank() }
                 if (card != null && p.billPaise >= 0) {
-                    dao.upsertAccount(card.copy(billPaise = p.billPaise, minDuePaise = p.minDuePaise,
-                        billDueEpochDay = (p.dueDate ?: CardMath.currentDue(LocalDate.now(), card.statementDay, card.dueDay))?.toEpochDay() ?: -1))
+                    dao.account(card.id)?.let { fresh -> dao.upsertAccount(fresh.copy(billPaise = p.billPaise, minDuePaise = p.minDuePaise,
+                        billDueEpochDay = (p.dueDate ?: CardMath.currentDue(LocalDate.now(), card.statementDay, card.dueDay))?.toEpochDay() ?: -1)) }
                 }
                 st.info++
                 return insert(SmsItem(key = key, sender = sender, body = body, receivedAt = time, status = SmsStatus.INFO, kind = p.kind.name,
@@ -152,34 +198,151 @@ class SmsEngine(private val context: Context, private val repo: Repo, private va
                     note = "Card bill" + (p.dueDate?.let { " due " + Dates.dayMonth(it) } ?: "")))
             }
             SmsKind.FAILED -> {
-                // a failed payment can come after its debit SMS: flag the matching suggestion
-                dao.smsSimilar(p.amountPaise, time - 30 * 60_000L, time + 30 * 60_000L).filter { it.status == SmsStatus.PENDING }.forEach {
-                    dao.updateSms(it.copy(note = "A failed-payment SMS came for this amount — check before saving"))
-                }
+                val undone = cancelMatching(p.amountPaise, account?.id, time - 30 * 60_000L, time + 30 * 60_000L, "Payment failed")
                 st.info++
-                return insert(SmsItem(key = key, sender = sender, body = body, receivedAt = time, status = SmsStatus.INFO, kind = p.kind.name, amountPaise = p.amountPaise, last4 = p.last4, note = "Failed / declined payment"))
+                return insert(SmsItem(key = key, sender = sender, body = body, receivedAt = time, status = SmsStatus.INFO, kind = p.kind.name, amountPaise = p.amountPaise, last4 = p.last4,
+                    accountId = account?.id, note = if (undone > 0) "Failed payment — the matching entry was cancelled" else "Failed / declined payment"))
             }
             SmsKind.AUTOPAY_SETUP, SmsKind.BALANCE -> {
                 st.info++
-                val note = balanceNote(account, p.balancePaise)
+                if (p.kind == SmsKind.AUTOPAY_SETUP) SmsParser.reminderOf(body, p.senderKey)?.let { (k, d, t) -> saveReminder(p.copy(remindKind = k, remindDate = d, remindTitle = t), account, key) }
+                val note = balanceNote(account, p.balancePaise, time)
                 return insert(SmsItem(key = key, sender = sender, body = body, receivedAt = time, status = SmsStatus.INFO, kind = p.kind.name, amountPaise = p.amountPaise, last4 = p.last4, accountId = account?.id, balancePaise = p.balancePaise, note = note.orEmpty()))
+            }
+            SmsKind.REMINDER -> {
+                st.info++
+                saveReminder(p, account, key)
+                return insert(SmsItem(key = key, sender = sender, body = body, receivedAt = time, status = SmsStatus.INFO, kind = p.kind.name, amountPaise = p.amountPaise,
+                    accountId = account?.id, note = p.remindTitle + (p.remindDate?.let { " · " + Dates.dayMonth(it) } ?: "")))
             }
             else -> Unit
         }
 
+        // a reversal of a payment that already went through: cancel that payment instead of adding income
+        if (p.kind == SmsKind.REFUND && "REVERSAL" in p.tags && p.amountPaise > 0) {
+            val undone = cancelMatching(p.amountPaise, account?.id, time - 3 * 86_400_000L, time, "Payment reversed by the bank")
+            if (undone > 0) {
+                st.info++
+                return insert(SmsItem(key = key, sender = sender, body = body, receivedAt = time, status = SmsStatus.INFO, kind = p.kind.name, amountPaise = p.amountPaise, debit = false,
+                    last4 = p.last4, accountId = account?.id, note = "Reversal — the earlier ${Money.fmt(p.amountPaise)} payment was cancelled"))
+            }
+        }
+
         // transaction or unknown money
-        val catId = categoryFor(p, account)
+        val named = upiNameFor(p.vpa, p.merchant)
+        val merchant = named?.display?.takeIf { it.isNotBlank() } ?: p.merchant
+        val catId = named?.categoryId ?: categoryFor(p.copy(merchant = merchant), account)
+        val flags = LinkedHashSet(p.tags)
+        personFor(named, merchant, p.debit)?.let { flags += "PERSON:$it" }
+        if (p.debit && p.isTransaction && (named?.askItems ?: true)) flags += "ASK"
         val dup = findDuplicate(p, account, time)
         val status = if (p.isTransaction && p.amountPaise > 0 && p.confidence >= 70) SmsStatus.PENDING else SmsStatus.LOOK
         if (status == SmsStatus.PENDING) st.parsed++ else st.look++
-        val notes = listOfNotNull(dup?.second, balanceNote(account, p.balancePaise)).joinToString(" · ")
-        return insert(SmsItem(
+        val notes = listOfNotNull(dup?.second, balanceNote(account, p.balancePaise, time)).joinToString(" · ")
+        val item = insert(SmsItem(
             key = key, sender = sender, body = body, receivedAt = time, status = status,
             kind = if (p.kind == SmsKind.UNKNOWN_MONEY) SmsKind.UNKNOWN_MONEY.name else p.kind.name,
-            amountPaise = p.amountPaise, debit = p.debit, last4 = p.last4, accountId = account?.id, merchant = p.merchant,
+            amountPaise = p.amountPaise, debit = p.debit, last4 = p.last4, accountId = account?.id, merchant = merchant,
             upiApp = p.upiApp, ref = p.ref, balancePaise = p.balancePaise, categoryId = catId, confidence = p.confidence,
-            duplicateOf = dup?.first, note = notes,
-        ))
+            duplicateOf = dup?.first, note = notes, vpa = p.vpa.lowercase(Locale.ROOT), flags = flags.joinToString(","),
+        )) ?: return null
+        pairTransfer(item)?.let { return it }
+        // unusual debits get their own alert (only for fresh SMS, not when old ones are caught up)
+        if (item.debit && item.amountPaise > 0 && time > System.currentTimeMillis() - 6 * 3_600_000L && repo.prefs.now.alertsOn) {
+            val why = Insights.unusual(item.amountPaise, time, item.accountId, "INTL" in p.tags, dao.entriesNow())
+            if (why.isNotEmpty()) Notify.unusual(context, item, why)
+        }
+        return item
+    }
+
+    /** A saved UPI name for this SMS: by UPI ID first, then by the shop text when the SMS has no UPI ID. */
+    private suspend fun upiNameFor(vpa: String, merchant: String): UpiName? {
+        if (vpa.isNotBlank()) dao.upiName("vpa:" + vpa.lowercase(Locale.ROOT))?.let { return it }
+        if (merchant.isNotBlank()) dao.upiName("name:" + merchant.trim().lowercase(Locale.ROOT))?.let { return it }
+        return null
+    }
+
+    /** Udhar: money from someone who owes him, or to someone he owes, can be settled against their balance. */
+    private suspend fun personFor(named: UpiName?, merchant: String, debit: Boolean): Long? {
+        val people = dao.peopleNow()
+        val p = named?.personId?.let { id -> people.firstOrNull { it.id == id } }
+            ?: people.firstOrNull { merchant.isNotBlank() && it.name.trim().equals(merchant.trim(), ignoreCase = true) } ?: return null
+        val bal = Ledger.personBalance(p, dao.udharNow())
+        return p.id.takeIf { (!debit && bal > 0) || (debit && bal < 0) }
+    }
+
+    private suspend fun saveReminder(p: Parsed, account: Account?, key: String) {
+        val date = p.remindDate ?: return
+        val rk = "${p.remindKind}|${p.remindTitle.lowercase(Locale.ROOT)}|${date.toEpochDay()}"
+        if (dao.reminderByKey(rk) != null) return
+        // a newer reminder for the same thing replaces the older one (e.g. the plan was renewed)
+        dao.remindersNow().filter { it.kind == p.remindKind && it.title.equals(p.remindTitle, true) && !it.done && it.dueEpochDay < date.toEpochDay() }
+            .forEach { dao.upsertReminder(it.copy(done = true)) }
+        dao.upsertReminder(Reminder(key = rk, kind = p.remindKind, title = p.remindTitle, amountPaise = if (p.amountPaise > 0) p.amountPaise else -1,
+            dueEpochDay = date.toEpochDay(), accountId = account?.id))
+        @Suppress("UNUSED_VARIABLE") val k = key
+    }
+
+    /** Remembers the bank's own balance line (bank accounts) and available limit (cards). */
+    private suspend fun recordBankFigures(account: Account, p: Parsed, time: Long) {
+        val a = dao.account(account.id) ?: return
+        var n = a
+        if (a.type != AccType.CARD && p.balancePaise >= 0 && time >= a.bankBalAt) n = n.copy(bankBalPaise = p.balancePaise, bankBalAt = time)
+        if (a.type == AccType.CARD && p.availLimitPaise >= 0 && time >= a.availLimitAt) {
+            n = n.copy(availLimitPaise = p.availLimitPaise, availLimitAt = time)
+            // the card's limit wasn't typed in: work it out once from what's available plus what's owed
+            if (a.limitPaise <= 0) {
+                val owed = maxOf(0L, -(Ledger.netAt(a, dao.entriesNow(), time)))
+                n = n.copy(limitPaise = p.availLimitPaise + owed)
+            }
+        }
+        if (n != a) dao.upsertAccount(n)
+    }
+
+    /** Cancels the payment this SMS undoes: a waiting suggestion is set aside, a saved entry is kept but marked
+     *  cancelled (it can be restored from the entry). Returns how many were undone. */
+    private suspend fun cancelMatching(amount: Long, accountId: Long?, from: Long, to: Long, why: String): Int {
+        if (amount <= 0) return 0
+        var n = 0
+        val near = dao.smsSimilar(amount, from, to).filter { it.debit && (accountId == null || it.accountId == null || it.accountId == accountId) }
+        near.filter { it.status == SmsStatus.PENDING }.maxByOrNull { it.receivedAt }?.let {
+            dao.updateSms(it.copy(status = SmsStatus.IGNORED, note = "$why — not saved")); Notify.cancel(context, Notify.smsId(it)); n++
+        }
+        if (n == 0) near.filter { it.status == SmsStatus.ACCEPTED && it.entryId != null }.maxByOrNull { it.receivedAt }?.let { sms ->
+            dao.entry(sms.entryId!!)?.takeIf { !it.cancelled }?.let { e -> dao.upsertEntry(e.copy(cancelled = true, note = listOfNotNull(e.note, why).joinToString(" · "))); n++ }
+        }
+        if (n > 0) Notify.refreshSummary(context, dao.smsNow().count { it.status == SmsStatus.PENDING || it.status == SmsStatus.LOOK })
+        return n
+    }
+
+    /** Money leaving one of his accounts and the same amount arriving in another of his accounts within minutes
+     *  is a transfer between his own accounts — not spending and not income. */
+    private suspend fun pairTransfer(item: SmsItem): SmsItem? {
+        val acc = item.accountId ?: return null
+        if (item.amountPaise <= 0 || item.kind !in setOf(SmsKind.DEBIT.name, SmsKind.CREDIT.name)) return null
+        val other = dao.smsSimilar(item.amountPaise, item.receivedAt - 20 * 60_000L, item.receivedAt + 20 * 60_000L)
+            .firstOrNull { it.id != item.id && it.debit != item.debit && it.accountId != null && it.accountId != acc && it.kind in setOf(SmsKind.DEBIT.name, SmsKind.CREDIT.name) }
+            ?: return null
+        val from = if (item.debit) acc else other.accountId!!
+        val to = if (item.debit) other.accountId!! else acc
+        val toName = dao.account(to)?.name ?: "your account"
+        val fromName = dao.account(from)?.name ?: "your account"
+        val f = "FROM:$from,TO:$to"
+        val existing = other.entryId?.let { dao.entry(it) }
+        if (other.status == SmsStatus.ACCEPTED && existing != null) {
+            // already saved as spending/income: turn that entry into the transfer it really was
+            dao.upsertEntry(existing.copy(type = EType.TRANSFER, accountId = from, toAccountId = to, categoryId = null, merchant = null, note = "Between your accounts"))
+            val done = item.copy(status = SmsStatus.ACCEPTED, entryId = existing.id, kind = "TRANSFER", flags = f, note = "Transfer $fromName → $toName (saved)")
+            dao.updateSms(done); return done
+        }
+        if (other.status == SmsStatus.PENDING || other.status == SmsStatus.LOOK) {
+            dao.updateSms(other.copy(status = SmsStatus.INFO, note = "Part of a transfer between your accounts", duplicateOf = item.id))
+            Notify.cancel(context, Notify.smsId(other))
+            val t = item.copy(kind = "TRANSFER", accountId = from, debit = true, flags = f, merchant = "$fromName → $toName", categoryId = null,
+                note = "Between your accounts — not counted as spending", status = SmsStatus.PENDING)
+            dao.updateSms(t); return t
+        }
+        return null
     }
 
     private suspend fun insert(item: SmsItem): SmsItem? {
@@ -192,6 +355,7 @@ class SmsEngine(private val context: Context, private val repo: Repo, private va
         if (p.merchant.isNotBlank()) repo.merchant(p.merchant)?.categoryId?.let { return it }
         val kind = if (p.debit) "EXPENSE" else "INCOME"
         if (p.kind == SmsKind.REFUND) return cats.firstOrNull { it.kind == "INCOME" && it.name.equals("Refund", true) }?.id
+        if (p.categoryHint.isNotBlank() && p.tags.isNotEmpty()) cats.firstOrNull { it.kind == kind && it.name.equals(p.categoryHint, true) }?.let { return it.id }
         if (!p.debit && Regex("(?i)salary|sal\\b").containsMatchIn(p.merchant)) return cats.firstOrNull { it.kind == "INCOME" && it.name.equals("Salary", true) }?.id
         if (p.categoryHint.isNotBlank()) return cats.firstOrNull { it.kind == kind && it.name.equals(p.categoryHint, true) }?.id
         return null
@@ -208,10 +372,9 @@ class SmsEngine(private val context: Context, private val repo: Repo, private va
         return null
     }
 
-    private suspend fun balanceNote(account: Account?, balance: Long): String? {
+    private suspend fun balanceNote(account: Account?, balance: Long, time: Long): String? {
         if (account == null || balance < 0 || account.type == AccType.CARD) return null
-        val nets = Ledger.nets(dao.accountsNow(), dao.entriesNow())
-        val app = nets[account.id] ?: return null
+        val app = Ledger.netAt(dao.account(account.id) ?: account, dao.entriesNow(), time)
         val diff = balance - app
         return if (kotlin.math.abs(diff) >= 100) "BAL:" + balance else null
     }

@@ -19,6 +19,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.testTagsAsResourceId
 import androidx.compose.ui.semantics.semantics
@@ -52,6 +53,37 @@ val LocalNav = staticCompositionLocalOf<NavHostController> { error("no nav") }
 val LocalWide = staticCompositionLocalOf { false }
 /** The bottom tab bar, drawn by each tab screen itself (given that screen's own route) so it moves with the screen during back. */
 val LocalTabBar = staticCompositionLocalOf<@Composable (String) -> Unit> { {} }
+/** Whether "Hide amounts" covers a part of the app (Settings → Hide amounts → What to hide). */
+val LocalHideFor = staticCompositionLocalOf<(String) -> Boolean> { { false } }
+@OptIn(androidx.compose.animation.ExperimentalSharedTransitionApi::class)
+val LocalSharedScope = staticCompositionLocalOf<androidx.compose.animation.SharedTransitionScope?> { null }
+val LocalNavAnimScope = staticCompositionLocalOf<androidx.compose.animation.AnimatedVisibilityScope?> { null }
+
+/** Window facts that plain navigation calls need (set by AppRoot). */
+object WindowInfo { @Volatile var wide = false }
+
+/** Which "Hide amounts" area a screen belongs to. */
+fun hideAreaOf(route: String): String = when (route) {
+    "home" -> com.sushant.bahikhata.data.HideArea.HOME
+    "accounts", "account", "account_edit", "transfer" -> com.sushant.bahikhata.data.HideArea.ACCOUNTS
+    "udhar", "person" -> com.sushant.bahikhata.data.HideArea.UDHAR
+    "reports", "budgets", "insights", "reminders" -> com.sushant.bahikhata.data.HideArea.REPORTS
+    else -> com.sushant.bahikhata.data.HideArea.ENTRIES
+}
+
+/** The search icon (Home) or search box (Entries) grows into the search bar, and shrinks back on Back. */
+@OptIn(androidx.compose.animation.ExperimentalSharedTransitionApi::class)
+@Composable
+fun Modifier.searchMorph(key: String): Modifier {
+    val shared = LocalSharedScope.current ?: return this
+    val anim = LocalNavAnimScope.current ?: return this
+    return with(shared) {
+        this@searchMorph.sharedBounds(rememberSharedContentState(key), anim,
+            enter = androidx.compose.animation.fadeIn(tween(200)), exit = androidx.compose.animation.fadeOut(tween(200)),
+            resizeMode = androidx.compose.animation.SharedTransitionScope.ResizeMode.RemeasureToBounds,
+            clipInOverlayDuringTransition = OverlayClip(androidx.compose.foundation.shape.RoundedCornerShape(50)))
+    }
+}
 
 data class Tab(val route: String, val label: String, val icon: androidx.compose.ui.graphics.vector.ImageVector, val selIcon: androidx.compose.ui.graphics.vector.ImageVector)
 
@@ -66,12 +98,17 @@ val tabs = listOf(
 )
 
 // single-top only for plain screens: "account_edit/5" must never reuse an open "account_edit/0" (its typed state would leak in)
-fun NavHostController.go(route: String) { android.util.Log.d("BahiNav", "go $route"); navigate(route) { launchSingleTop = !route.contains('/') && !route.contains('?') } }
+// on tablets and wide windows, adding / editing an entry opens as a side panel next to the list instead of covering it
+fun NavHostController.go(route0: String) {
+    val route = if (WindowInfo.wide && (route0 == "add" || route0.startsWith("add?"))) "addp" + route0.removePrefix("add") else route0
+    android.util.Log.d("BahiNav", "go $route"); navigate(route) { launchSingleTop = !route.contains('/') && !route.contains('?') }
+}
 fun NavHostController.tab(route: String) = navigate(route) {
     popUpTo(graph.findStartDestination().id) { saveState = true }
     launchSingleTop = true; restoreState = true
 }
 val SAFE_ROUTE = Regex("^(home|entries|accounts|udhar|reports|search|budgets|sms|sms_setup|settings|categories|recurring|backup|export|diagnostics|about|" +
+    "hide_amounts|upi_names|reminders|insights|insights/[a-z]+|" +
     "add(\\?(type=(EXPENSE|INCOME)|id=\\d+|sms=\\d+)(&(type=(EXPENSE|INCOME)|id=\\d+|sms=\\d+))*)?|entry/\\d+|account/\\d+|account_edit/\\d+(\\?type=[A-Z]+)?|" +
     "transfer/(paybill|withdraw|transfer)(\\?acc=\\d+)?|person/\\d+)$")
 
@@ -113,6 +150,7 @@ fun AppRoot(vm: AppVm, locked: Boolean, onUnlock: () -> Unit, onLockBack: () -> 
     val pendingLook by vm.smsLook.collectAsStateWithLifecycle()
     val pending = pendingOk + pendingLook   // same count as the Home card
     val start = remember { if (s.setupDone) "home" else "setup" }
+    SideEffect { WindowInfo.wide = wide }
 
     LaunchedEffect(pendingRoute, back, locked) {
         val r = pendingRoute ?: return@LaunchedEffect
@@ -125,7 +163,8 @@ fun AppRoot(vm: AppVm, locked: Boolean, onUnlock: () -> Unit, onLockBack: () -> 
         runCatching { when (r) { "home", "entries", "accounts", "udhar", "reports" -> nav.root(r); "add" -> nav.go("add?type=EXPENSE"); else -> nav.go(r) } }
     }
 
-    CompositionLocalProvider(LocalSnack provides snack, LocalNav provides nav, LocalHide provides s.hideAmounts, LocalWide provides wide) {
+    CompositionLocalProvider(LocalSnack provides snack, LocalNav provides nav, LocalHide provides s.hideAmounts, LocalWide provides wide,
+        LocalHideFor provides { area -> s.hides(area) }) {
         // debug builds expose test tags to UI Automator so the e2e audit can tap real elements
         Box(Modifier.fillMaxSize().semantics { testTagsAsResourceId = com.sushant.bahikhata.BuildConfig.DEBUG }) {
             // while locked the app is neither drawn nor readable by accessibility services (state is kept underneath)
@@ -174,8 +213,14 @@ fun AppRoot(vm: AppVm, locked: Boolean, onUnlock: () -> Unit, onLockBack: () -> 
     }
 }
 
+@OptIn(androidx.compose.animation.ExperimentalSharedTransitionApi::class)
 @Composable
 private fun Graph(nav: NavHostController, vm: AppVm, start: String) {
+    androidx.compose.animation.SharedTransitionLayout { CompositionLocalProvider(LocalSharedScope provides this) { GraphHost(nav, vm, start) } }
+}
+
+@Composable
+private fun GraphHost(nav: NavHostController, vm: AppVm, start: String) {
     // One motion for every move in the app, the same one the bottom tabs use: the current screen fades out
     // quickly and the next one fades in. Opening a screen, tapping a tab, tapping Home, the back button and the
     // back swipe all look identical. With the swipe, the fade follows the finger and can be cancelled.
@@ -219,6 +264,33 @@ private fun Graph(nav: NavHostController, vm: AppVm, start: String) {
         page("export") { ExportScreen(vm) }
         page("diagnostics") { DiagnosticsScreen(vm) }
         page("about") { AboutScreen() }
+        page("hide_amounts") { HideAmountsScreen(vm) }
+        page("upi_names") { UpiNamesScreen(vm) }
+        page("reminders") { RemindersScreen(vm) }
+        page("insights") { InsightsScreen(vm) }
+        page("insights/{page}", arguments = listOf(navArgument("page") { type = NavType.StringType })) { b -> InsightPage(vm, b.arguments?.getString("page") ?: "") }
+        // tablets / wide windows: the same add-entry form as a side panel over the list
+        dialog("addp?type={type}&id={id}&sms={sms}", arguments = listOf(
+            navArgument("type") { type = NavType.StringType; defaultValue = "EXPENSE" },
+            navArgument("id") { type = NavType.LongType; defaultValue = 0L },
+            navArgument("sms") { type = NavType.LongType; defaultValue = 0L },
+        ), dialogProperties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)) { b ->
+            SidePanel { AddEntryScreen(vm, b.arguments?.getString("type") ?: "EXPENSE", b.arguments?.getLong("id") ?: 0L, b.arguments?.getLong("sms") ?: 0L) }
+        }
+    }
+}
+
+/** A sheet on the right edge (tablets): the list stays visible behind; tapping outside works like Back. */
+@Composable
+private fun SidePanel(content: @Composable () -> Unit) {
+    val back = androidx.activity.compose.LocalOnBackPressedDispatcherOwner.current?.onBackPressedDispatcher
+    Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.scrim.copy(alpha = 0.32f))
+        .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { back?.onBackPressed() }, contentAlignment = Alignment.CenterEnd) {
+        Box(Modifier.fillMaxHeight().widthIn(max = 460.dp).fillMaxWidth(0.5f)
+            .clip(androidx.compose.foundation.shape.RoundedCornerShape(topStart = 28.dp, bottomStart = 28.dp))
+            .background(MaterialTheme.colorScheme.background)
+            .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { }
+            .navigationBarsPadding().imePadding().testTag("side_panel")) { content() }
     }
 }
 
@@ -284,11 +356,14 @@ private fun androidx.navigation.NavGraphBuilder.page(
     val tab = me in TAB_ROUTES
     val rail = railShown()
     val wide = LocalConfiguration.current.screenWidthDp >= 840
+    val hideFor = LocalHideFor.current
+    CompositionLocalProvider(LocalHide provides hideFor(hideAreaOf(me)), LocalNavAnimScope provides this) {
     Box(Modifier.fillMaxSize()
         .background(MaterialTheme.colorScheme.background), contentAlignment = Alignment.TopCenter) {
         if (tab && !rail) Column(Modifier.fillMaxSize()) {
             Box(Modifier.weight(1f)) { content(entry) }
             LocalTabBar.current(me)
         } else Box(Modifier.fillMaxHeight().navigationBarsPadding().then(if (!tab && wide) Modifier.widthIn(max = 840.dp) else Modifier.fillMaxWidth())) { content(entry) }
+    }
     }
 }

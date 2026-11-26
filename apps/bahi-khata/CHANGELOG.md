@@ -19,3 +19,15 @@ First version: money in and out per bank account, credit card, cash and wallet w
 
 ## 1.0.4 — 22 Nov 2026
 - Back rebuilt from scratch: the back button, the back swipe, tapping Home and switching tabs all use the same quick fade the bottom tabs use. Opening a screen uses it too, so every move in the app looks the same.
+
+## 1.1.0 — 26 Nov 2026
+- Hide amounts: its own page with a switch for each area (Home, Entries, Accounts, Udhar, Reports, Notifications). Hiding is one tap; showing again, or turning hiding off, needs your fingerprint. The app remembers your last choice.
+- Name your UPI IDs: a new UPI ID asks "Name this?" (shop or person, plus a category) once, then fills itself in. Saved names have their own page in Settings (rename, link a person, merge, delete).
+- "What did you buy?" after a payment, from the notification or in the app, with a price per item and how much is still not given to an item. Items are remembered per shop, with price history.
+- A notification goes away as soon as you save, ignore or delete that payment.
+- From your SMS: balance check against the bank's balance, failed and reversed payments cancel by themselves, refunds link to the purchase, your own transfers, ATM cash, subscriptions, recharge/bill/EMI/AutoPay reminders, credit card statement, due and limit used, unusual payment alerts, bank charges, salary and payday view, cashback and interest as income, investments and insurance, FASTag and wallet balances, people summary, yearly summary, and a one-time read of older bank SMS.
+- Pure black option for dark mode.
+- App lock also locks when the screen turns off, and never after the app's own pickers or share screens.
+- New opening animation and a 9-step setup guide on the first opening.
+- Search opens smoothly out of the search button and shrinks back.
+- Undo after deleting an account; tablet Add entry opens as a side panel; faster start-up.

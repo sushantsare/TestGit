@@ -68,6 +68,7 @@ object Ico {
 
     fun entry(e: Entry, cat: Category?): ImageVector = when (e.type) {
         EType.CARD_PAYMENT -> Icons.Outlined.CreditCard; EType.CASH_WITHDRAWAL -> Icons.Outlined.LocalAtm; EType.ADJUSTMENT -> Icons.Outlined.Tune
+        EType.TRANSFER -> Icons.Outlined.SwapHoriz; EType.INVEST -> Icons.Outlined.TrendingUp
         EType.UDHAR_GAVE, EType.UDHAR_GOT -> Icons.Outlined.Handshake
         else -> cat?.let { cat(it.icon) } ?: if (e.type == EType.INCOME) Icons.Outlined.AccountBalance else Icons.Outlined.MoreHoriz
     }

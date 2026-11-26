@@ -25,7 +25,8 @@ import org.junit.runner.RunWith
 class AccessibilityTest {
     @get:Rule val compose = createEmptyComposeRule()
     private val app get() = ApplicationProvider.getApplicationContext<App>()
-    private val routes = listOf("home", "entries", "accounts", "udhar", "reports", "add?type=EXPENSE", "search", "budgets", "sms", "settings", "categories", "backup", "export", "about")
+    private val routes = listOf("home", "entries", "accounts", "udhar", "reports", "add?type=EXPENSE", "search", "budgets", "sms", "settings", "categories", "backup", "export", "about",
+        "hide_amounts", "upi_names", "reminders", "insights", "insights/subs", "insights/people", "insights/year")
 
     @Test fun everyScreenPassesAtf() {
         assumeTrue("ATF in Compose needs API 34+", Build.VERSION.SDK_INT >= 34)

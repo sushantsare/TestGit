@@ -1,0 +1,9 @@
+# Startup profile for Bahi Khata: everything the app runs on the way to the first screen is compiled ahead of time
+# on install (Android merges this with the Compose / Room / Navigation libraries' own profiles).
+HSPLcom/sushant/bahikhata/App;->**(**)**
+HSPLcom/sushant/bahikhata/MainActivity;->**(**)**
+HSPLcom/sushant/bahikhata/MainActivity$**;->**(**)**
+HSPLcom/sushant/bahikhata/data/**;->**(**)**
+HSPLcom/sushant/bahikhata/ui/**;->**(**)**
+HSPLcom/sushant/bahikhata/sms/SmsEngine;->**(**)**
+Lcom/sushant/bahikhata/**;

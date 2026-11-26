@@ -12,6 +12,7 @@ import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -69,9 +70,14 @@ fun SmsInboxScreen(vm: AppVm) {
     var showGuide by rememberSaveable { mutableStateOf(false) }
     if (showGuide) BatteryGuide { showGuide = false; tipDue = false; app.prefs.batteryTipShown = true; app.prefs.batteryTipDue = false }
 
-    fun ok(item: SmsItem, accountId: Long) = vm.launch {
-        vm.repo.acceptSms(item, accountId, item.categoryId, item.merchant)
-        Notify.cancel(ctx, Notify.smsId(item))
+    val names by vm.upiNames.collectAsStateWithLifecycle()
+    val allItems by vm.items.collectAsStateWithLifecycle()
+    val peopleMap by vm.personMap.collectAsStateWithLifecycle()
+    val udharAll by vm.udhar.collectAsStateWithLifecycle()
+    var itemsFor by rememberSaveable(stateSaver = recordSaver<SmsItem>()) { mutableStateOf<SmsItem?>(null) }
+
+    fun ok(item: SmsItem, accountId: Long, kind: String = item.kind) = vm.launch {
+        vm.repo.acceptSms(item, accountId, item.categoryId, item.merchant, kind = kind)
         Diagnostics.count(ctx, "sms_ok")
         snack.show("Saved · ${Money.fmt(item.amountPaise)}", "Undo") {
             vm.launch { vm.repo.dao.smsItem(item.id)?.entryId?.let { id -> vm.repo.dao.entry(id)?.let { vm.repo.deleteEntry(it) } }; vm.repo.restoreSms(item) }
@@ -124,10 +130,33 @@ fun SmsInboxScreen(vm: AppVm) {
             else LazyColumn(contentPadding = PaddingValues(bottom = 32.dp), modifier = Modifier.testTag("sms_list")) {
                 items(list, key = { it.id }) { item ->
                     val okIt: () -> Unit = { if (item.accountId != null) ok(item, item.accountId) else chooseAcc = item }
-                    val ignoreIt: () -> Unit = { vm.launch { vm.repo.ignoreSms(item); Notify.cancel(ctx, Notify.smsId(item)); snack.show("Ignored", "Undo") { vm.launch { vm.repo.restoreSms(item) } } } }
+                    val ignoreIt: () -> Unit = { vm.launch { vm.repo.ignoreSms(item); snack.show("Ignored", "Undo") { vm.launch { vm.repo.restoreSms(item) } } } }
                     // suggestions: swipe right = OK, swipe left = Ignore (the buttons stay for TalkBack and one-handed use)
                     SwipeRow(enabled = tab == 0, onRight = okIt, onLeft = ignoreIt) {
+                    // read the latest copy (the name / items may have been added on this card a moment ago)
+                    val pid = item.flags.split(',').firstOrNull { it.startsWith("PERSON:") }?.removePrefix("PERSON:")?.toLongOrNull()
+                    val upiKey = vm.repo.upiKey(item.vpa.ifBlank { null }, item.merchant.ifBlank { null })
                     SmsCard(item, accounts, cats, nets, tab,
+                        extra = {
+                            if (tab == 0 && upiKey != null && item.kind != "TRANSFER" && names.none { it.key == upiKey })
+                                NameUpiCard(vm, upiKey, item.vpa.ifBlank { item.merchant }, item.merchant, item.debit, Modifier.padding(top = 8.dp))
+                            if (tab == 0 && pid != null && item.accountId != null) peopleMap[pid]?.let { p ->
+                                val bal = Ledger.personBalance(p, udharAll)
+                                Row(Modifier.padding(top = 8.dp).fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(bk.info).padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
+                                    Text(if (bal > 0) "${p.name} owes you ${hm(bal)}" else "You owe ${p.name} ${hm(-bal)}", color = bk.onInfo, style = MaterialTheme.typography.labelMedium, modifier = Modifier.weight(1f))
+                                    TextButton(onClick = { ok(item, item.accountId!!, "UDHAR") }, modifier = Modifier.testTag("settle_${item.id}")) { Text("Settle udhar") }
+                                }
+                            }
+                            if (tab == 0 && item.debit && s.askItems && item.flags.split(',').contains("ASK")) {
+                                Row(Modifier.padding(top = 8.dp).fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(MaterialTheme.colorScheme.secondaryContainer)
+                                    .clickable { itemsFor = item }.padding(10.dp).testTag("sms_items_${item.id}"), verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(Icons.Outlined.ShoppingBasket, null, tint = MaterialTheme.colorScheme.onSecondaryContainer); Spacer(Modifier.width(8.dp))
+                                    Text(if (item.itemsText.isBlank()) "What did you buy?" else item.itemsText, color = MaterialTheme.colorScheme.onSecondaryContainer,
+                                        style = MaterialTheme.typography.labelLarge, modifier = Modifier.weight(1f), maxLines = 2, overflow = TextOverflow.Ellipsis)
+                                    Text(if (item.itemsText.isBlank()) "Add" else "Edit", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.labelLarge)
+                                }
+                            }
+                        },
                         onOk = okIt,
                         onEdit = { nav.go("add?sms=${item.id}") },
                         onIgnore = ignoreIt,
@@ -145,12 +174,17 @@ fun SmsInboxScreen(vm: AppVm) {
             footer = { TextButton(onClick = { chooseAcc = null; nav.go("account_edit/0?type=BANK") }, modifier = Modifier.padding(16.dp)) { Text("+ Add a new account") } })
     }
     teach?.let { item -> TeachDialog(vm, item, accOk) { teach = null } }
+    itemsFor?.let { item ->
+        ItemsDialog("What did you buy?", item.amountPaise, item.merchant, Insights.parseItems(item.itemsText), allItems,
+            onSave = { list -> vm.launch { vm.repo.setSmsItems(item, Insights.itemsText(list)) } }, onDismiss = { itemsFor = null })
+    }
     @Suppress("UNUSED_VARIABLE") val u = s
 }
 
 @Composable
 private fun SmsCard(
     item: SmsItem, accounts: List<Account>, cats: Map<Long, Category>, nets: Map<Long, Long>, tab: Int,
+    extra: @Composable () -> Unit = {},
     onOk: () -> Unit, onEdit: () -> Unit, onIgnore: () -> Unit, onTeach: () -> Unit, onRestore: () -> Unit, onAdjust: (Account, Long) -> Unit,
 ) {
     val bk = LocalBk.current
@@ -159,7 +193,7 @@ private fun SmsCard(
     BkCard(Modifier.padding(16.dp, 6.dp).fillMaxWidth().testTag("sms_${item.id}"), padding = PaddingValues(14.dp), onClick = { expanded = !expanded }) {
         Row(verticalAlignment = Alignment.Top) {
             Column(Modifier.weight(1f)) {
-                Text(item.merchant.ifBlank { when (item.kind) { "ATM" -> "ATM cash withdrawal"; "CARD_PAYMENT" -> "Card bill payment"; "REFUND" -> "Refund"; else -> if (item.debit) "Payment" else "Money received" } },
+                Text(item.merchant.ifBlank { when (item.kind) { "ATM" -> "ATM cash withdrawal"; "CARD_PAYMENT" -> "Card bill payment"; "REFUND" -> "Refund"; "TRANSFER" -> "Transfer between your accounts"; else -> if (item.debit) "Payment" else "Money received" } },
                     style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Text(listOfNotNull(
                     item.categoryId?.let { cats[it]?.name },
@@ -180,6 +214,7 @@ private fun SmsCard(
                 TextButton(onClick = { onAdjust(acc, bal) }) { Text("Match") }
             }
         }
+        extra()
         Text(item.body, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = if (expanded) 20 else 2, overflow = TextOverflow.Ellipsis,
             modifier = Modifier.padding(top = 8.dp).fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(MaterialTheme.colorScheme.surfaceVariant).padding(8.dp))
         Row(Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End), verticalAlignment = Alignment.CenterVertically) {

@@ -72,7 +72,7 @@ fun EntriesScreen(vm: AppVm) {
 
     val list: @Composable (Modifier) -> Unit = { mod ->
         Column(mod) {
-            OutlinedCard(onClick = { nav.go("search") }, shape = RoundedCornerShape(50), modifier = Modifier.padding(horizontal = 16.dp).fillMaxWidth().testTag("search_box"),
+            OutlinedCard(onClick = { nav.go("search") }, shape = RoundedCornerShape(50), modifier = Modifier.padding(horizontal = 16.dp).fillMaxWidth().searchMorph("search_entries").testTag("search_box"),
                 colors = CardDefaults.outlinedCardColors(containerColor = bk.card), border = androidx.compose.foundation.BorderStroke(1.dp, bk.cardBorder)) {
                 Row(Modifier.padding(horizontal = 16.dp, vertical = 13.dp), verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Outlined.Search, null, tint = MaterialTheme.colorScheme.onSurfaceVariant); Spacer(Modifier.width(10.dp))
@@ -184,6 +184,8 @@ fun SearchScreen(vm: AppVm) {
     var maxA by rememberSaveable { mutableStateOf("") }
     val fr = remember { androidx.compose.ui.focus.FocusRequester() }
     LaunchedEffect(Unit) { runCatching { fr.requestFocus() } }
+    // the bar grows out of whichever search the user tapped (Home's icon or the Entries box) and shrinks back into it
+    val morphKey = remember { if (nav.previousBackStackEntry?.destination?.route?.startsWith("entries") == true) "search_entries" else "search_home" }
 
     val now = System.currentTimeMillis()
     val from = when (period) { "MONTH" -> Dates.startOf(Dates.today().withDayOfMonth(1)); "YEAR" -> Dates.startOf(Dates.today().withDayOfYear(1)); else -> 0L }
@@ -200,7 +202,7 @@ fun SearchScreen(vm: AppVm) {
             IconButton(onClick = { nav.popBackStack() }, modifier = Modifier.testTag("back")) { Icon(Icons.Outlined.ArrowBack, "Back") }
             OutlinedTextField(q, { q = it }, placeholder = { Text("Shop, note, #tag, account") }, singleLine = true, shape = RoundedCornerShape(50),
                 trailingIcon = { if (q.isNotEmpty()) IconButton(onClick = { q = "" }) { Icon(Icons.Outlined.Close, "Clear") } },
-                modifier = Modifier.weight(1f).focusRequester(fr).testTag("f_search"))
+                modifier = Modifier.weight(1f).searchMorph(morphKey).focusRequester(fr).testTag("f_search"))
         }
     }, contentWindowInsets = WindowInsets(0)) { pad ->
         Column(Modifier.padding(pad)) {
@@ -215,7 +217,7 @@ fun SearchScreen(vm: AppVm) {
             }
             if (res.isNotEmpty()) Row(Modifier.padding(horizontal = 18.dp, vertical = 6.dp)) {
                 Text("${res.size} RESULTS", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1f))
-                MoneyText(res.sumOf { signed(it) }, style = MaterialTheme.typography.labelMedium)
+                MoneyText(res.filter { !it.cancelled }.sumOf { signed(it) }, style = MaterialTheme.typography.labelMedium)
             }
             when {
                 ql.isEmpty() && lo == null && hi == null -> EmptyState(Icons.Outlined.Search, "Search your khata", "Type a shop name, a note, an account or a #tag.")
@@ -250,7 +252,12 @@ fun EntryDetailContent(vm: AppVm, id: Long, embedded: Boolean, onGone: () -> Uni
     val accs by vm.accMap.collectAsStateWithLifecycle()
     val people by vm.personMap.collectAsStateWithLifecycle()
     val udhar by vm.udhar.collectAsStateWithLifecycle()
+    val names by vm.upiNames.collectAsStateWithLifecycle()
+    val allItems by vm.items.collectAsStateWithLifecycle()
+    val allEntries by vm.entries.collectAsStateWithLifecycle()
+    val st by vm.settings.collectAsStateWithLifecycle()
     var confirm by rememberSaveable { mutableStateOf(false) }
+    var itemsOpen by rememberSaveable { mutableStateOf(false) }
     var viewing by remember { mutableStateOf<android.graphics.Bitmap?>(null) }
     var seen by rememberSaveable { mutableStateOf(false) }
     val entry = e
@@ -290,6 +297,44 @@ fun EntryDetailContent(vm: AppVm, id: Long, embedded: Boolean, onGone: () -> Uni
                 Text(entryTitle(entry, cat, accs, people), style = MaterialTheme.typography.titleMedium, textAlign = TextAlign.Center)
                 Text(Dates.full(entry.time), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
+            if (entry.cancelled) Row(Modifier.padding(16.dp, 4.dp).fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(bk.info).padding(12.dp).testTag("cancelled_note"),
+                verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Outlined.Block, null, tint = bk.onInfo); Spacer(Modifier.width(10.dp))
+                Text("Cancelled — the bank said this payment failed or was reversed. It isn't counted anywhere.", color = bk.onInfo, style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(1f))
+                TextButton(onClick = { vm.launch { vm.repo.setCancelled(entry, false); snack.show("Counted again") } }, modifier = Modifier.testTag("uncancel")) { Text("Count it") }
+            }
+            entry.refundOf?.let { oid -> allEntries.firstOrNull { it.id == oid } }?.let { o ->
+                Row(Modifier.padding(16.dp, 4.dp).fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(bk.info).clickable { nav.go("entry/${o.id}") }.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Outlined.Undo, null, tint = bk.onInfo); Spacer(Modifier.width(10.dp))
+                    Text("Refund for ${o.merchant ?: "a purchase"} on ${Dates.dayMonth(Dates.date(o.time))} — lowers that spending instead of counting as income", color = bk.onInfo, style = MaterialTheme.typography.bodySmall)
+                }
+            }
+            allEntries.filter { it.refundOf == entry.id && !it.cancelled }.takeIf { it.isNotEmpty() }?.let { rf ->
+                Row(Modifier.padding(16.dp, 4.dp).fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(bk.info).padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Outlined.Undo, null, tint = bk.onInfo); Spacer(Modifier.width(10.dp))
+                    Text("Refunded ${hm(rf.sumOf { it.amountPaise })}" + if (rf.sumOf { it.amountPaise } >= entry.amountPaise) " — fully paid back" else "", color = bk.onInfo, style = MaterialTheme.typography.bodySmall)
+                }
+            }
+            val upiKey = vm.repo.upiKey(entry.vpa, entry.merchant.takeIf { entry.smsKey != null })
+            if (upiKey != null && (entry.type == EType.EXPENSE || entry.type == EType.INCOME) && names.none { it.key == upiKey })
+                NameUpiCard(vm, upiKey, entry.vpa ?: entry.merchant.orEmpty(), entry.merchant.orEmpty(), entry.type == EType.EXPENSE, Modifier.padding(16.dp, 4.dp))
+            val its = allItems.filter { it.entryId == entry.id }
+            if (entry.type == EType.EXPENSE && !entry.cancelled) {
+                if (its.isEmpty() && st.askItems) Row(Modifier.padding(16.dp, 4.dp).fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(MaterialTheme.colorScheme.secondaryContainer)
+                    .clickable { itemsOpen = true }.padding(12.dp).testTag("ask_items"), verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Outlined.ShoppingBasket, null, tint = MaterialTheme.colorScheme.onSecondaryContainer); Spacer(Modifier.width(10.dp))
+                    Text("What did you buy?", color = MaterialTheme.colorScheme.onSecondaryContainer, style = MaterialTheme.typography.labelLarge, modifier = Modifier.weight(1f))
+                    Text("Add items", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.labelLarge)
+                }
+            }
+            if (its.isNotEmpty()) {
+                SectionLabel("Items · ${its.size}", action = "Edit", onAction = { itemsOpen = true })
+                BkCard(Modifier.padding(horizontal = 16.dp).fillMaxWidth().testTag("items_card")) {
+                    its.forEach { i -> ListRow(i.name, null, leading = { Icon(Icons.Outlined.ShoppingBasket, null) }, trailing = { if (i.pricePaise > 0) MoneyText(i.pricePaise) }) }
+                    val sum = its.sumOf { it.pricePaise.coerceAtLeast(0) }
+                    if (sum in 1 until entry.amountPaise) ListRow("Not given to an item", null, trailing = { MoneyText(entry.amountPaise - sum, color = MaterialTheme.colorScheme.onSurfaceVariant) })
+                }
+            }
             BkCard(Modifier.padding(horizontal = 16.dp).fillMaxWidth()) {
                 ListRow(Export.typeName(entry.type), "Type", leading = { Icon(Icons.Outlined.SwapVert, null) })
                 if (cat != null) ListRow(cat.name, "Category", leading = { Icon(Icons.Outlined.Category, null) })
@@ -322,6 +367,10 @@ fun EntryDetailContent(vm: AppVm, id: Long, embedded: Boolean, onGone: () -> Uni
         }
     }
 
+    if (itemsOpen) entry?.let { en ->
+        ItemsDialog("What did you buy?", en.amountPaise, en.merchant.orEmpty(), allItems.filter { it.entryId == en.id }.map { it.name to it.pricePaise }, allItems,
+            onSave = { list -> vm.launch { vm.repo.setItems(en.id, list) } }, onDismiss = { itemsOpen = false })
+    }
     if (confirm) ConfirmDialog("Delete this entry?", "Balances and reports will update. You can undo right after.", "Delete", onConfirm = {
         val en = entry ?: return@ConfirmDialog
         vm.launch {

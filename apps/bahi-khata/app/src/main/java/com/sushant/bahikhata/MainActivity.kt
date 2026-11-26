@@ -31,6 +31,8 @@ class MainActivity : AppCompatActivity() {
     private var pendingRoute by mutableStateOf<String?>(null)
     private var backgroundAt = 0L
     private val startedAt = SystemClock.elapsedRealtime()
+    /** The app itself opened another screen (photo / contact / file picker, share sheet, Google sign-in, a viewer). */
+    private var ownTripAt = 0L
 
     private val processObserver = object : DefaultLifecycleObserver {
         override fun onStop(owner: LifecycleOwner) { backgroundAt = SystemClock.elapsedRealtime() }
@@ -40,9 +42,34 @@ class MainActivity : AppCompatActivity() {
             val app = application as App
             app.appScope.launch { java.io.File(cacheDir, "open").deleteRecursively() }
             val s = vm.prefs.now
-            if (s.lockOn && backgroundAt > 0 && SystemClock.elapsedRealtime() - backgroundAt >= s.lockAfterSec * 1000L) locked = true
+            val away = SystemClock.elapsedRealtime() - backgroundAt
+            // coming back from the app's own picker or share sheet (within 10 minutes) never asks again
+            val ownTrip = ownTripAt > 0 && ownTripAt >= backgroundAt - 2_000L && away < 10 * 60_000L
+            if (s.lockOn && backgroundAt > 0 && !ownTrip && away >= s.lockAfterSec * 1000L) locked = true
+            ownTripAt = 0L
         }
     }
+
+    /** The screen turning off locks the app at once, whatever the "Lock after" time. */
+    private val screenOff = object : android.content.BroadcastReceiver() {
+        override fun onReceive(context: android.content.Context, intent: Intent) {
+            if (intent.action == Intent.ACTION_SCREEN_OFF && (application as App).ready && vm.prefs.now.lockOn) { locked = true; ownTripAt = 0L }
+        }
+    }
+
+    private fun markOwnTrip() { ownTripAt = SystemClock.elapsedRealtime() }
+
+    @Deprecated("Activity result APIs route through here")
+    @Suppress("DEPRECATION")
+    override fun startActivityForResult(intent: Intent, requestCode: Int, options: Bundle?) { markOwnTrip(); super.startActivityForResult(intent, requestCode, options) }
+
+    @Deprecated("Activity result APIs route through here")
+    @Suppress("DEPRECATION")
+    override fun startIntentSenderForResult(intent: android.content.IntentSender, requestCode: Int, fillInIntent: Intent?, flagsMask: Int, flagsValues: Int, extraFlags: Int, options: Bundle?) {
+        markOwnTrip(); super.startIntentSenderForResult(intent, requestCode, fillInIntent, flagsMask, flagsValues, extraFlags, options)
+    }
+
+    override fun startActivity(intent: Intent, options: Bundle?) { markOwnTrip(); super.startActivity(intent, options) }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         val splash = installSplashScreen()
@@ -60,6 +87,7 @@ class MainActivity : AppCompatActivity() {
         // be replayed — it would throw away the screen and typing the user came back to
         if (savedInstanceState == null && (intent.flags and Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY) == 0) pendingRoute = routeFrom(intent)
         ProcessLifecycleOwner.get().lifecycle.addObserver(processObserver)
+        ContextCompat.registerReceiver(this, screenOff, android.content.IntentFilter(Intent.ACTION_SCREEN_OFF), ContextCompat.RECEIVER_NOT_EXPORTED)
         lifecycleScope.launch {
             vm.settings.collect { s ->
                 if (s.secureScreens || s.lockOn) window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
@@ -78,7 +106,7 @@ class MainActivity : AppCompatActivity() {
                 )
                 onDispose { }
             }
-            BahiTheme(s.theme) {
+            BahiTheme(s.theme, s.pureBlack) {
                 AppRoot(vm = vm, locked = locked, onUnlock = { unlock() }, onLockBack = { finish() },
                     pendingRoute = pendingRoute, onRouteConsumed = { pendingRoute = null })
             }
@@ -114,7 +142,12 @@ class MainActivity : AppCompatActivity() {
         if (locked) unlock()
     }
 
-    override fun onDestroy() { if (!(application as App).ready) { super.onDestroy(); return }; ProcessLifecycleOwner.get().lifecycle.removeObserver(processObserver); super.onDestroy() }
+    override fun onDestroy() {
+        if (!(application as App).ready) { super.onDestroy(); return }
+        ProcessLifecycleOwner.get().lifecycle.removeObserver(processObserver)
+        runCatching { unregisterReceiver(screenOff) }
+        super.onDestroy()
+    }
 
     private fun routeFrom(i: Intent?): String? = i?.getStringExtra(EXTRA_ROUTE) ?: when (i?.action) {
         ACTION_ADD_EXPENSE -> "add?type=EXPENSE"; ACTION_ADD_INCOME -> "add?type=INCOME"; ACTION_UDHAR -> "udhar"; else -> null

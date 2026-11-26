@@ -80,6 +80,11 @@ fun ReportsScreen(vm: AppVm) {
     } }, contentWindowInsets = WindowInsets(0)) { pad ->
         LazyColumn(Modifier.padding(pad).fillMaxSize().testTag("reports"), contentPadding = PaddingValues(bottom = 32.dp)) {
             item {
+                BkCard(Modifier.padding(16.dp, 0.dp, 16.dp, 10.dp).fillMaxWidth().testTag("open_insights"), onClick = { nav.go("insights") }) {
+                    ListRow("From your SMS", "Subscriptions · payday · bills & EMIs · charges · people · prices · year", leading = { Icon(Icons.Outlined.AutoAwesome, null, tint = MaterialTheme.colorScheme.primary) }, trailing = { Chev() })
+                }
+            }
+            item {
                 Row(Modifier.horizontalScroll(rememberScrollState()).padding(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     listOf("WEEK" to "Week", "MONTH" to "Month", "YEAR" to "Year", "CUSTOM" to "Custom").forEach { (k, l) -> Pill(l, period == k, { period = k; if (k == "CUSTOM") pickRange = true }, modifier = Modifier.testTag("period_$k")) }
                 }

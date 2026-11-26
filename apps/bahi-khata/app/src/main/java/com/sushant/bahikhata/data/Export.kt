@@ -17,16 +17,17 @@ object Export {
     data class Row(val date: String, val type: String, val amount: Long, val account: String, val category: String, val merchant: String, val upi: String, val note: String, val tags: String)
 
     fun rows(entries: List<Entry>, accounts: Map<Long, Account>, cats: Map<Long, Category>, r: LongRange): List<Row> =
-        entries.filter { it.time in r }.sortedBy { it.time }.map { e ->
+        entries.filter { it.time in r && !it.cancelled }.sortedBy { it.time }.map { e ->
             val acc = accounts[e.accountId]?.name.orEmpty() + (e.toAccountId?.let { " → " + accounts[it]?.name.orEmpty() } ?: "")
             Row(Dates.dayMonthYear(Dates.date(e.time)) + " " + Dates.time(e.time), typeName(e.type),
-                if (e.type == EType.EXPENSE || e.type == EType.UDHAR_GAVE) -e.amountPaise else e.amountPaise,
+                if (e.type == EType.EXPENSE || e.type == EType.UDHAR_GAVE || e.type == EType.INVEST) -e.amountPaise else e.amountPaise,
                 acc, e.categoryId?.let { cats[it]?.name }.orEmpty(), e.merchant.orEmpty(), e.upiApp.orEmpty(), e.note.orEmpty(), Ledger.tags(e.tags).joinToString(" ") { "#$it" })
         }
 
     fun typeName(t: String) = when (t) {
         EType.EXPENSE -> "Expense"; EType.INCOME -> "Income"; EType.CARD_PAYMENT -> "Card bill paid"; EType.CASH_WITHDRAWAL -> "Cash withdrawn"
-        EType.ADJUSTMENT -> "Balance adjustment"; EType.UDHAR_GAVE -> "Udhar given"; EType.UDHAR_GOT -> "Udhar received"; else -> t
+        EType.ADJUSTMENT -> "Balance adjustment"; EType.UDHAR_GAVE -> "Udhar given"; EType.UDHAR_GOT -> "Udhar received"
+        EType.TRANSFER -> "Transfer"; EType.INVEST -> "Investment"; else -> t
     }
 
     private val header = listOf("Date", "Type", "Amount (₹)", "Account", "Category", "Merchant / person", "Paid via", "Note", "Tags")

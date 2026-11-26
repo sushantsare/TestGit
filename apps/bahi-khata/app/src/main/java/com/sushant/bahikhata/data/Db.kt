@@ -21,6 +21,8 @@ object EType {
     const val UDHAR_GAVE = "UDHAR_GAVE"          // money left accountId for a person (not spending)
     const val UDHAR_GOT = "UDHAR_GOT"            // money came back into accountId (not income)
     const val GOAL_SAVE = "GOAL_SAVE"            // money moved to a savings goal (not spending)
+    const val TRANSFER = "TRANSFER"              // accountId -> toAccountId, both his own (not spending, not income)
+    const val INVEST = "INVEST"                  // money moved into investments (SIP, mutual fund, FD…): not spending
 }
 
 @Serializable
@@ -43,6 +45,10 @@ data class Account(
     val archived: Boolean = false,
     val sort: Int = 0,
     val createdAt: Long = System.currentTimeMillis(),
+    @ColumnInfo(defaultValue = "-1") val bankBalPaise: Long = -1,     // last balance the bank's own SMS showed
+    @ColumnInfo(defaultValue = "0") val bankBalAt: Long = 0,          // when that SMS came
+    @ColumnInfo(defaultValue = "-1") val availLimitPaise: Long = -1,  // cards: available limit from the bank's SMS
+    @ColumnInfo(defaultValue = "0") val availLimitAt: Long = 0,
 )
 
 @Serializable
@@ -76,6 +82,9 @@ data class Entry(
     val personId: Long? = null,
     val goalId: Long? = null,
     val createdAt: Long = System.currentTimeMillis(),
+    @ColumnInfo(defaultValue = "0") val cancelled: Boolean = false,   // payment failed / reversed: kept for history, never counted
+    val refundOf: Long? = null,                                       // a refund linked to the purchase it pays back
+    val vpa: String? = null,                                          // UPI ID the money went to / came from (from the SMS)
 )
 
 @Serializable
@@ -161,7 +170,10 @@ data class Goal(
     val createdAt: Long = System.currentTimeMillis(),
 )
 
-object SmsStatus { const val PENDING = "PENDING"; const val LOOK = "LOOK"; const val ACCEPTED = "ACCEPTED"; const val IGNORED = "IGNORED"; const val INFO = "INFO" }
+object SmsStatus {
+    const val PENDING = "PENDING"; const val LOOK = "LOOK"; const val ACCEPTED = "ACCEPTED"; const val IGNORED = "IGNORED"; const val INFO = "INFO"
+    const val HISTORY = "HISTORY"   // older SMS read once for insights (subscriptions, payday); never shown as suggestions
+}
 
 @Serializable
 @Entity(tableName = "sms_items", indices = [Index(value = ["key"], unique = true), Index("status")])
@@ -186,7 +198,53 @@ data class SmsItem(
     val entryId: Long? = null,
     val duplicateOf: Long? = null,
     val note: String = "",
+    @ColumnInfo(defaultValue = "") val vpa: String = "",
+    @ColumnInfo(defaultValue = "") val itemsText: String = "",   // "What did you buy?" answered before the entry was saved
+    @ColumnInfo(defaultValue = "") val flags: String = "",       // comma list: SALARY, CHARGE, INVEST, TO:<accountId>, PERSON:<id>…
 )
+
+/** A UPI ID (or a shop name from SMS without one) he named once: later SMS use his name and category. */
+@Serializable
+@Entity(tableName = "upi_names")
+data class UpiName(
+    @PrimaryKey val key: String,         // "vpa:name@bank" or "name:raw shop text"
+    val display: String,                 // empty = he chose not to name it (never asked again)
+    val isPerson: Boolean = false,
+    val categoryId: Long? = null,
+    val personId: Long? = null,
+    val askItems: Boolean = true,
+    val createdAt: Long = System.currentTimeMillis(),
+)
+
+/** One thing bought in an entry ("What did you buy?"), with its price when he gave one. */
+@Serializable
+@Entity(tableName = "entry_items", indices = [Index("entryId"), Index("shopKey")])
+data class EntryItem(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val entryId: Long,
+    val name: String,
+    val pricePaise: Long = -1,
+    val shopKey: String = "",            // lowercase shop name, for price history per shop
+    val time: Long = System.currentTimeMillis(),
+)
+
+/** Something coming up that an SMS told about: recharge expiry, a utility bill, an EMI or AutoPay debit. */
+@Serializable
+@Entity(tableName = "reminders", indices = [Index(value = ["key"], unique = true)])
+data class Reminder(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val key: String,
+    val kind: String,                    // RECHARGE, UTILITY, EMI, AUTOPAY
+    val title: String,
+    val amountPaise: Long = -1,
+    val dueEpochDay: Long,
+    val accountId: Long? = null,
+    val done: Boolean = false,
+    val notified: String = "",
+    val createdAt: Long = System.currentTimeMillis(),
+)
+
+object RemindKind { const val RECHARGE = "RECHARGE"; const val UTILITY = "UTILITY"; const val EMI = "EMI"; const val AUTOPAY = "AUTOPAY" }
 
 /** Processed SMS keys (also non-financial ones) so nothing is handled twice. */
 @Entity(tableName = "sms_seen")
@@ -293,6 +351,32 @@ interface MainDao {
     @Query("SELECT * FROM learned") suspend fun learned(): List<Learned>
     @Insert suspend fun insertLearned(l: Learned): Long
 
+    // UPI names
+    @Query("SELECT * FROM upi_names ORDER BY display COLLATE NOCASE") fun upiNames(): Flow<List<UpiName>>
+    @Query("SELECT * FROM upi_names") suspend fun upiNamesNow(): List<UpiName>
+    @Query("SELECT * FROM upi_names WHERE `key`=:key") suspend fun upiName(key: String): UpiName?
+    @Upsert suspend fun upsertUpiName(u: UpiName)
+    @Delete suspend fun deleteUpiName(u: UpiName)
+
+    // items
+    @Query("SELECT * FROM entry_items ORDER BY time DESC, id") fun items(): Flow<List<EntryItem>>
+    @Query("SELECT * FROM entry_items") suspend fun itemsNow(): List<EntryItem>
+    @Query("SELECT * FROM entry_items WHERE entryId=:entryId ORDER BY id") suspend fun itemsOf(entryId: Long): List<EntryItem>
+    @Query("DELETE FROM entry_items WHERE entryId=:entryId") suspend fun deleteItemsOf(entryId: Long)
+    @Insert suspend fun insertItem(i: EntryItem): Long
+
+    // reminders
+    @Query("SELECT * FROM reminders ORDER BY dueEpochDay") fun reminders(): Flow<List<Reminder>>
+    @Query("SELECT * FROM reminders") suspend fun remindersNow(): List<Reminder>
+    @Query("SELECT * FROM reminders WHERE `key`=:key") suspend fun reminderByKey(key: String): Reminder?
+    @Upsert suspend fun upsertReminder(r: Reminder): Long
+    @Delete suspend fun deleteReminder(r: Reminder)
+
+    @Query("SELECT * FROM sms_items WHERE status=:st ORDER BY receivedAt DESC") suspend fun smsWithStatus(st: String): List<SmsItem>
+
+    @Query("DELETE FROM upi_names") suspend fun clearUpiNames()
+    @Query("DELETE FROM entry_items") suspend fun clearItems()
+    @Query("DELETE FROM reminders") suspend fun clearReminders()
     @Query("DELETE FROM accounts") suspend fun clearAccounts()
     @Query("DELETE FROM categories") suspend fun clearCategories()
     @Query("DELETE FROM entries") suspend fun clearEntries()
@@ -311,9 +395,13 @@ data class EntryCount(val entryId: Long, val n: Int)
 
 @Database(
     entities = [Account::class, Category::class, Entry::class, Attachment::class, Merchant::class, Recurring::class,
-        Person::class, Udhar::class, Budget::class, Goal::class, SmsItem::class, SmsSeen::class, Learned::class],
-    version = 1,
+        Person::class, Udhar::class, Budget::class, Goal::class, SmsItem::class, SmsSeen::class, Learned::class,
+        UpiName::class, EntryItem::class, Reminder::class],
+    version = 2,
     exportSchema = true,
+    // 1 -> 2 (Bahi Khata 1.1): new tables and new columns with defaults; Room writes the SQL from the saved schemas,
+    // so every entry, account and setting he already has stays exactly as it is
+    autoMigrations = [AutoMigration(from = 1, to = 2)],
 )
 abstract class AppDb : RoomDatabase() {
     abstract fun dao(): MainDao

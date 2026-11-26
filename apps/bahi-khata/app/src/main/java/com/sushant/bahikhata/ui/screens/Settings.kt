@@ -104,7 +104,9 @@ fun SettingsScreen(vm: AppVm) {
             item { SectionLabel("Appearance") }
             item { BkCard(Modifier.padding(horizontal = 16.dp).fillMaxWidth()) {
                 SettingNav(Icons.Outlined.DarkMode, "Theme", when (s.theme) { ThemeMode.SYSTEM -> "Follow phone"; ThemeMode.LIGHT -> "Light"; ThemeMode.DARK -> "Dark" }) { themePick = true }
-                SettingSwitch(Icons.Outlined.VisibilityOff, "Hide amounts", "Show ₹ •••• everywhere until you tap the eye", s.hideAmounts, { on -> vm.prefs.update { it.copy(hideAmounts = on) } }, "hide")
+                if (com.sushant.bahikhata.ui.theme.isDark(s.theme)) SettingSwitch(Icons.Outlined.Contrast, "Pure black", "Darker dark mode for OLED screens", s.pureBlack, { on -> vm.prefs.update { it.copy(pureBlack = on) } }, "pure_black")
+                SettingNav(Icons.Outlined.VisibilityOff, "Hide amounts", (if (s.hideAmounts) "On" else "Off") + (if (s.hideAskAuth) " · fingerprint to show" else "") +
+                    " · " + s.hideAreas.split(',').count { it.isNotBlank() } + " of " + HideArea.all.size + " areas") { nav.go("hide_amounts") }
             } }
             item { SectionLabel("Security") }
             item { BkCard(Modifier.padding(horizontal = 16.dp).fillMaxWidth()) {
@@ -117,6 +119,8 @@ fun SettingsScreen(vm: AppVm) {
                 SettingSwitch(Icons.Outlined.Sms, "SMS suggestions", if (app.sms.enabled()) "On · nothing is saved without your OK" else if (s.smsOn) "Needs SMS permission" else "Off", app.sms.enabled(), { on ->
                     if (on) nav.go("sms_setup") else { vm.prefs.update { it.copy(smsOn = false) }; app.sms.stopObserver() }
                 }, "sms")
+                SettingNav(Icons.Outlined.Badge, "Saved UPI names", "Names you gave to UPI IDs and shops") { nav.go("upi_names") }
+                SettingSwitch(Icons.Outlined.ShoppingBasket, "Ask \"What did you buy?\"", "After a payment, in the notification and on the SMS card", s.askItems, { on -> vm.prefs.update { it.copy(askItems = on) } }, "ask_items")
                 SettingNav(Icons.Outlined.Category, "Categories", "${cats.count { !it.archived }} categories") { nav.go("categories") }
                 SettingNav(Icons.Outlined.Repeat, "Repeating entries", if (rec.isEmpty()) "Rent, EMI, subscriptions" else "${rec.count { it.active }} active") { nav.go("recurring") }
                 SettingNav(Icons.Outlined.Savings, "Budgets & savings goals") { nav.go("budgets") }
@@ -131,6 +135,8 @@ fun SettingsScreen(vm: AppVm) {
                 SettingSwitch(Icons.Outlined.Event, "Card due reminders", dueText(s.dueReminderDays), s.dueRemindersOn, { on -> notifSwitch(on) { vm.prefs.update { it.copy(dueRemindersOn = on) }; Workers.runNow(ctx) } }, "due")
                 if (s.dueRemindersOn) SettingNav(Icons.Outlined.Tune, "When to remind", dueText(s.dueReminderDays)) { duePick = true }
                 SettingSwitch(Icons.Outlined.PieChart, "Budget alerts", "At 80% and 100% of a budget", s.budgetAlertsOn, { on -> notifSwitch(on) { vm.prefs.update { it.copy(budgetAlertsOn = on) } } }, "budget")
+                SettingSwitch(Icons.Outlined.GppMaybe, "Unusual payment alerts", "Very large, late-night, international or from an account you rarely use", s.alertsOn, { on -> notifSwitch(on) { vm.prefs.update { it.copy(alertsOn = on) } } }, "alerts")
+                SettingNav(Icons.Outlined.EventRepeat, "Bills, renewals & EMIs", if (s.remindersOn) "Reminders on" else "Reminders off") { nav.go("reminders") }
                 if (!notifOk && (s.dailyReminderOn || s.dueRemindersOn || s.budgetAlertsOn || s.smsOn)) {
                     Row(Modifier.fillMaxWidth().padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
                         Text("Notifications are blocked", color = LocalBk.current.warn, style = MaterialTheme.typography.labelLarge, modifier = Modifier.weight(1f))

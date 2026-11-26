@@ -4,6 +4,7 @@ import android.content.Context
 import android.net.Uri
 import android.provider.OpenableColumns
 import androidx.room.withTransaction
+import com.sushant.bahikhata.work.Notify
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -30,23 +31,51 @@ class Repo(private val context: Context, val db: AppDb, val prefs: Prefs) {
     val smsIgnored = dao.sms(listOf(SmsStatus.IGNORED))
     val smsPendingCount = dao.smsCount(SmsStatus.PENDING)
     val smsLookCount = dao.smsCount(SmsStatus.LOOK)
+    val upiNames = dao.upiNames()
+    val items = dao.items()
+    val reminders = dao.reminders()
 
     fun attachments(entryId: Long) = dao.attachments(entryId)
     fun entryFlow(id: Long) = dao.entryFlow(id)
 
     suspend fun ensureCategories() = db.withTransaction {   // check + insert in one transaction: never twice
-        if (dao.categoriesNow().isNotEmpty()) return@withTransaction
-        DefaultData.categories().forEach { dao.upsertCategory(it) }
+        val have = dao.categoriesNow()
+        if (have.isEmpty()) { DefaultData.categories().forEach { dao.upsertCategory(it) }; return@withTransaction }
+        // categories added in later versions (SMS insights) are added once for people who set up earlier
+        DefaultData.added().forEach { c ->
+            if (have.none { it.kind == c.kind && it.name.equals(c.name, true) }) dao.upsertCategory(c.copy(sort = have.count { it.kind == c.kind }))
+        }
+    }
+
+    /** Clears the SMS notification of [item] and keeps the "N entries need your OK" summary right. */
+    private suspend fun clearNotification(item: SmsItem) {
+        runCatching {
+            Notify.cancel(context, Notify.smsId(item))
+            Notify.refreshSummary(context, dao.smsNow().count { it.status == SmsStatus.PENDING || it.status == SmsStatus.LOOK })
+        }
     }
 
     // ---------------- accounts
     suspend fun saveAccount(a: Account): Long = dao.upsertAccount(a)
     suspend fun archiveAccount(a: Account) = dao.upsertAccount(a.copy(archived = !a.archived))
 
+    /** Everything an account delete removes, so Undo can put it back exactly. */
+    class AccountBackup(val account: Account, val entries: List<Deleted>)
+
     /** Deletes the account and all its entries (asked with a confirm dialog in the UI). */
-    suspend fun deleteAccount(a: Account) = db.withTransaction {
-        dao.entriesNow().filter { it.accountId == a.id || it.toAccountId == a.id }.forEach { deleteEntryInternal(it) }
-        dao.deleteAccount(a)
+    suspend fun deleteAccount(a: Account): AccountBackup = withContext(Dispatchers.IO) {
+        db.withTransaction {
+            val gone = dao.entriesNow().filter { it.accountId == a.id || it.toAccountId == a.id }.map { deleteEntryInternal(it) }
+            dao.deleteAccount(a)
+            AccountBackup(a, gone)
+        }
+    }
+
+    suspend fun undoDeleteAccount(b: AccountBackup) = withContext(Dispatchers.IO) {
+        db.withTransaction {
+            dao.upsertAccount(b.account)
+            b.entries.forEach { restoreDeleted(it) }
+        }
     }
 
     /** Adds an ADJUSTMENT so the app balance equals the real balance he typed. */
@@ -57,6 +86,14 @@ class Repo(private val context: Context, val db: AppDb, val prefs: Prefs) {
         val diff = target - cur
         if (diff == 0L) return
         dao.upsertEntry(Entry(type = EType.ADJUSTMENT, amountPaise = diff, accountId = acc.id, note = "Balance adjusted to match bank"))
+    }
+
+    /** Makes the app agree with the bank's last SMS balance: the difference is saved as an adjustment at that moment. */
+    suspend fun matchBank(acc: Account) {
+        val a = dao.account(acc.id) ?: return
+        if (a.bankBalAt <= 0 || a.bankBalPaise < 0) return
+        val diff = a.bankBalPaise - Ledger.netAt(a, dao.entriesNow(), a.bankBalAt)
+        if (diff != 0L) dao.upsertEntry(Entry(type = EType.ADJUSTMENT, amountPaise = diff, accountId = a.id, time = a.bankBalAt, note = "Matched to the bank's SMS balance"))
     }
 
     suspend fun transfer(type: String, from: Long, to: Long, amount: Long, time: Long = System.currentTimeMillis(), note: String? = null, smsKey: String? = null): Long =
@@ -122,7 +159,7 @@ class Repo(private val context: Context, val db: AppDb, val prefs: Prefs) {
 
     suspend fun merchant(name: String): Merchant? = dao.merchant(name.trim().lowercase(Locale.ROOT))
 
-    data class Deleted(val entry: Entry, val attachments: List<Attachment>, val udhar: List<Udhar>, val files: Map<String, ByteArray>)
+    data class Deleted(val entry: Entry, val attachments: List<Attachment>, val udhar: List<Udhar>, val files: Map<String, ByteArray>, val items: List<EntryItem> = emptyList(), val sms: List<SmsItem> = emptyList())
 
     /** Deletes an entry and returns what's needed to undo it. */
     suspend fun deleteEntry(e: Entry): Deleted = withContext(Dispatchers.IO) {
@@ -133,20 +170,73 @@ class Repo(private val context: Context, val db: AppDb, val prefs: Prefs) {
         val atts = dao.attachmentsNow().filter { it.entryId == e.id }
         val files = atts.associate { it.fileName to (runCatching { attFile(it).readBytes() }.getOrDefault(ByteArray(0))) }
         val ud = dao.udharOfEntry(e.id)
+        val items = dao.itemsOf(e.id)
         ud.forEach { dao.deleteUdhar(it) }
         atts.forEach { dao.deleteAttachment(it); attFile(it).delete() }
+        dao.deleteItemsOf(e.id)
         dao.deleteEntry(e)
-        dao.smsNow().filter { it.entryId == e.id }.forEach { dao.updateSms(it.copy(status = SmsStatus.IGNORED, entryId = null)) }
-        return Deleted(e, atts, ud, files)
+        val sms = dao.smsNow().filter { it.entryId == e.id }
+        sms.forEach { dao.updateSms(it.copy(status = SmsStatus.IGNORED, entryId = null)) }
+        return Deleted(e, atts, ud, files, items, sms)
+    }
+
+    private suspend fun restoreDeleted(d: Deleted) {
+        dao.upsertEntry(d.entry)
+        d.udhar.forEach { dao.upsertUdhar(it) }
+        d.items.forEach { dao.insertItem(it) }
+        d.sms.forEach { dao.updateSms(it) }
+        d.attachments.forEach { a -> d.files[a.fileName]?.let { attFile(a).apply { parentFile?.mkdirs() }.writeBytes(it) }; dao.insertAttachment(a) }
     }
 
     suspend fun undoDelete(d: Deleted) = withContext(Dispatchers.IO) {
-        db.withTransaction {
-            dao.upsertEntry(d.entry)
-            d.udhar.forEach { dao.upsertUdhar(it) }
-            d.attachments.forEach { a -> d.files[a.fileName]?.let { attFile(a).apply { parentFile?.mkdirs() }.writeBytes(it) }; dao.insertAttachment(a) }
+        db.withTransaction { restoreDeleted(d) }
+    }
+
+    /** A failed / reversed payment is kept in the list but counts nowhere; he can bring it back. */
+    suspend fun setCancelled(e: Entry, cancelled: Boolean) = dao.upsertEntry(e.copy(cancelled = cancelled))
+
+    // ---------------- items ("What did you buy?")
+    suspend fun itemsOf(entryId: Long) = dao.itemsOf(entryId)
+
+    suspend fun setItems(entryId: Long, items: List<Pair<String, Long>>) = db.withTransaction {
+        val e = dao.entry(entryId) ?: return@withTransaction
+        dao.deleteItemsOf(entryId)
+        items.filter { it.first.isNotBlank() }.forEach { (n, p) -> dao.insertItem(EntryItem(entryId = entryId, name = n.trim(), pricePaise = p, shopKey = Insights.shopKey(e.merchant), time = e.time)) }
+    }
+
+    /** Items answered before the SMS was saved (in the notification or the SMS card). */
+    suspend fun setSmsItems(item: SmsItem, text: String) = dao.updateSms(item.copy(itemsText = text))
+
+    // ---------------- UPI names
+    fun upiKey(vpa: String?, merchant: String?): String? = when {
+        !vpa.isNullOrBlank() -> "vpa:" + vpa.trim().lowercase(Locale.ROOT)
+        !merchant.isNullOrBlank() -> "name:" + merchant.trim().lowercase(Locale.ROOT)
+        else -> null
+    }
+
+    /** He named a UPI ID: later SMS use the name, and waiting suggestions and saved entries from that ID update now. */
+    suspend fun nameUpi(n: UpiName) = db.withTransaction {
+        dao.upsertUpiName(n)
+        if (n.display.isBlank()) return@withTransaction
+        val vpa = n.key.removePrefix("vpa:").takeIf { n.key.startsWith("vpa:") }
+        val raw = n.key.removePrefix("name:").takeIf { n.key.startsWith("name:") }
+        dao.smsNow().filter { (it.status == SmsStatus.PENDING || it.status == SmsStatus.LOOK || it.status == SmsStatus.HISTORY) &&
+            (vpa != null && it.vpa == vpa || raw != null && it.merchant.trim().lowercase(Locale.ROOT) == raw) }.forEach {
+            dao.updateSms(it.copy(merchant = n.display, categoryId = n.categoryId ?: it.categoryId))
+        }
+        dao.entriesNow().filter { vpa != null && it.vpa == vpa || raw != null && it.merchant?.trim()?.lowercase(Locale.ROOT) == raw }.forEach {
+            dao.upsertEntry(it.copy(merchant = n.display, categoryId = n.categoryId ?: it.categoryId))
         }
     }
+
+    suspend fun deleteUpiName(n: UpiName) = dao.deleteUpiName(n)
+
+    /** Two saved names are the same place: [from] takes [into]'s name and category everywhere. */
+    suspend fun mergeUpiName(from: UpiName, into: UpiName) = nameUpi(from.copy(display = into.display, categoryId = into.categoryId, isPerson = into.isPerson, personId = into.personId))
+
+    // ---------------- reminders
+    suspend fun setReminderDone(r: Reminder, done: Boolean) = dao.upsertReminder(r.copy(done = done))
+    suspend fun deleteReminder(r: Reminder) = dao.deleteReminder(r)
 
     suspend fun duplicate(e: Entry): Long = dao.upsertEntry(e.copy(id = 0, time = System.currentTimeMillis(), smsKey = null, recurringId = null, createdAt = System.currentTimeMillis()))
 
@@ -242,30 +332,50 @@ class Repo(private val context: Context, val db: AppDb, val prefs: Prefs) {
     }
 
     // ---------------- SMS suggestions
-    /** Turns a suggestion into a real entry. Returns the entry id. */
-    suspend fun acceptSms(item: SmsItem, accountId: Long, categoryId: Long?, merchant: String, amount: Long = item.amountPaise, debit: Boolean = item.debit, kind: String = item.kind): Long =
-        db.withTransaction {
+    /** Turns a suggestion into a real entry. Returns the entry id. [kind] "UDHAR" settles it against the person in the
+     *  item's PERSON flag instead of counting it as spending / income. */
+    suspend fun acceptSms(item: SmsItem, accountId: Long, categoryId: Long?, merchant: String, amount: Long = item.amountPaise, debit: Boolean = item.debit, kind: String = item.kind): Long {
+        val id = db.withTransaction {
             val time = item.receivedAt
-            val id = when (kind) {
-                "ATM" -> {
+            val flags = item.flags.split(',').map { it.trim() }.filter { it.isNotEmpty() }
+            fun flagId(p: String) = flags.firstOrNull { it.startsWith(p) }?.removePrefix(p)?.toLongOrNull()
+            val id = when {
+                kind == "ATM" -> {
                     val cash = dao.accountsNow().firstOrNull { it.type == AccType.CASH && !it.archived }?.id
                         ?: dao.upsertAccount(Account(type = AccType.CASH, name = "Cash"))
                     dao.upsertEntry(Entry(type = EType.CASH_WITHDRAWAL, amountPaise = amount, accountId = accountId, toAccountId = cash, time = time, smsKey = item.key, note = "ATM withdrawal"))
                 }
-                "CARD_PAYMENT" -> {
+                kind == "CARD_PAYMENT" -> {
                     val from = dao.accountsNow().firstOrNull { it.type == AccType.BANK && !it.archived }?.id ?: accountId
                     dao.upsertEntry(Entry(type = EType.CARD_PAYMENT, amountPaise = amount, accountId = from, toAccountId = accountId, time = time, smsKey = item.key, note = "Card bill paid"))
                 }
+                kind == "TRANSFER" && flagId("TO:") != null -> {
+                    val from = flagId("FROM:") ?: accountId
+                    dao.upsertEntry(Entry(type = EType.TRANSFER, amountPaise = amount, accountId = from, toAccountId = flagId("TO:"), time = time, smsKey = item.key, note = "Between your accounts"))
+                }
+                kind == "UDHAR" && flagId("PERSON:") != null -> {
+                    val pid = flagId("PERSON:")!!
+                    val eid = dao.upsertEntry(Entry(type = if (debit) EType.UDHAR_GAVE else EType.UDHAR_GOT, amountPaise = amount, accountId = accountId, time = time, smsKey = item.key, personId = pid, vpa = item.vpa.ifBlank { null }))
+                    dao.upsertUdhar(Udhar(personId = pid, gave = debit, amountPaise = amount, accountId = accountId, entryId = eid, note = "From bank SMS", time = time))
+                    eid
+                }
+                debit && "INVEST" in flags -> dao.upsertEntry(Entry(type = EType.INVEST, amountPaise = amount, accountId = accountId, merchant = merchant.ifBlank { null },
+                    upiApp = item.upiApp.ifBlank { null }, time = time, smsKey = item.key, vpa = item.vpa.ifBlank { null }, note = "Investment"))
                 else -> {
-                    val e = Entry(type = if (debit) EType.EXPENSE else EType.INCOME, amountPaise = amount, accountId = accountId,
+                    var e = Entry(type = if (debit) EType.EXPENSE else EType.INCOME, amountPaise = amount, accountId = accountId,
                         categoryId = categoryId, upiApp = item.upiApp.ifBlank { null }, merchant = merchant.ifBlank { null }, time = time, smsKey = item.key,
-                        note = if (kind == "REFUND") "Refund" else null)
+                        note = if (kind == "REFUND") "Refund" else null, vpa = item.vpa.ifBlank { null })
+                    if (kind == "REFUND") refundTarget(e)?.let { o -> e = e.copy(refundOf = o.id, categoryId = o.categoryId, note = "Refund for " + (o.merchant ?: "a purchase")) }
                     val id = dao.upsertEntry(e)
                     if (!merchant.isBlank()) remember(e)
                     id
                 }
             }
             dao.updateSms(item.copy(status = SmsStatus.ACCEPTED, entryId = id, accountId = accountId, categoryId = categoryId, merchant = merchant, amountPaise = amount))
+            if (item.itemsText.isNotBlank()) {
+                val shop = Insights.shopKey(merchant)
+                Insights.parseItems(item.itemsText).forEach { (n, p) -> dao.insertItem(EntryItem(entryId = id, name = n, pricePaise = p, shopKey = shop, time = time)) }
+            }
             // remember the last-4 for this account so the next SMS matches automatically
             if (item.last4.isNotBlank()) dao.account(accountId)?.let { a ->
                 val l4 = a.last4.split(',').map { it.trim() }.filter { it.isNotEmpty() }
@@ -273,17 +383,33 @@ class Repo(private val context: Context, val db: AppDb, val prefs: Prefs) {
             }
             id
         }
+        clearNotification(item)
+        return id
+    }
+
+    /** The purchase a refund pays back: same shop (or account) in the last 60 days, nearest amount first. */
+    private suspend fun refundTarget(r: Entry): Entry? {
+        val from = r.time - 60L * 86_400_000L
+        val c = dao.entriesNow().filter { it.type == EType.EXPENSE && !it.cancelled && it.time in from..r.time && it.amountPaise >= r.amountPaise }
+        val shop = Insights.shopKey(r.merchant)
+        val sameShop = c.filter { shop.isNotEmpty() && Insights.shopKey(it.merchant) == shop }
+        val pool = sameShop.ifEmpty { c.filter { it.accountId == r.accountId && it.amountPaise == r.amountPaise } }
+        return pool.minWithOrNull(compareBy<Entry>({ it.amountPaise - r.amountPaise }, { r.time - it.time }))
+    }
 
     /** Marks an SMS as saved after he edited it on the full entry screen, and remembers its last-4 for the account. */
     suspend fun linkSms(item: SmsItem, entryId: Long, accountId: Long) {
         dao.updateSms(item.copy(status = SmsStatus.ACCEPTED, entryId = entryId, accountId = accountId))
+        dao.entry(entryId)?.let { e -> if (e.vpa == null && item.vpa.isNotBlank()) dao.upsertEntry(e.copy(vpa = item.vpa)) }
+        if (item.itemsText.isNotBlank() && dao.itemsOf(entryId).isEmpty()) setItems(entryId, Insights.parseItems(item.itemsText))
         if (item.last4.isNotBlank()) dao.account(accountId)?.let { a ->
             val l4 = a.last4.split(',').map { it.trim() }.filter { it.isNotEmpty() }
             if (item.last4 !in l4) dao.upsertAccount(a.copy(last4 = (l4 + item.last4).joinToString(",")))
         }
+        clearNotification(item)
     }
 
-    suspend fun ignoreSms(item: SmsItem) = dao.updateSms(item.copy(status = SmsStatus.IGNORED))
+    suspend fun ignoreSms(item: SmsItem) { dao.updateSms(item.copy(status = SmsStatus.IGNORED)); clearNotification(item) }
     suspend fun restoreSms(item: SmsItem) = dao.updateSms(item.copy(status = if (item.amountPaise > 0 && item.confidence >= 70) SmsStatus.PENDING else SmsStatus.LOOK))
     suspend fun teach(l: Learned) = dao.insertLearned(l)
 
@@ -292,6 +418,7 @@ class Repo(private val context: Context, val db: AppDb, val prefs: Prefs) {
         db.withTransaction {
             dao.clearEntries(); dao.clearAttachments(); dao.clearAccounts(); dao.clearCategories(); dao.clearMerchants(); dao.clearRecurring()
             dao.clearPeople(); dao.clearUdhar(); dao.clearBudgets(); dao.clearGoals(); dao.clearSms(); dao.clearLearned()
+            dao.clearUpiNames(); dao.clearItems(); dao.clearReminders()
         }
         attDir().deleteRecursively()
         ensureCategories()
@@ -320,5 +447,12 @@ object DefaultData {
         Category(name = "Refund", kind = "INCOME", icon = "undo", colorIdx = 6, sort = 3),
         Category(name = "Gift", kind = "INCOME", icon = "gift", colorIdx = 7, sort = 4),
         Category(name = "Others", kind = "INCOME", icon = "more", colorIdx = 8, sort = 5),
+    ) + added()
+
+    /** Added in 1.1 for SMS insights (also added once on phones set up before). */
+    fun added(): List<Category> = listOf(
+        Category(name = "Bank charges", kind = "EXPENSE", icon = "bank", colorIdx = 3, sort = 13),
+        Category(name = "Insurance", kind = "EXPENSE", icon = "health", colorIdx = 4, sort = 14),
+        Category(name = "Cashback", kind = "INCOME", icon = "percent", colorIdx = 9, sort = 6),
     )
 }

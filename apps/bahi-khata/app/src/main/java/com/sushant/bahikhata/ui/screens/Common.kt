@@ -60,8 +60,8 @@ fun MainBar(title: String, actions: @Composable RowScope.() -> Unit = {}) {
 }
 
 @Composable
-fun Act(icon: ImageVector, desc: String, tag: String = desc, onClick: () -> Unit) =
-    IconButton(onClick = onClick, modifier = Modifier.testTag("act_$tag")) { Icon(icon, desc, tint = MaterialTheme.colorScheme.onSurfaceVariant) }
+fun Act(icon: ImageVector, desc: String, tag: String = desc, modifier: Modifier = Modifier, onClick: () -> Unit) =
+    IconButton(onClick = onClick, modifier = modifier.testTag("act_$tag")) { Icon(icon, desc, tint = MaterialTheme.colorScheme.onSurfaceVariant) }
 
 fun accLabel(a: Account?): String = when {
     a == null -> "Unknown account"
@@ -73,6 +73,8 @@ fun accLabel(a: Account?): String = when {
 fun entryTitle(e: Entry, cat: Category?, accs: Map<Long, Account>, people: Map<Long, Person> = emptyMap()): String = when (e.type) {
     EType.CARD_PAYMENT -> "Card bill paid · " + (accs[e.toAccountId ?: -1]?.name ?: "card")
     EType.CASH_WITHDRAWAL -> "Cash withdrawn"
+    EType.TRANSFER -> "Moved to " + (accs[e.toAccountId ?: -1]?.name ?: "your account")
+    EType.INVEST -> "Invested" + (e.merchant?.takeIf { it.isNotBlank() }?.let { " · $it" } ?: "")
     EType.ADJUSTMENT -> "Balance adjusted"
     EType.UDHAR_GAVE -> "Gave to " + (people[e.personId ?: -1]?.name ?: "someone")
     EType.UDHAR_GOT -> "Got back from " + (people[e.personId ?: -1]?.name ?: "someone")
@@ -84,9 +86,9 @@ fun entrySub(e: Entry, cat: Category?, accs: Map<Long, Account>): String {
     val via = e.upiApp?.takeIf { it.isNotBlank() }?.let { " via $it" } ?: ""
     return when (e.type) {
         EType.EXPENSE, EType.INCOME -> listOfNotNull(cat?.name.takeIf { !e.merchant.isNullOrBlank() }, "$acc$via").joinToString(" · ")
-        EType.CARD_PAYMENT, EType.CASH_WITHDRAWAL -> "From $acc"
+        EType.CARD_PAYMENT, EType.CASH_WITHDRAWAL, EType.TRANSFER -> "From $acc"
         else -> acc
-    }
+    } + (if (e.cancelled) " · cancelled" else "") + (if (e.refundOf != null) " · refund" else "")
 }
 
 /** Sign for display: spending and money leaving is negative. */
@@ -115,7 +117,7 @@ fun EntryRow(e: Entry, vm: com.sushant.bahikhata.ui.AppVm, onClick: () -> Unit, 
         leading = { IconBadge(Ico.entry(e, cat), bg, fg) },
         trailing = {
             Column(horizontalAlignment = Alignment.End) {
-                MoneyText(v, style = MaterialTheme.typography.titleSmall, sign = v > 0,
+                MoneyText(v, style = if (e.cancelled) MaterialTheme.typography.titleSmall.copy(textDecoration = androidx.compose.ui.text.style.TextDecoration.LineThrough) else MaterialTheme.typography.titleSmall, sign = v > 0,
                     color = when (e.type) { EType.EXPENSE -> bk.expense; EType.INCOME -> bk.income; else -> MaterialTheme.colorScheme.onSurfaceVariant })
                 Text(Dates.short(e.time), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }

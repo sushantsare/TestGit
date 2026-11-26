@@ -42,7 +42,17 @@ fun HomeScreen(vm: AppVm) {
     val cats by vm.catMap.collectAsStateWithLifecycle()
     val loaded by vm.loaded.collectAsStateWithLifecycle()
     val s by vm.settings.collectAsStateWithLifecycle()
+    val reminders by vm.reminders.collectAsStateWithLifecycle()
     val wide = LocalWide.current
+    val ctx = androidx.compose.ui.platform.LocalContext.current
+    // a card bill counts as paid once its payment SMS has come in, even before he OKs it
+    val paidBySms = pending.filter { it.kind == "CARD_PAYMENT" }.groupBy { it.accountId }.mapValues { e -> e.value.sumOf { it.amountPaise } }
+    // the bank's own balance (from its last SMS) against what the app shows for that moment
+    val mismatches = accounts.filter { !it.archived && it.type != AccType.CARD && it.bankBalAt > 0 && it.bankBalPaise >= 0 }.mapNotNull { a ->
+        val app = Ledger.netAt(a, entries, a.bankBalAt)
+        if (kotlin.math.abs(a.bankBalPaise - app) >= 100) Triple(a, a.bankBalPaise, app) else null
+    }
+    val soon = reminders.filter { !it.done && Insights.daysLeft(it) in 0..3 }.sortedBy { it.dueEpochDay }
 
     val r = Dates.monthRange(ym)
     // totals are worked out once per data change, not on every redraw
@@ -53,7 +63,7 @@ fun HomeScreen(vm: AppVm) {
     val dueCards = accounts.filter { it.type == AccType.CARD && !it.archived }.mapNotNull { c ->
         val b = Ledger.cardBill(c, nets[c.id] ?: 0, entries, today)
         if (b.bill > 0 && b.due != null) Triple(c, b, java.time.temporal.ChronoUnit.DAYS.between(today, b.due)) else null
-    }.filter { it.third in -3..20 }.sortedBy { it.third }
+    }.filter { it.third in -3..20 && (paidBySms[it.first.id] ?: 0L) < it.second.bill }.sortedBy { it.third }
     val recent = entries.filter { it.time in r || ym == YearMonth.now() }.take(8)
     val byCat = remember(entries, r) { Ledger.byCategory(entries, r) }
 
@@ -61,8 +71,8 @@ fun HomeScreen(vm: AppVm) {
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {
             MainBar("Bahi Khata") {
-                Act(if (s.hideAmounts) Icons.Outlined.VisibilityOff else Icons.Outlined.Visibility, if (s.hideAmounts) "Show amounts" else "Hide amounts", "hide") { vm.toggleHide() }
-                Act(Icons.Outlined.Search, "Search", "search") { nav.go("search") }
+                Act(if (s.hideAmounts) Icons.Outlined.VisibilityOff else Icons.Outlined.Visibility, if (s.hideAmounts) "Show amounts" else "Hide amounts", "hide") { vm.toggleHide(ctx) }
+                Act(Icons.Outlined.Search, "Search", "search", Modifier.searchMorph("search_home")) { nav.go("search") }
                 Act(Icons.Outlined.Settings, "Settings", "settings") { nav.go("settings") }
             }
         },
@@ -120,6 +130,27 @@ fun HomeScreen(vm: AppVm) {
                         val n = pending.size + look.size
                         Text("$n SMS ${if (n == 1) "entry needs" else "entries need"} your OK", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSecondaryContainer, modifier = Modifier.weight(1f))
                         Icon(Icons.Outlined.ChevronRight, null, tint = MaterialTheme.colorScheme.onSecondaryContainer)
+                    }
+                }
+                if (mismatches.isNotEmpty() && ym == YearMonth.now()) {
+                    SectionTitle("Balance check")
+                    BkCard(Modifier.padding(horizontal = 16.dp).fillMaxWidth()) {
+                        mismatches.forEach { (a, bank, app) ->
+                            ListRow(a.name, "Bank says ${hm(bank)} · app says ${hm(app)} (${Dates.short(a.bankBalAt)})", Modifier.testTag("mismatch_${a.id}"),
+                                leading = { Icon(Icons.Outlined.ErrorOutline, null, tint = bk.warn) }, trailing = { Chev() }, onClick = { nav.go("account/${a.id}") })
+                        }
+                    }
+                }
+                if (soon.isNotEmpty() && ym == YearMonth.now()) {
+                    SectionTitle("Coming up", "All") { nav.go("reminders") }
+                    BkCard(Modifier.padding(horizontal = 16.dp).fillMaxWidth()) {
+                        soon.forEach { r ->
+                            val d = Insights.daysLeft(r)
+                            ListRow(r.title, listOfNotNull(r.amountPaise.takeIf { it > 0 }?.let { hm(it) }, Dates.dayMonth(java.time.LocalDate.ofEpochDay(r.dueEpochDay))).joinToString(" · "),
+                                Modifier.testTag("soon_${r.id}"), leading = { Icon(Icons.Outlined.EventRepeat, null) },
+                                trailing = { Text(when (d) { 0L -> "today"; 1L -> "tomorrow"; else -> "in $d days" }, style = MaterialTheme.typography.labelLarge, color = if (d <= 1) bk.expense else MaterialTheme.colorScheme.onSurfaceVariant) },
+                                onClick = { nav.go("reminders") })
+                        }
                     }
                 }
                 if (dueCards.isNotEmpty()) {
