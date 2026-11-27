@@ -57,6 +57,10 @@ jobs:
       TARANG_KEYSTORE_PASSWORD: ${{ secrets.TARANG_KEYSTORE_PASSWORD }}
       TARANG_KEY_ALIAS: ${{ secrets.TARANG_KEY_ALIAS }}
       TARANG_KEY_PASSWORD: ${{ secrets.TARANG_KEY_PASSWORD }}
+      PAGEONE_KEYSTORE_B64: ${{ secrets.PAGEONE_KEYSTORE_B64 }}
+      PAGEONE_KEYSTORE_PASSWORD: ${{ secrets.PAGEONE_KEYSTORE_PASSWORD }}
+      PAGEONE_KEY_ALIAS: ${{ secrets.PAGEONE_KEY_ALIAS }}
+      PAGEONE_KEY_PASSWORD: ${{ secrets.PAGEONE_KEY_PASSWORD }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
@@ -73,6 +77,14 @@ jobs:
           if [ "${{ needs.target.outputs.name }}" = "tarang" ] && [ -n "$TARANG_KEYSTORE_B64" ]; then
             echo "$TARANG_KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/tarang.jks"
             export TARANG_KEYSTORE_FILE="$RUNNER_TEMP/tarang.jks"
+          fi
+          # PageOne: same rule (permanent key from secrets only)
+          if [ "${{ needs.target.outputs.name }}" = "pageone" ] && [ -n "$PAGEONE_KEYSTORE_B64" ]; then
+            echo "$PAGEONE_KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/pageone.jks"
+            export PAGEONE_KEYSTORE_FILE="$RUNNER_TEMP/pageone.jks"
+            echo "release-key" > /tmp/out/SIGNING
+          else
+            echo "debug-key" > /tmp/out/SIGNING
           fi
           ./gradlew :app:assembleRelease --stacktrace 2>&1 | tee /tmp/out/build.log
           # Apps with per-CPU APKs: deliver the 64-bit phone APK, keep all variants in apks/

@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut android:shortcutId="continue" android:enabled="true" android:icon="@drawable/ic_sc_continue"
+        android:shortcutShortLabel="@string/shortcut_continue">
+        <intent android:action="com.sushant.pageone.CONTINUE" android:targetPackage="com.sushant.pageone" android:targetClass="com.sushant.pageone.MainActivity" />
+    </shortcut>
+    <shortcut android:shortcutId="search" android:enabled="true" android:icon="@drawable/ic_sc_search"
+        android:shortcutShortLabel="@string/shortcut_search">
+        <intent android:action="com.sushant.pageone.SEARCH" android:targetPackage="com.sushant.pageone" android:targetClass="com.sushant.pageone.MainActivity" />
+    </shortcut>
+    <shortcut android:shortcutId="starred" android:enabled="true" android:icon="@drawable/ic_sc_star"
+        android:shortcutShortLabel="@string/shortcut_starred">
+        <intent android:action="com.sushant.pageone.STARRED" android:targetPackage="com.sushant.pageone" android:targetClass="com.sushant.pageone.MainActivity" />
+    </shortcut>
+</shortcuts>

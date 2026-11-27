@@ -11,3 +11,6 @@ apps/bahi-khata/**/*.keystore
 apps/tarang/**/*.jks
 apps/tarang/**/*.keystore
 !apps/tarang/debug.keystore
+apps/pageone/**/*.jks
+apps/pageone/**/*.keystore
+!apps/pageone/debug.keystore
