@@ -59,7 +59,8 @@ echo "home_folders=$FOLDERS" >> $LOG
 [ "$FOLDERS" -ge 3 ] && echo "library_scan=PASSED" >> $LOG || echo "library_scan=FAILED" >> $LOG
 
 # ---------- open a PDF exactly like WhatsApp / Files does (VIEW intent with a content:// Uri), timed
-ID=$(adb shell content query --uri content://media/external/file --projection _id:_display_name --where "_display_name='STET 2025 Paper 2 English.pdf'" 2>/dev/null | sed -n 's/.*_id=\([0-9]*\).*/\1/p' | head -1)
+idof() { adb shell content query --uri content://media/external/file --projection _id:_display_name 2>/dev/null | tr -d '\r' | grep "_display_name=$1" | sed -n 's/.*_id=\([0-9]*\),.*/\1/p' | head -1; }
+ID=$(idof "STET 2025 Paper 2 English.pdf")
 OPEN=FAILED
 if [ -n "$ID" ]; then
   adb shell am force-stop $PKG
@@ -69,14 +70,14 @@ if [ -n "$ID" ]; then
   hasid page_0 && OPEN=PASSED
   echo "open_from_other_app_ms=$T" >> $LOG
 fi
-echo "open_from_other_app=$OPEN" >> $LOG
+echo "open_from_other_app=$OPEN (id=$ID)" >> $LOG
 
 # volume keys off by default must not turn pages or crash; back to Home
 adb shell input keyevent KEYCODE_VOLUME_DOWN; sleep 1
 adb shell input keyevent KEYCODE_BACK; sleep 2
 
 # ---------- password PDF opens only with the right password
-PID=$(adb shell content query --uri content://media/external/file --projection _id:_display_name --where "_display_name='SBI Statement Oct 2026.pdf'" 2>/dev/null | sed -n 's/.*_id=\([0-9]*\).*/\1/p' | head -1)
+PID=$(idof "SBI Statement Oct 2026.pdf")
 PW=FAILED
 if [ -n "$PID" ]; then
   adb shell am start -a android.intent.action.VIEW -d "content://media/external/file/$PID" -t application/pdf -n $ACT >/dev/null 2>&1; sleep 4
@@ -85,7 +86,7 @@ if [ -n "$PID" ]; then
     hasid page_0 && PW=PASSED
   fi
 fi
-echo "password_pdf=$PW" >> $LOG
+echo "password_pdf=$PW (id=$PID)" >> $LOG
 
 # ---------- crashes, permissions, network
 CR=$(mycrash); echo "crashes=$CR" >> $LOG

@@ -129,12 +129,12 @@ class WalkthroughTest {
 
     /** Show (true) or hide (false) the reader's toolbars by tapping the page. */
     private fun chrome(visible: Boolean) {
-        repeat(3) {
+        repeat(2) {
             if (has("reader_find") == visible) return
             runCatching { compose.onNodeWithTag("page_0").performTouchInput { click(Offset(width * 0.5f, height * 0.6f)) } }
-            Thread.sleep(700); compose.waitForIdle()
+            if (runCatching { compose.waitUntil(3_000) { has("reader_find") == visible } }.isSuccess) return
         }
-        if (has("reader_find") != visible) problem("reader toolbars did not ${if (visible) "show" else "hide"}")
+        problem("reader toolbars did not ${if (visible) "show" else "hide"}")
     }
 
     private fun clickTab(t: String) { if (has("tab_$t")) click("tab_$t") else { repeat(4) { if (!has("tab_$t")) back() }; click("tab_$t", soft = true) } }
