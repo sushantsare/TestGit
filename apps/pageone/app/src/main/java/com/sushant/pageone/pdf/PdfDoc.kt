@@ -219,11 +219,16 @@ class PdfDoc private constructor(
                 // older Android can't pass a password to PdfRenderer: decrypt to a private copy first
                 openFile = PdfTools.decryptCopy(context, src, password)
             }
-            val pfd = ParcelFileDescriptor.open(openFile, ParcelFileDescriptor.MODE_READ_ONLY)
+            var pfd = ParcelFileDescriptor.open(openFile, ParcelFileDescriptor.MODE_READ_ONLY)
             val renderer = try {
                 if (password != null && Build.VERSION.SDK_INT >= 35) open35(pfd, password) else PdfRenderer(pfd)
             } catch (e: SecurityException) {
-                pfd.close(); throw PasswordNeeded(wrong = password != null)
+                pfd.close()
+                if (password == null) throw PasswordNeeded(false)
+                // some Android versions can't decrypt every kind of protection: decrypt a private copy instead
+                val dec = PdfTools.decryptCopy(context, src, password)          // throws PasswordNeeded(true) when wrong
+                pfd = ParcelFileDescriptor.open(dec, ParcelFileDescriptor.MODE_READ_ONLY)
+                try { PdfRenderer(pfd) } catch (e2: Exception) { pfd.close(); throw e2 }
             } catch (e: Exception) {
                 pfd.close()
                 if (password == null && PdfTools.isEncrypted(src)) throw PasswordNeeded(false)
