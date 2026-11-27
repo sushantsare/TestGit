@@ -111,7 +111,7 @@ fun ReaderScreen(main: MainVm, nav: NavHostController, ref: DocRef) {
                 container = MaterialTheme.colorScheme.errorContainer, content = MaterialTheme.colorScheme.onErrorContainer,
                 actionLabel = "Go back", onAction = { nav.popBackStack() }, secondLabel = "Open with…", onSecond = { runCatching { Outputs.openWith(context, vm.ref) } })
             is Status.NeedPassword -> PasswordDialog(st.wrong, vm.ref.name, onOpen = { vm.open(it) }, onCancel = { nav.popBackStack() })
-            Status.Ready -> if (doc != null) Body(vm, main, doc, s.pageMode, s.cropMargins, s.pageByPage)
+            Status.Ready -> if (doc != null) Body(vm, main, doc, s.pageMode, s.cropMargins, s.pageByPage, s.twoPages)
         }
 
         // ---------- top
@@ -291,7 +291,7 @@ private fun ReaderMenu(open: Boolean, close: () -> Unit, vm: ReaderVm, main: Mai
 
 /** The page area: scroll or page-by-page, pinch zoom, reflow, fast-scroll handle. */
 @Composable
-private fun BoxScope.Body(vm: ReaderVm, main: MainVm, doc: com.sushant.pageone.pdf.PdfDoc, pageMode: PageMode, crop: Boolean, paged: Boolean) {
+private fun BoxScope.Body(vm: ReaderVm, main: MainVm, doc: com.sushant.pageone.pdf.PdfDoc, pageMode: PageMode, crop: Boolean, paged: Boolean, twoPages: Boolean) {
     val density = LocalDensity.current
     val scope = rememberCoroutineScope()
     var view by remember { mutableStateOf(IntOffset(1, 1)) }
@@ -299,7 +299,7 @@ private fun BoxScope.Body(vm: ReaderVm, main: MainVm, doc: com.sushant.pageone.p
     val list = rememberLazyListState()
     val pager = rememberPagerState { doc.pageCount }
     val wide = with(density) { view.x.toDp() } >= 840.dp && view.x > view.y
-    val perRow = if (wide && !paged) 2 else 1
+    val perRow = if (twoPages && wide && !paged) 2 else 1      // one page per screen unless asked for
     val gap = with(density) { 10.dp.roundToPx() }
     // sideways (and, page by page, up/down) position of zoomed pages
     var ox by remember { mutableFloatStateOf(0f) }

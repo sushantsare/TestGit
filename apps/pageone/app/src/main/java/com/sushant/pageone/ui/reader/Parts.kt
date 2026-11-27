@@ -363,13 +363,17 @@ fun OptionsSheet(vm: ReaderVm, s: Settings, update: ((Settings) -> Settings) -> 
         ConnectedButtons(listOf("Scroll", "Page by page"), if (s.pageByPage) 1 else 0, { i -> update { it.copy(pageByPage = i == 1) } },
             Modifier.padding(horizontal = 24.dp).fillMaxWidth(), height = 40.dp, fill = true, tagPrefix = "scroll_mode")
         Spacer(Modifier.height(14.dp))
+        val wideScreen = androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp >= 840
+        val n = if (wideScreen) 7 else 6
         Group {
-            SettingSwitch(Icons.AutoMirrored.Rounded.Article, "Reflow text", if (doc.hasRichText) "Fit text to the screen" else "Fit text to the screen (text PDFs)", vm.reflow, { vm.reflow = it }, 0, 6, "opt_reflow")
-            SettingSwitch(Icons.Rounded.Crop, "Crop white margins", null, s.cropMargins, { v -> update { it.copy(cropMargins = v) } }, 1, 6, "opt_crop")
-            SettingNav(Icons.Rounded.Rotate90DegreesCw, "Rotate pages", if (vm.rotation == 0) "Upright" else "${vm.rotation}°", { vm.rotation = (vm.rotation + 90) % 360; vm.selection = null }, 2, 6, "opt_rotate", chevron = false)
-            SettingSwitch(Icons.Rounded.ScreenLockRotation, "Lock rotation", null, vm.lockRotation, { vm.lockRotation = it }, 3, 6, "opt_lock_rotation")
-            SettingSwitch(Icons.Rounded.LightMode, "Keep screen on", null, s.keepScreenOn, { v -> update { it.copy(keepScreenOn = v) } }, 4, 6, "opt_screen_on")
-            SettingSwitch(Icons.AutoMirrored.Rounded.VolumeUp, "Volume keys turn pages", null, s.volumeKeys, { v -> update { it.copy(volumeKeys = v) } }, 5, 6, "opt_volume")
+            SettingSwitch(Icons.AutoMirrored.Rounded.Article, "Reflow text", if (doc.hasRichText) "Fit text to the screen" else "Fit text to the screen (text PDFs)", vm.reflow, { vm.reflow = it }, 0, n, "opt_reflow")
+            SettingSwitch(Icons.Rounded.Crop, "Crop white margins", null, s.cropMargins, { v -> update { it.copy(cropMargins = v) } }, 1, n, "opt_crop")
+            if (wideScreen) SettingSwitch(Icons.Rounded.AutoStories, "Two pages side by side", "When the screen is wide", s.twoPages, { v -> update { it.copy(twoPages = v) } }, 2, n, "opt_two_pages")
+            val o = if (wideScreen) 1 else 0
+            SettingNav(Icons.Rounded.Rotate90DegreesCw, "Rotate pages", if (vm.rotation == 0) "Upright" else "${vm.rotation}°", { vm.rotation = (vm.rotation + 90) % 360; vm.selection = null }, 2 + o, n, "opt_rotate", chevron = false)
+            SettingSwitch(Icons.Rounded.ScreenLockRotation, "Lock rotation", null, vm.lockRotation, { vm.lockRotation = it }, 3 + o, n, "opt_lock_rotation")
+            SettingSwitch(Icons.Rounded.LightMode, "Keep screen on", null, s.keepScreenOn, { v -> update { it.copy(keepScreenOn = v) } }, 4 + o, n, "opt_screen_on")
+            SettingSwitch(Icons.AutoMirrored.Rounded.VolumeUp, "Volume keys turn pages", null, s.volumeKeys, { v -> update { it.copy(volumeKeys = v) } }, 5 + o, n, "opt_volume")
         }
     }
 }

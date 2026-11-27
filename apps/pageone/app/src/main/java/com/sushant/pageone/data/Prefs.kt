@@ -20,6 +20,8 @@ data class Settings(
     val rowProgress: Boolean = true,
     val pageByPage: Boolean = false,
     val keepScreenOn: Boolean = true,
+    /** Wide screens only: two pages side by side. Off = one page per screen everywhere. */
+    val twoPages: Boolean = false,
     val volumeKeys: Boolean = false,
     val cropMargins: Boolean = false,
     val pageMode: PageMode = PageMode.NORMAL,
@@ -48,6 +50,7 @@ class Prefs(context: Context) {
         rowProgress = sp.getBoolean("rowProgress", true),
         pageByPage = sp.getBoolean("pageByPage", false),
         keepScreenOn = sp.getBoolean("keepScreenOn", true),
+        twoPages = sp.getBoolean("twoPages", false),
         volumeKeys = sp.getBoolean("volumeKeys", false),
         cropMargins = sp.getBoolean("cropMargins", false),
         pageMode = runCatching { PageMode.valueOf(sp.getString("pageMode", "NORMAL")!!) }.getOrDefault(PageMode.NORMAL),
@@ -72,6 +75,7 @@ class Prefs(context: Context) {
             .putBoolean("rowProgress", n.rowProgress)
             .putBoolean("pageByPage", n.pageByPage)
             .putBoolean("keepScreenOn", n.keepScreenOn)
+            .putBoolean("twoPages", n.twoPages)
             .putBoolean("volumeKeys", n.volumeKeys)
             .putBoolean("cropMargins", n.cropMargins)
             .putString("pageMode", n.pageMode.name)
