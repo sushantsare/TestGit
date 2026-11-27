@@ -17,9 +17,12 @@ object Downloads {
         val url: String, val title: String, val thumb: String,
         val site: String, val quality: String, val playlist: Boolean,
         val opts: DlOpts = DlOpts(),
+        /** Stays the same across pause/resume and retry, so the half-downloaded part is found again. */
+        val key: String = "",
     )
 
-    fun enqueue(ctx: Context, job: Job): UUID {
+    fun enqueue(ctx: Context, job0: Job, resume: Boolean = false): UUID {
+        val job = if (job0.key.isBlank()) job0.copy(key = UUID.randomUUID().toString()) else job0
         val req = OneTimeWorkRequestBuilder<DownloadWorker>()
             .setInputData(
                 workDataOf(
@@ -30,6 +33,8 @@ object Downloads {
                     DownloadWorker.K_QUALITY to job.quality,
                     DownloadWorker.K_PLAYLIST to job.playlist,
                     DownloadWorker.K_OPTS to job.opts.encode(),
+                    DownloadWorker.K_KEY to job.key,
+                    DownloadWorker.K_RESUME to resume,
                 )
             )
             .setExpedited(OutOfQuotaPolicy.RUN_AS_NON_EXPEDITED_WORK_REQUEST)
@@ -41,6 +46,7 @@ object Downloads {
             .addTag("q:${job.quality}")
             .addTag("p:${job.playlist}")
             .addTag("o:${job.opts.encode()}")
+            .addTag("k:${job.key}")
             .addTag("c:${System.currentTimeMillis()}")
             .build()
         WorkManager.getInstance(ctx).enqueue(req)
@@ -60,7 +66,41 @@ object Downloads {
         quality = w.tag("q:").ifBlank { "best" },
         playlist = w.tag("p:") == "true",
         opts = DlOpts.decode(w.tag("o:")),
+        key = w.tag("k:"),
     )
+
+    /** Folder holding a job's half-finished files. */
+    fun partDir(ctx: Context, key: String) = java.io.File(ctx.cacheDir, "dl/$key")
+
+    private fun hasPart(ctx: Context, key: String): Boolean =
+        partDir(ctx, key).walkTopDown().any { it.isFile && it.length() > 0 }
+
+    /** Stops a running download but keeps what it already downloaded. */
+    fun pause(ctx: Context, w: WorkInfo) {
+        val job = jobOf(w).let { if (it.key.isBlank()) it.copy(key = w.id.toString()) else it }
+        val p = w.progress
+        com.sushant.grabbit.data.Paused.add(
+            com.sushant.grabbit.data.PausedItem(
+                job, p.getFloat(DownloadWorker.P_PCT, 0f), p.getString(DownloadWorker.P_SIZE).orEmpty(),
+                canContinue = hasPart(ctx, job.key), time = System.currentTimeMillis(),
+            )
+        )
+        // Stop the job first so the worker sees it was stopped (not failed) and keeps the part file
+        WorkManager.getInstance(ctx).cancelWorkById(w.id)
+        runCatching { YoutubeDL.getInstance().destroyProcessById(w.id.toString()) }
+    }
+
+    /** Starts a paused download again; yt-dlp continues from the part file. */
+    fun resume(ctx: Context, item: com.sushant.grabbit.data.PausedItem): UUID {
+        com.sushant.grabbit.data.Paused.remove(item.job.key)
+        return enqueue(ctx, item.job, resume = true)
+    }
+
+    /** Cancels a paused download and deletes its part file. */
+    fun discard(ctx: Context, item: com.sushant.grabbit.data.PausedItem) {
+        com.sushant.grabbit.data.Paused.remove(item.job.key)
+        partDir(ctx, item.job.key).deleteRecursively()
+    }
 
     fun created(w: WorkInfo): Long = w.tag("c:").toLongOrNull() ?: 0L
 }

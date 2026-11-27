@@ -53,6 +53,7 @@
             </intent-filter>
         </activity>
 
+        <receiver android:name=".download.PauseReceiver" android:exported="false" />
         <service
             android:name="androidx.work.impl.foreground.SystemForegroundService"
             android:foregroundServiceType="dataSync"

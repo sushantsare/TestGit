@@ -13,6 +13,7 @@ class GrabbitApp : Application() {
         Prefs.init(this)
         Cookies.init(this)
         Library.init(this)
+        com.sushant.grabbit.data.Paused.init(this)
         Notifs.createChannels(this)
         Engine.start(this)
     }

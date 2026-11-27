@@ -24,6 +24,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.OpenInNew
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.Pause
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.ErrorOutline
 import androidx.compose.material.icons.rounded.Link
@@ -94,6 +95,7 @@ fun DownloadsScreen(vm: MainViewModel, modifier: Modifier) {
     val sp = LocalSpacing.current
     val works by vm.works.collectAsState()
     val library by vm.library.collectAsState()
+    val paused by vm.paused.collectAsState()
     var filter by rememberSaveable { mutableStateOf("All") }
     var query by rememberSaveable { mutableStateOf("") }
     var sort by rememberSaveable { mutableIntStateOf(0) }
@@ -134,7 +136,7 @@ fun DownloadsScreen(vm: MainViewModel, modifier: Modifier) {
             }
         }
 
-        if (active.isEmpty() && library.isEmpty()) {
+        if (active.isEmpty() && paused.isEmpty() && library.isEmpty()) {
             item(key = "empty") {
                 EmptyState(
                     EmptyType.FIRST_TIME, "No downloads yet", "Videos you grab show up here and in your gallery",
@@ -145,9 +147,19 @@ fun DownloadsScreen(vm: MainViewModel, modifier: Modifier) {
             return@LazyColumn
         }
 
-        if (active.isNotEmpty()) {
-            item(key = "activeLabel") { SectionLabel("In progress · ${active.size}") }
+        if (active.isNotEmpty() || paused.isNotEmpty()) {
+            val running = active.filter { !it.state.isFinished }
+            item(key = "activeLabel") {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    SectionLabel("In progress · ${active.size + paused.size}", Modifier.weight(1f))
+                    if (running.size + paused.size >= 2) {
+                        if (running.isNotEmpty()) TextButton(onClick = { vm.pauseAll(running) }, modifier = Modifier.testTag("pauseAll")) { Text("Pause all") }
+                        else TextButton(onClick = { vm.resumeAll() }, modifier = Modifier.testTag("resumeAll")) { Text("Resume all") }
+                    }
+                }
+            }
             items(active, key = { it.id.toString() }) { w -> ActiveCard(w, vm, Modifier.animateItem()) }
+            items(paused, key = { "p_" + it.job.key }) { p -> PausedCard(p, vm, Modifier.animateItem()) }
             item(key = "activeGap") { Spacer(Modifier.height(sp.s)) }
         }
 
@@ -209,6 +221,7 @@ private fun ActiveCard(w: WorkInfo, vm: MainViewModel, modifier: Modifier) {
                 Text(listOf(job.site, qualityText(job.quality)).filter { it.isNotBlank() }.joinToString(" · "),
                     style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
             }
+            IconButton(onClick = { vm.pause(w) }, modifier = Modifier.testTag("pauseBtn")) { Icon(Icons.Rounded.Pause, "Pause download") }
             IconButton(onClick = { vm.cancel(w.id) }) { Icon(Icons.Rounded.Close, "Cancel download") }
         }
         val p = w.progress
@@ -379,5 +392,38 @@ private fun SearchSortRow(query: String, onQuery: (String) -> Unit, sort: Int, o
                 }
             }
         }
+    }
+}
+
+
+@Composable
+private fun PausedCard(p: com.sushant.grabbit.data.PausedItem, vm: MainViewModel, modifier: Modifier) {
+    val sp = LocalSpacing.current
+    val sz = LocalSizes.current
+    val job = p.job
+    AppCard(modifier.testTag("pausedCard"), padding = sp.m) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            VideoThumb(job.thumb, isAudioQuality(job.quality), Modifier.width(sz.rowThumbW).height(sz.rowThumbH))
+            Spacer(Modifier.width(sp.m))
+            Column(Modifier.weight(1f)) {
+                Text(job.title.ifBlank { job.url }, style = MaterialTheme.typography.titleSmall, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                Text(listOf(job.site, qualityText(job.quality)).filter { it.isNotBlank() }.joinToString(" · "),
+                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
+            }
+            IconButton(onClick = { vm.resume(p) }, modifier = Modifier.testTag("resumeBtn")) { Icon(Icons.Rounded.PlayArrow, "Resume download") }
+            IconButton(onClick = { vm.discard(p) }) { Icon(Icons.Rounded.Close, "Cancel download") }
+        }
+        Spacer(Modifier.height(sp.m))
+        Text(
+            if (!p.canContinue) "Paused · will start again from the beginning"
+            else listOf("Paused", if (p.pct > 0) "${p.pct.toInt()}%" else "", p.size).filter { it.isNotBlank() }.joinToString(" · "),
+            style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(Modifier.height(sp.s))
+        LinearProgressIndicator(
+            progress = { if (p.canContinue) p.pct / 100f else 0f },
+            modifier = Modifier.fillMaxWidth().height(sz.progress), strokeCap = StrokeCap.Round, gapSize = 0.dp, drawStopIndicator = {},
+            color = MaterialTheme.colorScheme.outline,
+        )
     }
 }

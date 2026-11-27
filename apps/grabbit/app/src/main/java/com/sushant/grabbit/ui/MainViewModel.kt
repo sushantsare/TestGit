@@ -124,6 +124,14 @@ class MainViewModel(private val app: Application) : AndroidViewModel(app) {
 
     fun cancel(id: UUID) = Downloads.cancel(app, id)
 
+    val paused = com.sushant.grabbit.data.Paused.items
+
+    fun pause(w: WorkInfo) = Downloads.pause(app, w)
+    fun resume(p: com.sushant.grabbit.data.PausedItem) { Downloads.resume(app, p) }
+    fun discard(p: com.sushant.grabbit.data.PausedItem) = Downloads.discard(app, p)
+    fun pauseAll(running: List<WorkInfo>) = running.forEach { Downloads.pause(app, it) }
+    fun resumeAll() = paused.value.forEach { Downloads.resume(app, it) }
+
     fun hide(id: UUID) {
         hidden = hidden + id.toString()
         Prefs.hidden = hidden

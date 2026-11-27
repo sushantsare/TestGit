@@ -352,6 +352,50 @@ class GrabbitE2ETest {
         r.release(); d
     }.getOrDefault(-1)
 
+    /** Pause mid-download, "restart" (reload the paused list from disk), resume, and check the finished file is whole. */
+    private fun pauseFlow(fast: Boolean): String {
+        val info = runCatching { runBlocking { com.sushant.grabbit.engine.Media.fetchInfo(ctx, "https://x.com/SpaceX/status/1732824684683784516") } }.getOrNull()
+            ?: return "pause=noInfo"
+        val vm = ViewModelProvider(compose.activity)[MainViewModel::class.java]
+        val wm = WorkManager.getInstance(ctx)
+        Prefs.fasterDownloads = fast
+        val name = if (fast) "fast" else "single"
+        return runCatching {
+            val before = Library.items.value.size
+            compose.activity.runOnUiThread { vm.download(info, "h720", com.sushant.grabbit.download.DlOpts()) }
+            compose.onNodeWithTag("nav_downloads").performClick()
+            // Wait until it is properly under way
+            var running: androidx.work.WorkInfo? = null
+            compose.waitUntil(120_000) {
+                running = wm.getWorkInfosByTag(Downloads.TAG).get().firstOrNull {
+                    it.state == androidx.work.WorkInfo.State.RUNNING && it.progress.getFloat(com.sushant.grabbit.download.DownloadWorker.P_PCT, 0f) >= 8f
+                }
+                running != null
+            }
+            val pctAtPause = running!!.progress.getFloat(com.sushant.grabbit.download.DownloadWorker.P_PCT, 0f)
+            compose.onAllNodesWithTag("pauseBtn")[0].performClick()
+            compose.waitUntil(20_000) { com.sushant.grabbit.data.Paused.items.value.isNotEmpty() }
+            Thread.sleep(3000)
+            val p = com.sushant.grabbit.data.Paused.items.value.first()
+            val partBytes = Downloads.partDir(ctx, p.job.key).walkTopDown().filter { it.isFile }.sumOf { it.length() }
+            shot("pause_${name}_1_paused")
+            // Simulate closing the app: reload the paused list from storage
+            com.sushant.grabbit.data.Paused.init(ctx)
+            val survived = com.sushant.grabbit.data.Paused.has(p.job.key)
+            compose.waitForIdle()
+            val tResume = System.currentTimeMillis()
+            compose.onAllNodesWithTag("resumeBtn")[0].performClick()
+            compose.waitUntil(300_000) { Library.items.value.size > before }
+            val ms = System.currentTimeMillis() - tResume
+            val done = Library.items.value.maxByOrNull { it.time }!!
+            val d = durationMs(done.uri)
+            shot("pause_${name}_2_done")
+            log("PAUSE $name pctAtPause=$pctAtPause partBytes=$partBytes canContinue=${p.canContinue} survived=$survived resumeMs=$ms bytes=${done.size} durationMs=$d")
+            "pause_$name=${partBytes > 0 && p.canContinue && survived && done.size > 10_000_000 && d > 100_000}"
+        }.getOrElse { log("PAUSE $name failed: ${it.message}"); shot("pause_${name}_fail"); "pause_$name=false" }
+            .also { Prefs.fasterDownloads = true }
+    }
+
     /** Same X video with Faster downloads off (one connection) and on (aria2c); the worker logs TIMING lines. */
     private fun speedFlow(): String {
         val info = runCatching { runBlocking { com.sushant.grabbit.engine.Media.fetchInfo(ctx, "https://x.com/SpaceX/status/1732824684683784516") } }.getOrNull()
@@ -546,8 +590,9 @@ class GrabbitE2ETest {
         val threads = threadsFlow()
         val options = optionsFlow()
         val speed = speedFlow()
+        val pause = pauseFlow(false) + " " + pauseFlow(true)
 
-        log("SUMMARY direct=$direct x=$x dailymotion=$dm facebook=$fb youtube=$youtube share=$share threads=$threads $options $renamed $speed")
+        log("SUMMARY direct=$direct x=$x dailymotion=$dm facebook=$fb youtube=$youtube share=$share threads=$threads $options $renamed $speed $pause")
         results.forEach { Log.i("GrabbitE2E", "RESULT $it") }
         assertTrue("Downloads failed", direct && x)
         assertTrue("Share sheet download failed", share)

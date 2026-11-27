@@ -48,6 +48,11 @@ object Notifs {
             .setOngoing(true)
             .setOnlyAlertOnce(true)
             .setContentIntent(openApp(ctx))
+            .addAction(0, "Pause", PendingIntent.getBroadcast(
+                ctx, workId.hashCode(),
+                Intent(ctx, PauseReceiver::class.java).putExtra(PauseReceiver.EXTRA_ID, workId.toString()),
+                PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+            ))
             .addAction(0, "Cancel", cancel)
             .build()
     }

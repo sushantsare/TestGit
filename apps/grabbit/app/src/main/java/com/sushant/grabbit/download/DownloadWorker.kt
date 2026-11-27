@@ -34,6 +34,8 @@ class DownloadWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(c
         const val K_QUALITY = "quality"
         const val K_PLAYLIST = "playlist"
         const val K_OPTS = "opts"
+        const val K_KEY = "key"
+        const val K_RESUME = "resume"
         const val K_ERROR = "error"
         const val K_RAW = "raw"
         const val P_PCT = "p"
@@ -115,7 +117,14 @@ class DownloadWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(c
 
         if (!Engine.awaitReady()) return fail(Engine.failMessage(), "")
 
-        val tmp = File(ctx.cacheDir, "dl/$id").apply { deleteRecursively(); mkdirs() }
+        val key = inputData.getString(K_KEY)?.ifBlank { null } ?: id.toString()
+        val resuming = inputData.getBoolean(K_RESUME, false)
+        val tmp = Downloads.partDir(ctx, key).apply { if (!resuming) deleteRecursively(); mkdirs() }
+        // Paused (not cancelled): keep the part file so Resume continues from here
+        fun stoppedResult(): Result {
+            if (!com.sushant.grabbit.data.Paused.has(key)) tmp.deleteRecursively()
+            return Result.failure(workDataOf(K_ERROR to "Cancelled"))
+        }
         // Threads: find the post's direct video file first (yt-dlp can't read Threads pages)
         val source = if (Threads.isThreads(url) || InstaStory.isStory(url)) {
             try {
@@ -202,10 +211,7 @@ class DownloadWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(c
                 grab(opts)
             }
         } catch (e: Exception) {
-            if (isStopped) {
-                tmp.deleteRecursively()
-                return Result.failure(workDataOf(K_ERROR to "Cancelled"))
-            }
+            if (isStopped || com.sushant.grabbit.data.Paused.has(key)) return stoppedResult()
             val raw = e.message ?: e.toString()
             // A playlist with a few broken items still counts if something was downloaded
             val partialPlaylist = playlist && tmp.walkTopDown().any {
