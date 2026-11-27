@@ -328,6 +328,27 @@ class WalkthroughTest {
         clickTab("home"); shot("home"); click("open_settings"); shot("settings"); back()
         app.prefs.update { it.copy(themeMode = ThemeMode.LIGHT, pureBlack = false) }; suffix = ""
 
+        // ---------- app lock: coming back to PageOne brings up the unlock prompt by itself (no tap)
+        val dev = UiDevice.getInstance(inst)
+        dev.executeShellCommand("locksettings set-pin 1234")      // the emulator has no fingerprint; the phone PIN stands in
+        try {
+            app.prefs.update { it.copy(appLock = true) }
+            val launch = app.packageManager.getLaunchIntentForPackage(app.packageName)!!.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            for (round in 1..2) {
+                dev.pressHome(); Thread.sleep(1500)
+                app.startActivity(launch)
+                val shown = dev.wait(androidx.test.uiautomator.Until.hasObject(By.textContains("Unlock PageOne")), 8_000)
+                log("app lock round $round: prompt shown by itself = $shown")
+                if (round == 1) shot("lock_prompt")
+                if (!shown) { problem("app lock: unlock prompt did not come up by itself (round $round)"); break }
+                dev.executeShellCommand("input text 1234"); Thread.sleep(300); dev.pressEnter(); Thread.sleep(2000)
+                log("app lock round $round: unlocked = ${!has("lock_screen")}")
+            }
+        } finally {
+            app.prefs.update { it.copy(appLock = false) }
+            dev.executeShellCommand("locksettings clear --old 1234")
+        }
+
         runCatching { scenario.close() }          // the activity may already be in the background
         log("walkthrough done: $shots screenshots, ${problems.size} problems")
         assertTrue("Problems: $problems", problems.isEmpty())

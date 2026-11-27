@@ -142,8 +142,6 @@
     <string name="app_lock">App lock</string>
     <string name="app_lock_sub">Face, fingerprint or phone PIN</string>
     <string name="files_access">Files access</string>
-    <string name="offline_title">Works fully offline</string>
-    <string name="offline_body">PageOne has no internet access. Your files stay on this phone.</string>
     <string name="about">About</string>
     <string name="about_pageone">About PageOne</string>
     <string name="version">Version %1$s</string>
@@ -152,14 +150,13 @@
     <string name="email">Email</string>
     <string name="developer_email">sushant.sare@gmail.com</string>
     <string name="licences">Open-source licences</string>
-    <string name="privacy_note">No internet, no ads, no tracking. Everything stays on your phone.</string>
     <string name="locked_title">PageOne is locked</string>
     <string name="locked_body">Unlock with face, fingerprint or your phone PIN</string>
     <string name="unlock_prompt_title">Unlock PageOne</string>
     <string name="unlock_prompt_sub">Use face, fingerprint or screen lock</string>
     <string name="setup_step">Step %1$d of %2$d</string>
     <string name="setup1_title">Welcome to PageOne</string>
-    <string name="setup1_body">Open, read and mark up every PDF on your phone. Fast, offline and private.</string>
+    <string name="setup1_body">Open, read and mark up every PDF on your phone.</string>
     <string name="setup2_title">Find all your PDFs</string>
     <string name="setup2_body">Allow “All files access” so PageOne can list PDFs from WhatsApp, Telegram and Downloads. Nothing leaves your phone.</string>
     <string name="skip">Skip</string>

@@ -95,9 +95,8 @@ fun SettingsScreen(vm: MainVm, nav: NavHostController) {
                     if (!v) vm.update { it.copy(appLock = false) }
                     else if (act != null && canUnlock(act)) authenticate(act, "Turn on app lock", onOk = { vm.update { it.copy(appLock = true) }; vm.message("App lock is on") })
                     else vm.message("Set a screen lock on your phone first")
-                }, 0, 3, "set_app_lock")
-                SettingNav(Icons.Rounded.FolderOpen, "Files access", if (access) "Allowed" else "Not allowed · tap to allow", { openAllFilesSettings(context) }, 1, 3, "set_files_access")
-                SettingNav(Icons.Rounded.WifiOff, "Works fully offline", "PageOne has no internet access. Your files stay on this phone.", null, 2, 3, "set_offline")
+                }, 0, 2, "set_app_lock")
+                SettingNav(Icons.Rounded.FolderOpen, "Files access", if (access) "Allowed" else "Not allowed · tap to allow", { openAllFilesSettings(context) }, 1, 2, "set_files_access")
             }
             Label("About")
             Group { SettingNav(Icons.Rounded.Info, "About PageOne", "Version ${BuildConfig.VERSION_NAME}", { nav.navigate(Routes.ABOUT) }, 0, 1, "set_about") }
@@ -147,12 +146,11 @@ fun AboutScreen(vm: MainVm, nav: NavHostController) {
                 modifier = Modifier.clip(RoundedCornerShape(8.dp)).clickable { taps++; if (taps >= 5) { taps = 0; nav.navigate(Routes.DIAGNOSTICS) } }.padding(8.dp).testTag("about_version"))
             Spacer(Modifier.height(20.dp))
             Group {
-                SettingNav(Icons.Rounded.Person, "Developer", "Sushant Kumar", null, 0, 4, "about_dev")
+                SettingNav(Icons.Rounded.Person, "Developer", "Sushant Kumar", null, 0, 3, "about_dev")
                 SettingNav(Icons.Rounded.Mail, "Email", "sushant.sare@gmail.com", {
                     runCatching { context.startActivity(Intent(Intent.ACTION_SENDTO, Uri.parse("mailto:sushant.sare@gmail.com"))) }
-                }, 1, 4, "about_email")
-                SettingNav(Icons.Rounded.Gavel, "Open-source licences", null, { licences = true }, 2, 4, "about_licences")
-                SettingNav(Icons.Rounded.Shield, "Privacy", "No internet, no ads, no tracking. Everything stays on your phone.", null, 3, 4, "about_privacy")
+                }, 1, 3, "about_email")
+                SettingNav(Icons.Rounded.Gavel, "Open-source licences", null, { licences = true }, 2, 3, "about_licences")
             }
             Spacer(Modifier.height(32.dp))
         }

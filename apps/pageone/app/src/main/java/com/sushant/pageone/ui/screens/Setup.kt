@@ -3,6 +3,8 @@ package com.sushant.pageone.ui.screens
 import androidx.activity.compose.BackHandler
 import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricPrompt
+import androidx.compose.runtime.DisposableEffect
+import androidx.lifecycle.LifecycleEventObserver
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
@@ -112,7 +114,7 @@ fun SetupScreen(vm: MainVm, onDone: () -> Unit) {
 
 private val titles = listOf("Welcome to PageOne", "Find all your PDFs", "Pick your look", "You’re all set")
 private val bodies = listOf(
-    "Open, read and mark up every PDF on your phone. Fast, offline and private.",
+    "Open, read and mark up every PDF on your phone.",
     "Allow “All files access” so PageOne can list PDFs from WhatsApp, Telegram and Downloads. Nothing leaves your phone.",
     "Use your wallpaper colours, light or dark, and pure black for OLED screens.",
     "Tap any PDF to start reading. Use + on Home to merge PDFs and photos, split pages or compress.",
@@ -180,10 +182,10 @@ fun canUnlock(activity: FragmentActivity): Boolean =
     BiometricManager.from(activity).canAuthenticate(UNLOCK_AUTH) == BiometricManager.BIOMETRIC_SUCCESS
 
 /** Android's own unlock sheet: face, fingerprint or phone PIN/pattern, whichever you use first. */
-fun authenticate(activity: FragmentActivity, title: String, onOk: () -> Unit, onFail: (String?) -> Unit = {}) {
+fun authenticate(activity: FragmentActivity, title: String, onOk: () -> Unit, onFail: (code: Int) -> Unit = {}) {
     val prompt = BiometricPrompt(activity, ContextCompat.getMainExecutor(activity), object : BiometricPrompt.AuthenticationCallback() {
         override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) = onOk()
-        override fun onAuthenticationError(errorCode: Int, errString: CharSequence) = onFail(errString.toString())
+        override fun onAuthenticationError(errorCode: Int, errString: CharSequence) = onFail(errorCode)
     })
     val info = BiometricPrompt.PromptInfo.Builder()
         .setTitle(title)
@@ -196,8 +198,44 @@ fun authenticate(activity: FragmentActivity, title: String, onOk: () -> Unit, on
 @Composable
 fun LockScreen(activity: FragmentActivity, onUnlocked: () -> Unit, onClose: () -> Unit) {
     BackHandler { onClose() }
-    val ask = { authenticate(activity, "Unlock PageOne", onUnlocked) }
-    LaunchedEffect(Unit) { delay(250); ask() }
+    // One prompt at a time; a system cancel (app not fully in front yet) is retried once, your own cancel is not.
+    val prompting = remember { java.util.concurrent.atomic.AtomicBoolean(false) }
+    var retried by remember { mutableStateOf(false) }
+    val window = activity.window.decorView
+
+    fun ask() {
+        if (!activity.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) return
+        if (!prompting.compareAndSet(false, true)) return
+        authenticate(activity, "Unlock PageOne",
+            onOk = { prompting.set(false); onUnlocked() },
+            onFail = { code ->
+                prompting.set(false)
+                if (code == BiometricPrompt.ERROR_CANCELED && !retried) { retried = true; window.postDelayed({ ask() }, 400) }
+            })
+    }
+
+    /** Ask only once the app is really in front: resumed, with the splash gone and the window focused. */
+    fun askWhenReady() {
+        if (activity.hasWindowFocus()) { window.post { ask() }; return }
+        val vto = window.viewTreeObserver
+        val l = object : android.view.ViewTreeObserver.OnWindowFocusChangeListener {
+            override fun onWindowFocusChanged(hasFocus: Boolean) {
+                if (!hasFocus) return
+                window.viewTreeObserver.removeOnWindowFocusChangeListener(this)
+                window.post { ask() }
+            }
+        }
+        vto.addOnWindowFocusChangeListener(l)
+    }
+
+    // every time PageOne comes to the front while locked: launch, switching back, screen turned on
+    val owner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+    DisposableEffect(owner) {
+        val obs = LifecycleEventObserver { _, e -> if (e == Lifecycle.Event.ON_RESUME) { retried = false; askWhenReady() } }
+        owner.lifecycle.addObserver(obs)
+        onDispose { owner.lifecycle.removeObserver(obs) }
+    }
+
     Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface).clickable(remember { MutableInteractionSource() }, null) {}.testTag("lock_screen"),
         contentAlignment = Alignment.Center) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -206,7 +244,7 @@ fun LockScreen(activity: FragmentActivity, onUnlocked: () -> Unit, onClose: () -
             Text("PageOne is locked", style = MaterialTheme.typography.headlineSmall)
             Text("Unlock with face, fingerprint or your phone PIN", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 6.dp))
             Spacer(Modifier.height(28.dp))
-            FilledTonalButton(onClick = ask, modifier = Modifier.testTag("unlock")) { Icon(Icons.Rounded.Fingerprint, null); Spacer(Modifier.width(8.dp)); Text("Unlock") }
+            FilledTonalButton(onClick = { ask() }, modifier = Modifier.testTag("unlock")) { Icon(Icons.Rounded.Fingerprint, null); Spacer(Modifier.width(8.dp)); Text("Unlock") }
         }
     }
 }
