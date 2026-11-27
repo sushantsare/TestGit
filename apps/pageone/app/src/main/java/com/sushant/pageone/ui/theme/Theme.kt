@@ -63,7 +63,19 @@ fun PageOneTheme(
             motionScheme = MotionScheme.expressive(),
             typography = PageOneTypography,
             shapes = PageOneShapes,
-            content = content,
-        )
+        ) {
+            // text outside a Surface must follow the theme, not default to black
+            CompositionLocalProvider(androidx.compose.material3.LocalContentColor provides scheme.onBackground) {
+                val view = androidx.compose.ui.platform.LocalView.current
+                if (!view.isInEditMode) androidx.compose.runtime.SideEffect {
+                    (view.context as? android.app.Activity)?.window?.let { w ->
+                        androidx.core.view.WindowCompat.getInsetsController(w, view).apply {
+                            isAppearanceLightStatusBars = !dark; isAppearanceLightNavigationBars = !dark
+                        }
+                    }
+                }
+                content()
+            }
+        }
     }
 }
