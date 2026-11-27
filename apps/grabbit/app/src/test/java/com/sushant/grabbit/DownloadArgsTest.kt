@@ -62,7 +62,7 @@ class DownloadArgsTest {
         assertTrue(a.has("--split-chapters"))
         assertTrue(a.any { it.second?.startsWith("chapter:/tmp/x/ch_") == true })
         assertEquals("intro,sponsor", a.v("--sponsorblock-remove"))
-        assertEquals("4", a.v("--concurrent-fragments"))
+        assertEquals("8", a.v("--concurrent-fragments"))
         assertFalse(args("best", g = GlobalOpts(sponsorCats = setOf("sponsor"))).has("--sponsorblock-remove"))
         assertFalse(args("best", g = GlobalOpts(faster = false)).has("--concurrent-fragments"))
     }
