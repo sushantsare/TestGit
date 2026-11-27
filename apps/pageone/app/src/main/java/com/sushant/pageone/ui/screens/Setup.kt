@@ -16,6 +16,7 @@ import androidx.compose.material.icons.automirrored.rounded.ArrowForward
 import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -36,6 +37,8 @@ import com.sushant.pageone.ui.MainVm
 import com.sushant.pageone.ui.components.*
 import com.sushant.pageone.ui.theme.ThemeMode
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.launch
 
 private data class Shapelet(val kind: ExpressiveKind, val icon: ImageVector, val size: Dp, val x: Dp, val y: Dp, val rot: Float, val primary: Int)
 
@@ -156,9 +159,9 @@ private fun OpeningAnimation() {
     val scale = remember { Animatable(0.4f) }
     val turn = remember { Animatable(-90f) }
     LaunchedEffect(Unit) {
-        kotlinx.coroutines.coroutineScope {
-            kotlinx.coroutines.launch { scale.animateTo(1f, spring(dampingRatio = 0.55f, stiffness = Spring.StiffnessLow)) }
-            kotlinx.coroutines.launch { turn.animateTo(0f, tween(900, easing = FastOutSlowInEasing)) }
+        coroutineScope {
+            launch { scale.animateTo(1f, spring(dampingRatio = 0.55f, stiffness = Spring.StiffnessLow)) }
+            launch { turn.animateTo(0f, tween(900, easing = FastOutSlowInEasing)) }
         }
     }
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {

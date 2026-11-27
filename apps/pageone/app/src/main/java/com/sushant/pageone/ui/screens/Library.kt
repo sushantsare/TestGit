@@ -2,7 +2,7 @@ package com.sushant.pageone.ui.screens
 
 import android.content.Intent
 import android.net.Uri
-import android.provider.Settings
+import android.provider.Settings as AndroidSettings
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -27,6 +27,7 @@ import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -65,8 +66,8 @@ import kotlin.math.roundToInt
 private fun countText(n: Int) = if (n == 1) "1 PDF" else "$n PDFs"
 
 fun openAllFilesSettings(context: android.content.Context) {
-    val i = Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION, Uri.parse("package:" + context.packageName))
-    runCatching { context.startActivity(i) }.onFailure { context.startActivity(Intent(Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION)) }
+    val i = Intent(AndroidSettings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION, Uri.parse("package:" + context.packageName))
+    runCatching { context.startActivity(i) }.onFailure { context.startActivity(Intent(AndroidSettings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION)) }
 }
 
 // ======================= HOME =======================
