@@ -260,8 +260,10 @@ class WalkthroughTest {
                 shot("form_filled")
             } else problem("form fields not shown")
         }
-        back(); if (has("save_discard")) { shot("form_unsaved_prompt"); click("save_discard") }
-        if (has("reader")) back()
+        back()                                   // closes the keyboard
+        if (!has("save_discard")) back()         // asks to save the form entries
+        if (waitTag("save_discard", 5_000, soft = true)) { shot("form_unsaved_prompt"); click("save_discard") } else problem("no unsaved-changes prompt")
+        if (!has("tab_home")) back()
 
         // ---------- settings, about, diagnostics, duplicates
         clickTab("home"); click("open_settings"); waitTag("settings_list"); shot("settings")
