@@ -167,6 +167,12 @@ class WalkthroughTest {
         shot("home")
         compose.onNodeWithTag("home_list").performTouchInput { swipeUp() }; shot("home_scrolled")
         compose.onNodeWithTag("home_list").performTouchInput { swipeDown() }
+        run {   // the sort arrow sits on the same line as Name / Date / Size
+            val a = compose.onNodeWithTag("folder_sort_0", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+            val b = compose.onNodeWithTag("folder_sort_dir", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+            log("sort row: chip $a arrow $b")
+            if (kotlin.math.abs(a.center.y - b.center.y) > 2f || kotlin.math.abs(a.height - b.height) > 2f) problem("sort arrow not in line")
+        }
         click("folder_sort_1"); shot("home_sort_date"); click("folder_sort_0")
 
         // ---------- + tools menu
@@ -186,10 +192,26 @@ class WalkthroughTest {
         if (!waitPage(15_000)) problem("reader did not show page 1")
         Thread.sleep(1500); shot("reader")
         chrome(false); shot("reader_fullscreen"); chrome(true)
-        // pinch zoom
-        compose.onNodeWithTag("pages").performTouchInput { pinch(center - Offset(80f, 0f), center - Offset(240f, 0f), center + Offset(80f, 0f), center + Offset(240f, 0f)) }
-        Thread.sleep(800); shot("reader_zoomed")
-        compose.onNodeWithTag("pages").performTouchInput { doubleClick(center) }; Thread.sleep(800)
+        // ---------- zoom: pinch holds, double-tap steps 2x → 3.5x → fit, pinch is never a double-tap
+        fun area() = compose.onNodeWithTag("reader_area")
+        fun pw() = page().fetchSemanticsNode().size.width.toFloat()
+        val w0 = pw()
+        area().performTouchInput { pinch(center - Offset(80f, 0f), center - Offset(240f, 0f), center + Offset(80f, 0f), center + Offset(240f, 0f)) }
+        Thread.sleep(2000); shot("reader_zoomed")
+        val w1 = pw(); log("zoom: fit $w0 -> pinch $w1")
+        if (w1 < w0 * 2f) problem("pinch zoom did not hold")
+        area().performTouchInput { doubleClick(center) }; Thread.sleep(900)
+        val w2 = pw(); log("zoom: double-tap -> $w2")
+        if (w2 < w1 * 1.05f) problem("double tap did not zoom closer")
+        area().performTouchInput { doubleClick(center) }; Thread.sleep(900)
+        val w3 = pw(); log("zoom: double-tap -> $w3")
+        if (kotlin.math.abs(w3 - w0) > w0 * 0.05f) problem("double tap did not return to fit")
+        area().performTouchInput { doubleClick(center) }; Thread.sleep(900); shot("reader_double_tap")
+        val w4 = pw(); log("zoom: double-tap -> $w4")
+        if (w4 < w0 * 1.7f) problem("double tap from fit did not zoom")
+        area().performTouchInput { doubleClick(center) }; Thread.sleep(900)
+        area().performTouchInput { doubleClick(center) }; Thread.sleep(900)
+        if (kotlin.math.abs(pw() - w0) > w0 * 0.05f) problem("zoom not back to fit")
         chrome(true)
         // find
         click("reader_find"); type("find_field", "tense")
@@ -254,6 +276,10 @@ class WalkthroughTest {
         // ---------- form PDF
         openReaderFor("Admit Card")
         if (waitPage(15_000)) {
+            Thread.sleep(800); shot("one_page_centred")
+            val pb = page().fetchSemanticsNode().boundsInRoot; val ab = compose.onNodeWithTag("reader_area").fetchSemanticsNode().boundsInRoot
+            log("one page: page $pb area $ab")
+            if (kotlin.math.abs(pb.center.x - ab.center.x) > ab.width * 0.03f || kotlin.math.abs(pb.center.y - ab.center.y) > ab.height * 0.06f) problem("one-page PDF not centred")
             if (waitTag("field_name", 10_000, soft = true)) {
                 compose.onAllNodesWithTag("field_name", useUnmergedTree = true).onFirst().performClick()
                 compose.onAllNodesWithTag("field_name", useUnmergedTree = true).onFirst().performTextInput("Sushant Kumar")
@@ -282,6 +308,16 @@ class WalkthroughTest {
             if (!waitPage(15_000)) problem("PDF from another app did not open") else shot("opened_from_other_app")
             back()
         }
+
+        // ---------- phone turned sideways: all three tabs keep the same side rail
+        UiDevice.getInstance(inst).setOrientationLeft(); Thread.sleep(2500); compose.waitForIdle()
+        for (t in listOf("home", "recent", "starred", "home")) {
+            clickTab(t); Thread.sleep(800); shot("landscape_$t")
+            if (!has("side_rail") || has("bottom_nav")) problem("landscape $t: navigation not in the side rail")
+        }
+        UiDevice.getInstance(inst).setOrientationNatural(); Thread.sleep(2500); compose.waitForIdle()
+        UiDevice.getInstance(inst).unfreezeRotation()
+        if (!has("bottom_nav")) problem("portrait: bottom bar missing after turning back")
 
         // ---------- dark, then pure black
         app.prefs.update { it.copy(themeMode = ThemeMode.DARK) }; suffix = "_dark"

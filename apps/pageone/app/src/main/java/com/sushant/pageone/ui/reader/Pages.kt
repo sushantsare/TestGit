@@ -42,6 +42,8 @@ import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
@@ -73,22 +75,30 @@ fun pageFilter(mode: PageMode): ColorFilter? = when (mode) {
 }
 
 /**
- * Two-finger pinch zoom and pan over the pages (one finger still scrolls normally, and draws in annotate mode).
- * The zoom previews instantly and then re-renders the pages sharp at the new size.
+ * Two-finger zoom for the reader. Every touch is one kind of gesture: once a second finger lands it is a zoom
+ * for the rest of that touch (the leftover finger can't scroll or tap), so a pinch is never read as a double-tap.
+ * [onZoom] gets the step's scale, the finger midpoint before the step and after it (so the page also moves with
+ * the fingers); [onEnd] runs when the last finger lifts.
  */
-fun Modifier.pinch(onPinch: (zoom: Float, centroid: Offset, pan: Offset) -> Unit, onEnd: () -> Unit) = pointerInput(Unit) {
+fun Modifier.zoomGestures(vm: ReaderVm, onZoom: (scale: Float, from: Offset, to: Offset) -> Unit, onEnd: () -> Unit) = pointerInput(vm) {
     awaitEachGesture {
         awaitFirstDown(requireUnconsumed = false)
-        var pinching = false
+        var zooming = false
         do {
             val e = awaitPointerEvent(PointerEventPass.Initial)
             if (e.changes.count { it.pressed } >= 2) {
-                pinching = true
-                onPinch(e.calculateZoom(), e.calculateCentroid(useCurrent = true), e.calculatePan())
-                e.changes.forEach { if (it.positionChange() != Offset.Zero) it.consume() }
+                zooming = true
+                vm.lastMultiTouch = android.os.SystemClock.uptimeMillis()
+                val c = e.calculateCentroid(useCurrent = true)
+                if (c != Offset.Unspecified) {
+                    var z = e.calculateZoom()
+                    if (kotlin.math.abs(z - 1f) < 0.002f) z = 1f          // ignore finger tremble
+                    onZoom(z, c - e.calculatePan(), c)
+                }
             }
+            if (zooming) e.changes.forEach { if (it.positionChange() != Offset.Zero) it.consume() }
         } while (e.changes.any { it.pressed })
-        if (pinching) onEnd()
+        if (zooming) { vm.lastMultiTouch = android.os.SystemClock.uptimeMillis(); onEnd() }
     }
 }
 
@@ -103,7 +113,9 @@ class PageGeo(val widthPx: Float, val heightPx: Float, val area: RectF) {
 @Composable
 fun PageView(
     vm: ReaderVm, doc: PdfDoc, index: Int, widthPx: Int, pageMode: PageMode, crop: Boolean, modifier: Modifier = Modifier,
+    renderW: Int = widthPx,
 ) {
+    var coords by remember { mutableStateOf<androidx.compose.ui.layout.LayoutCoordinates?>(null) }
     val density = LocalDensity.current
     val size = doc.sizes[index]
     var cropBox by remember(index, crop) { mutableStateOf<RectF?>(null) }
@@ -115,10 +127,10 @@ fun PageView(
     val hPx = (widthPx * aspect).roundToInt().coerceAtLeast(1)
     val geo = remember(widthPx, area, rot) { PageGeo(widthPx.toFloat(), hPx.toFloat(), area) }
     // low-res first so big books appear instantly, then sharp
-    val bmp by produceState<Bitmap?>(null, index, widthPx, cropBox, rot) {
-        val low = doc.render(index, (widthPx / 3).coerceAtLeast(64), cropBox, rot)
-        if (value == null) value = low
-        value = doc.render(index, widthPx, cropBox, rot) ?: low
+    // drawn at the settled zoom: while a pinch is moving, the current image is simply scaled, never thrown away
+    val bmp by produceState<Bitmap?>(null, index, renderW, cropBox, rot) {
+        if (value == null) value = doc.render(index, (renderW / 3).coerceAtLeast(64), cropBox, rot)
+        doc.render(index, renderW, cropBox, rot)?.let { value = it }
     }
     val scope = rememberCoroutineScope()
     val annots = remember(vm.annotVersion, index) { vm.history.all.filter { it.page == index } }
@@ -134,6 +146,7 @@ fun PageView(
 
     Box(
         modifier.size(with(density) { widthPx.toDp() }, with(density) { hPx.toDp() })
+            .onGloballyPositioned { coords = it }
             .shadow(1.dp).background(Color.White).testTag("page_$index")
             .pointerInput(vm.mode, vm.tool, editable, widthPx) {
                 if (vm.mode == Mode.ANNOTATE && editable) {
@@ -172,9 +185,9 @@ fun PageView(
                     }
                 } else {
                     detectTapGestures(
-                        onTap = { if (vm.selection != null) vm.selection = null else vm.chrome = !vm.chrome },
-                        onDoubleTap = { o -> vm.doubleTap?.invoke(o, index) },
-                        onLongPress = { o -> if (editable) vm.select(index, geo.toPoint(o)) },
+                        onTap = { if (!vm.touchIsTap()) Unit else if (vm.selection != null) vm.selection = null else vm.chrome = !vm.chrome },
+                        onDoubleTap = { o -> if (vm.touchIsTap()) coords?.let { c -> vm.doubleTap?.invoke(c.localToRoot(o)) } },
+                        onLongPress = { o -> if (editable && vm.touchIsTap()) vm.select(index, geo.toPoint(o)) },
                     )
                 }
             },
@@ -275,43 +288,74 @@ private fun FormLayer(vm: ReaderVm, fields: List<FormField>, geo: PageGeo) {
 }
 
 
-/** Vertical list of pages (or two per row on wide screens), with zoom. */
+/** Height of a row of pages at a zoom, the same sum PageView does (crop margins aside). */
+fun rowHeightPx(doc: PdfDoc, vm: ReaderVm, pages: List<Int>, viewW: Int, zoom: Float, gap: Int): Float {
+    val pageW = ((viewW * zoom - gap * (pages.size + 1)) / pages.size).coerceAtLeast(10f)
+    return pages.maxOf { i ->
+        val sz = doc.sizes[i]
+        pageW * (if (vm.rotation % 180 != 0) sz.width / sz.height else sz.height / sz.width)
+    }
+}
+
+/**
+ * Vertical list of pages (or two per row on wide screens). Zoom resizes the pages for real; [ox] is how far the
+ * zoomed pages are moved sideways. Pages shorter than the screen sit in the middle.
+ */
 @Composable
-fun ScrollPages(vm: ReaderVm, doc: PdfDoc, list: LazyListState, hScroll: ScrollState, viewW: Int, pageMode: PageMode, crop: Boolean, spread: Boolean) {
+fun ScrollPages(vm: ReaderVm, doc: PdfDoc, list: LazyListState, ox: Float, viewW: Int, pageMode: PageMode, crop: Boolean, spread: Boolean) {
     val density = LocalDensity.current
     val gap = with(density) { 10.dp.roundToPx() }
-    val contentW = (viewW * vm.zoom).roundToInt()
     val perRow = if (spread) 2 else 1
-    val pageW = ((contentW - gap * (perRow + 1)) / perRow).coerceAtLeast(10)
+    fun pageWidth(z: Float) = ((viewW * z - gap * (perRow + 1)) / perRow).roundToInt().coerceAtLeast(10)
+    val contentW = (viewW * vm.zoom).roundToInt()
+    val pageW = pageWidth(vm.zoom)
+    val renderW = pageWidth(vm.renderZoom)
     val rows = (0 until doc.pageCount).chunked(perRow)
-    Box(Modifier.fillMaxSize().horizontalScroll(hScroll, enabled = vm.zoom > 1.01f)) {
+    Box(Modifier.fillMaxSize().clipToBounds()) {
         LazyColumn(
             state = list,
-            modifier = Modifier.width(with(density) { contentW.toDp() }).fillMaxHeight().testTag("pages"),
+            modifier = Modifier.wrapContentWidth(Alignment.Start, unbounded = true)
+                .width(with(density) { contentW.toDp() }).fillMaxHeight()
+                .offset { IntOffset(-ox.roundToInt(), 0) }
+                .testTag("pages"),
             contentPadding = PaddingValues(top = 104.dp, bottom = 120.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp, Alignment.CenterVertically),
             userScrollEnabled = vm.mode != Mode.ANNOTATE,
         ) {
             items(rows.size, key = { it }) { r ->
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(with(density) { gap.toDp() }, Alignment.CenterHorizontally)) {
-                    for (i in rows[r]) PageView(vm, doc, i, pageW, pageMode, crop)
+                    for (i in rows[r]) PageView(vm, doc, i, pageW, pageMode, crop, renderW = renderW)
                 }
             }
         }
     }
 }
 
-/** One page per screen, swiped sideways. */
+/** Where a page sits on screen in page-by-page mode: centred when smaller than the screen, else moved by the pan. */
+data class PagedGeo(val w: Float, val h: Float, val x: Float, val y: Float)
+
+fun pagedGeo(doc: PdfDoc, vm: ReaderVm, i: Int, viewW: Int, viewH: Int, zoom: Float, ox: Float, oy: Float): PagedGeo {
+    val sz = doc.sizes[i]
+    val rotated = vm.rotation % 180 != 0
+    val aspect = if (rotated) sz.width / sz.height else sz.height / sz.width
+    val fitW = minOf(viewW.toFloat(), viewH * 0.86f / aspect)
+    val w = fitW * zoom; val h = w * aspect
+    val x = if (w <= viewW) (viewW - w) / 2f else -ox.coerceIn(0f, w - viewW)
+    val y = if (h <= viewH) (viewH - h) / 2f else -oy.coerceIn(0f, h - viewH)
+    return PagedGeo(w, h, x, y)
+}
+
+/** One page per screen, swiped sideways; zoomed pages pan with one finger. */
 @Composable
-fun PagedPages(vm: ReaderVm, doc: PdfDoc, pager: PagerState, viewW: Int, viewH: Int, pageMode: PageMode, crop: Boolean) {
+fun PagedPages(vm: ReaderVm, doc: PdfDoc, pager: PagerState, viewW: Int, viewH: Int, ox: Float, oy: Float, pageMode: PageMode, crop: Boolean) {
     HorizontalPager(pager, Modifier.fillMaxSize().testTag("pager"), userScrollEnabled = vm.mode != Mode.ANNOTATE && vm.zoom <= 1.01f, beyondViewportPageCount = 1) { i ->
-        val sz = doc.sizes[i]
-        val fitW = minOf(viewW.toFloat(), viewH * 0.86f * sz.width / sz.height)
-        val w = (fitW * vm.zoom).roundToInt()
-        Box(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).horizontalScroll(rememberScrollState()), contentAlignment = Alignment.Center) {
-            Box(Modifier.defaultMinSize(minWidth = with(LocalDensity.current) { viewW.toDp() }, minHeight = with(LocalDensity.current) { viewH.toDp() }), contentAlignment = Alignment.Center) {
-                PageView(vm, doc, i, w, pageMode, crop)
-            }
+        val current = i == pager.currentPage
+        val g = pagedGeo(doc, vm, i, viewW, viewH, if (current) vm.zoom else 1f, if (current) ox else 0f, if (current) oy else 0f)
+        val rw = pagedGeo(doc, vm, i, viewW, viewH, if (current) vm.renderZoom else 1f, 0f, 0f).w
+        Box(Modifier.fillMaxSize().clipToBounds()) {
+            PageView(vm, doc, i, g.w.roundToInt(), pageMode, crop,
+                Modifier.wrapContentSize(Alignment.TopStart, unbounded = true).offset { IntOffset(g.x.roundToInt(), g.y.roundToInt()) },
+                renderW = rw.roundToInt())
         }
     }
 }

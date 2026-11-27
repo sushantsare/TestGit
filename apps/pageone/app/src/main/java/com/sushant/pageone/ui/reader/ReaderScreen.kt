@@ -28,6 +28,12 @@ import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.layout.positionInRoot
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.scrollable
+import androidx.compose.foundation.gestures.rememberScrollableState
+import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
@@ -105,7 +111,7 @@ fun ReaderScreen(main: MainVm, nav: NavHostController, ref: DocRef) {
                 container = MaterialTheme.colorScheme.errorContainer, content = MaterialTheme.colorScheme.onErrorContainer,
                 actionLabel = "Go back", onAction = { nav.popBackStack() }, secondLabel = "Open with…", onSecond = { runCatching { Outputs.openWith(context, vm.ref) } })
             is Status.NeedPassword -> PasswordDialog(st.wrong, vm.ref.name, onOpen = { vm.open(it) }, onCancel = { nav.popBackStack() })
-            Status.Ready -> if (doc != null) Body(vm, main, doc, s.pageMode, s.cropMargins, s.pageByPage)
+            Status.Ready -> if (doc != null) Body(vm, main, doc, s.pageMode, s.cropMargins, s.pageByPage, s.twoPages)
         }
 
         // ---------- top
@@ -285,20 +291,71 @@ private fun ReaderMenu(open: Boolean, close: () -> Unit, vm: ReaderVm, main: Mai
 
 /** The page area: scroll or page-by-page, pinch zoom, reflow, fast-scroll handle. */
 @Composable
-private fun BoxScope.Body(vm: ReaderVm, main: MainVm, doc: com.sushant.pageone.pdf.PdfDoc, pageMode: PageMode, crop: Boolean, paged: Boolean) {
+private fun BoxScope.Body(vm: ReaderVm, main: MainVm, doc: com.sushant.pageone.pdf.PdfDoc, pageMode: PageMode, crop: Boolean, paged: Boolean, twoPages: Boolean) {
     val density = LocalDensity.current
     val scope = rememberCoroutineScope()
     var view by remember { mutableStateOf(IntOffset(1, 1)) }
+    var boxInRoot by remember { mutableStateOf(Offset.Zero) }
     val list = rememberLazyListState()
     val pager = rememberPagerState { doc.pageCount }
-    val h = rememberScrollState()
     val wide = with(density) { view.x.toDp() } >= 840.dp && view.x > view.y
-    val perRow = if (wide && !paged) 2 else 1
-    var preview by remember { mutableFloatStateOf(1f) }
-    var origin by remember { mutableStateOf(Offset.Zero) }
+    val perRow = if (twoPages && wide && !paged) 2 else 1      // one page per screen unless asked for
+    val gap = with(density) { 10.dp.roundToPx() }
+    // sideways (and, page by page, up/down) position of zoomed pages
+    var ox by remember { mutableFloatStateOf(0f) }
+    var oy by remember { mutableFloatStateOf(0f) }
+    var zoomAnim by remember { mutableStateOf<kotlinx.coroutines.Job?>(null) }
+
+    fun maxOx(z: Float = vm.zoom) = (view.x * z - view.x).coerceAtLeast(0f)
+    /** The zoom has stopped moving: draw the pages sharp at it and remember it. */
+    fun settle() {
+        vm.renderZoom = vm.zoom
+        vm.savePosition(if (paged) pager.currentPage else vm.page)
+    }
+
+    /**
+     * Zoom to [target] keeping the bit of page that was under [from] under [to] (both in this box).
+     * Pages are laid out for real at the new size in the same frame, so nothing jumps when the fingers lift.
+     */
+    fun applyZoom(target: Float, from: Offset, to: Offset) {
+        val old = vm.zoom
+        val nz = target.coerceIn(1f, 5f)
+        if (paged) {
+            val i = pager.currentPage
+            val g0 = pagedGeo(doc, vm, i, view.x, view.y, old, ox, oy)
+            val fx = (from.x - g0.x) / g0.w; val fy = (from.y - g0.y) / g0.h
+            val g1 = pagedGeo(doc, vm, i, view.x, view.y, nz, 0f, 0f)
+            ox = (fx * g1.w - to.x).coerceIn(0f, (g1.w - view.x).coerceAtLeast(0f))
+            oy = (fy * g1.h - to.y).coerceIn(0f, (g1.h - view.y).coerceAtLeast(0f))
+            vm.zoom = nz
+            return
+        }
+        val k = nz / old
+        ox = ((ox + from.x) * k - to.x).coerceIn(0f, maxOx(nz))
+        val info = list.layoutInfo
+        val items = info.visibleItemsInfo
+        if (items.isNotEmpty()) {
+            val base = -info.viewportStartOffset                     // screen y of an item = offset + base
+            val it = items.firstOrNull { from.y >= it.offset + base && from.y < it.offset + base + it.size }
+                ?: items.minBy { kotlin.math.abs(it.offset + base + it.size / 2f - from.y) }
+            val rows = (0 until doc.pageCount).chunked(perRow)
+            fun rowH(r: Int, z: Float) = rowHeightPx(doc, vm, rows[r], view.x, z, gap)
+            val frac = (from.y - (it.offset + base)) / it.size
+            val newSize = it.size * rowH(it.index, nz) / rowH(it.index, old)
+            val newTop = to.y - frac * newSize
+            // scroll offset 0 puts the first visible item where it sits now minus its current offset
+            val first = items.firstOrNull { i -> i.index == list.firstVisibleItemIndex } ?: items.first()
+            val c = first.offset + base + (if (first.index == list.firstVisibleItemIndex) list.firstVisibleItemScrollOffset else 0)
+            var idx = it.index
+            var off = c - newTop
+            while (off < 0 && idx > 0) { idx--; off += rowH(idx, nz) + gap }
+            list.requestScrollToItem(idx, off.coerceAtLeast(0f).roundToInt())
+        }
+        vm.zoom = nz
+    }
 
     fun go(p: Int) = scope.launch {
-        if (paged) pager.scrollToPage(p) else list.scrollToItem(p / perRow)
+        if (paged) { ox = 0f; oy = 0f; pager.scrollToPage(p) } else list.scrollToItem(p / perRow)
         vm.savePosition(p)
     }
     SideEffect { vm.goTo = { p -> go(p) } }
@@ -307,11 +364,13 @@ private fun BoxScope.Body(vm: ReaderVm, main: MainVm, doc: com.sushant.pageone.p
     LaunchedEffect(vm.restore, view.x > 1) {
         val r = vm.restore ?: return@LaunchedEffect
         if (view.x <= 1) return@LaunchedEffect
-        vm.zoom = r.second
+        vm.zoom = r.second; vm.renderZoom = r.second; ox = 0f; oy = 0f
         delay(30)
         if (paged) pager.scrollToPage(r.first) else list.scrollToItem(r.first / perRow)
         vm.restore = null
     }
+    // a new page in page-by-page mode starts at its top-left
+    LaunchedEffect(paged) { if (paged) snapshotFlow { pager.currentPage }.distinctUntilChanged().collect { ox = 0f; oy = 0f } }
     // remember the page as you read
     LaunchedEffect(paged, perRow) {
         if (paged) snapshotFlow { pager.currentPage }.distinctUntilChanged().collectLatest { delay(400); vm.savePosition(it) }
@@ -337,43 +396,48 @@ private fun BoxScope.Body(vm: ReaderVm, main: MainVm, doc: com.sushant.pageone.p
             if (next < doc.pageCount) { go(next); vm.speakFrom(next) } else vm.speech.stop()
         }
     }
-    vm.doubleTap = { o, _ ->
-        scope.launch {
-            if (vm.zoom > 1.05f) { vm.zoom = 1f; h.scrollTo(0) }
-            else { vm.zoom = 2.5f; delay(16); h.scrollTo(((o.x * 2.5f) - view.x / 2f).roundToInt().coerceAtLeast(0)) }
+    // double-tap: fit → closer → closer still → back to fit, around the tapped spot
+    vm.doubleTap = { root ->
+        val p = root - boxInRoot
+        val levels = listOf(1f, 2f, 3.5f)
+        val target = levels.firstOrNull { it > vm.zoom + 0.05f } ?: 1f
+        zoomAnim?.cancel()
+        zoomAnim = scope.launch {
+            val start = vm.zoom
+            androidx.compose.animation.core.animate(0f, 1f, animationSpec = androidx.compose.animation.core.tween(260)) { t, _ ->
+                applyZoom(start + (target - start) * t, p, p)
+            }
+            settle()
         }
     }
 
     Box(
-        Modifier.fillMaxSize().onSizeChanged { view = IntOffset(it.width, it.height) }
-            .pinch(onPinch = { z, c, pan ->
-                preview = (preview * z).coerceIn(1f / vm.zoom, 5f / vm.zoom); origin = c
-                if (vm.mode == Mode.ANNOTATE && !paged) scope.launch { list.scrollBy(-pan.y); h.scrollBy(-pan.x) }
-            }, onEnd = {
-                val newZoom = (vm.zoom * preview).coerceIn(1f, 5f)
-                val k = newZoom / vm.zoom
-                val c = origin
-                preview = 1f
-                if (k != 1f) {
-                    val first = list.firstVisibleItemIndex; val off = list.firstVisibleItemScrollOffset
-                    val hv = h.value
-                    vm.zoom = newZoom
-                    scope.launch {
-                        delay(16)
-                        h.scrollTo(((hv + c.x) * k - c.x).roundToInt().coerceAtLeast(0))
-                        if (!paged) list.scrollToItem(first, ((off + c.y) * k - c.y).roundToInt().coerceAtLeast(0))
-                    }
+        Modifier.fillMaxSize().testTag("reader_area")
+            .onSizeChanged { view = IntOffset(it.width, it.height) }
+            .onGloballyPositioned { boxInRoot = it.positionInRoot() }
+            .zoomGestures(vm,
+                onZoom = { z, from, to -> zoomAnim?.cancel(); applyZoom(vm.zoom * z, from, to) },
+                onEnd = { settle() })
+            // one finger moves zoomed pages sideways (scroll mode) — up/down stays with the page list and its fling
+            .scrollable(
+                rememberScrollableState { d -> val o = ox; ox = (ox - d).coerceIn(0f, maxOx()); o - ox },
+                Orientation.Horizontal,
+                enabled = !paged && vm.zoom > 1.01f && vm.mode != Mode.ANNOTATE,
+            )
+            // page by page, a zoomed page pans freely
+            .pointerInput(paged, vm.zoom > 1.01f, vm.mode) {
+                if (paged && vm.zoom > 1.01f && vm.mode != Mode.ANNOTATE) detectDragGestures { ch, d ->
+                    ch.consume()
+                    val g = pagedGeo(doc, vm, pager.currentPage, view.x, view.y, vm.zoom, 0f, 0f)
+                    ox = (ox - d.x).coerceIn(0f, (g.w - view.x).coerceAtLeast(0f))
+                    oy = (oy - d.y).coerceIn(0f, (g.h - view.y).coerceAtLeast(0f))
                 }
-            })
-            .graphicsLayer {
-                scaleX = preview; scaleY = preview
-                transformOrigin = TransformOrigin((origin.x / view.x).coerceIn(0f, 1f), (origin.y / view.y).coerceIn(0f, 1f))
             },
     ) {
         when {
             vm.reflow -> Reflow(vm, doc, pageMode)
-            paged -> PagedPages(vm, doc, pager, view.x, view.y, pageMode, crop)
-            else -> ScrollPages(vm, doc, list, h, view.x, pageMode, crop, spread = perRow == 2)
+            paged -> PagedPages(vm, doc, pager, view.x, view.y, ox, oy, pageMode, crop)
+            else -> ScrollPages(vm, doc, list, ox, view.x, pageMode, crop, spread = perRow == 2)
         }
     }
     if (!paged && !vm.reflow && doc.pageCount > 3) FastScroll(vm, doc.pageCount, list, perRow)

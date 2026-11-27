@@ -146,7 +146,8 @@ fun ConnectedButtons(
     fill: Boolean = false,
 ) {
     val total = labels.size + if (trailingIcon != null) 1 else 0
-    Row(modifier, horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+    // centred on one line: every segment, the arrow too, is exactly [height] tall
+    Row(modifier, horizontalArrangement = Arrangement.spacedBy(2.dp), verticalAlignment = Alignment.CenterVertically) {
         labels.forEachIndexed { i, l ->
             val on = i == selected
             val outer = height / 2
@@ -160,7 +161,7 @@ fun ConnectedButtons(
                 onClick = { onSelect(i) }, shape = shape,
                 color = if (on) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surfaceContainerHigh,
                 contentColor = if (on) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = (if (fill) Modifier.weight(1f) else Modifier).heightIn(min = height).testTag("${tagPrefix}_$i"),
+                modifier = (if (fill) Modifier.weight(1f) else Modifier).height(height).testTag("${tagPrefix}_$i"),
             ) {
                 Box(Modifier.padding(horizontal = 12.dp), contentAlignment = Alignment.Center) {
                     Text(l, style = MaterialTheme.typography.labelMedium, maxLines = 1)
@@ -322,7 +323,7 @@ enum class Tab { HOME, RECENT, STARRED }
 
 @Composable
 fun BottomNav(current: Tab, onSelect: (Tab) -> Unit) {
-    Surface(color = MaterialTheme.colorScheme.surfaceContainer) {
+    Surface(color = MaterialTheme.colorScheme.surfaceContainer, modifier = Modifier.testTag("bottom_nav")) {
         Row(Modifier.fillMaxWidth().navigationBarsPadding().height(80.dp), horizontalArrangement = Arrangement.SpaceAround, verticalAlignment = Alignment.CenterVertically) {
             NavItem(Tab.HOME, current, Icons.Rounded.Home, Icons.Outlined.OutlinedHome, "Home", onSelect)
             NavItem(Tab.RECENT, current, Icons.Rounded.History, Icons.Rounded.History, "Recent", onSelect)
@@ -351,7 +352,7 @@ private fun NavItem(tab: Tab, current: Tab, on: ImageVector, off: ImageVector, l
 /** Navigation rail for medium/expanded windows. */
 @Composable
 fun SideRail(current: Tab, onSelect: (Tab) -> Unit, fab: @Composable () -> Unit) {
-    Column(Modifier.fillMaxHeight().width(96.dp).statusBarsPadding().padding(top = 20.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp)) {
+    Column(Modifier.fillMaxHeight().width(96.dp).testTag("side_rail").statusBarsPadding().padding(top = 20.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp)) {
         fab()
         Spacer(Modifier.height(12.dp))
         NavItem(Tab.HOME, current, Icons.Rounded.Home, Icons.Outlined.OutlinedHome, "Home", onSelect)

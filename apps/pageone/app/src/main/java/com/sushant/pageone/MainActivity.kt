@@ -46,7 +46,7 @@ class MainActivity : AppCompatActivity() {
         installSplashScreen()
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        handle(intent)
+        if (savedInstanceState == null) handle(intent)   // a rotation rebuilds the screen: the PDF was already opened once
         ProcessLifecycleOwner.get().lifecycle.addObserver(object : DefaultLifecycleObserver {
             override fun onStop(owner: LifecycleOwner) { if (vm.settings.value.appLock) vm.locked.value = true }
         })

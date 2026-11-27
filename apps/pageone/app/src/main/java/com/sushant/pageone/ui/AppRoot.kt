@@ -128,9 +128,14 @@ fun AppRoot(vm: MainVm, activity: MainActivity) {
                 ReaderScreen(vm, nav, ref)
             }
         }
+        // list screens scroll under the status bar: keep the clock and icons on a solid strip
+        if (!inReader) Box(
+            Modifier.align(Alignment.TopCenter).fillMaxWidth().windowInsetsTopHeight(WindowInsets.statusBars)
+                .background(MaterialTheme.colorScheme.surface)
+        )
         SnackbarHost(
             vm.snackbar,
-            Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(bottom = when { inTabs -> 88.dp; inReader -> 100.dp; else -> 16.dp }, start = 12.dp, end = 12.dp).testTag("snackbar"),
+            Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(bottom = when { inTabs && androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp < com.sushant.pageone.ui.screens.WIDE_DP -> 88.dp; inReader -> 100.dp; else -> 16.dp }, start = 12.dp, end = 12.dp).testTag("snackbar"),
         ) { Snackbar(it) }
         if (locked) LockScreen(activity, onUnlocked = { vm.locked.value = false }, onClose = { activity.finish() })
     }
