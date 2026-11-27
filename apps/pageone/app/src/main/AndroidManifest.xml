@@ -7,6 +7,8 @@
     <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" tools:ignore="ScopedStorage" />
     <!-- App lock (face, fingerprint or phone PIN through Android's own unlock sheet) -->
     <uses-permission android:name="android.permission.USE_BIOMETRIC" />
+    <!-- added by androidx.biometric for Android 9 and older; this app needs Android 12+ -->
+    <uses-permission android:name="android.permission.USE_FINGERPRINT" tools:node="remove" />
 
     <!-- PageOne is fully offline: make sure no library sneaks network access in -->
     <uses-permission android:name="android.permission.INTERNET" tools:node="remove" />
