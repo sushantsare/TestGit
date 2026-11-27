@@ -214,10 +214,10 @@ class WalkthroughTest {
             val dp = InstrumentationRegistry.getInstrumentation().targetContext.resources.displayMetrics.density
             if (h == null || first == null) problem("folder page: header or first song missing")
             else {
-                // the tags sit inside each card's own padding (header 20dp all round; song card 12dp start, 2dp end, 8dp top),
-                // so step back out to the cards' visible edges before comparing
+                // the header's tag sits inside its 20dp padding, so step back out to its visible edge;
+                // the song card's tag is on the card's own edge
                 val hl = h.left - 20f * dp; val hr = h.right + 20f * dp; val hb = h.bottom + 20f * dp
-                val sl = first.left - 12f * dp; val sr = first.right + 2f * dp; val st = first.top - 8f * dp
+                val sl = first.left; val sr = first.right; val st = first.top
                 val gapDp = (st - hb) / dp
                 if (gapDp < 12f) problem("folder page: first song card too close to the header ($gapDp dp)")
                 if (kotlin.math.abs(sl - hl) > 2f || kotlin.math.abs(sr - hr) > 2f) problem("folder page: header ($hl..$hr) and song card ($sl..$sr) edges differ")
