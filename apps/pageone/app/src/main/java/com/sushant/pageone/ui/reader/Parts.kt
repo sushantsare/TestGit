@@ -49,6 +49,8 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.testTagsAsResourceId
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
@@ -408,7 +410,7 @@ fun PasswordDialog(wrong: Boolean, name: String, onOpen: (String) -> Unit, onCan
         icon = { Icon(Icons.Rounded.Lock, null) },
         title = { Text("This PDF is protected") },
         text = {
-            Column {
+            Column(Modifier.semantics { testTagsAsResourceId = true }) {
                 Text("Enter the password to open $name.")
                 Spacer(Modifier.height(16.dp))
                 OutlinedTextField(pw, { pw = it }, singleLine = true, label = { Text("Password") }, isError = wrong,
@@ -420,7 +422,7 @@ fun PasswordDialog(wrong: Boolean, name: String, onOpen: (String) -> Unit, onCan
                     modifier = Modifier.fillMaxWidth().testTag("password_field"))
             }
         },
-        confirmButton = { TextButton(onClick = { onOpen(pw) }, enabled = pw.isNotEmpty(), modifier = Modifier.testTag("password_open")) { Text("Open") } },
+        confirmButton = { TextButton(onClick = { onOpen(pw) }, enabled = pw.isNotEmpty(), modifier = Modifier.semantics { testTagsAsResourceId = true }.testTag("password_open")) { Text("Open") } },
         dismissButton = { TextButton(onClick = onCancel) { Text("Cancel") } },
     )
 }

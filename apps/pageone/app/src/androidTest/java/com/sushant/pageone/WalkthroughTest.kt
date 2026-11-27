@@ -131,7 +131,7 @@ class WalkthroughTest {
     private fun chrome(visible: Boolean) {
         repeat(2) {
             if (has("reader_find") == visible) return
-            runCatching { compose.onNodeWithTag("page_0").performTouchInput { click(Offset(width * 0.5f, height * 0.6f)) } }
+            runCatching { compose.onNodeWithTag(if (has("pages")) "pages" else "pager").performTouchInput { click(Offset(width * 0.5f, height * 0.6f)) } }
             if (runCatching { compose.waitUntil(3_000) { has("reader_find") == visible } }.isSuccess) return
         }
         problem("reader toolbars did not ${if (visible) "show" else "hide"}")
@@ -181,7 +181,7 @@ class WalkthroughTest {
         // pinch zoom
         compose.onNodeWithTag("pages").performTouchInput { pinch(center - Offset(80f, 0f), center - Offset(240f, 0f), center + Offset(80f, 0f), center + Offset(240f, 0f)) }
         Thread.sleep(800); shot("reader_zoomed")
-        compose.onNodeWithTag("page_0").performTouchInput { doubleClick(center) }; Thread.sleep(500)
+        compose.onNodeWithTag("pages").performTouchInput { doubleClick(center) }; Thread.sleep(800)
         chrome(true)
         // find
         click("reader_find"); type("find_field", "tense")
