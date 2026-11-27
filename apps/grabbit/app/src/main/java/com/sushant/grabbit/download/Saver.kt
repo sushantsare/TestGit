@@ -30,10 +30,17 @@ object Saver {
         "wav" -> "audio/wav"
         "flac" -> "audio/flac"
         "aac" -> "audio/aac"
+        "jpg", "jpeg" -> "image/jpeg"
+        "png" -> "image/png"
+        "webp" -> "image/webp"
+        "gif" -> "image/gif"
+        "heic" -> "image/heic"
+        "avif" -> "image/avif"
         else -> MimeTypeMap.getSingleton().getMimeTypeFromExtension(ext.lowercase()) ?: "application/octet-stream"
     }
 
     private val SUBS = setOf("srt", "vtt", "ass")
+    private val IMAGE_EXT = setOf("jpg", "jpeg", "png", "webp", "gif", "heic", "avif")
 
     /** True if a file with this name already exists in that phone folder (Android 10+). */
     @androidx.annotation.RequiresApi(29)
@@ -56,9 +63,10 @@ object Saver {
         keepSubs: Boolean = false, name: String = "",
         onProgress: (done: Long, total: Long) -> Unit = { _, _ -> },
         folder: String = "",
+        images: Boolean = false,
     ): List<SavedItem> {
         val all = dir.walkTopDown().filter { it.isFile && it.length() > 0 }.sortedBy { it.name }.toList()
-        val files = all.filter { it.extension.lowercase() !in SKIP }
+        val files = all.filter { val e = it.extension.lowercase(); e !in SKIP || (images && e in IMAGE_EXT) }
         val single = files.size == 1
         val grand = files.sumOf { it.length() }.coerceAtLeast(1)
         var before = 0L
@@ -67,6 +75,7 @@ object Saver {
         val items = files.mapIndexed { i, f ->
             val base = when {
                 single -> mainBase
+                images -> FileNames.numbered(custom.ifBlank { mainBase }, i + 1, files.size)
                 custom.isNotBlank() -> FileNames.numbered(custom, i + 1, files.size)
                 else -> FileNames.clean(
                     f.nameWithoutExtension.replace(Regex("""\s*\[[^\]]+]$"""), "").removePrefix(DownloadArgs.CHAPTER_PREFIX)
@@ -145,9 +154,11 @@ object Saver {
         val mime = mimeOf(f.extension)
         val isAudio = mime.startsWith("audio")
         val isVideo = mime.startsWith("video")
+        val isImage = mime.startsWith("image")
         val dirType = when {
             isAudio -> Environment.DIRECTORY_MUSIC
             isVideo -> Environment.DIRECTORY_MOVIES
+            isImage -> Environment.DIRECTORY_PICTURES
             else -> Environment.DIRECTORY_DOWNLOADS
         }
         var name = "$base.${f.extension}"
@@ -159,6 +170,7 @@ object Saver {
             val coll = when {
                 isAudio -> MediaStore.Audio.Media.getContentUri(vol)
                 isVideo -> MediaStore.Video.Media.getContentUri(vol)
+                isImage -> MediaStore.Images.Media.getContentUri(vol)
                 else -> MediaStore.Downloads.getContentUri(vol)
             }
             val cr = ctx.contentResolver

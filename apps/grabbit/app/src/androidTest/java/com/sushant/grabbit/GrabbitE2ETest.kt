@@ -429,6 +429,8 @@ class GrabbitE2ETest {
                     android.os.ParcelFileDescriptor.AutoCloseInputStream(pfd).bufferedReader().readText() } }.getOrDefault("").contains(item.fileName)
             val sticky = com.sushant.grabbit.data.Folders.current.value.contains("GrabbitTest")
             // Next link starts in the same folder
+            compose.onNodeWithTag("nav_home").performClick()
+            compose.waitForIdle()
             compose.onNodeWithTag("urlField").performTextClearance()
             compose.onNodeWithTag("urlField").performTextInput("https://www.w3schools.com/html/mov_bbb.mp4")
             compose.onNodeWithTag("grabBtn").performClick()
@@ -446,6 +448,62 @@ class GrabbitE2ETest {
             "folder=${onDisk && sticky && shownPath.contains("GrabbitTest") && renamed && deleted}"
         }.getOrElse { log("FOLDER failed: ${it.message}"); shot("folder_fail"); "folder=false" }
             .also { com.sushant.grabbit.data.Folders.pickerStart = null; com.sushant.grabbit.data.Folders.select("") }
+    }
+
+    /** Photos: a direct image link, a tweet with a photo, and the Image tab (cover image) of a video. */
+    private fun imageFlow(): String {
+        val out = mutableListOf<String>()
+        fun waitSaved(before: Int) = try { compose.waitUntil(120_000) { Library.items.value.size > before }; true } catch (e: Throwable) { false }
+        // 1) Direct image link, through the UI
+        out += runCatching {
+            compose.onNodeWithTag("nav_home").performClick()
+            compose.onNodeWithTag("urlField").performTextClearance()
+            compose.onNodeWithTag("urlField").performTextInput("https://www.w3schools.com/html/pic_trulli.jpg")
+            compose.onNodeWithTag("grabBtn").performClick()
+            compose.waitUntil(60_000) { exists("downloadBtn") || exists("fetchError") }
+            shot("img_1_direct_card")
+            val before = Library.items.value.size
+            compose.onNodeWithTag("downloadBtn").performScrollTo().performClick()
+            val ok = waitSaved(before)
+            val it = Library.items.value.maxByOrNull { it.time }
+            log("IMAGE direct ok=$ok name=${it?.fileName} mime=${it?.mime} size=${it?.size}")
+            "imgDirect=${ok && it?.mime == "image/jpeg"}"
+        }.getOrElse { log("IMAGE direct failed: ${it.message}"); shot("img_1_fail"); "imgDirect=false" }
+        // 2) Tweet with a photo (no login)
+        out += runCatching {
+            val info = runBlocking { com.sushant.grabbit.engine.Media.fetchInfo(ctx, "https://x.com/TheEllenShow/status/440322224407314432") }
+            log("IMAGE tweet gallery=${info.gallery.size} title=${info.title} first=${info.gallery.firstOrNull()?.url}")
+            if (info.gallery.isEmpty()) return@runCatching "imgTweet=noPhotos"
+            val vm = ViewModelProvider(compose.activity)[MainViewModel::class.java]
+            val before = Library.items.value.size
+            compose.activity.runOnUiThread { vm.download(info, com.sushant.grabbit.download.Gallery.Q_ORIGINAL, com.sushant.grabbit.download.DlOpts()) }
+            val ok = waitSaved(before)
+            val it = Library.items.value.maxByOrNull { it.time }
+            log("IMAGE tweet ok=$ok name=${it?.fileName} mime=${it?.mime} size=${it?.size}")
+            "imgTweet=${ok && it?.mime?.startsWith("image") == true}"
+        }.getOrElse { log("IMAGE tweet failed: ${it.message}"); "imgTweet=false" }
+        // 3) Image tab of a video: its cover image, as JPG
+        out += runCatching {
+            compose.onNodeWithTag("nav_home").performClick()
+            compose.onNodeWithTag("urlField").performTextClearance()
+            compose.onNodeWithTag("urlField").performTextInput("https://x.com/SpaceX/status/1732824684683784516")
+            compose.onNodeWithTag("grabBtn").performClick()
+            compose.waitUntil(120_000) { exists("downloadBtn") || exists("fetchError") }
+            compose.onNodeWithTag("imageTab").performClick()
+            compose.onNodeWithTag("pq_imgjpg").performScrollTo().performClick()
+            compose.onNodeWithTag("downloadBtn").performScrollTo()
+            shot("img_2_cover_tab")
+            val before = Library.items.value.size
+            compose.onNodeWithTag("downloadBtn").performClick()
+            val ok = waitSaved(before)
+            val it = Library.items.value.maxByOrNull { it.time }
+            log("IMAGE cover ok=$ok name=${it?.fileName} mime=${it?.mime} size=${it?.size}")
+            "imgCover=${ok && it?.mime == "image/jpeg"}"
+        }.getOrElse { log("IMAGE cover failed: ${it.message}"); shot("img_2_fail"); "imgCover=false" }
+        compose.onNodeWithTag("nav_downloads").performClick()
+        compose.waitForIdle()
+        shot("img_3_downloads")
+        return out.joinToString(" ")
     }
 
     /** Same X video with Faster downloads off (one connection) and on (aria2c); the worker logs TIMING lines. */
@@ -644,8 +702,9 @@ class GrabbitE2ETest {
         val speed = speedFlow()
         val pause = pauseFlow(false) + " " + pauseFlow(true)
         val folder = folderFlow()
+        val images = imageFlow()
 
-        log("SUMMARY direct=$direct x=$x dailymotion=$dm facebook=$fb youtube=$youtube share=$share threads=$threads $options $renamed $speed $pause $folder")
+        log("SUMMARY direct=$direct x=$x dailymotion=$dm facebook=$fb youtube=$youtube share=$share threads=$threads $options $renamed $speed $pause $folder $images")
         results.forEach { Log.i("GrabbitE2E", "RESULT $it") }
         assertTrue("Downloads failed", direct && x)
         assertTrue("Share sheet download failed", share)

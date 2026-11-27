@@ -159,7 +159,7 @@ class ShareViewModel(app: android.app.Application) : AndroidViewModel(app) {
     fun download(info: MediaInfo, quality: String, opts: DlOpts): String {
         Downloads.enqueue(
             getApplication(),
-            Downloads.Job(info.url, info.title, info.thumbnail, info.site, quality, info.isPlaylist, opts),
+            Downloads.Job(info.url, info.title, info.thumbnail, info.site, quality, info.isPlaylist, opts, items = info.gallery),
         )
         return if (info.isPlaylist) "Downloading ${info.count} videos" else "Download started"
     }
@@ -234,7 +234,7 @@ private fun ShareSheet(vm: ShareViewModel, onClose: () -> Unit, onStarted: (Stri
                         Text("Open in Grabbit")
                     }
                 }
-                is FetchState.Loaded -> MediaCard(s.info, framed = false) { q, o -> onDownload(s.info, q, o) }
+                is FetchState.Loaded -> MediaCard(s.info, framed = false) { i, q, o -> onDownload(i, q, o) }
             }
         }
     }

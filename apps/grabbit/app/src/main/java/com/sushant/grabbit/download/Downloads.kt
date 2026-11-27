@@ -19,12 +19,16 @@ object Downloads {
         val opts: DlOpts = DlOpts(),
         /** Stays the same across pause/resume and retry, so the half-downloaded part is found again. */
         val key: String = "",
+        /** Photo-post items to download (kept in a file by key, not in job data). */
+        val items: List<com.sushant.grabbit.engine.GalleryItem> = emptyList(),
+        val gallery: Boolean = items.isNotEmpty(),
     )
 
     fun enqueue(ctx: Context, job0: Job, resume: Boolean = false): UUID {
         val job = if (job0.key.isBlank()) job0.copy(key = UUID.randomUUID().toString()) else job0
         // "Keep my last folder": the next download starts where this one goes
         if (!resume && com.sushant.grabbit.data.Prefs.keepLastFolder) com.sushant.grabbit.data.Folders.select(job.opts.folder)
+        if (job.items.isNotEmpty()) Gallery.save(ctx, job.key, job.items)
         val req = OneTimeWorkRequestBuilder<DownloadWorker>()
             .setInputData(
                 workDataOf(
@@ -37,6 +41,7 @@ object Downloads {
                     DownloadWorker.K_OPTS to job.opts.encode(),
                     DownloadWorker.K_KEY to job.key,
                     DownloadWorker.K_RESUME to resume,
+                    DownloadWorker.K_GALLERY to job.gallery,
                 )
             )
             .setExpedited(OutOfQuotaPolicy.RUN_AS_NON_EXPEDITED_WORK_REQUEST)
@@ -49,6 +54,7 @@ object Downloads {
             .addTag("p:${job.playlist}")
             .addTag("o:${job.opts.encode()}")
             .addTag("k:${job.key}")
+            .addTag("g:${if (job.gallery) 1 else 0}")
             .addTag("c:${System.currentTimeMillis()}")
             .build()
         WorkManager.getInstance(ctx).enqueue(req)
@@ -69,6 +75,7 @@ object Downloads {
         playlist = w.tag("p:") == "true",
         opts = DlOpts.decode(w.tag("o:")),
         key = w.tag("k:"),
+        gallery = w.tag("g:") == "1",
     )
 
     /** Folder holding a job's half-finished files. */
@@ -102,6 +109,7 @@ object Downloads {
     fun discard(ctx: Context, item: com.sushant.grabbit.data.PausedItem) {
         com.sushant.grabbit.data.Paused.remove(item.job.key)
         partDir(ctx, item.job.key).deleteRecursively()
+        Gallery.delete(ctx, item.job.key)
     }
 
     fun created(w: WorkInfo): Long = w.tag("c:").toLongOrNull() ?: 0L

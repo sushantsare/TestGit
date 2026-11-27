@@ -36,6 +36,7 @@ class DownloadWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(c
         const val K_OPTS = "opts"
         const val K_KEY = "key"
         const val K_RESUME = "resume"
+        const val K_GALLERY = "gallery"
         const val K_ERROR = "error"
         const val K_RAW = "raw"
         const val P_PCT = "p"
@@ -103,6 +104,65 @@ class DownloadWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(c
         }
     }
 
+    /** Photo posts: fetch each chosen item directly (resumes half-done files), optional JPG, save to Pictures. */
+    private suspend fun galleryWork(
+        key: String, tmp: File, site: String, thumb: String, url: String, quality: String, stopped: () -> Result,
+    ): Result {
+        val ctx = applicationContext
+        val opts = DlOpts.decode(inputData.getString(K_OPTS))
+        val items = Gallery.load(ctx, key)
+        if (items.isEmpty()) return fail("Nothing to download in this post. Open it again and pick the photos.", "")
+        val nm = ctx.getSystemService(NotificationManager::class.java)
+        var last = 0L
+        for ((i, it) in items.withIndex()) {
+            val f = File(tmp, String.format(java.util.Locale.US, "%03d.%s", i + 1, it.ext))
+            val status = if (items.size > 1) "Downloading ${i + 1} of ${items.size}…" else "Downloading…"
+            try {
+                withContext(Dispatchers.IO) {
+                    Gallery.fetch(it.url, f, { isStopped }) { done, total ->
+                        val now = SystemClock.elapsedRealtime()
+                        if (now - last < 500) return@fetch
+                        last = now
+                        val part = if (total > 0) done.toFloat() / total else 0f
+                        val pct = (i + part) * 100f / items.size
+                        val size = if (total > 0) "${Progress.bytes(done)} of ${Progress.bytes(total)}" else Progress.bytes(done)
+                        setProgressAsync(workDataOf(P_PCT to pct, P_STATUS to status, P_SIZE to size, P_STAGE to Stages.DOWNLOAD))
+                        nm.notify(nid, Notifs.progress(ctx, title, "$status  ${pct.toInt()}%", pct.toInt(), false, id))
+                    }
+                }
+            } catch (e: Exception) {
+                if (isStopped || com.sushant.grabbit.data.Paused.has(key)) return stopped()
+                tmp.deleteRecursively()
+                return fail("Couldn't download item ${i + 1} of ${items.size}. The link may have expired — open the post again and retry.",
+                    e.toString())
+            }
+        }
+        if (quality == Gallery.Q_JPG) {
+            setProgress(workDataOf(P_PCT to 100f, P_STATUS to "Converting to JPG…", P_STAGE to Stages.WORK))
+            withContext(Dispatchers.Default) {
+                tmp.listFiles()?.filter { Saver.mimeOf(it.extension).startsWith("image") }?.forEach { runCatching { Gallery.toJpg(it) } }
+            }
+        }
+        val folder = opts.folder.takeIf { it.isNotBlank() && com.sushant.grabbit.data.Folders.valid(ctx, it) }.orEmpty()
+        val allImages = items.all { !it.video }
+        val where = com.sushant.grabbit.data.Folders.label(ctx, folder, audio = false, image = allImages)
+        setProgress(workDataOf(P_PCT to 0f, P_STATUS to "Saving to $where…", P_STAGE to Stages.SAVE))
+        val saved = try {
+            Saver.saveAll(ctx, tmp, title, site, thumb, url, name = opts.name, folder = folder, images = true)
+        } catch (e: Exception) {
+            return fail("Couldn't save the files: ${e.message ?: e}", e.toString())
+        } finally {
+            tmp.deleteRecursively()
+        }
+        if (saved.isEmpty()) return fail("Download finished but no file was produced.", "")
+        Gallery.delete(ctx, key)
+        Library.add(saved)
+        val word = if (allImages) "photo" else "file"
+        Notifs.done(ctx, nid + 1, title, true,
+            if (saved.size > 1) "${saved.size} ${word}s saved to $where" else "Saved to $where", saved.singleOrNull())
+        return Result.success()
+    }
+
     private suspend fun work(): Result {
         val ctx = applicationContext
         val t0 = SystemClock.elapsedRealtime()
@@ -120,11 +180,14 @@ class DownloadWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(c
         val key = inputData.getString(K_KEY)?.ifBlank { null } ?: id.toString()
         val resuming = inputData.getBoolean(K_RESUME, false)
         val tmp = Downloads.partDir(ctx, key).apply { if (!resuming) deleteRecursively(); mkdirs() }
+        if (resuming) timing("resume start: part files ${tmp.walkTopDown().filter { it.isFile }.map { "${it.name}=${it.length()}" }.toList()}")
         // Paused (not cancelled): keep the part file so Resume continues from here
         fun stoppedResult(): Result {
             if (!com.sushant.grabbit.data.Paused.has(key)) tmp.deleteRecursively()
             return Result.failure(workDataOf(K_ERROR to "Cancelled"))
         }
+        if (inputData.getBoolean(K_GALLERY, false)) return galleryWork(key, tmp, site, thumb, url, quality, ::stoppedResult)
+
         // Threads: find the post's direct video file first (yt-dlp can't read Threads pages)
         val source = if (Threads.isThreads(url) || InstaStory.isStory(url)) {
             try {
@@ -167,7 +230,7 @@ class DownloadWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(c
         suspend fun grab(o: DlOpts) = withContext(Dispatchers.IO) {
             val tStart = SystemClock.elapsedRealtime()
             YoutubeDL.getInstance().execute(buildRequest(ctx, source, quality, playlist, tmp, o, multi), processId = id.toString(), callback = { p, eta, line ->
-                if (line.contains("Resuming download at byte")) timing("RESUMED $line")
+                if (line.contains("esuming") || line.contains("already been downloaded")) timing("RESUMED $line")
                 val work = Stages.statusFor(line)
                 val item = ITEM.find(line)
                 var force = false

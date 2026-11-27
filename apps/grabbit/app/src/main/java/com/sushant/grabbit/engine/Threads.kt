@@ -17,7 +17,7 @@ import java.net.URL
 class FriendlyError(message: String, val raw: String) : Exception(message)
 
 object Threads {
-    data class Post(val videos: List<String>, val thumb: String, val caption: String, val user: String)
+    data class Post(val videos: List<String>, val thumb: String, val caption: String, val user: String, val images: List<String> = emptyList())
 
     fun isThreads(url: String): Boolean {
         val host = runCatching { Uri.parse(url).host }.getOrNull()?.lowercase() ?: return false
@@ -35,6 +35,7 @@ object Threads {
         val ua = Prefs.loginUserAgent.ifBlank { CHROME }
         val diag = mutableListOf<String>()
         var blocked: String? = null
+        var photoPost: Post? = null
         for ((name, agent, cookie) in listOf(
             Triple("browser", ua, Cookies.headerFor(host)),
             Triple("preview", PREVIEW_BOT, ""),
@@ -45,12 +46,14 @@ object Threads {
                 diag += "$name: page ${html.length / 1024} KB, login=${cookie.isNotBlank()}, " +
                     "video_versions=${"video_versions" in html}, og_video=${"og:video" in html}, videos=${post.videos.size}"
                 if (post.videos.isNotEmpty()) return@withContext post
+                if (post.images.isNotEmpty() && photoPost == null) photoPost = post
             } catch (e: Exception) {
                 diag += "$name: ${e.message}"
                 if (blocked == null && e is IllegalStateException) blocked = e.message
                 if (blocked == null && e is java.io.IOException) blocked = "Couldn't reach Threads. Check your internet connection and try again."
             }
         }
+        photoPost?.let { return@withContext it }
         throw FriendlyError(
             blocked ?: ("No video found in this Threads post. It may be a photo or text post, or from a private " +
                 "account (log in to Threads in Settings → Accounts)."),
@@ -121,7 +124,9 @@ object ThreadsParser {
             ?: ""
         val user = userHint.ifBlank { USERNAME.find(html)?.groupValues?.get(1)?.let { jsonString(it) }.orEmpty() }
         // The main post comes first on the page; replies with their own videos come later
-        return Threads.Post(videos.take(1), thumb, caption, user)
+        // Photo post: the main post's image (its first image_versions2 on the page)
+        val images = if (videos.isEmpty()) listOfNotNull(IMAGE_CANDIDATES.find(html)?.groupValues?.get(1)?.let { firstUrl(it) }) else emptyList()
+        return Threads.Post(videos.take(1), thumb, caption, user, images)
     }
 
     fun title(post: Threads.Post): String {

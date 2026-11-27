@@ -50,6 +50,11 @@ object Prefs {
         set(v) = p.edit().putString("sub_lang", v).apply()
 
     /** "embed", "file" or "both" */
+    /** Photos: "img" = original file, "imgjpg" = smaller JPG. */
+    var imageFormat: String
+        get() = p.getString("image_format", "img") ?: "img"
+        set(v) = p.edit().putString("image_format", v).apply()
+
     /** Folder (tree uri) the next download goes to; "" = Default (Movies / Music / Pictures). */
     var saveFolder: String
         get() = p.getString("save_folder", "") ?: ""

@@ -10,6 +10,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
 import androidx.compose.material.icons.rounded.ContentCut
 import androidx.compose.material.icons.rounded.Speed
+import androidx.compose.material.icons.rounded.Image
 import androidx.compose.material3.IconButton
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.FolderOpen
@@ -107,6 +108,7 @@ fun SettingsScreen(vm: MainViewModel, modifier: Modifier) {
     var quality by remember { mutableStateOf(Prefs.defaultQuality) }
     var subLang by remember { mutableStateOf(Prefs.subLang) }
     var subMode by remember { mutableStateOf(Prefs.subMode) }
+    var imageFormat by remember { mutableStateOf(Prefs.imageFormat) }
     var videoFormat by remember { mutableStateOf(Prefs.videoFormat) }
     var audioFormat by remember { mutableStateOf(Prefs.audioFormat) }
     var faster by remember { mutableStateOf(Prefs.fasterDownloads) }
@@ -160,6 +162,9 @@ fun SettingsScreen(vm: MainViewModel, modifier: Modifier) {
                 SettingsDivider()
                 SettingsItem("Audio format", AUDIO_FORMATS_SET.first { it.first == audioFormat }.second, Icons.Rounded.MusicNote,
                     onClick = { sheet = "audio" }) { Icon(Icons.AutoMirrored.Rounded.KeyboardArrowRight, null, tint = MaterialTheme.colorScheme.onSurfaceVariant) }
+                SettingsDivider()
+                SettingsItem("Image format", IMAGE_FORMATS.first { it.first == imageFormat }.second, Icons.Rounded.Image,
+                    onClick = { sheet = "image" }) { Icon(Icons.AutoMirrored.Rounded.KeyboardArrowRight, null, tint = MaterialTheme.colorScheme.onSurfaceVariant) }
                 SettingsDivider()
                 SettingsItem(
                     "Subtitles",
@@ -265,6 +270,8 @@ fun SettingsScreen(vm: MainViewModel, modifier: Modifier) {
             VIDEO_FORMAT_NOTES, videoFormat.toString(), { videoFormat = it.toInt(); Prefs.videoFormat = videoFormat }) { sheet = null }
         "audio" -> ChoiceSheet("Audio format", "Used when you choose Audio", AUDIO_FORMATS_SET, AUDIO_FORMAT_NOTES, audioFormat,
             { audioFormat = it; Prefs.audioFormat = it }) { sheet = null }
+        "image" -> ChoiceSheet("Image format", "Used for photos and cover images", IMAGE_FORMATS, IMAGE_FORMAT_NOTES, imageFormat,
+            { imageFormat = it; Prefs.imageFormat = it }) { sheet = null }
         "subs" -> SubtitleDefaultsSheet(subLang, subMode, { subLang = it; Prefs.subLang = it }, { subMode = it; Prefs.subMode = it }) { sheet = null }
         "sponsor" -> SponsorSheet(sponsor, { sponsor = it; Prefs.sponsorCats = it }) { sheet = null }
     }
@@ -301,6 +308,12 @@ private val VIDEO_FORMAT_NOTES = mapOf(
     "1" to "VP9/AV1 when available. Sometimes sharper, may not play everywhere",
 )
 private val AUDIO_FORMATS_SET = listOf("mp3" to "MP3", "m4a" to "M4A", "opus" to "Opus", "best" to "Original")
+private val IMAGE_FORMATS = listOf("img" to "Original", "imgjpg" to "Smaller (JPG)")
+private val IMAGE_FORMAT_NOTES = mapOf(
+    "img" to "Exactly what the site has, full quality",
+    "imgjpg" to "Converted to JPG: opens everywhere, often smaller",
+)
+
 private val AUDIO_FORMAT_NOTES = mapOf(
     "mp3" to "Plays everywhere",
     "m4a" to "Smaller files, same quality as MP3",

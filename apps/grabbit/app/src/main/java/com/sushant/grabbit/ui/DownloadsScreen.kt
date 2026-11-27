@@ -252,6 +252,8 @@ private fun ActiveCard(w: WorkInfo, vm: MainViewModel, modifier: Modifier) {
 }
 
 private fun qualityText(q: String) = when {
+    q == com.sushant.grabbit.download.Gallery.Q_ORIGINAL -> "Photos"
+    q == com.sushant.grabbit.download.Gallery.Q_JPG -> "Photos · JPG"
     q == "audio" -> "MP3"
     audioKbps(q) != null -> "MP3 · ${audioKbps(q)} kbps"
     q == "best" -> "Best"

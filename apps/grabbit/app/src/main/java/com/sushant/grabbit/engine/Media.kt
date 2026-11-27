@@ -29,6 +29,8 @@ data class MediaInfo(
     val subtitles: List<SubLang> = emptyList(),
     /** Number of chapters in the video (0 = none) */
     val chapters: Int = 0,
+    /** Photo post (carousel, gallery, tweet photos): every item, photos and videos. Empty for normal videos. */
+    val gallery: List<GalleryItem> = emptyList(),
 )
 
 data class SubLang(val code: String, val name: String, val auto: Boolean)
@@ -98,8 +100,14 @@ object Media {
                 "Instagram", false, 1, emptyList(), emptyMap(), true,
             )
         }
+        // Photo posts (and direct image links); null means "no photos here", so videos carry on as before
+        if (Images.mightHavePhotos(url)) runCatching { Images.resolve(url) }.getOrNull()?.let { return@withContext it }
         if (Threads.isThreads(url)) {
             val post = Threads.resolve(url)
+            if (post.videos.isEmpty() && post.images.isNotEmpty()) return@withContext Images.info(
+                url, ThreadsParser.title(post), post.user.let { if (it.isEmpty()) "" else "@$it" }, "Threads",
+                post.images.map { GalleryItem(it, false, it) },
+            )
             return@withContext MediaInfo(
                 url, ThreadsParser.title(post), post.user.let { if (it.isEmpty()) "" else "@$it" }, post.thumb, 0,
                 "Threads", false, 1, emptyList(), emptyMap(), true,

@@ -20,6 +20,7 @@ data class SavedItem(
     val path: String?,
 ) {
     val isAudio get() = mime.startsWith("audio")
+    val isImage get() = mime.startsWith("image")
 }
 
 /** List of finished downloads, stored as JSON in app storage. */

@@ -38,6 +38,7 @@ import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Download
 import androidx.compose.material.icons.rounded.Link
 import androidx.compose.material.icons.rounded.Movie
+import androidx.compose.material.icons.rounded.Image
 import androidx.compose.material.icons.rounded.MusicNote
 import androidx.compose.material.icons.rounded.Share
 import androidx.compose.material3.AlertDialog
@@ -169,7 +170,7 @@ fun HomeScreen(vm: MainViewModel, modifier: Modifier) {
                 ErrorCard("Couldn't get this video", f.message, f.raw, onRetry = { vm.fetch() },
                     modifier = Modifier.testTag("fetchError"))
             }
-            is FetchState.Loaded -> item(key = "media") { MediaCard(f.info) { q, o -> startDownload(f.info, q, o) } }
+            is FetchState.Loaded -> item(key = "media") { MediaCard(f.info) { i, q, o -> startDownload(i, q, o) } }
         }
     }
 }
@@ -372,12 +373,20 @@ private fun defaultVideoChoice(opts: List<QOpt>): String {
 
 @OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class)
 @Composable
-internal fun MediaCard(info: MediaInfo, framed: Boolean = true, onDownload: (String, DlOpts) -> Unit) {
+internal fun MediaCard(info: MediaInfo, framed: Boolean = true, onDownload: (MediaInfo, String, DlOpts) -> Unit) {
+    // Photo posts (carousels, tweet photos, image links) get the photo picker instead
+    if (info.gallery.isNotEmpty()) {
+        GalleryCard(info, framed, onDownload)
+        return
+    }
     val sp = LocalSpacing.current
     val sz = LocalSizes.current
     val opts = remember(info) { videoOptions(info) }
     val startAudio = !info.hasVideo || Prefs.defaultQuality == "audio"
     var audio by rememberSaveable(info.url) { mutableStateOf(startAudio) }
+    /** Image tab: save the video's cover image. */
+    var image by rememberSaveable(info.url) { mutableStateOf(false) }
+    var imgQuality by rememberSaveable(info.url) { mutableStateOf(Prefs.imageFormat) }
     var video by rememberSaveable(info.url) { mutableStateOf(defaultVideoChoice(opts)) }
     val audioOpts = remember(info) { audioOptions(info) }
     var aud by rememberSaveable(info.url) {
@@ -415,42 +424,52 @@ internal fun MediaCard(info: MediaInfo, framed: Boolean = true, onDownload: (Str
                 Spacer(Modifier.height(sp.l))
                 SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
                     SegmentedButton(
-                        selected = !audio, onClick = { audio = false },
-                        shape = SegmentedButtonDefaults.itemShape(0, 2),
+                        selected = !audio && !image, onClick = { audio = false; image = false },
+                        shape = SegmentedButtonDefaults.itemShape(0, if (info.thumbnail.isNotBlank()) 3 else 2),
                         icon = { Icon(Icons.Rounded.Movie, null, Modifier.size(sz.iconSmall)) },
                     ) { FitText("Video") }
                     SegmentedButton(
-                        selected = audio, onClick = { audio = true },
-                        shape = SegmentedButtonDefaults.itemShape(1, 2),
+                        selected = audio && !image, onClick = { audio = true; image = false },
+                        shape = SegmentedButtonDefaults.itemShape(1, if (info.thumbnail.isNotBlank()) 3 else 2),
                         icon = { Icon(Icons.Rounded.MusicNote, null, Modifier.size(sz.iconSmall)) },
                     ) { FitText("Audio") }
+                    if (info.thumbnail.isNotBlank()) SegmentedButton(
+                        selected = image, onClick = { image = true },
+                        shape = SegmentedButtonDefaults.itemShape(2, 3),
+                        icon = { Icon(Icons.Rounded.Image, null, Modifier.size(sz.iconSmall)) },
+                        modifier = Modifier.testTag("imageTab"),
+                    ) { FitText("Image") }
                 }
             }
             Spacer(Modifier.height(sp.m))
-            if (audio) QualityChips(audioOpts, aud) { aud = it }
-            else if (info.hasVideo) QualityChips(opts, video) { video = it }
-            Spacer(Modifier.height(sp.m))
-            DownloadOptionsRow(info, audio, st)
-            Spacer(Modifier.height(sp.l))
-            SaveToSection(st.folder, { st.folder = it }, audio)
-            Spacer(Modifier.height(sp.l))
-            val fmtName = AUDIO_FORMAT_LABELS.firstOrNull { it.first == st.audioFormat }?.second ?: "MP3"
-            val label = when {
-                info.isPlaylist -> "Download all (${info.count})"
-                audio && (chosenAudio == null || chosenAudio.key == "audio") -> "Download $fmtName · best"
-                audio -> "Download $fmtName · ${chosenAudio!!.label}" + fmtSize((chosenAudio.size * st.keptShare).toLong()).let { if (it.isEmpty()) "" else " · $it" }
-                chosen == null || chosen.key == "best" -> if (st.trimmed) "Download best quality · trimmed" else "Download best quality"
-                else -> "Download ${chosen.label}" + fmtSize((chosen.size * st.keptShare).toLong()).let { if (it.isEmpty()) "" else " · $it" }
-            }
-            Button(
-                onClick = { onDownload(if (audio) aud else video, st.toOpts(audio)) },
-                modifier = Modifier.fillMaxWidth().height(sz.button).testTag("downloadBtn"),
-                shape = PillShape,
-            ) {
-                Icon(Icons.Rounded.Download, null)
-                Spacer(Modifier.width(sp.s))
-                Text(label, style = MaterialTheme.typography.titleMedium.copy(fontFeatureSettings = TabularNums),
-                    maxLines = 1, overflow = TextOverflow.Ellipsis)
+            if (image) CoverImageOptions(info, imgQuality, { imgQuality = it }, st, onDownload)
+            else {
+                if (audio) QualityChips(audioOpts, aud) { aud = it }
+                else if (info.hasVideo) QualityChips(opts, video) { video = it }
+                Spacer(Modifier.height(sp.m))
+                DownloadOptionsRow(info, audio, st)
+                Spacer(Modifier.height(sp.l))
+                SaveToSection(st.folder, { st.folder = it }, audio)
+                Spacer(Modifier.height(sp.l))
+                val fmtName = AUDIO_FORMAT_LABELS.firstOrNull { it.first == st.audioFormat }?.second ?: "MP3"
+                val label = when {
+                    info.isPlaylist -> "Download all (${info.count})"
+                    audio && (chosenAudio == null || chosenAudio.key == "audio") -> "Download $fmtName · best"
+                    audio -> "Download $fmtName · ${chosenAudio!!.label}" + fmtSize((chosenAudio.size * st.keptShare).toLong()).let { if (it.isEmpty()) "" else " · $it" }
+                    chosen == null || chosen.key == "best" -> if (st.trimmed) "Download best quality · trimmed" else "Download best quality"
+                    else -> "Download ${chosen.label}" + fmtSize((chosen.size * st.keptShare).toLong()).let { if (it.isEmpty()) "" else " · $it" }
+                }
+                Button(
+                    onClick = { onDownload(info, if (audio) aud else video, st.toOpts(audio)) },
+                    modifier = Modifier.fillMaxWidth().height(sz.button).testTag("downloadBtn"),
+                    shape = PillShape,
+                ) {
+                    Icon(Icons.Rounded.Download, null)
+                    Spacer(Modifier.width(sp.s))
+                    Text(label, style = MaterialTheme.typography.titleMedium.copy(fontFeatureSettings = TabularNums),
+                        maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
+
             }
         }
     }
