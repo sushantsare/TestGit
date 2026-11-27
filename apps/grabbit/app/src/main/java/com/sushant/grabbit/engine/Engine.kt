@@ -26,6 +26,8 @@ object Engine {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
+    @Volatile var aria2Ready = false
+
     fun start(ctx: Context) {
         val app = ctx.applicationContext
         state.value = State.Starting
@@ -33,6 +35,8 @@ object Engine {
             try {
                 YoutubeDL.getInstance().init(app)
                 FFmpeg.getInstance().init(app)
+                // Multi-connection downloader; if it can't start, downloads fall back to yt-dlp's own
+                aria2Ready = runCatching { com.yausername.aria2c.Aria2c.getInstance().init(app) }.isSuccess
                 version.value = runCatching { YoutubeDL.getInstance().version(app) }.getOrNull()
                 state.value = State.Ready
                 if (Prefs.autoUpdate && System.currentTimeMillis() - Prefs.lastUpdate > 24L * 3600 * 1000) {

@@ -14,8 +14,8 @@ android {
         applicationId = "com.sushant.grabbit"
         minSdk = 26
         targetSdk = 35
-        versionCode = 13
-        versionName = "2.8"
+        versionCode = 14
+        versionName = "3.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
@@ -90,6 +90,7 @@ dependencies {
     val ytdl = "0.17.4"
     implementation("io.github.junkfood02.youtubedl-android:library:$ytdl")
     implementation("io.github.junkfood02.youtubedl-android:ffmpeg:$ytdl")
+    implementation("io.github.junkfood02.youtubedl-android:aria2c:$ytdl")
 
     implementation("androidx.core:core-ktx:1.15.0")
     implementation("androidx.core:core-splashscreen:1.0.1")

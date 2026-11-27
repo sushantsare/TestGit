@@ -55,6 +55,8 @@ data class GlobalOpts(
     /** 0 = most compatible (H.264/AAC in MP4), 1 = highest quality (VP9/AV1 allowed). */
     val videoFormat: Int = 0,
     val faster: Boolean = true,
+    /** Use aria2c (many connections per file) for whole-file downloads. */
+    val multiConn: Boolean = false,
     val embedThumb: Boolean = true,
     /** SponsorBlock categories to remove from YouTube videos (empty = off). */
     val sponsorCats: Set<String> = emptySet(),
@@ -74,7 +76,13 @@ object DownloadArgs {
         if (playlist) o("--ignore-errors")
         val template = if (playlist) "%(playlist_index)03d - %(title).70B [%(id).30B].%(ext)s" else "%(title).80B [%(id).40B].%(ext)s"
         o("-o", "$outDir/$template")
-        if (g.faster) o("--concurrent-fragments", "4")
+        if (g.faster) o("--concurrent-fragments", "8")
+        if (g.faster && g.multiConn) {
+            // One file over many connections (YouTube, X, direct links); streams in small pieces keep the native downloader
+            o("--downloader", "aria2c")
+            o("--downloader", "dash,m3u8:native")
+            o("--downloader-args", "aria2c:-x 16 -s 16 -k 1M --file-allocation=none --summary-interval=1")
+        }
 
         val audio = quality == "audio" || (quality.length > 1 && quality[0] == 'a' && quality.drop(1).all { it.isDigit() })
         if (audio) {

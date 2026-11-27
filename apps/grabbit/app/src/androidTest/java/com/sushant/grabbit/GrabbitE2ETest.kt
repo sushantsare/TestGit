@@ -352,6 +352,27 @@ class GrabbitE2ETest {
         r.release(); d
     }.getOrDefault(-1)
 
+    /** Same X video with Faster downloads off (one connection) and on (aria2c); the worker logs TIMING lines. */
+    private fun speedFlow(): String {
+        val info = runCatching { runBlocking { com.sushant.grabbit.engine.Media.fetchInfo(ctx, "https://x.com/SpaceX/status/1732824684683784516") } }.getOrNull()
+            ?: return "speed=noInfo"
+        val vm = ViewModelProvider(compose.activity)[MainViewModel::class.java]
+        val out = mutableListOf<String>()
+        for (fast in listOf(false, true)) {
+            Prefs.fasterDownloads = fast
+            val before = Library.items.value.size
+            val t = System.currentTimeMillis()
+            compose.activity.runOnUiThread { vm.download(info, "h720", com.sushant.grabbit.download.DlOpts()) }
+            val ok = try { compose.waitUntil(300_000) { Library.items.value.size > before }; true } catch (e: Throwable) { false }
+            val ms = System.currentTimeMillis() - t
+            val bytes = Library.items.value.maxByOrNull { it.time }?.size ?: 0
+            log("SPEED faster=$fast ok=$ok ms=$ms bytes=$bytes")
+            out += "${if (fast) "fast" else "single"}=${if (ok) "${ms}ms" else "fail"}"
+        }
+        Prefs.fasterDownloads = true
+        return out.joinToString(" ")
+    }
+
     /** Pen-icon name before download, then Rename from the Downloads list. */
     private fun renameFlow(): String {
         val item = Library.items.value.firstOrNull { it.fileName.startsWith("My test clip") }
@@ -524,8 +545,9 @@ class GrabbitE2ETest {
         val share = shareFlow()
         val threads = threadsFlow()
         val options = optionsFlow()
+        val speed = speedFlow()
 
-        log("SUMMARY direct=$direct x=$x dailymotion=$dm facebook=$fb youtube=$youtube share=$share threads=$threads $options $renamed")
+        log("SUMMARY direct=$direct x=$x dailymotion=$dm facebook=$fb youtube=$youtube share=$share threads=$threads $options $renamed $speed")
         results.forEach { Log.i("GrabbitE2E", "RESULT $it") }
         assertTrue("Downloads failed", direct && x)
         assertTrue("Share sheet download failed", share)

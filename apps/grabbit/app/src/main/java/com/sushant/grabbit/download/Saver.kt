@@ -54,10 +54,13 @@ object Saver {
     fun saveAll(
         ctx: Context, dir: File, title: String, site: String, thumb: String, url: String,
         keepSubs: Boolean = false, name: String = "",
+        onProgress: (done: Long, total: Long) -> Unit = { _, _ -> },
     ): List<SavedItem> {
         val all = dir.walkTopDown().filter { it.isFile && it.length() > 0 }.sortedBy { it.name }.toList()
         val files = all.filter { it.extension.lowercase() !in SKIP }
         val single = files.size == 1
+        val grand = files.sumOf { it.length() }.coerceAtLeast(1)
+        var before = 0L
         val custom = FileNames.clean(name)
         val mainBase = custom.ifBlank { FileNames.clean(title) }.ifBlank { "Grabbit" }
         val items = files.mapIndexed { i, f ->
@@ -68,7 +71,8 @@ object Saver {
                     f.nameWithoutExtension.replace(Regex("""\s*\[[^\]]+]$"""), "").removePrefix(DownloadArgs.CHAPTER_PREFIX)
                 ).ifBlank { FileNames.numbered(mainBase, i + 1, files.size) }
             }
-            save(ctx, f, base, base, site, thumb, url)
+            val len = f.length()
+            save(ctx, f, base, base, site, thumb, url) { d -> onProgress(before + d, grand) }.also { before += len }
         }
         if (keepSubs) all.filter { it.extension.lowercase() in SUBS && it.exists() }.forEach { f ->
             // "title [id].en.srt" -> "<name>.en.srt"
@@ -78,7 +82,25 @@ object Saver {
         return items
     }
 
-    private fun save(ctx: Context, f: File, title: String, base: String, site: String, thumb: String, url: String): SavedItem {
+    /** Copies with a 1 MB buffer and reports bytes written. */
+    private fun copy(f: File, out: java.io.OutputStream, onBytes: (Long) -> Unit) {
+        val buf = ByteArray(1 shl 20)
+        var done = 0L
+        var lastReport = 0L
+        f.inputStream().use { inp ->
+            while (true) {
+                val n = inp.read(buf)
+                if (n < 0) break
+                out.write(buf, 0, n)
+                done += n
+                val now = android.os.SystemClock.elapsedRealtime()
+                if (now - lastReport > 300) { lastReport = now; onBytes(done) }
+            }
+        }
+        onBytes(done)
+    }
+
+    private fun save(ctx: Context, f: File, title: String, base: String, site: String, thumb: String, url: String, onBytes: (Long) -> Unit = {}): SavedItem {
         val mime = mimeOf(f.extension)
         val isAudio = mime.startsWith("audio")
         val isVideo = mime.startsWith("video")
@@ -109,7 +131,7 @@ object Saver {
             uri = cr.insert(coll, values) ?: throw IOException("Couldn't create the file in phone storage")
             try {
                 (cr.openOutputStream(uri) ?: throw IOException("Couldn't open phone storage")).use { out ->
-                    f.inputStream().use { it.copyTo(out, 256 * 1024) }
+                    copy(f, out, onBytes)
                 }
                 values.clear()
                 values.put(MediaStore.MediaColumns.IS_PENDING, 0)
@@ -127,7 +149,7 @@ object Saver {
             val folder = File(Environment.getExternalStoragePublicDirectory(dirType), "Grabbit").apply { mkdirs() }
             name = FileNames.unique(base, f.extension) { File(folder, it).exists() }
             val dest = File(folder, name)
-            f.copyTo(dest)
+            dest.outputStream().use { copy(f, it, onBytes) }
             path = dest.absolutePath
             MediaScannerConnection.scanFile(ctx, arrayOf(dest.absolutePath), arrayOf(mime), null)
             uri = FileProvider.getUriForFile(ctx, "${ctx.packageName}.files", dest)

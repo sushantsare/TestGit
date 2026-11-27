@@ -217,18 +217,21 @@ private fun ActiveCard(w: WorkInfo, vm: MainViewModel, modifier: Modifier) {
         val speed = p.getString(DownloadWorker.P_SPEED).orEmpty()
         val eta = fmtEta(p.getLong(DownloadWorker.P_ETA, 0))
         val size = p.getString(DownloadWorker.P_SIZE).orEmpty()
+        // While merging/converting there is no percentage: show a moving bar instead of a stuck 99%
+        val working = p.getString(DownloadWorker.P_STAGE) == com.sushant.grabbit.download.Stages.WORK
         Spacer(Modifier.height(sp.m))
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(status, Modifier.weight(1f), style = MaterialTheme.typography.labelLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            if (pct > 0f) Text("${pct.toInt()}%", style = MaterialTheme.typography.labelLarge.copy(fontFeatureSettings = TabularNums),
+            if (pct > 0f && !working) Text("${pct.toInt()}%", style = MaterialTheme.typography.labelLarge.copy(fontFeatureSettings = TabularNums),
                 color = MaterialTheme.colorScheme.primary)
         }
         Spacer(Modifier.height(sp.s))
         val barMod = Modifier.fillMaxWidth().height(sz.progress)
-        if (pct > 0f) LinearProgressIndicator(progress = { pct / 100f }, modifier = barMod, strokeCap = StrokeCap.Round, gapSize = 0.dp, drawStopIndicator = {})
+        if (pct > 0f && !working) LinearProgressIndicator(progress = { pct / 100f }, modifier = barMod, strokeCap = StrokeCap.Round, gapSize = 0.dp, drawStopIndicator = {})
         else LinearProgressIndicator(barMod, strokeCap = StrokeCap.Round)
         Spacer(Modifier.height(sp.s))
-        val detail = listOf(size, speed, eta).filter { it.isNotBlank() }.joinToString(" · ")
+        val detail = if (working) "Almost done · big files take a little longer"
+            else listOf(size, speed, eta).filter { it.isNotBlank() }.joinToString(" · ")
         Text(detail.ifEmpty { "Connecting to the site…" },
             style = MaterialTheme.typography.bodySmall.copy(fontFeatureSettings = TabularNums),
             color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)

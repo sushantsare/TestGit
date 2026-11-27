@@ -44,9 +44,16 @@ class DownloadWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(c
         private val SPEED = Regex("""at\s+~?\s*([\d.]+\s*[KMG]i?B/s)""")
         private val ITEM = Regex("""Downloading item (\d+) of (\d+)""")
 
-        fun buildRequest(ctx: Context, url: String, quality: String, playlist: Boolean, dir: File, opts: DlOpts): YoutubeDLRequest {
+        const val P_STAGE = "stage"
+        private const val TAG = "GrabbitE2E"
+
+        fun buildRequest(
+            ctx: Context, url: String, quality: String, playlist: Boolean, dir: File, opts: DlOpts,
+            multiConnAllowed: Boolean = true,
+        ): YoutubeDLRequest {
             val r = YoutubeDLRequest(url)
-            val g = GlobalOpts(Prefs.videoFormat, Prefs.fasterDownloads, Prefs.embedThumb, Prefs.sponsorCats)
+            val g = GlobalOpts(Prefs.videoFormat, Prefs.fasterDownloads, Prefs.embedThumb, Prefs.sponsorCats,
+                multiConn = Engine.aria2Ready && multiConnAllowed)
             val yt = Sites.siteName(url) == "YouTube"
             DownloadArgs.build(quality, playlist, dir.absolutePath, opts, g, yt).forEach { (k, v) ->
                 if (v == null) r.addOption(k) else r.addOption(k, v)
@@ -73,8 +80,30 @@ class DownloadWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(c
         return Result.failure(workDataOf(K_ERROR to msg, K_RAW to raw.takeLast(3000)))
     }
 
+    private fun timing(msg: String) {
+        if (com.sushant.grabbit.BuildConfig.DEBUG) android.util.Log.i(TAG, "TIMING $msg")
+    }
+
     override suspend fun doWork(): Result {
+        // Keep the CPU and Wi-Fi awake for the whole download, even with the screen off
+        val pm = applicationContext.getSystemService(android.os.PowerManager::class.java)
+        val wake = pm.newWakeLock(android.os.PowerManager.PARTIAL_WAKE_LOCK, "Grabbit:download").apply { setReferenceCounted(false) }
+        @Suppress("DEPRECATION")
+        val wifi = (applicationContext.getSystemService(Context.WIFI_SERVICE) as? android.net.wifi.WifiManager)
+            ?.createWifiLock(android.net.wifi.WifiManager.WIFI_MODE_FULL_HIGH_PERF, "Grabbit:download")
+        runCatching { wake.acquire(6 * 60 * 60 * 1000L) }
+        runCatching { wifi?.acquire() }
+        try {
+            return work()
+        } finally {
+            runCatching { if (wake.isHeld) wake.release() }
+            runCatching { if (wifi?.isHeld == true) wifi.release() }
+        }
+    }
+
+    private suspend fun work(): Result {
         val ctx = applicationContext
+        val t0 = SystemClock.elapsedRealtime()
         val url = inputData.getString(K_URL) ?: return Result.failure(workDataOf(K_ERROR to "No link"))
         val quality = inputData.getString(K_QUALITY) ?: "best"
         val playlist = inputData.getBoolean(K_PLAYLIST, false)
@@ -104,37 +133,65 @@ class DownloadWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(c
         var last = 0L
         var total = 0L
         var status = if (isAudioQuality(quality)) "Downloading audio…" else "Downloading…"
+        var stage = Stages.DOWNLOAD
+        var tDl = 0L
+        var tWork = 0L
+        var multi = true
+
+        fun publish(pct: Float, speed: String, eta: Long, size: String, force: Boolean) {
+            val now = SystemClock.elapsedRealtime()
+            if (!force && now - last < 600) return
+            last = now
+            val busy = stage != Stages.DOWNLOAD || pct <= 0f
+            setProgressAsync(workDataOf(P_PCT to pct, P_STATUS to status, P_SPEED to speed, P_ETA to eta, P_SIZE to size, P_STAGE to stage))
+            val text = buildString {
+                append(status)
+                if (stage == Stages.DOWNLOAD) {
+                    if (pct > 0) append("  ${pct.toInt()}%")
+                    if (size.isNotEmpty()) append("  ·  $size")
+                    if (speed.isNotEmpty()) append("  ·  $speed")
+                }
+            }
+            nm.notify(nid, Notifs.progress(ctx, title, text, pct.toInt(), busy, id))
+        }
 
         suspend fun grab(o: DlOpts) = withContext(Dispatchers.IO) {
-                YoutubeDL.getInstance().execute(buildRequest(ctx, source, quality, playlist, tmp, o), processId = id.toString(), callback = { p, eta, line ->
-                    when {
-                        line.contains("[Merger]") -> status = "Merging video and audio…"
-                        line.contains("[ExtractAudio]") -> status = "Converting audio…"
-                        line.contains("[EmbedThumbnail]") || line.contains("[Metadata]") -> status = "Finishing…"
-                        else -> ITEM.find(line)?.let { status = "Downloading ${it.groupValues[1]} of ${it.groupValues[2]}…" }
-                    }
-                    Progress.totalBytes(line)?.let { total = it }
-                    val now = SystemClock.elapsedRealtime()
-                    if (now - last >= 600) {
-                        last = now
-                        val pct = p.coerceIn(0f, 100f)
-                        val speed = (SPEED.find(line)?.groupValues?.get(1) ?: "").replace("iB", "B")
-                        val size = Progress.sizeText(pct, total)
-                        setProgressAsync(workDataOf(P_PCT to pct, P_STATUS to status, P_SPEED to speed, P_ETA to eta, P_SIZE to size))
-                        val text = buildString {
-                            append(status)
-                            if (pct > 0) append("  ${pct.toInt()}%")
-                            if (size.isNotEmpty()) append("  ·  $size")
-                            if (speed.isNotEmpty()) append("  ·  $speed")
-                        }
-                        nm.notify(nid, Notifs.progress(ctx, title, text, pct.toInt(), p <= 0f, id))
-                    }
-                })
+            val tStart = SystemClock.elapsedRealtime()
+            YoutubeDL.getInstance().execute(buildRequest(ctx, source, quality, playlist, tmp, o, multi), processId = id.toString(), callback = { p, eta, line ->
+                val work = Stages.statusFor(line)
+                val item = ITEM.find(line)
+                var force = false
+                if (work != null && work != status) {
+                    if (stage == Stages.DOWNLOAD) tDl = SystemClock.elapsedRealtime() - tStart
+                    stage = Stages.WORK; status = work; force = true
+                } else if (item != null) {
+                    stage = Stages.DOWNLOAD
+                    status = "Downloading ${item.groupValues[1]} of ${item.groupValues[2]}…"; force = true
+                }
+                Progress.totalBytes(line)?.let { total = it }
+                val aria = Stages.aria(line)
+                val pct = (aria?.pct ?: p).coerceIn(0f, 100f)
+                val speed = aria?.speed?.replace("iB", "B") ?: (SPEED.find(line)?.groupValues?.get(1) ?: "").replace("iB", "B")
+                val size = if (aria != null) "${aria.done.replace("iB", "B")} of ${aria.total.replace("iB", "B")}" else Progress.sizeText(pct, total)
+                publish(if (stage == Stages.WORK) 100f else pct, speed, eta, size, force)
+            })
+            val end = SystemClock.elapsedRealtime() - tStart
+            if (tDl == 0L) tDl = end else tWork = end - tDl
         }
 
         try {
             try {
-                grab(opts)
+                try {
+                    grab(opts)
+                } catch (e: Exception) {
+                    // aria2c couldn't handle this site: retry with yt-dlp's own downloader
+                    val raw = (e.message ?: e.toString()).lowercase()
+                    if (isStopped || !multi || !("aria2" in raw || "external downloader" in raw)) throw e
+                    multi = false
+                    timing("aria2c failed, retrying with native downloader")
+                    tmp.listFiles()?.forEach { it.deleteRecursively() }
+                    grab(opts)
+                }
             } catch (e: Exception) {
                 // Subtitles failed (e.g. YouTube refused them): don't lose the video — download it without subtitles
                 if (isStopped || opts.subLang.isEmpty() || !Errors.isSubtitleError(e.message ?: e.toString())) throw e
@@ -160,10 +217,11 @@ class DownloadWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(c
             }
         }
 
-        setProgress(workDataOf(P_PCT to 100f, P_STATUS to "Saving to your phone…"))
+        stage = Stages.WORK
+        val tPost0 = SystemClock.elapsedRealtime()
         // Trim: keep only the chosen part of each downloaded file
         if (opts.trimmed && !playlist) {
-            setProgress(workDataOf(P_PCT to 100f, P_STATUS to "Trimming…"))
+            status = "Trimming…"; publish(100f, "", 0, "", true)
             val media = tmp.walkTopDown().filter { it.isFile && Saver.mimeOf(it.extension).let { m -> m.startsWith("video") || m.startsWith("audio") } }.toList()
             for (f in media) {
                 val err = withContext(Dispatchers.IO) { Trimmer.trim(ctx, f, opts.trimStart, opts.trimEnd) }
@@ -180,14 +238,23 @@ class DownloadWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(c
                 media.filterNot { it.name.startsWith(DownloadArgs.CHAPTER_PREFIX) }.forEach { it.delete() }
             }
         }
+        val tSave0 = SystemClock.elapsedRealtime()
+        val audioOnly = tmp.walkTopDown().filter { it.isFile }.all { Saver.mimeOf(it.extension).let { m -> !m.startsWith("video") } }
+        stage = Stages.SAVE
+        status = "Saving to ${if (audioOnly) "Music/Grabbit" else "Movies/Grabbit"}…"
+        publish(0f, "", 0, "", true)
         val saved = try {
-            Saver.saveAll(ctx, tmp, title, site, thumb, url, keepSubs = opts.keepSubFiles, name = opts.name)
+            Saver.saveAll(ctx, tmp, title, site, thumb, url, keepSubs = opts.keepSubFiles, name = opts.name) { d, t ->
+                publish(d * 100f / t, "", 0, "${Progress.bytes(d)} of ${Progress.bytes(t)}", false)
+            }
         } catch (e: Exception) {
             return fail("Couldn't save the file: ${e.message ?: e}", e.toString())
         } finally {
             tmp.deleteRecursively()
         }
         if (saved.isEmpty()) return fail("Download finished but no file was produced. Try another format.", "")
+        val now = SystemClock.elapsedRealtime()
+        timing("site=$site multi=${multi && Engine.aria2Ready && Prefs.fasterDownloads} bytes=${saved.sumOf { it.size }} download=${tDl}ms processing=${tWork + (tSave0 - tPost0)}ms save=${now - tSave0}ms total=${now - t0}ms")
 
         Library.add(saved)
         val where = if (saved.first().isAudio) "Music/Grabbit" else "Movies/Grabbit"

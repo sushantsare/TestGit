@@ -10,6 +10,8 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
 import androidx.compose.material.icons.rounded.ContentCut
 import androidx.compose.material.icons.rounded.Speed
+import androidx.compose.material.icons.rounded.Check
+import androidx.compose.material.icons.rounded.BatteryChargingFull
 import androidx.compose.material.icons.rounded.MusicNote
 import androidx.compose.material.icons.rounded.Movie
 import androidx.compose.foundation.layout.Arrangement
@@ -162,9 +164,11 @@ fun SettingsScreen(vm: MainViewModel, modifier: Modifier) {
                     Icons.Rounded.Subtitles, onClick = { sheet = "subs" },
                 ) { Icon(Icons.AutoMirrored.Rounded.KeyboardArrowRight, null, tint = MaterialTheme.colorScheme.onSurfaceVariant) }
                 SettingsDivider()
-                SettingsSwitch("Faster downloads", "Downloads several parts of a video at once", Icons.Rounded.Speed, faster) {
+                SettingsSwitch("Faster downloads", "Many connections at once, so big files finish sooner", Icons.Rounded.Speed, faster) {
                     faster = it; Prefs.fasterDownloads = it
                 }
+                SettingsDivider()
+                BatteryRow()
                 SettingsDivider()
                 SettingsItem(
                     "SponsorBlock",
@@ -404,5 +408,28 @@ private fun SponsorSheet(cats: Set<String>, onChange: (Set<String>) -> Unit, onC
             }
             Button(onClick = onClose, modifier = Modifier.fillMaxWidth().padding(horizontal = sp.xl)) { Text("Done") }
         }
+    }
+}
+
+
+/** Battery: lets downloads keep full speed with the screen off. */
+@Composable
+private fun BatteryRow() {
+    val ctx = androidx.compose.ui.platform.LocalContext.current
+    val pm = remember { ctx.getSystemService(android.os.PowerManager::class.java) }
+    var free by remember { mutableStateOf(pm.isIgnoringBatteryOptimizations(ctx.packageName)) }
+    androidx.lifecycle.compose.LifecycleResumeEffect(Unit) {
+        free = pm.isIgnoringBatteryOptimizations(ctx.packageName)
+        onPauseOrDispose { }
+    }
+    SettingsItem(
+        "Download with screen off",
+        if (free) "Allowed · downloads keep full speed in the background"
+        else "Tap to allow, so Android doesn't slow downloads when the screen is off",
+        Icons.Rounded.BatteryChargingFull,
+        onClick = if (free) null else ({ BatteryAccess.request(ctx) }),
+    ) {
+        if (free) Icon(Icons.Rounded.Check, null, tint = MaterialTheme.colorScheme.primary)
+        else Icon(Icons.AutoMirrored.Rounded.KeyboardArrowRight, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
