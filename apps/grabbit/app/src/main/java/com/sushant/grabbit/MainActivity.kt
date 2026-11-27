@@ -9,6 +9,8 @@ import com.sushant.grabbit.ui.theme.isDarkTheme
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.getValue
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import com.sushant.grabbit.ui.GrabbitRoot

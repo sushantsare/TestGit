@@ -440,7 +440,6 @@ internal fun MediaCard(info: MediaInfo, framed: Boolean = true, onDownload: (Med
                     tabs, if (image) "image" else if (audio) "audio" else "video",
                     { k -> image = k == "image"; audio = k == "audio" },
                 )
-                }
             }
             Spacer(Modifier.height(sp.m))
             if (image) CoverImageOptions(info, imgQuality, { imgQuality = it }, st, onDownload)
