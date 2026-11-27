@@ -138,7 +138,7 @@ class WalkthroughTest {
     }
 
     private val pageMatcher = SemanticsMatcher("a page") { n ->
-        n.config.getOrNull(androidx.compose.ui.semantics.SemanticsProperties.TestTag)?.matches(Regex("page_\\d+")) == true
+        (n.config.getOrElseNullable(androidx.compose.ui.semantics.SemanticsProperties.TestTag) { null })?.matches(Regex("page_\\d+")) == true
     }
     private fun page() = compose.onAllNodes(pageMatcher, useUnmergedTree = true).onFirst()
     private fun waitPage(ms: Long = 10_000, soft: Boolean = false): Boolean =
