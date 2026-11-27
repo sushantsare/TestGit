@@ -330,11 +330,17 @@ fun EntryDetailContent(vm: AppVm, id: Long, embedded: Boolean, onGone: () -> Uni
             if (its.isNotEmpty()) {
                 SectionLabel("Items · ${its.size}", action = "Edit", onAction = { itemsOpen = true })
                 BkCard(Modifier.padding(horizontal = 16.dp).fillMaxWidth().testTag("items_card")) {
-                    its.forEach { i -> ListRow(i.name, null, leading = { Icon(Icons.Outlined.ShoppingBasket, null) }, trailing = { if (i.pricePaise > 0) MoneyText(i.pricePaise) }) }
+                    its.forEach { i ->
+                        val hasQty = i.qty != 1.0 || i.unit.isNotBlank()
+                        val sub = if (!hasQty) null else Insights.qtyText(i.qty, i.unit) + if (i.pricePaise > 0) " · ${hm(Insights.unitPrice(i.pricePaise, i.qty, i.unit))} " +
+                            Insights.unitLabel(i.unit).let { l -> if (l == "each") "each" else "per " + l.removePrefix("/") } else ""
+                        ListRow(i.name, sub, leading = { Icon(Icons.Outlined.ShoppingBasket, null) }, trailing = { if (i.pricePaise > 0) MoneyText(i.pricePaise) })
+                    }
                     val sum = its.sumOf { it.pricePaise.coerceAtLeast(0) }
                     if (sum in 1 until entry.amountPaise) ListRow("Not given to an item", null, trailing = { MoneyText(entry.amountPaise - sum, color = MaterialTheme.colorScheme.onSurfaceVariant) })
                 }
             }
+            Spacer(Modifier.height(12.dp))
             BkCard(Modifier.padding(horizontal = 16.dp).fillMaxWidth()) {
                 ListRow(Export.typeName(entry.type), "Type", leading = { Icon(Icons.Outlined.SwapVert, null) })
                 if (cat != null) ListRow(cat.name, "Category", leading = { Icon(Icons.Outlined.Category, null) })
@@ -368,7 +374,7 @@ fun EntryDetailContent(vm: AppVm, id: Long, embedded: Boolean, onGone: () -> Uni
     }
 
     if (itemsOpen) entry?.let { en ->
-        ItemsDialog("What did you buy?", en.amountPaise, en.merchant.orEmpty(), allItems.filter { it.entryId == en.id }.map { it.name to it.pricePaise }, allItems,
+        ItemsDialog("What did you buy?", en.amountPaise, en.merchant.orEmpty(), allItems.filter { it.entryId == en.id }.map { Insights.Item(it.name, it.pricePaise, it.qty, it.unit) }, allItems,
             onSave = { list -> vm.launch { vm.repo.setItems(en.id, list) } }, onDismiss = { itemsOpen = false })
     }
     if (confirm) ConfirmDialog("Delete this entry?", "Balances and reports will update. You can undo right after.", "Delete", onConfirm = {

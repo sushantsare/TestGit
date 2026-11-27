@@ -217,7 +217,7 @@ class WalkthroughTest {
         val s6 = runBlocking { app.repo.dao.smsNow().first { it.key == "s6" } }
         val s7 = runBlocking { app.repo.dao.smsNow().first { it.key == "s7" } }
         waitTag("sms_${s6.id}"); compose.onNodeWithTag("sms_list").performScrollToNode(hasTestTag("sms_${s6.id}")); waitTag("name_upi"); shot("sms_name_upi_and_items")
-        click("sms_items_${s6.id}"); waitTag("items_save"); type("item_name_0", "Tea"); type("item_price_0", "40"); click("item_add"); type("item_name_1", "Biscuit"); type("item_price_1", "100")
+        click("sms_items_${s6.id}"); waitTag("items_save"); type("item_name_0", "Tea"); type("item_price_0", "40"); click("item_add"); type("item_name_1", "Biscuit"); type("item_qty_1", "4"); type("item_price_1", "100"); waitTag("item_each_1")
         waitTag("items_left"); shot("sms_items_dialog"); click("items_save")
         click("name_upi_open"); waitTag("f_upi_name"); type("f_upi_name", "Sharma Tea Stall"); shot("sms_name_upi_form"); click("name_upi_save")
         compose.waitUntil(5_000) { runBlocking { app.repo.dao.upiName("vpa:paytmqr28100505@paytm") != null } }
@@ -244,6 +244,13 @@ class WalkthroughTest {
         click("upi_Ravi Kirana"); waitTag("upi_edit_ok"); shot("upi_name_edit"); back()
 
         // ---- dark theme: main screens again
+        // Block screenshots off must really allow screenshots, even with App lock on
+        app.prefs.update { it.copy(lockOn = true, secureScreens = false) }; Thread.sleep(800)
+        fun secure(): Boolean { var f = 0; scenario.onActivity { a -> f = a.window.attributes.flags }; return (f and android.view.WindowManager.LayoutParams.FLAG_SECURE) != 0 }
+        if (secure()) problem("screenshots blocked with the switch off")
+        app.prefs.update { it.copy(secureScreens = true) }; Thread.sleep(800)
+        if (!secure()) problem("screenshots allowed with the switch on")
+        app.prefs.update { it.copy(lockOn = false, secureScreens = false) }; Thread.sleep(500)
         app.prefs.update { it.copy(theme = ThemeMode.DARK) }
         go("home", "net"); shot("dark_home")
         go("add?type=EXPENSE", "key_1"); click("key_7"); click("key_5"); shot("dark_add"); backDiscard()

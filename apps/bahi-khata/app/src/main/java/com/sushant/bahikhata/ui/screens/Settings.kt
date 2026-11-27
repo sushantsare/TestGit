@@ -112,7 +112,7 @@ fun SettingsScreen(vm: AppVm) {
             item { BkCard(Modifier.padding(horizontal = 16.dp).fillMaxWidth()) {
                 SettingSwitch(Icons.Outlined.Fingerprint, "App lock", if (canLock) "Fingerprint or phone PIN" else "Set a screen lock on your phone first", s.lockOn && canLock, { on -> if (canLock) vm.prefs.update { it.copy(lockOn = on) } else snack.show("Set a screen lock in phone settings first") }, "lock")
                 if (s.lockOn) SettingNav(Icons.Outlined.Timer, "Lock after", when (s.lockAfterSec) { 0 -> "Immediately"; 60 -> "1 minute"; 300 -> "5 minutes"; else -> "${s.lockAfterSec / 60} minutes" }) { lockPick = true }
-                SettingSwitch(Icons.Outlined.Screenshot, "Block screenshots", "Keeps amounts out of screenshots and recent apps", s.secureScreens, { on -> vm.prefs.update { it.copy(secureScreens = on) } }, "secure")
+                SettingSwitch(Icons.Outlined.Screenshot, "Block screenshots", "Screenshots and screen recordings come out black", s.secureScreens, { on -> vm.prefs.update { it.copy(secureScreens = on) } }, "secure")
             } }
             item { SectionLabel("Entries") }
             item { BkCard(Modifier.padding(horizontal = 16.dp).fillMaxWidth()) {
@@ -307,7 +307,7 @@ fun BackupScreen(vm: AppVm) {
             res.onSuccess { (tok, pi) ->
                 if (tok != null) { vm.prefs.update { it.copy(driveOn = true) }; Workers.scheduleDrive(ctx); Workers.driveNow(ctx); snack.show("Google Drive backup is on") }
                 else if (pi != null) consent.launch(IntentSenderRequest.Builder(pi.intentSender).build())
-            }.onFailure { snack.show("Google sign-in isn't available on this phone. Drive backup needs Google Play services.") }
+            }.onFailure { e -> snack.show(Drive.reason(e)) }
         }
     }
 

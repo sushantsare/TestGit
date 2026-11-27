@@ -31,3 +31,9 @@ First version: money in and out per bank account, credit card, cash and wallet w
 - New opening animation and a 9-step setup guide on the first opening.
 - Search opens smoothly out of the search button and shrinks back.
 - Undo after deleting an account; tablet Add entry opens as a side panel; faster start-up.
+
+## 1.1.1 — 27 Nov 2026
+- Items now have a quantity (pcs, kg, g, L, ml, pack, dozen) and the total paid; the app shows the price for one (or per kg / per litre). Price history compares the price for one. The notification reply understands "milk 2L 60, 3 eggs 21".
+- Block screenshots: turning it off now really allows screenshots. App lock no longer blocks screenshots; it only hides the app's preview in recent apps.
+- Entry details: proper gap between the items card and the details card.
+- Google Drive backup: the Google project is now set up, and any failure shows Google's real reason instead of "isn't available on this phone".

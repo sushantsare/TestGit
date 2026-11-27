@@ -26,6 +26,19 @@ object Drive {
 
     sealed class Res { object Ok : Res(); data class NeedsSignIn(val intent: PendingIntent?) : Res(); data class Fail(val msg: String) : Res() }
 
+    /** Google's real reason, in plain words, so a failed sign-in is never a mystery. */
+    fun reason(e: Throwable): String {
+        val api = (e as? com.google.android.gms.common.api.ApiException) ?: (e.cause as? com.google.android.gms.common.api.ApiException)
+        return when (api?.statusCode) {
+            null -> if (e is java.util.concurrent.TimeoutException) "Google didn't answer in time — try again" else "Google sign-in failed: ${e.javaClass.simpleName}${e.message?.let { " — $it" } ?: ""}"
+            10 -> "Google hasn't accepted Bahi Khata yet (code 10). New Google setups can take a few hours."
+            7 -> "No internet connection — try again when you're online"
+            16 -> "Sign-in was cancelled"
+            17 -> "Google Play services is missing or out of date (code 17)"
+            else -> "Google sign-in failed (code ${api.statusCode}: ${com.google.android.gms.common.api.CommonStatusCodes.getStatusCodeString(api.statusCode)})"
+        }
+    }
+
     fun request(): AuthorizationRequest = AuthorizationRequest.builder().setRequestedScopes(listOf(Scope(SCOPE))).build()
 
     /** Returns a token, or the PendingIntent the UI must launch once to ask for consent. */
@@ -37,7 +50,7 @@ object Drive {
     suspend fun backup(context: Context): Res = withContext(Dispatchers.IO) {
         val app = context.applicationContext as App
         val pw = Backup.loadPassword(context) ?: return@withContext Res.Fail("Set a backup password in Bahi Khata → Backup")
-        val (tok, pi) = try { token(context) } catch (e: Exception) { return@withContext Res.Fail("Google sign-in isn't available on this phone") }
+        val (tok, pi) = try { token(context) } catch (e: Exception) { return@withContext Res.Fail(reason(e)) }
         if (tok == null) return@withContext Res.NeedsSignIn(pi)
         try {
             val bytes = Backup.build(context, pw)
@@ -59,16 +72,24 @@ object Drive {
             }
             c.outputStream.use { it.write(body) }
             val code = c.responseCode
-            if (code !in 200..299) return@withContext Res.Fail(if (code == 401 || code == 403) "Google Drive refused access — sign in again" else "Google Drive had a problem — it will try again later")
+            if (code !in 200..299) {
+                val why = runCatching { JSONObject(c.errorStream.bufferedReader().readText()).getJSONObject("error").optString("message") }.getOrNull().orEmpty()
+                return@withContext Res.Fail(when (code) {
+                    401 -> "Google Drive sign-in expired — sign in again"
+                    403 -> "Google Drive refused access (403)${if (why.isNotBlank()) ": $why" else ""}"
+                    else -> "Google Drive answered $code${if (why.isNotBlank()) ": $why" else ""} — it will try again later"
+                })
+            }
             app.prefs.update { it.copy(lastDriveBackup = System.currentTimeMillis()) }
             Res.Ok
-        } catch (e: Exception) { Res.Fail("No internet connection — it will try again later") }
+        } catch (e: java.io.IOException) { Res.Fail("No internet connection — it will try again later") }
+        catch (e: Exception) { Res.Fail("Backup failed: ${e.javaClass.simpleName}${e.message?.let { " — $it" } ?: ""}") }
     }
 
     data class Remote(val id: String, val modified: String, val size: Long)
 
     suspend fun latest(context: Context): Pair<Remote?, Res> = withContext(Dispatchers.IO) {
-        val (tok, pi) = try { token(context) } catch (e: Exception) { return@withContext null to Res.Fail("Google sign-in isn't available on this phone") }
+        val (tok, pi) = try { token(context) } catch (e: Exception) { return@withContext null to Res.Fail(reason(e)) }
         if (tok == null) return@withContext null to Res.NeedsSignIn(pi)
         try {
             val c = URL("https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&fields=files(id,name,modifiedTime,size)&q=name%3D'$NAME'").openConnection() as HttpURLConnection

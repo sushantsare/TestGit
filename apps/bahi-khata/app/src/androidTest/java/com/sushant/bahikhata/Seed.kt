@@ -71,9 +71,9 @@ object Seed {
         repo.saveEntry(Repo.SaveRequest(Entry(type = EType.INCOME, amountPaise = 599_00, accountId = icici, categoryId = amazon.categoryId, merchant = "Amazon", refundOf = amazon.id, note = "Refund for Amazon", time = t(2, 11))))
         val kirana = repo.dao.entriesNow().first { it.merchant == "Ravi Kirana" }
         repo.dao.upsertEntry(kirana.copy(vpa = "ravikirana@ybl"))
-        repo.setItems(kirana.id, listOf("Milk" to 60_00, "Bread" to 40_00, "Eggs" to 72_00))
+        repo.setItems(kirana.id, listOf(Insights.Item("Milk", 60_00, 2.0, "L"), Insights.Item("Bread", 40_00), Insights.Item("Eggs", 72_00, 12.0, "")))
         val oldKirana = repo.saveEntry(Repo.SaveRequest(Entry(type = EType.EXPENSE, amountPaise = 96_00, accountId = sbi, categoryId = cat("Groceries"), merchant = "Ravi Kirana", vpa = "ravikirana@ybl", time = t(16, 19))))
-        repo.setItems(oldKirana, listOf("Milk" to 56_00, "Bread" to 40_00))
+        repo.setItems(oldKirana, listOf(Insights.Item("Milk", 56_00, 2.0, "L"), Insights.Item("Bread", 40_00)))
         repo.nameUpi(UpiName(key = "vpa:ravikirana@ybl", display = "Ravi Kirana", categoryId = cat("Groceries")))
         repo.nameUpi(UpiName(key = "vpa:rahulk@okaxis", display = "Rahul Kumar", isPerson = true, personId = rahul))
         val ep = today.toEpochDay()

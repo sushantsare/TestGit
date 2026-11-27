@@ -209,7 +209,7 @@ class RepoTest {
     @Test fun accountDeleteCanBeUndone() = runBlocking {
         val a = repo.saveAccount(Account(type = AccType.BANK, name = "A", openingPaise = 1_000_00))
         val id = repo.saveEntry(Repo.SaveRequest(Entry(type = EType.EXPENSE, amountPaise = 100_00, accountId = a, merchant = "Shop")))
-        repo.setItems(id, listOf("Pen" to 100_00))
+        repo.setItems(id, listOf(Insights.Item("Pen", 100_00)))
         val b = repo.deleteAccount(repo.dao.account(a)!!)
         assertNull(repo.dao.account(a)); assertTrue(repo.dao.entriesNow().isEmpty())
         repo.undoDeleteAccount(b)

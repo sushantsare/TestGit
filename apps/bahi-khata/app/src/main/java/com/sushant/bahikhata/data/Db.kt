@@ -223,8 +223,10 @@ data class EntryItem(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val entryId: Long,
     val name: String,
-    val pricePaise: Long = -1,
+    val pricePaise: Long = -1,           // total paid for this item (all of the quantity)
     val shopKey: String = "",            // lowercase shop name, for price history per shop
+    @ColumnInfo(defaultValue = "1") val qty: Double = 1.0,
+    @ColumnInfo(defaultValue = "") val unit: String = "",   // "", pcs, kg, g, L, ml, pack, dozen
     val time: Long = System.currentTimeMillis(),
 )
 
@@ -397,11 +399,11 @@ data class EntryCount(val entryId: Long, val n: Int)
     entities = [Account::class, Category::class, Entry::class, Attachment::class, Merchant::class, Recurring::class,
         Person::class, Udhar::class, Budget::class, Goal::class, SmsItem::class, SmsSeen::class, Learned::class,
         UpiName::class, EntryItem::class, Reminder::class],
-    version = 2,
+    version = 3,
     exportSchema = true,
     // 1 -> 2 (Bahi Khata 1.1): new tables and new columns with defaults; Room writes the SQL from the saved schemas,
     // so every entry, account and setting he already has stays exactly as it is
-    autoMigrations = [AutoMigration(from = 1, to = 2)],
+    autoMigrations = [AutoMigration(from = 1, to = 2), AutoMigration(from = 2, to = 3)],
 )
 abstract class AppDb : RoomDatabase() {
     abstract fun dao(): MainDao
