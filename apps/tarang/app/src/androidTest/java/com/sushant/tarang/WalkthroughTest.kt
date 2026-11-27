@@ -214,8 +214,14 @@ class WalkthroughTest {
             val dp = InstrumentationRegistry.getInstrumentation().targetContext.resources.displayMetrics.density
             if (h == null || first == null) problem("folder page: header or first song missing")
             else {
-                if (first.top - h.bottom < 12f * dp) problem("folder page: first song card too close to the header (${(first.top - h.bottom) / dp} dp)")
-                if (kotlin.math.abs(first.left - h.left) > 2f || kotlin.math.abs(first.right - h.right) > 2f) problem("folder page: header and song cards have different side edges")
+                // the tags sit inside each card's own padding (header 20dp all round; song card 12dp start, 2dp end, 8dp top),
+                // so step back out to the cards' visible edges before comparing
+                val hl = h.left - 20f * dp; val hr = h.right + 20f * dp; val hb = h.bottom + 20f * dp
+                val sl = first.left - 12f * dp; val sr = first.right + 2f * dp; val st = first.top - 8f * dp
+                val gapDp = (st - hb) / dp
+                if (gapDp < 12f) problem("folder page: first song card too close to the header ($gapDp dp)")
+                if (kotlin.math.abs(sl - hl) > 2f || kotlin.math.abs(sr - hr) > 2f) problem("folder page: header ($hl..$hr) and song card ($sl..$sr) edges differ")
+                if (kotlin.math.abs(hl - 12f * dp) > 2f) problem("folder page: cards are not 12dp from the screen edge (${hl / dp} dp)")
             }
         }
         waitTag("grow_cover", 3000, soft = true)
