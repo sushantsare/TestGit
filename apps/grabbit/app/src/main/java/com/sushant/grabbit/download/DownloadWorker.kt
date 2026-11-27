@@ -55,7 +55,7 @@ class DownloadWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(c
             multiConnAllowed: Boolean = true,
         ): YoutubeDLRequest {
             val r = YoutubeDLRequest(url)
-            val g = GlobalOpts(Prefs.videoFormat, Prefs.fasterDownloads, Prefs.embedThumb, Prefs.sponsorCats,
+            val g = GlobalOpts(if (opts.videoFormat >= 0) opts.videoFormat else Prefs.videoFormat, Prefs.fasterDownloads, Prefs.embedThumb, Prefs.sponsorCats,
                 multiConn = Engine.aria2Ready && multiConnAllowed)
             val yt = Sites.siteName(url) == "YouTube"
             DownloadArgs.build(quality, playlist, dir.absolutePath, opts, g, yt).forEach { (k, v) ->

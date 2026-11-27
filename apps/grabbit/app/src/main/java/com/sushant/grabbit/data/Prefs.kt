@@ -50,6 +50,11 @@ object Prefs {
         set(v) = p.edit().putString("sub_lang", v).apply()
 
     /** "embed", "file" or "both" */
+    /** Setup guide finished or skipped (shown only on a fresh install). */
+    var onboarded: Boolean
+        get() = p.getBoolean("onboarded", false)
+        set(v) = p.edit().putBoolean("onboarded", v).apply()
+
     /** Photos: "img" = original file, "imgjpg" = smaller JPG. */
     var imageFormat: String
         get() = p.getString("image_format", "img") ?: "img"

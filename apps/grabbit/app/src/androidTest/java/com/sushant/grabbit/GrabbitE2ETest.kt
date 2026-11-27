@@ -21,6 +21,7 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onAllNodesWithText
+import android.os.Build
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.SemanticsMatcher
@@ -586,8 +587,39 @@ class GrabbitE2ETest {
         return "trimDirect=${trimOk}(${d}ms) xtrim=${xd in 8500..12500} m4a=${m4aOk && m4a?.mime == "audio/mp4"}"
     }
 
+    /** Fresh install: intro animation, then every setup page; allow notifications and battery through Android's dialogs. */
+    private fun onboardingFlow(): String {
+        val ui = androidx.test.uiautomator.UiDevice.getInstance(instr)
+        val seen = try { compose.waitUntil(8_000) { exists("introAnim") || exists("onboarding") }; true } catch (e: Throwable) { false }
+        if (!seen) { log("ONBOARDING not shown"); return "onboarding=notShown" }
+        if (exists("introAnim")) shot("ob_00_intro")
+        compose.waitUntil(8_000) { exists("onboarding") }
+        val pages = mutableListOf<Int>()
+        fun allow() {
+            ui.wait(androidx.test.uiautomator.Until.findObject(androidx.test.uiautomator.By.text(java.util.regex.Pattern.compile("(?i)^allow$"))), 8_000)?.click()
+            Thread.sleep(1200)
+        }
+        for (p in 0 until 7) {
+            compose.waitUntil(5_000) { exists("obPage$p") }
+            compose.waitForIdle()
+            val skip = exists("obSkip")
+            shot("ob_${p + 1}_page")
+            if (p == 2 && exists("obNotif")) { compose.onNodeWithTag("obNotif").performClick(); allow(); shot("ob_3b_notif_done") }
+            if (p == 3 && exists("obBattery")) { compose.onNodeWithTag("obBattery").performClick(); allow(); shot("ob_4b_battery_done") }
+            pages += p
+            log("ONBOARDING page=$p skip=$skip")
+            if (p < 6) compose.onNodeWithTag("obNext").performClick() else compose.onNodeWithTag("obStart").performClick()
+        }
+        compose.waitUntil(8_000) { exists("urlField") }
+        val notif = Build.VERSION.SDK_INT < 33 || ctx.checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) == android.content.pm.PackageManager.PERMISSION_GRANTED
+        val battery = com.sushant.grabbit.ui.BatteryAccess.allowed(ctx)
+        log("ONBOARDING pages=${pages.size} notif=$notif battery=$battery onboarded=${Prefs.onboarded}")
+        return "onboarding=${pages.size == 7 && Prefs.onboarded} notif=$notif battery=$battery"
+    }
+
     @Test
     fun endToEnd() {
+        val onboarding = onboardingFlow()
         renderIcons()
         shot("00_home_start")
         val ready = runBlocking { withTimeout(180_000) { Engine.awaitReady() } }
@@ -649,6 +681,7 @@ class GrabbitE2ETest {
 
         // Search in Saved
         compose.onNodeWithTag("nav_downloads").performClick()
+        compose.onNodeWithTag("searchBtn").performClick()
         compose.onNodeWithTag("searchField").performTextInput("mov")
         shot("92_search")
         compose.onNodeWithContentDescription("Clear search").performClick()
@@ -709,7 +742,7 @@ class GrabbitE2ETest {
         val folder = folderFlow()
         val images = imageFlow()
 
-        log("SUMMARY direct=$direct x=$x dailymotion=$dm facebook=$fb youtube=$youtube share=$share threads=$threads $options $renamed $speed $pause $folder $images")
+        log("SUMMARY direct=$direct x=$x dailymotion=$dm facebook=$fb youtube=$youtube share=$share threads=$threads $options $renamed $speed $pause $folder $images $onboarding")
         results.forEach { Log.i("GrabbitE2E", "RESULT $it") }
         assertTrue("Downloads failed", direct && x)
         assertTrue("Share sheet download failed", share)

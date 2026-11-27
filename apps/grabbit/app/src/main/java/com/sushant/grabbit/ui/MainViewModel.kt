@@ -48,6 +48,12 @@ class MainViewModel(private val app: Application) : AndroidViewModel(app) {
     var fetchState by mutableStateOf<FetchState>(FetchState.Idle)
         private set
     var loginSite by mutableStateOf<LoginSite?>(null)
+
+    /** The header mark's drop-in animation plays once per app open. */
+    var playIntro = false
+
+    /** After the setup guide: put the cursor in the link field. */
+    var focusUrl by mutableStateOf(false)
     var loginTick by mutableIntStateOf(0)
     var hidden by mutableStateOf(Prefs.hidden)
         private set

@@ -49,7 +49,14 @@ private val DESTS = listOf(
 @Composable
 fun GrabbitRoot(vm: MainViewModel) {
     val snackbar = remember { SnackbarHostState() }
-    LaunchedEffect(Unit) { UiMessages.flow.collect { snackbar.showSnackbar(it) } }
+    // Messages always go away after a few seconds — with accessibility services on (password managers,
+    // screen readers…) newer Compose can keep a snackbar up indefinitely, covering buttons underneath
+    LaunchedEffect(Unit) {
+        UiMessages.flow.collect { msg ->
+            snackbar.currentSnackbarData?.dismiss()
+            kotlinx.coroutines.withTimeoutOrNull(3500) { snackbar.showSnackbar(msg) }
+        }
+    }
 
     val site = vm.loginSite
     if (site != null) {

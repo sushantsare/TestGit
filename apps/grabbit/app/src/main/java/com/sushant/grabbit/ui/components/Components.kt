@@ -97,7 +97,9 @@ fun ScreenTitle(text: String, modifier: Modifier = Modifier, trailing: @Composab
     Row(modifier.fillMaxWidth().heightIn(min = 64.dp), verticalAlignment = Alignment.CenterVertically) {
         Text(
             text, Modifier.weight(1f).semantics { heading() },
-            style = MaterialTheme.typography.headlineMedium, color = MaterialTheme.colorScheme.onSurface,
+            style = MaterialTheme.typography.displaySmall.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.ExtraBold,
+                letterSpacing = androidx.compose.ui.unit.TextUnit(-1f, androidx.compose.ui.unit.TextUnitType.Sp)),
+            color = MaterialTheme.colorScheme.onSurface,
         )
         trailing()
     }
@@ -120,11 +122,20 @@ fun AppCard(
     color: Color = MaterialTheme.colorScheme.surfaceContainerLow,
     contentColor: Color = MaterialTheme.colorScheme.onSurface,
     padding: Dp = LocalSpacing.current.l,
+    shape: androidx.compose.ui.graphics.Shape = MaterialTheme.shapes.extraLarge,
     content: @Composable ColumnScope.() -> Unit,
 ) {
-    Surface(modifier.fillMaxWidth(), shape = MaterialTheme.shapes.extraLarge, color = color, contentColor = contentColor) {
+    Surface(modifier.fillMaxWidth(), shape = shape, color = color, contentColor = contentColor) {
         Column(Modifier.padding(padding), content = content)
     }
+}
+
+/** Grouped cards (Expressive lists): the first is round on top, the last round at the bottom, the rest slightly round. */
+fun groupShape(index: Int, count: Int, big: Dp = 28.dp, small: Dp = 8.dp): androidx.compose.foundation.shape.RoundedCornerShape = when {
+    count <= 1 -> androidx.compose.foundation.shape.RoundedCornerShape(big)
+    index == 0 -> androidx.compose.foundation.shape.RoundedCornerShape(big, big, small, small)
+    index == count - 1 -> androidx.compose.foundation.shape.RoundedCornerShape(small, small, big, big)
+    else -> androidx.compose.foundation.shape.RoundedCornerShape(small)
 }
 
 /** Dark label sitting on a thumbnail (site, duration). */
@@ -268,7 +279,25 @@ fun SettingsGroup(modifier: Modifier = Modifier, content: @Composable ColumnScop
 }
 
 @Composable
-fun SettingsDivider() = HorizontalDivider(Modifier.padding(start = 56.dp, end = 16.dp), color = MaterialTheme.colorScheme.outlineVariant)
+fun SettingsDivider() {
+    // Grouped cards (Expressive): a 3dp gap in the page colour, with small rounded corners cut on both sides
+    val bg = MaterialTheme.colorScheme.surface
+    androidx.compose.foundation.Canvas(Modifier.fillMaxWidth().height(3.dp)) {
+        val r = 8.dp.toPx()
+        val w = size.width
+        val g = size.height
+        drawRect(bg)
+        fun notch(cornerX: Float, cornerY: Float, cx: Float, cy: Float) {
+            val p = androidx.compose.ui.graphics.Path().apply {
+                addRect(androidx.compose.ui.geometry.Rect(minOf(cornerX, cx), minOf(cornerY, cy), maxOf(cornerX, cx), maxOf(cornerY, cy)))
+            }
+            val circle = androidx.compose.ui.graphics.Path().apply { addOval(androidx.compose.ui.geometry.Rect(androidx.compose.ui.geometry.Offset(cx, cy), r)) }
+            drawPath(androidx.compose.ui.graphics.Path.combine(androidx.compose.ui.graphics.PathOperation.Difference, p, circle), bg)
+        }
+        notch(0f, 0f, r, -r); notch(w, 0f, w - r, -r)
+        notch(0f, g, r, g + r); notch(w, g, w - r, g + r)
+    }
+}
 
 /** One settings row: leading icon, title, optional subtitle, trailing slot. Whole row is the tap target. */
 @Composable

@@ -22,6 +22,8 @@ data class DlOpts(
     val name: String = "",
     /** Folder to save into (tree uri); "" = Default. */
     val folder: String = "",
+    /** Video format for this download only; -1 = the Settings choice. */
+    val videoFormat: Int = -1,
 ) {
     val trimmed get() = trimStart >= 0 && trimEnd > trimStart
     val keepSubFiles get() = subLang.isNotEmpty() && subMode != "embed"
@@ -31,6 +33,7 @@ data class DlOpts(
         "ch=${if (splitChapters) 1 else 0}", "af=$audioFormat",
         "nm=${java.net.URLEncoder.encode(name, "UTF-8")}",
         "fd=${java.net.URLEncoder.encode(folder, "UTF-8")}",
+        "vf=$videoFormat",
     ).joinToString(";")
 
     companion object {
@@ -47,6 +50,7 @@ data class DlOpts(
                 audioFormat = m["af"]?.takeIf { it in AUDIO_FORMATS } ?: "mp3",
                 name = m["nm"]?.let { runCatching { java.net.URLDecoder.decode(it, "UTF-8") }.getOrNull() }.orEmpty(),
                 folder = m["fd"]?.let { runCatching { java.net.URLDecoder.decode(it, "UTF-8") }.getOrNull() }.orEmpty(),
+                videoFormat = m["vf"]?.toIntOrNull() ?: -1,
             )
         }
 

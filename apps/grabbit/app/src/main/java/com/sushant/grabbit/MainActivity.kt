@@ -27,7 +27,10 @@ class MainActivity : ComponentActivity() {
         installSplashScreen()
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        if (savedInstanceState == null) handleIntent(intent)
+        if (savedInstanceState == null) {
+            vm.playIntro = true
+            handleIntent(intent)
+        }
         setContent {
             // Status/navigation bar icons follow the app's own theme choice, not just the phone's
             val dark = isDarkTheme()
@@ -36,7 +39,16 @@ class MainActivity : ComponentActivity() {
                 else SystemBarStyle.light(Color.TRANSPARENT, Color.TRANSPARENT)
                 enableEdgeToEdge(statusBarStyle = style, navigationBarStyle = style)
             }
-            GrabbitTheme { GrabbitRoot(vm) }
+            GrabbitTheme {
+                // Fresh install: first-launch animation + setup guide; updates go straight to the app
+                var setup by androidx.compose.runtime.saveable.rememberSaveable { androidx.compose.runtime.mutableStateOf(com.sushant.grabbit.ui.shouldShowOnboarding(this)) }
+                if (setup) com.sushant.grabbit.ui.Onboarding { login ->
+                    setup = false
+                    vm.tab = 0
+                    if (login) vm.loginSite = com.sushant.grabbit.data.Sites.logins.first { it.key == "instagram" }
+                    else vm.focusUrl = true
+                } else GrabbitRoot(vm)
+            }
         }
     }
 

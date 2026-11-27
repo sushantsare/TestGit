@@ -1,3 +1,5 @@
+@file:OptIn(androidx.compose.material3.ExperimentalMaterial3ExpressiveApi::class)
+
 package com.sushant.grabbit.ui
 
 import android.Manifest
@@ -77,6 +79,10 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.focus.focusRequester
+import com.sushant.grabbit.ui.components.pressSquish
+import androidx.compose.ui.unit.sp
+import androidx.compose.material3.ButtonDefaults
 import androidx.core.app.ActivityCompat
 import coil.compose.AsyncImage
 import com.sushant.grabbit.data.Prefs
@@ -147,7 +153,7 @@ fun HomeScreen(vm: MainViewModel, modifier: Modifier) {
         contentPadding = PaddingValues(start = sp.screen, end = sp.screen, bottom = sp.xl),
         verticalArrangement = Arrangement.spacedBy(sp.m),
     ) {
-        item(key = "appbar") { AppBar() }
+        item(key = "appbar") { AppBar(vm.playIntro) { vm.playIntro = false } }
         if (!loaded) item(key = "hero") { Hero() }
         if (engine !is Engine.State.Ready) item(key = "engine") { EngineBanner(engine) { vm.restartEngine() } }
         item(key = "input") {
@@ -160,7 +166,9 @@ fun HomeScreen(vm: MainViewModel, modifier: Modifier) {
                 onClear = { vm.url = ""; vm.resetFetch() },
                 showButton = !loaded,
                 busy = vm.fetchState is FetchState.Loading,
+                focus = vm.focusUrl, onFocused = { vm.focusUrl = false },
                 onGo = go,
+                onCancel = { vm.resetFetch() },
             )
         }
         when (val f = vm.fetchState) {
@@ -176,10 +184,13 @@ fun HomeScreen(vm: MainViewModel, modifier: Modifier) {
 }
 
 @Composable
-private fun AppBar() {
+private fun AppBar(playIntro: Boolean, onPlayed: () -> Unit) {
     val sp = LocalSpacing.current
+    // The ring-and-arrow mark animates in once each time the app is opened
+    val animate = remember { playIntro }
+    LaunchedEffect(Unit) { if (playIntro) onPlayed() }
     Row(Modifier.fillMaxWidth().heightIn(min = 64.dp), verticalAlignment = Alignment.CenterVertically) {
-        BrandMark()
+        com.sushant.grabbit.ui.components.GrabbitMark(32.dp, animate = animate, modifier = Modifier.testTag("grabbitMark"))
         Spacer(Modifier.width(sp.m))
         Text("Grabbit", style = MaterialTheme.typography.titleLarge.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.ExtraBold))
     }
@@ -189,27 +200,26 @@ private fun AppBar() {
 private fun Hero() {
     val sp = LocalSpacing.current
     Column(Modifier.padding(top = sp.xs, bottom = sp.s)) {
-        Text("Paste a link.\nGet the video.", style = MaterialTheme.typography.headlineLarge)
-        Spacer(Modifier.height(sp.s))
-        Text(
-            "YouTube, Instagram, Threads, X, Facebook and 1,000+ more sites",
-            style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+        Text("Grab anything.", style = MaterialTheme.typography.displaySmall.copy(
+            fontWeight = androidx.compose.ui.text.font.FontWeight.ExtraBold, letterSpacing = (-1).sp))
     }
 }
 
 @Composable
 private fun LinkInput(
     url: String, onUrl: (String) -> Unit, onClear: () -> Unit,
-    showButton: Boolean, busy: Boolean, onGo: () -> Unit,
+    showButton: Boolean, busy: Boolean, onGo: () -> Unit, onCancel: () -> Unit = {},
+    focus: Boolean = false, onFocused: () -> Unit = {},
 ) {
+    val fr = remember { androidx.compose.ui.focus.FocusRequester() }
+    LaunchedEffect(focus) { if (focus) { runCatching { fr.requestFocus() }; onFocused() } }
     val sp = LocalSpacing.current
     val sz = LocalSizes.current
     AppCard {
         TextField(
             value = url,
             onValueChange = onUrl,
-            modifier = Modifier.fillMaxWidth().testTag("urlField"),
+            modifier = Modifier.fillMaxWidth().focusRequester(fr).testTag("urlField"),
             placeholder = { Text("Paste a video link") },
             leadingIcon = { Icon(Icons.Rounded.Link, null) },
             trailingIcon = {
@@ -230,15 +240,28 @@ private fun LinkInput(
         AnimatedVisibility(showButton) {
             Column {
                 Spacer(Modifier.height(sp.m))
+                val src = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
                 Button(
-                    onClick = onGo,
-                    modifier = Modifier.fillMaxWidth().height(sz.button).testTag("grabBtn"),
-                    enabled = !busy && url.isNotBlank(),
+                    onClick = if (busy) onCancel else onGo,
+                    modifier = Modifier.fillMaxWidth().height(sz.button).testTag("grabBtn")
+                        .pressSquish(src, 0.97f),
+                    enabled = busy || url.isNotBlank(),
                     shape = PillShape,
+                    interactionSource = src,
+                    colors = if (busy) ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.primaryContainer,
+                        contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                    ) else ButtonDefaults.buttonColors(),
                 ) {
-                    Icon(Icons.Rounded.Download, null)
-                    Spacer(Modifier.width(sp.s))
-                    Text(if (busy) "Getting video…" else "Grab video", style = MaterialTheme.typography.titleMedium)
+                    if (busy) {
+                        // Expressive loading shape: keeps morphing between soft polygons while the link is read
+                        androidx.compose.material3.LoadingIndicator(Modifier.size(32.dp), color = MaterialTheme.colorScheme.primary)
+                        Spacer(Modifier.width(sp.s))
+                        Text("Fetching…", style = MaterialTheme.typography.titleMedium)
+                        Spacer(Modifier.width(sp.s))
+                        Text("tap to cancel", style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.75f))
+                    } else Text("Grab", style = MaterialTheme.typography.titleMedium)
                 }
             }
         }
@@ -337,27 +360,13 @@ private fun audioOptions(info: MediaInfo): List<QOpt> = buildList {
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun QualityChips(options: List<QOpt>, selected: String, onSelect: (String) -> Unit) {
-    val sp = LocalSpacing.current
-    FlowRow(horizontalArrangement = Arrangement.spacedBy(sp.s)) {
-        options.forEach { o ->
-            val sel = selected == o.key
-            FilterChip(
-                selected = sel,
-                onClick = { onSelect(o.key) },
-                label = {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(o.label, style = MaterialTheme.typography.labelLarge)
-                        val s = fmtSize(o.size)
-                        if (s.isNotEmpty()) Text(" · $s", style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                },
-                leadingIcon = if (sel) ({ Icon(Icons.Rounded.Check, null, Modifier.size(FilterChipDefaults.IconSize)) }) else null,
-                shape = MaterialTheme.shapes.small,
-                modifier = Modifier.testTag("q_${o.key}"),
-            )
-        }
-    }
+    // Connected, sideways-scrolling row: equal widths, the chosen one fills and widens (Expressive)
+    if (options.isEmpty()) return
+    com.sushant.grabbit.ui.components.ConnectedGroup(
+        options.map { com.sushant.grabbit.ui.components.SegOption(it.key, it.label, sub = fmtSize(it.size), tag = "q_${it.key}") },
+        selected, onSelect, height = 56.dp, scroll = options.size > 4, itemWidth = 84.dp,
+        color = MaterialTheme.colorScheme.surfaceContainerHigh, onColor = MaterialTheme.colorScheme.onSurface,
+    )
 }
 
 private fun defaultVideoChoice(opts: List<QOpt>): String {
@@ -422,23 +431,15 @@ internal fun MediaCard(info: MediaInfo, framed: Boolean = true, onDownload: (Med
 
             if (info.hasVideo) {
                 Spacer(Modifier.height(sp.l))
-                SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
-                    SegmentedButton(
-                        selected = !audio && !image, onClick = { audio = false; image = false },
-                        shape = SegmentedButtonDefaults.itemShape(0, if (info.thumbnail.isNotBlank()) 3 else 2),
-                        icon = { Icon(Icons.Rounded.Movie, null, Modifier.size(sz.iconSmall)) },
-                    ) { FitText("Video") }
-                    SegmentedButton(
-                        selected = audio && !image, onClick = { audio = true; image = false },
-                        shape = SegmentedButtonDefaults.itemShape(1, if (info.thumbnail.isNotBlank()) 3 else 2),
-                        icon = { Icon(Icons.Rounded.MusicNote, null, Modifier.size(sz.iconSmall)) },
-                    ) { FitText("Audio") }
-                    if (info.thumbnail.isNotBlank()) SegmentedButton(
-                        selected = image, onClick = { image = true },
-                        shape = SegmentedButtonDefaults.itemShape(2, 3),
-                        icon = { Icon(Icons.Rounded.Image, null, Modifier.size(sz.iconSmall)) },
-                        modifier = Modifier.testTag("imageTab"),
-                    ) { FitText("Image") }
+                val tabs = buildList {
+                    add(com.sushant.grabbit.ui.components.SegOption("video", "Video", Icons.Rounded.Movie, tag = "tab_video"))
+                    add(com.sushant.grabbit.ui.components.SegOption("audio", "Audio", Icons.Rounded.MusicNote, tag = "tab_audio"))
+                    if (info.thumbnail.isNotBlank()) add(com.sushant.grabbit.ui.components.SegOption("image", "Image", Icons.Rounded.Image, tag = "imageTab"))
+                }
+                com.sushant.grabbit.ui.components.ConnectedGroup(
+                    tabs, if (image) "image" else if (audio) "audio" else "video",
+                    { k -> image = k == "image"; audio = k == "audio" },
+                )
                 }
             }
             Spacer(Modifier.height(sp.m))
@@ -459,16 +460,17 @@ internal fun MediaCard(info: MediaInfo, framed: Boolean = true, onDownload: (Med
                     chosen == null || chosen.key == "best" -> if (st.trimmed) "Download best quality · trimmed" else "Download best quality"
                     else -> "Download ${chosen.label}" + fmtSize((chosen.size * st.keptShare).toLong()).let { if (it.isEmpty()) "" else " · $it" }
                 }
-                Button(
+                // Split button: the big part downloads, the small part picks the format for this download
+                com.sushant.grabbit.ui.components.SplitButton(
+                    label = {
+                        Icon(Icons.Rounded.Download, null)
+                        Spacer(Modifier.width(sp.s))
+                        Text(label, style = MaterialTheme.typography.titleMedium.copy(fontFeatureSettings = TabularNums),
+                            maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    },
                     onClick = { onDownload(info, if (audio) aud else video, st.toOpts(audio)) },
-                    modifier = Modifier.fillMaxWidth().height(sz.button).testTag("downloadBtn"),
-                    shape = PillShape,
-                ) {
-                    Icon(Icons.Rounded.Download, null)
-                    Spacer(Modifier.width(sp.s))
-                    Text(label, style = MaterialTheme.typography.titleMedium.copy(fontFeatureSettings = TabularNums),
-                        maxLines = 1, overflow = TextOverflow.Ellipsis)
-                }
+                    menuDescription = if (audio) "Audio format" else "Video format",
+                ) { close -> FormatMenu(audio, st, close) }
 
             }
         }
@@ -531,4 +533,25 @@ internal fun StorageBlockedDialog(ctx: android.content.Context, onClose: () -> U
         },
         dismissButton = { if (permanently) TextButton(onClick = onClose) { Text("Cancel") } },
     )
+}
+
+
+/** The split button's menu: audio format (MP3, M4A…) or video format (most compatible / highest quality) for this download. */
+@Composable
+private fun FormatMenu(audio: Boolean, st: OptsState, close: () -> Unit) {
+    Text(if (audio) "Audio format" else "Video format", style = MaterialTheme.typography.labelLarge,
+        color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
+    val items = if (audio) AUDIO_FORMAT_LABELS.map { (k, l) -> Triple("af_$k", l, st.audioFormat == k) to { st.audioFormat = k } }
+    else listOf(
+        Triple("vf_0", "Most compatible (MP4)", st.videoFormat == 0) to { st.videoFormat = 0 },
+        Triple("vf_1", "Highest quality", st.videoFormat == 1) to { st.videoFormat = 1 },
+    )
+    items.forEach { (t, pick) ->
+        androidx.compose.material3.DropdownMenuItem(
+            text = { Text(t.second) },
+            onClick = { pick(); close() },
+            leadingIcon = { if (t.third) Icon(Icons.Rounded.Check, null) else Spacer(Modifier.size(24.dp)) },
+            modifier = Modifier.testTag(t.first),
+        )
+    }
 }

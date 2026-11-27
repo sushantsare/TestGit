@@ -65,6 +65,8 @@ class OptsState(info: MediaInfo) {
     var trim by mutableStateOf(0f..info.duration.toFloat())
     var chapters by mutableStateOf(false)
     var audioFormat by mutableStateOf(Prefs.audioFormat)
+    /** 0 most compatible, 1 highest quality (this download only; starts at the Settings choice). */
+    var videoFormat by mutableStateOf(Prefs.videoFormat)
     private val defaultName = com.sushant.grabbit.download.FileNames.clean(info.title).ifBlank { "Grabbit" }
     /** File name shown on the card; the user can change it with the pen icon. */
     var name by mutableStateOf(defaultName)
@@ -85,6 +87,7 @@ class OptsState(info: MediaInfo) {
         audioFormat = audioFormat,
         name = if (name != defaultName) name else "",
         folder = folder,
+        videoFormat = if (videoFormat != Prefs.videoFormat) videoFormat else -1,
     )
 
     companion object {
@@ -111,21 +114,6 @@ fun DownloadOptionsRow(info: MediaInfo, audio: Boolean, st: OptsState) {
     var subSheet by remember { mutableStateOf(false) }
     var trimSheet by remember { mutableStateOf(false) }
 
-    if (audio) {
-        Text("Format", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Spacer(Modifier.height(sp.xs))
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(sp.s)) {
-            AUDIO_FORMAT_LABELS.forEach { (k, l) ->
-                val sel = st.audioFormat == k
-                FilterChip(
-                    selected = sel, onClick = { st.audioFormat = k }, label = { Text(l) },
-                    leadingIcon = if (sel) ({ Icon(Icons.Rounded.Check, null, Modifier.size(FilterChipDefaults.IconSize)) }) else null,
-                    shape = MaterialTheme.shapes.small, modifier = Modifier.testTag("af_$k"),
-                )
-            }
-        }
-        Spacer(Modifier.height(sp.s))
-    }
     val showSubs = !audio && info.subtitles.isNotEmpty() && !info.isPlaylist
     val showTrim = info.duration > 0 && !info.isPlaylist
     val showChapters = info.chapters > 1 && !info.isPlaylist

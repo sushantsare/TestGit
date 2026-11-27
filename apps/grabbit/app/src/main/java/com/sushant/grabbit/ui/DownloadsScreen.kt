@@ -60,6 +60,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import com.sushant.grabbit.ui.components.groupShape
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.material3.Surface
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.background
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
@@ -99,6 +105,7 @@ fun DownloadsScreen(vm: MainViewModel, modifier: Modifier) {
     var filter by rememberSaveable { mutableStateOf("All") }
     var query by rememberSaveable { mutableStateOf("") }
     var sort by rememberSaveable { mutableIntStateOf(0) }
+    var searchOpen by rememberSaveable { mutableStateOf(false) }
 
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { vm.checkMissing() }
     LaunchedEffect(library.size) { vm.checkMissing() }
@@ -128,11 +135,12 @@ fun DownloadsScreen(vm: MainViewModel, modifier: Modifier) {
     LazyColumn(
         modifier.fillMaxSize(),
         contentPadding = PaddingValues(start = sp.screen, end = sp.screen, bottom = sp.xl),
-        verticalArrangement = Arrangement.spacedBy(sp.s),
+        // 3dp between grouped cards; sections add their own space above
+        verticalArrangement = Arrangement.spacedBy(3.dp),
     ) {
         item(key = "title") {
             ScreenTitle("Downloads") {
-                if (works.any { it.state.isFinished }) TextButton(onClick = { vm.clearFinished() }) { Text("Clear finished") }
+                if (library.isNotEmpty()) SearchSortPair(searchOpen || query.isNotEmpty(), { searchOpen = !searchOpen; if (!searchOpen) query = "" }, sort) { sort = it }
             }
         }
 
@@ -150,22 +158,24 @@ fun DownloadsScreen(vm: MainViewModel, modifier: Modifier) {
         if (active.isNotEmpty() || paused.isNotEmpty()) {
             val running = active.filter { !it.state.isFinished }
             item(key = "activeLabel") {
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = sp.s, bottom = sp.xs)) {
                     SectionLabel("In progress · ${active.size + paused.size}", Modifier.weight(1f))
+                    if (active.any { it.state == WorkInfo.State.FAILED }) TextButton(onClick = { vm.clearFinished() }) { Text("Clear failed") }
                     if (running.size + paused.size >= 2) {
                         if (running.isNotEmpty()) TextButton(onClick = { vm.pauseAll(running) }, modifier = Modifier.testTag("pauseAll")) { Text("Pause all") }
                         else TextButton(onClick = { vm.resumeAll() }, modifier = Modifier.testTag("resumeAll")) { Text("Resume all") }
                     }
                 }
             }
-            items(active, key = { it.id.toString() }) { w -> ActiveCard(w, vm, Modifier.animateItem()) }
-            items(paused, key = { "p_" + it.job.key }) { p -> PausedCard(p, vm, Modifier.animateItem()) }
+            val total = active.size + paused.size
+            itemsIndexed(active, key = { _, w -> w.id.toString() }) { i, w -> ActiveCard(w, vm, Modifier.animateItem(), groupShape(i, total)) }
+            itemsIndexed(paused, key = { _, p -> "p_" + p.job.key }) { i, p -> PausedCard(p, vm, Modifier.animateItem(), groupShape(active.size + i, total)) }
             item(key = "activeGap") { Spacer(Modifier.height(sp.s)) }
         }
 
         if (library.isNotEmpty()) {
-            item(key = "savedLabel") { SectionLabel("Saved · ${library.size}") }
-            item(key = "search") { SearchSortRow(query, { query = it }, sort, { sort = it }) }
+            item(key = "savedLabel") { SectionLabel("Saved · ${library.size}", Modifier.padding(top = sp.l, bottom = sp.xs)) }
+            if (searchOpen || query.isNotEmpty()) item(key = "search") { SearchField(query) { query = it } }
             item(key = "chips") {
                 LazyRow(horizontalArrangement = Arrangement.spacedBy(sp.s), contentPadding = PaddingValues(vertical = sp.xs)) {
                     items(sites) { s ->
@@ -186,13 +196,17 @@ fun DownloadsScreen(vm: MainViewModel, modifier: Modifier) {
                     actionLabel = "Clear filters", onAction = { query = ""; filter = "All" },
                 )
             }
-            items(shown, key = { it.id }) { item -> SavedRow(item, item.id in vm.missing, vm, Modifier.animateItem()) }
+            item(key = "chipsGap") { Spacer(Modifier.height(sp.xs)) }
+            itemsIndexed(shown, key = { _, it -> it.id }) { i, item ->
+                SavedRow(item, item.id in vm.missing, vm,
+                    Modifier.animateItem().clip(groupShape(i, shown.size)).background(MaterialTheme.colorScheme.surfaceContainerLow))
+            }
         }
     }
 }
 
 @Composable
-private fun ActiveCard(w: WorkInfo, vm: MainViewModel, modifier: Modifier) {
+private fun ActiveCard(w: WorkInfo, vm: MainViewModel, modifier: Modifier, shape: androidx.compose.ui.graphics.Shape = MaterialTheme.shapes.extraLarge) {
     val sp = LocalSpacing.current
     val sz = LocalSizes.current
     val job = Downloads.jobOf(w)
@@ -212,7 +226,7 @@ private fun ActiveCard(w: WorkInfo, vm: MainViewModel, modifier: Modifier) {
         )
         return
     }
-    AppCard(modifier, padding = sp.m) {
+    AppCard(modifier, padding = sp.m, shape = shape) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             VideoThumb(job.thumb, isAudioQuality(job.quality), Modifier.width(sz.rowThumbW).height(sz.rowThumbH))
             Spacer(Modifier.width(sp.m))
@@ -240,8 +254,8 @@ private fun ActiveCard(w: WorkInfo, vm: MainViewModel, modifier: Modifier) {
         }
         Spacer(Modifier.height(sp.s))
         val barMod = Modifier.fillMaxWidth().height(sz.progress)
-        if (pct > 0f && !working) LinearProgressIndicator(progress = { pct / 100f }, modifier = barMod, strokeCap = StrokeCap.Round, gapSize = 0.dp, drawStopIndicator = {})
-        else LinearProgressIndicator(barMod, strokeCap = StrokeCap.Round)
+        // Expressive wavy bar; while merging/converting there is no percentage, so it just keeps moving
+        com.sushant.grabbit.ui.components.WavyProgress(if (pct > 0f && !working) pct / 100f else null, Modifier.testTag("wavyProgress"))
         Spacer(Modifier.height(sp.s))
         val detail = if (working) "Almost done · big files take a little longer"
             else listOf(size, speed, eta).filter { it.isNotBlank() }.joinToString(" · ")
@@ -357,33 +371,45 @@ private fun SavedRow(item: SavedItem, missing: Boolean, vm: MainViewModel, modif
 }
 
 @Composable
-private fun SearchSortRow(query: String, onQuery: (String) -> Unit, sort: Int, onSort: (Int) -> Unit) {
-    val sp = LocalSpacing.current
+private fun SearchField(query: String, onQuery: (String) -> Unit) {
+    val focus = remember { androidx.compose.ui.focus.FocusRequester() }
+    LaunchedEffect(Unit) { runCatching { focus.requestFocus() } }
+    TextField(
+        value = query,
+        onValueChange = onQuery,
+        modifier = Modifier.fillMaxWidth().padding(bottom = LocalSpacing.current.s).focusRequester(focus).testTag("searchField"),
+        placeholder = { Text("Search downloads") },
+        leadingIcon = { Icon(Icons.Rounded.Search, null) },
+        trailingIcon = {
+            if (query.isNotEmpty()) IconButton(onClick = { onQuery("") }) { Icon(Icons.Rounded.Close, "Clear search") }
+        },
+        singleLine = true,
+        shape = PillShape,
+        colors = TextFieldDefaults.colors(
+            focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+            unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+            focusedIndicatorColor = Color.Transparent,
+            unfocusedIndicatorColor = Color.Transparent,
+        ),
+    )
+}
+
+/** Search + Sort as a connected pair in the title row (Expressive). */
+@Composable
+private fun SearchSortPair(searchOn: Boolean, onSearch: () -> Unit, sort: Int, onSort: (Int) -> Unit) {
     var open by remember { mutableStateOf(false) }
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        TextField(
-            value = query,
-            onValueChange = onQuery,
-            modifier = Modifier.weight(1f).testTag("searchField"),
-            placeholder = { Text("Search downloads") },
-            leadingIcon = { Icon(Icons.Rounded.Search, null) },
-            trailingIcon = {
-                if (query.isNotEmpty()) IconButton(onClick = { onQuery("") }) { Icon(Icons.Rounded.Close, "Clear search") }
-            },
-            singleLine = true,
-            shape = PillShape,
-            colors = TextFieldDefaults.colors(
-                focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-                unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-                focusedIndicatorColor = Color.Transparent,
-                unfocusedIndicatorColor = Color.Transparent,
-            ),
-        )
-        Spacer(Modifier.width(sp.xs))
+    Row(horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+        Surface(
+            onClick = onSearch, shape = RoundedCornerShape(22.dp, 8.dp, 8.dp, 22.dp),
+            color = if (searchOn) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainerHigh,
+            modifier = Modifier.size(width = 52.dp, height = 48.dp).testTag("searchBtn"),
+        ) { Box(contentAlignment = Alignment.Center) { Icon(Icons.Rounded.Search, if (searchOn) "Close search" else "Search downloads") } }
         Box {
-            IconButton(onClick = { open = true }, modifier = Modifier.testTag("sortBtn")) {
-                Icon(Icons.Rounded.SwapVert, "Sort: ${SORTS[sort]}")
-            }
+            Surface(
+                onClick = { open = true }, shape = RoundedCornerShape(8.dp, 22.dp, 22.dp, 8.dp),
+                color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                modifier = Modifier.size(width = 52.dp, height = 48.dp).testTag("sortBtn"),
+            ) { Box(contentAlignment = Alignment.Center) { Icon(Icons.Rounded.SwapVert, "Sort: ${SORTS[sort]}") } }
             DropdownMenu(expanded = open, onDismissRequest = { open = false }, shape = MaterialTheme.shapes.medium) {
                 SORTS.forEachIndexed { i, label ->
                     DropdownMenuItem(
@@ -397,13 +423,12 @@ private fun SearchSortRow(query: String, onQuery: (String) -> Unit, sort: Int, o
     }
 }
 
-
 @Composable
-private fun PausedCard(p: com.sushant.grabbit.data.PausedItem, vm: MainViewModel, modifier: Modifier) {
+private fun PausedCard(p: com.sushant.grabbit.data.PausedItem, vm: MainViewModel, modifier: Modifier, shape: androidx.compose.ui.graphics.Shape = MaterialTheme.shapes.extraLarge) {
     val sp = LocalSpacing.current
     val sz = LocalSizes.current
     val job = p.job
-    AppCard(modifier.testTag("pausedCard"), padding = sp.m) {
+    AppCard(modifier.testTag("pausedCard"), padding = sp.m, shape = shape) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             VideoThumb(job.thumb, isAudioQuality(job.quality), Modifier.width(sz.rowThumbW).height(sz.rowThumbH))
             Spacer(Modifier.width(sp.m))
@@ -422,10 +447,6 @@ private fun PausedCard(p: com.sushant.grabbit.data.PausedItem, vm: MainViewModel
             style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Spacer(Modifier.height(sp.s))
-        LinearProgressIndicator(
-            progress = { if (p.canContinue) p.pct / 100f else 0f },
-            modifier = Modifier.fillMaxWidth().height(sz.progress), strokeCap = StrokeCap.Round, gapSize = 0.dp, drawStopIndicator = {},
-            color = MaterialTheme.colorScheme.outline,
-        )
+        com.sushant.grabbit.ui.components.WavyProgress(if (p.canContinue) p.pct / 100f else 0f, color = MaterialTheme.colorScheme.outline)
     }
 }
