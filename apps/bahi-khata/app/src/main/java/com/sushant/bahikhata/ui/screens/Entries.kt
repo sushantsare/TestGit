@@ -320,7 +320,7 @@ fun EntryDetailContent(vm: AppVm, id: Long, embedded: Boolean, onGone: () -> Uni
                 NameUpiCard(vm, upiKey, entry.vpa ?: entry.merchant.orEmpty(), entry.merchant.orEmpty(), entry.type == EType.EXPENSE, Modifier.padding(16.dp, 4.dp))
             val its = allItems.filter { it.entryId == entry.id }
             if (entry.type == EType.EXPENSE && !entry.cancelled) {
-                if (its.isEmpty() && st.askItems) Row(Modifier.padding(16.dp, 4.dp).fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(MaterialTheme.colorScheme.secondaryContainer)
+                if (its.isEmpty() && st.askItems && entry.smsKey != null) Row(Modifier.padding(16.dp, 4.dp).fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(MaterialTheme.colorScheme.secondaryContainer)
                     .clickable { itemsOpen = true }.padding(12.dp).testTag("ask_items"), verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Outlined.ShoppingBasket, null, tint = MaterialTheme.colorScheme.onSecondaryContainer); Spacer(Modifier.width(10.dp))
                     Text("What did you buy?", color = MaterialTheme.colorScheme.onSecondaryContainer, style = MaterialTheme.typography.labelLarge, modifier = Modifier.weight(1f))
@@ -350,6 +350,8 @@ fun EntryDetailContent(vm: AppVm, id: Long, embedded: Boolean, onGone: () -> Uni
                 if (!entry.note.isNullOrBlank()) ListRow(entry.note, "Note", leading = { Icon(Icons.Outlined.EditNote, null) })
                 if (entry.tags.isNotBlank()) ListRow(Ledger.tags(entry.tags).joinToString("  ") { "#$it" }, "Tags", leading = { Icon(Icons.Outlined.Sell, null) })
                 if (entry.smsKey != null) ListRow("Saved from bank SMS", null, leading = { Icon(Icons.Outlined.Sms, null) })
+                if (entry.type == EType.EXPENSE && !entry.cancelled && its.isEmpty() && entry.smsKey == null)
+                    ListRow("Add items", "What you bought, with quantity and price", leading = { Icon(Icons.Outlined.ShoppingBasket, null) }, onClick = { itemsOpen = true })
                 if (entry.recurringId != null) ListRow("Repeating entry", "Manage in Settings → Recurring", leading = { Icon(Icons.Outlined.Repeat, null) }, onClick = { nav.go("recurring") })
             }
             if (atts.isNotEmpty()) {

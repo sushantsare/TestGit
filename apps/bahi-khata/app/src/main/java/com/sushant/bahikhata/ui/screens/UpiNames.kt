@@ -71,22 +71,80 @@ fun NameUpiCard(vm: AppVm, key: String, shown: String, suggestion: String, debit
 }
 
 /** "What did you buy?": each item with an optional price; shows how much of the payment is still not split into items. */
+/** One editable item row: name, quantity, unit, total paid. Kept as text while typing. */
+data class ItemRow(val name: String = "", val qty: String = "", val unit: String = "", val total: String = "") {
+    fun toItem() = Insights.Item(name.trim(), Money.parse(total) ?: -1L, qty.toDoubleOrNull()?.takeIf { it > 0 } ?: 1.0, unit)
+    fun pack() = listOf(name, qty, unit, total).joinToString("\u0001")
+    companion object {
+        fun of(i: Insights.Item) = ItemRow(i.name, if (i.qty == 1.0) "" else Insights.qtyText(i.qty, ""), i.unit, if (i.pricePaise > 0) Money.input(i.pricePaise) else "")
+        fun unpack(s: String) = s.split('\u0001').let { ItemRow(it.getOrElse(0) { "" }, it.getOrElse(1) { "" }, it.getOrElse(2) { "" }, it.getOrElse(3) { "" }) }
+    }
+}
+
+fun List<ItemRow>.toItems(): List<Insights.Item> = filter { it.name.isNotBlank() }.map { it.toItem() }
+
+/** Things bought at this shop before, most often first (the latest visit's quantity and price). */
+fun usualItems(history: List<EntryItem>, shop: String): List<EntryItem> {
+    val key = Insights.shopKey(shop)
+    if (key.isBlank()) return emptyList()
+    return history.filter { it.shopKey == key }.groupBy { it.name.lowercase() }
+        .map { (_, l) -> l.maxBy { it.time } to l.size }.sortedByDescending { it.second }.take(10).map { it.first }
+}
+
+fun usualLabel(u: EntryItem): String {
+    val q = if (u.qty != 1.0 || u.unit.isNotBlank()) " " + (if (u.unit.isBlank()) "×" else "") + Insights.qtyText(u.qty, u.unit) else ""
+    return u.name + q + if (u.pricePaise > 0) " · ${Money.fmt(u.pricePaise)}" else ""
+}
+
+fun usualRow(u: EntryItem) = ItemRow(u.name, if (u.qty == 1.0) "" else Insights.qtyText(u.qty, ""), u.unit, if (u.pricePaise > 0) Money.input(u.pricePaise) else "")
+
+/** The rows themselves, with "+ Add item". Shared by the "What did you buy?" box and the Add entry screen. */
+@Composable
+fun ItemRowsEditor(rows: List<ItemRow>, onRows: (List<ItemRow>) -> Unit, modifier: Modifier = Modifier, tagPrefix: String = "item") {
+    fun update(i: Int, f: (ItemRow) -> ItemRow) = onRows(rows.toMutableList().also { it[i] = f(it[i]) })
+    Column(modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        rows.forEachIndexed { i, r ->
+            Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(MaterialTheme.colorScheme.surfaceContainerLow).padding(8.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    OutlinedTextField(r.name, { v -> update(i) { it.copy(name = v) } }, label = { Text("Item") }, singleLine = true,
+                        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(capitalization = androidx.compose.ui.text.input.KeyboardCapitalization.Sentences),
+                        modifier = Modifier.weight(1f).testTag("${tagPrefix}_name_$i"))
+                    IconButton(onClick = { onRows(rows.toMutableList().also { it.removeAt(i) }) }) { Icon(Icons.Outlined.Close, "Remove item") }
+                }
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    OutlinedTextField(r.qty, { v -> update(i) { it.copy(qty = v.filter { c -> c.isDigit() || c == '.' }.take(7)) } }, label = { Text("Qty") }, placeholder = { Text("1") },
+                        singleLine = true, keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Decimal),
+                        modifier = Modifier.weight(0.8f).testTag("${tagPrefix}_qty_$i"))
+                    var unitOpen by remember { mutableStateOf(false) }
+                    Box {
+                        OutlinedButton(onClick = { unitOpen = true }, contentPadding = PaddingValues(horizontal = 10.dp), modifier = Modifier.padding(top = 6.dp).testTag("${tagPrefix}_unit_$i")) {
+                            Text(r.unit.ifBlank { "pcs" }); Icon(Icons.Outlined.ArrowDropDown, null)
+                        }
+                        DropdownMenu(unitOpen, { unitOpen = false }) {
+                            Insights.UNITS.forEach { u -> DropdownMenuItem(text = { Text(u.ifBlank { "pcs" }) }, onClick = { update(i) { it.copy(unit = u) }; unitOpen = false }) }
+                        }
+                    }
+                    OutlinedTextField(r.total, { v -> update(i) { it.copy(total = v.filter { c -> c.isDigit() || c == '.' }) } }, label = { Text("Total ₹") }, singleLine = true,
+                        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Decimal),
+                        modifier = Modifier.weight(1f).testTag("${tagPrefix}_price_$i"))
+                }
+                val cur = r.toItem()
+                if (cur.pricePaise > 0 && cur.hasQty)
+                    Text("${Money.fmt(cur.unitPricePaise)} ${cur.unitLabel.let { l -> if (l == "each") "each" else "per " + l.removePrefix("/") }}",
+                        style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(start = 4.dp).testTag("${tagPrefix}_each_$i"))
+            }
+        }
+        TextButton(onClick = { onRows(rows + ItemRow()) }, modifier = Modifier.testTag("${tagPrefix}_add")) { Icon(Icons.Outlined.Add, null); Spacer(Modifier.width(4.dp)); Text("Add item") }
+    }
+}
+
 @Composable
 fun ItemsDialog(title: String, total: Long, shop: String, initial: List<Insights.Item>, history: List<EntryItem>, onSave: (List<Insights.Item>) -> Unit, onDismiss: () -> Unit) {
-    // one row per item: name, quantity, unit, total paid for it
-    data class R(val name: String = "", val qty: String = "", val unit: String = "", val total: String = "")
-    fun qtyInput(q: Double) = if (q == 1.0) "" else Insights.qtyText(q, "")
-    var rows by remember { mutableStateOf(initial.map { R(it.name, qtyInput(it.qty), it.unit, if (it.pricePaise > 0) Money.input(it.pricePaise) else "") }.ifEmpty { listOf(R()) }) }
-    val shopKey = Insights.shopKey(shop)
-    // things bought at this shop before, most often first, with the last price for one
-    val usual = remember(history, shopKey) {
-        history.filter { it.shopKey == shopKey && shopKey.isNotBlank() }.groupBy { it.name.lowercase() }
-            .map { (_, l) -> l.maxBy { it.time } to l.size }.sortedByDescending { it.second }.take(10).map { it.first }
-    }
-    fun item(r: R) = Insights.Item(r.name.trim(), Money.parse(r.total) ?: -1L, r.qty.toDoubleOrNull()?.takeIf { it > 0 } ?: 1.0, r.unit)
-    val parsed = rows.filter { it.name.isNotBlank() }.map(::item)
+    var rows by remember { mutableStateOf(initial.map(ItemRow::of).ifEmpty { listOf(ItemRow()) }) }
+    val usual = remember(history, shop) { usualItems(history, shop) }
+    val parsed = rows.toItems()
     val assigned = parsed.sumOf { it.pricePaise.coerceAtLeast(0) }
-    fun update(i: Int, f: (R) -> R) { rows = rows.toMutableList().also { it[i] = f(it[i]) } }
     AlertDialog(onDismissRequest = onDismiss, title = { Text(title) }, text = {
         Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             if (usual.isNotEmpty()) {
@@ -94,46 +152,14 @@ fun ItemsDialog(title: String, total: Long, shop: String, initial: List<Insights
                 Row(Modifier.horizontalScrollSafe(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     usual.forEach { u ->
                         val on = rows.any { it.name.equals(u.name, true) }
-                        val per = Insights.unitPrice(u.pricePaise, u.qty, u.unit)
-                        Pill(u.name + if (u.pricePaise > 0) " · ${Money.fmt(per)}${Insights.unitLabel(u.unit).let { if (it == "each") "" else it }}" else "", on, {
-                            rows = if (on) rows.filterNot { it.name.equals(u.name, true) }.ifEmpty { listOf(R()) }
-                            else (rows.filter { it.name.isNotBlank() || it.total.isNotBlank() } + R(u.name, "", u.unit, ""))
+                        Pill(usualLabel(u), on, {
+                            rows = if (on) rows.filterNot { it.name.equals(u.name, true) }.ifEmpty { listOf(ItemRow()) }
+                            else (rows.filter { it.name.isNotBlank() || it.total.isNotBlank() } + usualRow(u))
                         })
                     }
                 }
             }
-            rows.forEachIndexed { i, r ->
-                Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(MaterialTheme.colorScheme.surfaceContainerLow).padding(8.dp),
-                    verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        OutlinedTextField(r.name, { v -> update(i) { it.copy(name = v) } }, label = { Text("Item") }, singleLine = true,
-                            modifier = Modifier.weight(1f).testTag("item_name_$i"))
-                        IconButton(onClick = { rows = rows.toMutableList().also { it.removeAt(i) }.ifEmpty { listOf(R()) } }) { Icon(Icons.Outlined.Close, "Remove item") }
-                    }
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        OutlinedTextField(r.qty, { v -> update(i) { it.copy(qty = v.filter { c -> c.isDigit() || c == '.' }.take(7)) } }, label = { Text("Qty") }, placeholder = { Text("1") },
-                            singleLine = true, keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Decimal),
-                            modifier = Modifier.weight(0.8f).testTag("item_qty_$i"))
-                        var unitOpen by remember { mutableStateOf(false) }
-                        Box {
-                            OutlinedButton(onClick = { unitOpen = true }, contentPadding = PaddingValues(horizontal = 10.dp), modifier = Modifier.padding(top = 6.dp).testTag("item_unit_$i")) {
-                                Text(r.unit.ifBlank { "pcs" }); Icon(Icons.Outlined.ArrowDropDown, null)
-                            }
-                            DropdownMenu(unitOpen, { unitOpen = false }) {
-                                Insights.UNITS.forEach { u -> DropdownMenuItem(text = { Text(u.ifBlank { "pcs" }) }, onClick = { update(i) { it.copy(unit = u) }; unitOpen = false }) }
-                            }
-                        }
-                        OutlinedTextField(r.total, { v -> update(i) { it.copy(total = v.filter { c -> c.isDigit() || c == '.' }) } }, label = { Text("Total ₹") }, singleLine = true,
-                            keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Decimal),
-                            modifier = Modifier.weight(1f).testTag("item_price_$i"))
-                    }
-                    val cur = item(r)
-                    if (cur.pricePaise > 0 && cur.hasQty)
-                        Text("${Money.fmt(cur.unitPricePaise)} ${cur.unitLabel.let { l -> if (l == "each") "each" else l.removePrefix("/").let { u -> "per $u" } }}",
-                            style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(start = 4.dp).testTag("item_each_$i"))
-                }
-            }
-            TextButton(onClick = { rows = rows + R() }, modifier = Modifier.testTag("item_add")) { Icon(Icons.Outlined.Add, null); Spacer(Modifier.width(4.dp)); Text("Add item") }
+            ItemRowsEditor(rows, { rows = it.ifEmpty { listOf(ItemRow()) } })
             if (total > 0) {
                 val left = total - assigned
                 Text(when {

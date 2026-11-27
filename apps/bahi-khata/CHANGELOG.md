@@ -37,3 +37,10 @@ First version: money in and out per bank account, credit card, cash and wallet w
 - Block screenshots: turning it off now really allows screenshots. App lock no longer blocks screenshots; it only hides the app's preview in recent apps.
 - Entry details: proper gap between the items card and the details card.
 - Google Drive backup: the Google project is now set up, and any failure shows Google's real reason instead of "isn't available on this phone".
+
+## 1.1.2 — 27 Nov 2026
+- Add entry: items go in right on the first screen — tap "Items", or tap a "Usual here" chip for the shop (last quantity and price). With no amount typed, the amount becomes the items' total.
+- Add entry: type "Ravi Kirana: milk 2L 60, bread 40" in the shop box and Next fills the shop, items and amount.
+- Add entry: when the phone keyboard opens, the number pad steps aside so the shop name stays in view; tap the amount or close the keyboard to get it back.
+- Entry page: the "What did you buy?" strip shows only for SMS entries; manual ones have a quiet "Add items" row.
+- Price history reads "per L" / "per kg".

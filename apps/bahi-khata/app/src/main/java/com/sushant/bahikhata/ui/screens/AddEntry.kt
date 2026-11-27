@@ -91,6 +91,18 @@ fun AddEntryScreen(vm: AppVm, initialType: String, editId: Long, smsId: Long) {
     var saving by rememberSaveable { mutableStateOf(false) }
     var existing by remember { mutableStateOf<Entry?>(null) }
     var smsItem by remember { mutableStateOf<SmsItem?>(null) }
+    // items bought, typed right here while adding (new manual expenses)
+    var itemPacked by rememberSaveable { mutableStateOf(listOf<String>()) }
+    var amountFromItems by rememberSaveable { mutableStateOf(false) }   // amount was filled in from the items' total
+    val itemRows = itemPacked.map(ItemRow::unpack)
+    val allItems by vm.items.collectAsStateWithLifecycle()
+    fun setRows(l: List<ItemRow>) {
+        itemPacked = l.map { it.pack() }
+        val sum = l.toItems().sumOf { it.pricePaise.coerceAtLeast(0) }
+        if (expr.isBlank() || amountFromItems) {
+            if (sum > 0) { expr = Money.input(sum); amountFromItems = true } else if (amountFromItems) { expr = ""; amountFromItems = false }
+        }
+    }
 
     LaunchedEffect(editId, smsId) {
         if (editId > 0) vm.repo.dao.entry(editId)?.let { e ->
@@ -128,7 +140,7 @@ fun AddEntryScreen(vm: AppVm, initialType: String, editId: Long, smsId: Long) {
         amount != e.amountPaise || merchant != e.merchant.orEmpty() || catId != (e.categoryId ?: 0L) || accId != e.accountId ||
             note != e.note.orEmpty() || time != e.time || files.isNotEmpty() || Ledger.tags(tags) != Ledger.tags(e.tags) || upi != e.upiApp.orEmpty() ||
             rule != null || splitsTouched
-    } ?: if (smsId > 0) false else (expr.isNotBlank() || merchant.isNotBlank() || note.isNotBlank() || tags.isNotBlank() || files.isNotEmpty() || splits.isNotEmpty())
+    } ?: if (smsId > 0) false else (expr.isNotBlank() || itemPacked.isNotEmpty() || merchant.isNotBlank() || note.isNotBlank() || tags.isNotBlank() || files.isNotEmpty() || splits.isNotEmpty())
     fun close() { if (dirty && !saving) askDiscard = true else nav.popBackStack() }
     BackHandler(step > 1 && editId == 0L && smsId == 0L) { step-- }
     BackHandler(!(step > 1 && editId == 0L && smsId == 0L) && dirty) { askDiscard = true }
@@ -150,6 +162,7 @@ fun AddEntryScreen(vm: AppVm, initialType: String, editId: Long, smsId: Long) {
         val sp = if (splitMode == "amt") chosen else Ledger.splitShares(amount, chosen.map { it.first }, splitMode == "eq1")
         vm.launch {
             val id = vm.repo.saveEntry(Repo.SaveRequest(e, files.map { Uri.parse(it) }, sp, rule))
+            if (editId == 0L && smsId == 0L && type == EType.EXPENSE && itemRows.toItems().isNotEmpty()) vm.repo.setItems(id, itemRows.toItems())
             smsItem?.let { vm.repo.linkSms(it, id, accId) }
             Diagnostics.count(ctx, if (editId > 0) "entry_edited" else "entry_added")
             val failed = vm.repo.lastAttachFailures
@@ -185,7 +198,7 @@ fun AddEntryScreen(vm: AppVm, initialType: String, editId: Long, smsId: Long) {
         Column(Modifier.padding(pad).fillMaxSize().widthIn(max = 720.dp)) {
             StepBar(step)
             when (step) {
-                1 -> AmountStep(type, { type = it; catId = 0 }, expr, { expr = it }, merchant, { merchant = it }, merchants,
+                1 -> AmountStep(type, { type = it; catId = 0 }, expr, { expr = it; amountFromItems = false }, merchant, { merchant = it }, merchants,
                     onPickMerchant = { m ->
                         merchant = m.display
                         m.categoryId?.let { id -> if (categories.any { it.id == id && it.kind == (if (type == EType.INCOME) "INCOME" else "EXPENSE") }) catId = id }
@@ -193,15 +206,31 @@ fun AddEntryScreen(vm: AppVm, initialType: String, editId: Long, smsId: Long) {
                     },
                     onNext = {
                         focus.clearFocus()
-                        if (amount > 0) step = if (catId > 0 && accId > 0) 3 else 2
+                        // "Ravi Kirana: milk 2L 60, bread 40" → shop, items and amount in one go
+                        val colon = merchant.indexOf(':')
+                        if (type == EType.EXPENSE && colon >= 0) {
+                            val typed = Insights.parseItems(merchant.substring(colon + 1))
+                            if (typed.isNotEmpty()) {
+                                val shop = merchant.substring(0, colon).trim()
+                                merchant = shop
+                                merchants.firstOrNull { it.kind == type && it.display.equals(shop, true) }?.let { m ->
+                                    m.categoryId?.let { id -> if (categories.any { it.id == id && it.kind == "EXPENSE" }) catId = id }
+                                    m.accountId?.let { id -> if (accounts.any { it.id == id && !it.archived }) accId = id }
+                                }
+                                setRows(itemRows.filter { it.name.isNotBlank() } + typed.map(ItemRow::of))
+                            }
+                        }
+                        val a = Calc.eval(expr) ?: 0L
+                        if (a > 0) step = if (catId > 0 && accId > 0) 3 else 2
                     }, amount = amount,
+                    itemRows = itemRows, onRows = { setRows(it) }, usual = usualItems(allItems, merchant.substringBefore(':')), amountFromItems = amountFromItems,
                     onTransfer = { kind -> nav.popBackStack(); nav.go("transfer/$kind") })
                 2 -> CategoryStep(cats, catId) { catId = it; step = 3 }
                 else -> DetailsStep(
                     vm, type, accounts.filter { !it.archived || it.id == accId }, accId, { accId = it; if (accounts.firstOrNull { a -> a.id == it }?.type != AccType.BANK) upi = "" },
                     upi, { upi = it }, time, { time = it }, note, { note = it }, tags, { tags = it }, files, { files = it },
                     existing?.id ?: 0L, splits, { l, m -> splits = l; splitMode = m; splitsTouched = true }, splitMode, people, amount, rule, { rule = it }, editId == 0L,
-                    amountText = expr, onAmount = { expr = it }, merchant = merchant, onMerchant = { merchant = it },
+                    amountText = expr, onAmount = { expr = it; amountFromItems = false }, merchant = merchant, onMerchant = { merchant = it },
                     cat = cat, onChangeCat = { step = 2 }, smsBody = smsItem?.body,
                     onSave = { save() }, saving = saving,
                 )
@@ -210,11 +239,19 @@ fun AddEntryScreen(vm: AppVm, initialType: String, editId: Long, smsId: Long) {
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun AmountStep(
     type: String, onType: (String) -> Unit, expr: String, onExpr: (String) -> Unit, merchant: String, onMerchant: (String) -> Unit,
     merchants: List<Merchant>, onPickMerchant: (Merchant) -> Unit, onNext: () -> Unit, amount: Long, onTransfer: (String) -> Unit,
+    itemRows: List<ItemRow> = emptyList(), onRows: (List<ItemRow>) -> Unit = {}, usual: List<EntryItem> = emptyList(), amountFromItems: Boolean = false,
 ) {
+    val focusMgr = LocalFocusManager.current
+    // while the phone keyboard is up (typing a shop or an item) the number pad steps aside, so nothing gets squeezed or pushed off screen
+    val imeOpen = WindowInsets.isImeVisible
+    val colon = merchant.indexOf(':')
+    val quick = if (type == EType.EXPENSE && colon >= 0) Insights.parseItems(merchant.substring(colon + 1)) else emptyList()
+    val quickSum = quick.sumOf { it.pricePaise.coerceAtLeast(0) }
     val bk = LocalBk.current
     // short screens (phone landscape) put the keypad beside the amount so Next is never cut off
     val short = androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp < 480
@@ -225,7 +262,8 @@ private fun AmountStep(
             val shown = if (expr.isBlank()) "₹0" else if (expr.any { it in "+−×÷" }) expr else "₹" + expr
             Text(shown, style = if (shown.length > 11) MaterialTheme.typography.headlineLarge else MaterialTheme.typography.displayMedium,
                 textAlign = TextAlign.Center, maxLines = 1, overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.fillMaxWidth().padding(top = 14.dp, start = 16.dp, end = 16.dp).testTag("amount_display")
+                modifier = Modifier.fillMaxWidth().clickable(interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }, indication = null) { focusMgr.clearFocus() }
+                    .padding(top = 14.dp, start = 16.dp, end = 16.dp).testTag("amount_display")
                     .semantics { liveRegion = LiveRegionMode.Polite })
             if (expr.any { it in "+−×÷" }) Text("= " + Money.fmt(amount), textAlign = TextAlign.Center, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.fillMaxWidth())
             Spacer(Modifier.height(12.dp))
@@ -241,15 +279,42 @@ private fun AmountStep(
                     topM.forEach { m -> AssistChip(onClick = { onPickMerchant(m); showSug = false }, label = { Text(m.display, maxLines = 1) }, modifier = Modifier.testTag("sug_${m.display}")) }
                 }
             }
+            if (quick.isNotEmpty()) Text(
+                "${merchant.substring(0, colon).trim().ifBlank { "Shop" }} · ${quick.size} ${if (quick.size == 1) "item" else "items"}" + (if (quickSum > 0) " · ${Money.fmt(quickSum)}" else "") + " — tap Next",
+                style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp).testTag("quick_items"))
+            if (type == EType.EXPENSE && usual.isNotEmpty()) {
+                Text("Usual here — tap to add", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(start = 16.dp, top = 6.dp))
+                Row(Modifier.fillMaxWidth().horizontalScrollSafe().padding(horizontal = 16.dp, vertical = 6.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    usual.forEach { u ->
+                        val on = itemRows.any { it.name.equals(u.name, true) }
+                        Pill(usualLabel(u), on, {
+                            onRows(if (on) itemRows.filterNot { it.name.equals(u.name, true) } else itemRows.filter { it.name.isNotBlank() || it.total.isNotBlank() } + usualRow(u))
+                        }, modifier = Modifier.testTag("usual_${u.name}"))
+                    }
+                }
+            }
+            if (type == EType.EXPENSE && itemRows.isNotEmpty()) {
+                Text("What did you buy?", style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(start = 16.dp, top = 8.dp, bottom = 4.dp))
+                ItemRowsEditor(itemRows, onRows, Modifier.padding(horizontal = 16.dp), tagPrefix = "ae_item")
+                val sum = itemRows.toItems().sumOf { it.pricePaise.coerceAtLeast(0) }
+                if (sum > 0) Text(when {
+                    amountFromItems -> "Amount is the total of these items"
+                    sum == amount -> "Adds up to the amount ✓"
+                    sum < amount -> "${Money.fmt(amount - sum)} not given to an item"
+                    else -> "Items add up to ${Money.fmt(sum - amount)} more than the amount"
+                }, style = MaterialTheme.typography.labelMedium, color = if (!amountFromItems && sum > amount) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp).testTag("ae_items_left"))
+            }
             if (type == EType.EXPENSE) FlowRow(Modifier.padding(horizontal = 16.dp, vertical = 4.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (itemRows.isEmpty()) OutlinedPillButton("Items", Icons.Outlined.ShoppingBasket, { onRows(listOf(ItemRow())) }, tag = "add_items")
                 OutlinedPillButton("Pay card bill", Icons.Outlined.CreditCard, { onTransfer("paybill") })
                 OutlinedPillButton("Withdraw cash", Icons.Outlined.LocalAtm, { onTransfer("withdraw") })
             }
         }
     }
     val pad: @Composable ColumnScope.() -> Unit = {
-        Keypad(expr, onExpr, compact = short)
-        Button(onClick = onNext, enabled = amount > 0, modifier = Modifier.fillMaxWidth().padding(16.dp).height(52.dp).testTag("next")) { Text("Next") }
+        if (!imeOpen) Keypad(expr, onExpr, compact = short)
+        Button(onClick = onNext, enabled = amount > 0 || quickSum > 0, modifier = Modifier.fillMaxWidth().padding(16.dp).height(52.dp).testTag("next")) { Text("Next") }
     }
     // a physical keyboard types the amount straight away (Enter goes to the next step); keys no text field
     // used arrive from the activity through KeyBus

@@ -159,7 +159,7 @@ fun InsightPage(vm: AppVm, page: String) {
                     else item { BkCard(Modifier.padding(16.dp, 8.dp).fillMaxWidth()) {
                         lines.forEach { l ->
                             val up = l.change > 0
-                            ListRow("${l.item} · ${l.shop}", "${hm(l.first)} → ${hm(l.last)}${if (l.per == "each") "" else " " + l.per} since ${Dates.dayMonth(l.points.first().date)} · ${l.points.size} times", Modifier.testTag("price_${l.item}"),
+                            ListRow("${l.item} · ${l.shop}", "${hm(l.first)} → ${hm(l.last)}${if (l.per == "each") "" else " per " + l.per.removePrefix("/")} since ${Dates.dayMonth(l.points.first().date)} · ${l.points.size} times", Modifier.testTag("price_${l.item}"),
                                 leading = { Icon(if (up) Icons.Outlined.TrendingUp else if (l.change < 0) Icons.Outlined.TrendingDown else Icons.Outlined.TrendingFlat, null,
                                     tint = if (up) bk.expense else if (l.change < 0) bk.income else MaterialTheme.colorScheme.onSurfaceVariant) },
                                 trailing = { Text(if (l.change == 0L) "same" else (if (up) "+" else "−") + hm(kotlin.math.abs(l.change)).removePrefix("−"), style = MaterialTheme.typography.labelLarge,

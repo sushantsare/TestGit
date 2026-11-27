@@ -156,6 +156,29 @@ class WalkthroughTest {
         click("row_repeat"); waitTag("pick_Never"); shot("add_repeat_sheet"); click("pick_Never")
         click("save"); waitTag("fab_add"); if (runBlocking { app.repo.dao.entriesNow() }.none { it.merchant == "Chai point" }) problem("Chai point not saved"); shot("home_after_add")
 
+        // ---- add with items on the first screen: usual chips fill the amount, number pad steps aside for the keyboard
+        clickTo("fab_add", "key_4")
+        compose.onNodeWithTag("f_merchant").performClick(); compose.onNodeWithTag("f_merchant").performTextInput("Ravi Kirana"); Thread.sleep(700); compose.waitForIdle()
+        shot("add_keyboard_open"); hideKeyboard(); Thread.sleep(400)
+        click("usual_Milk"); click("usual_Bread"); waitTag("ae_items_left"); shot("add_with_items")
+        if (!has("amount_display") || runCatching { compose.onNodeWithTag("amount_display").assertTextEquals("₹100") }.isFailure) problem("items did not fill the amount")
+        click("next"); runCatching { compose.waitUntil(5_000) { has("save") || has("cat_Groceries") } }; if (has("cat_Groceries")) click("cat_Groceries")
+        waitTag("save"); click("acc_Cash"); click("save"); waitTag("fab_add")
+        runBlocking {
+            val e = app.repo.dao.entriesNow().filter { it.merchant == "Ravi Kirana" }.maxBy { it.id }
+            val its = app.repo.itemsOf(e.id)
+            if (e.amountPaise != 100_00L || its.size != 2 || its.none { it.name == "Milk" && it.qty == 2.0 && it.unit == "L" }) problem("items not saved with the entry")
+        }
+        // ---- quick typing: "Shop: items" fills shop, items and amount
+        clickTo("fab_add", "key_4")
+        type("f_merchant", "Sharma Store: 2 tea 40, biscuit x4 100"); waitTag("quick_items"); shot("add_quick_items")
+        click("next"); waitTag("cat_Food"); click("cat_Food"); waitTag("save"); click("acc_Cash"); click("save"); waitTag("fab_add")
+        runBlocking {
+            val e = app.repo.dao.entriesNow().firstOrNull { it.merchant == "Sharma Store" }
+            val its = e?.let { app.repo.itemsOf(it.id) }.orEmpty()
+            if (e == null || e.amountPaise != 140_00L || its.size != 2 || its.none { it.name == "Biscuit" && it.qty == 4.0 }) problem("quick items not saved: ${e?.amountPaise} ${its.size}")
+        }
+
         // ---- income + transfer chips
         go("add?type=INCOME", "key_5"); click("key_5"); click("key_0"); click("key_0"); shot("add_income"); backDiscard(); compose.waitForIdle()
 
