@@ -77,7 +77,10 @@ class Library(private val context: Context, private val db: PageOneDb, private v
         scanJob = scope.launch(Dispatchers.IO) {
             _scan.value = ScanState(running = true, found = 0)
             try {
-                val found = queryMediaStore()
+                val indexed = queryMediaStore()
+                // files the phone hasn't indexed yet (just copied, just downloaded) are found by walking storage
+                val known = indexed.mapTo(HashSet()) { it.path }
+                val found = indexed + walkStorage().filter { it.path !in known }
                 _scan.value = ScanState(running = true, found = found.size)
                 val existing = db.pdfs().allOnce().associateBy { it.path }
                 val merged = found.map { n ->
@@ -123,6 +126,24 @@ class Library(private val context: Context, private val db: PageOneDb, private v
             }
         }
         return out.distinctBy { it.path }
+    }
+
+    private fun walkStorage(): List<PdfEntity> {
+        val root = android.os.Environment.getExternalStorageDirectory()
+        val skip = setOf("${root.path}/Android/data", "${root.path}/Android/obb")
+        val out = ArrayList<PdfEntity>()
+        fun walk(dir: File, depth: Int) {
+            if (depth > 8 || dir.path in skip || out.size > 20_000) return
+            val kids = dir.listFiles() ?: return
+            for (f in kids) {
+                if (f.name.startsWith(".")) continue
+                if (f.isDirectory) walk(f, depth + 1)
+                else if (f.name.endsWith(".pdf", true) && f.length() > 0)
+                    out += PdfEntity(path = f.path, name = f.name, folder = f.parent ?: "/", size = f.length(), modified = f.lastModified(), mediaId = 0L)
+            }
+        }
+        runCatching { walk(root, 0) }.onFailure { Log.w(tag, "walk failed", it) }
+        return out
     }
 
     /** Page counts and fingerprints for rows that don't have them yet, plus first-page thumbnails. */
