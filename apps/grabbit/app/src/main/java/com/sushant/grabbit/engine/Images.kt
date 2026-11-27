@@ -26,10 +26,16 @@ object Images {
     private const val UA = "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Mobile Safari/537.36"
     val IMG_EXT = setOf("jpg", "jpeg", "png", "webp", "gif", "heic", "avif")
 
+    /** Path part of a link, without query or fragment (plain string work, so it is unit-tested). */
+    private fun pathOf(url: String) = url.substringBefore('#').substringBefore('?').substringAfter("://").substringAfter('/', "")
+
+    private fun query(url: String, key: String): String? =
+        url.substringAfter('?', "").substringBefore('#').split('&').firstOrNull { it.startsWith("$key=") }?.substringAfter('=')
+
     fun extOf(url: String): String {
-        val path = runCatching { Uri.parse(url).path }.getOrNull() ?: url.substringBefore('?')
-        val e = path.substringAfterLast('.', "").lowercase()
-        val fmt = runCatching { Uri.parse(url).getQueryParameter("format") }.getOrNull()?.lowercase()
+        val path = pathOf(url)
+        val e = path.substringAfterLast('/').substringAfterLast('.', "").lowercase()
+        val fmt = query(url, "format")?.lowercase()
         return when {
             e in IMG_EXT -> if (e == "jpeg") "jpg" else e
             fmt in IMG_EXT -> if (fmt == "jpeg") "jpg" else fmt!!
@@ -37,10 +43,8 @@ object Images {
         }
     }
 
-    fun isDirectImage(url: String): Boolean {
-        val path = runCatching { Uri.parse(url).path }.getOrNull() ?: return false
-        return path.substringAfterLast('.', "").lowercase() in IMG_EXT
-    }
+    fun isDirectImage(url: String): Boolean =
+        url.startsWith("http", true) && pathOf(url).substringAfterLast('/').substringAfterLast('.', "").lowercase() in IMG_EXT
 
     private val TWEET = Regex("""(?:twitter|x)\.com/[^/?#]+/status(?:es)?/(\d+)""", RegexOption.IGNORE_CASE)
     private val INSTA_POST = Regex("""instagram\.com/(?:[^/?#]+/)?p/([A-Za-z0-9_-]+)""", RegexOption.IGNORE_CASE)
@@ -81,7 +85,7 @@ object Images {
     suspend fun resolve(url: String): MediaInfo? = withContext(Dispatchers.IO) {
         when {
             isDirectImage(url) -> {
-                val name = Uri.parse(url).lastPathSegment?.substringBeforeLast('.')?.ifBlank { null } ?: "Image"
+                val name = pathOf(url).substringAfterLast('/').substringBeforeLast('.').let { Uri.decode(it) }.ifBlank { "Image" }
                 info(url, name, "", Sites.siteName(url), listOf(GalleryItem(url, false, url)))
             }
             tweetId(url) != null -> tweet(url, tweetId(url)!!)
@@ -108,7 +112,8 @@ object Images {
         val items = TweetParser.items(j)
         if (items.none { !it.video }) return null // video-only tweets keep using yt-dlp
         val user = j.optJSONObject("user")?.optString("screen_name").orEmpty()
-        val title = j.optString("text").substringBefore("https://t.co").trim().take(80).ifBlank { "Post by @$user" }
+        val title = j.optString("text").replace(Regex("""https?://\S+"""), "").replace(Regex("\\s+"), " ").trim().take(80)
+            .ifBlank { "Post by @$user" }
         return info(url, title, if (user.isBlank()) "" else "@$user", "X", items)
     }
 

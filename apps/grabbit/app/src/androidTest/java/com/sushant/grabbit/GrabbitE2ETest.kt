@@ -493,6 +493,9 @@ class GrabbitE2ETest {
             compose.onNodeWithTag("pq_imgjpg").performScrollTo().performClick()
             compose.onNodeWithTag("downloadBtn").performScrollTo()
             shot("img_2_cover_tab")
+            // Let the previous "Download started" message go, so it doesn't cover the button
+            Thread.sleep(6000)
+            compose.onNodeWithTag("downloadBtn").performScrollTo()
             val before = Library.items.value.size
             compose.onNodeWithTag("downloadBtn").performClick()
             val ok = waitSaved(before)
