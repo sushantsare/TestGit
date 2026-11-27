@@ -110,6 +110,18 @@ class WalkthroughTest {
     private fun isFull() = has("full_player") && !has("mini_player")
     private fun isMini() = has("mini_player") && !has("full_player")
     private fun settle() { Thread.sleep(1300); compose.waitForIdle() }
+    /** Two-line greeting: "Good" + icon on the row of the Search | Settings pill, the second word below, nothing overlapping. */
+    private fun checkGreeting(where: String) {
+        val w1 = bounds("greet_word1"); val w2 = bounds("greet_word2"); val ic = bounds("greeting_icon"); val pill = bounds("open_search")
+        if (w1 == null || w2 == null || ic == null || pill == null) { problem("$where: greeting parts missing"); return }
+        fun mid(r: androidx.compose.ui.geometry.Rect) = (r.top + r.bottom) / 2f
+        if (mid(w1) < pill.top || mid(w1) > pill.bottom) problem("$where: 'Good' is not on the row of the Search | Settings buttons")
+        if (mid(ic) < pill.top || mid(ic) > pill.bottom) problem("$where: the time-of-day icon is not on the first row")
+        if (ic.left < w1.right - 1f) problem("$where: icon overlaps 'Good'")
+        if (ic.right > pill.left + 1f) problem("$where: icon touches the Search | Settings buttons")
+        if (w2.top < w1.bottom - 4f || w2.top < pill.bottom - 4f) problem("$where: second word is not below the first row")
+        if (w2.width < 4f) problem("$where: second word is empty")
+    }
     private val playingNow = SemanticsMatcher.expectValue(androidx.compose.ui.semantics.SemanticsProperties.StateDescription, "Playing now")
     /** The song playing now must be marked as playing in this list, wherever it was started from. */
     private fun checkMarked(listTag: String, where: String) {
@@ -180,6 +192,13 @@ class WalkthroughTest {
         if (app.repo.library.value.songs.any { it.folderName == "WhatsApp Audio" }) problem("WhatsApp audio should be hidden by default")
         if (has("tab_stats")) problem("Stats tab should be gone from the dock")
         waitTag("greeting_icon")
+        checkGreeting("Home")
+        // every time of day keeps the same two-line layout
+        listOf(8 to "morning", 14 to "afternoon", 19 to "evening", 23 to "night").forEach { (h, w) ->
+            com.sushant.tarang.ui.screens.GreetingClock.hourOverride = h; Thread.sleep(500); compose.waitForIdle()
+            checkGreeting("Home ($w)"); shot("home_greeting_$w")
+        }
+        com.sushant.tarang.ui.screens.GreetingClock.hourOverride = null; compose.waitForIdle()
         if (has("continue_card")) problem("the Continue listening banner should be gone")
         if (!has("open_search") || !has("open_settings")) problem("Home: Search / Settings buttons missing")
         shot("home_fresh")
@@ -189,6 +208,16 @@ class WalkthroughTest {
         checkInlineTitle("Folders", "open_search")
         click("chip_Most songs"); shot("folders_most_songs"); click("chip_Name")
         clickTo("folder_Bollywood", "song_list"); Thread.sleep(700); shot("folder_detail")
+        // header card: clear gap before the first song, same side edges as the song cards
+        run {
+            val h = bounds("list_header"); val first = song("Kesariya.mp3")?.let { bounds("song_${it.id}") }
+            val dp = InstrumentationRegistry.getInstrumentation().targetContext.resources.displayMetrics.density
+            if (h == null || first == null) problem("folder page: header or first song missing")
+            else {
+                if (first.top - h.bottom < 12f * dp) problem("folder page: first song card too close to the header (${(first.top - h.bottom) / dp} dp)")
+                if (kotlin.math.abs(first.left - h.left) > 2f || kotlin.math.abs(first.right - h.right) > 2f) problem("folder page: header and song cards have different side edges")
+            }
+        }
         waitTag("grow_cover", 3000, soft = true)
         click("play_all")
         if (!waitTag("mini_player", 10_000)) return
@@ -443,6 +472,35 @@ class WalkthroughTest {
         tab("home", "home"); shot("home_playing")
         compose.onNodeWithTag("home").performTouchInput { swipeUp(startY = bottom * 0.8f, endY = bottom * 0.2f, durationMillis = 400) }
         Thread.sleep(700); if (!has("collapsed_title")) problem("big title did not collapse into the top bar"); shot("home_scrolled")
+        // tapping Home while on Home: no reload (never two Home pages fading), it scrolls back to the top
+        compose.mainClock.autoAdvance = false
+        compose.onNodeWithTag("tab_home", useUnmergedTree = true).performClick()
+        var most = 0
+        repeat(8) { compose.mainClock.advanceTimeBy(50); most = maxOf(most, compose.onAllNodesWithTag("home").fetchSemanticsNodes().size) }
+        compose.mainClock.autoAdvance = true
+        settle()
+        if (most > 1) problem("tapping Home on Home reloaded the page (fade between two Home pages)")
+        if (has("collapsed_title") || !has("greet_word1")) problem("tapping Home on Home did not scroll back to the top")
+        shot("home_after_tab_reselect")
+        click("tab_home"); settle()
+        if (!has("greet_word1")) problem("tapping Home at the top changed the page")
+        // same on Folders and Library
+        tab("folders", "folders")
+        compose.onNodeWithTag("folders").performTouchInput { swipeUp(startY = bottom * 0.8f, endY = bottom * 0.3f, durationMillis = 300) }; settle()
+        compose.mainClock.autoAdvance = false
+        compose.onNodeWithTag("tab_folders", useUnmergedTree = true).performClick()
+        most = 0; repeat(8) { compose.mainClock.advanceTimeBy(50); most = maxOf(most, compose.onAllNodesWithTag("folders").fetchSemanticsNodes().size) }
+        compose.mainClock.autoAdvance = true; settle()
+        if (most > 1) problem("tapping Folders on Folders reloaded the page")
+        tab("library", "library"); waitTag("songs_list")
+        compose.onNodeWithTag("songs_list").performTouchInput { swipeUp(startY = bottom * 0.8f, endY = bottom * 0.2f, durationMillis = 300) }; settle()
+        compose.mainClock.autoAdvance = false
+        compose.onNodeWithTag("tab_library", useUnmergedTree = true).performClick()
+        most = 0; repeat(8) { compose.mainClock.advanceTimeBy(50); most = maxOf(most, compose.onAllNodesWithTag("library").fetchSemanticsNodes().size) }
+        compose.mainClock.autoAdvance = true; settle()
+        if (most > 1) problem("tapping Library on Library reloaded the page")
+        if (!has("tile_liked")) problem("tapping Library on Library did not scroll back to the top")
+        tab("home", "home")
         clickTo("open_search", "search"); shot("search_empty")
         type("search_field", "kes"); Thread.sleep(800); shot("search_results")
         // pause first (the test songs are under a minute, so the song could change mid-check); the mark must stay while paused
@@ -500,6 +558,17 @@ class WalkthroughTest {
         go(com.sushant.tarang.ui.R0.SETTINGS, "settings"); Thread.sleep(600)
         if (has("set_pure_black")) problem("pure black switch shown in light mode")
         app.prefs.update { it.copy(pureBlack = false, eqEnabled = false) }
+        // large system font: the greeting still fits beside the buttons
+        val ua = InstrumentationRegistry.getInstrumentation().uiAutomation
+        runCatching {
+            ua.executeShellCommand("settings put system font_scale 1.5").close(); Thread.sleep(2500)
+            runCatching { scenario.close() }
+            scenario = ActivityScenario.launch(MainActivity::class.java); waitTag("home"); Thread.sleep(1500)
+            suffix = "_bigfont"; checkGreeting("Home at 150% font"); shot("home")
+            go(com.sushant.tarang.ui.R0.FOLDERS, "folders"); shot("folders"); go(com.sushant.tarang.ui.R0.LIBRARY, "library"); shot("library")
+            suffix = ""
+        }
+        ua.executeShellCommand("settings put system font_scale 1.0").close()
         runCatching { scenario.close() }   // closing can time out while the player service keeps the app busy; the walk itself is done
     }
 }

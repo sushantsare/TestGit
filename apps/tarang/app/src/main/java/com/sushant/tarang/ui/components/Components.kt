@@ -99,6 +99,13 @@ fun PageHeader(title: String, modifier: Modifier = Modifier, onBack: (() -> Unit
     }
 }
 
+/** When the tab of this page is tapped while you are already on it, run [toTop] (smoothly scroll back to the top). */
+@Composable
+fun ScrollTopOnReselect(route: String, toTop: suspend () -> Unit) {
+    val nav = com.sushant.tarang.ui.LocalNav.current
+    LaunchedEffect(nav) { nav.reselect.collect { if (it == route) toTop() } }
+}
+
 /** One icon button in a page's top bar. */
 data class TopAction(val icon: ImageVector, val desc: String, val tag: String? = null, val onClick: () -> Unit)
 

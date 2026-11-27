@@ -108,7 +108,8 @@ fun SongListScreen(kind: ListKind) {
         LazyColumn(Modifier.fillMaxSize().testTag("song_rows"), contentPadding = PaddingValues(bottom = LocalDockPadding.current)) {
             item {
                 // header card
-                Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp).clip(RoundedCornerShape(28.dp)).background(cs.surfaceContainer).padding(20.dp).testTag("list_header")) {
+                // same side edges as the song cards below (12dp), and a clear 16dp gap before the first song
+                Column(Modifier.fillMaxWidth().padding(horizontal = 12.dp).clip(RoundedCornerShape(28.dp)).background(cs.surfaceContainer).padding(20.dp).testTag("list_header")) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         if (model.icon != null && kind !is ListKind.Mix) GrowIn { Box(Modifier.size(112.dp).clip(RoundedCornerShape(24.dp)).background(cs.primaryContainer), contentAlignment = Alignment.Center) {
                             if (kind is ListKind.ArtistList) LetterAvatar(model.title, 96.dp) else Icon(model.icon, null, tint = cs.onPrimaryContainer, modifier = Modifier.size(48.dp))
@@ -125,6 +126,7 @@ fun SongListScreen(kind: ListKind) {
                         PlayButtons(onPlay = { play(0, false) }, onShuffle = { play(0, true) }, compactShuffle = true, sidePadding = 0.dp)
                     }
                 }
+                Spacer(Modifier.height(16.dp))
             }
             if (model.songs.isEmpty()) item {
                 EmptyState(if (kind is ListKind.Liked) Icons.Rounded.FavoriteBorder else Icons.Rounded.MusicNote,
