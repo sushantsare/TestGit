@@ -614,8 +614,16 @@ class GrabbitE2ETest {
         compose.waitUntil(8_000) { exists("onboarding") }
         val pages = mutableListOf<Int>()
         fun allow() {
-            ui.wait(androidx.test.uiautomator.Until.findObject(androidx.test.uiautomator.By.text(java.util.regex.Pattern.compile("(?i)^allow$"))), 8_000)?.click()
-            Thread.sleep(1200)
+            // Android's dialogs: find "Allow" by text or by the dialog's positive-button id; retry for slow emulators
+            val byText = androidx.test.uiautomator.By.text(java.util.regex.Pattern.compile("(?i)^allow$"))
+            val t0 = System.currentTimeMillis()
+            while (System.currentTimeMillis() - t0 < 20_000) {
+                val b = ui.findObject(byText) ?: ui.findObject(androidx.test.uiautomator.By.res("android", "button1"))
+                    ?: ui.findObject(androidx.test.uiautomator.By.res("com.android.permissioncontroller", "permission_allow_button"))
+                if (b != null) { b.click(); break }
+                Thread.sleep(500)
+            }
+            Thread.sleep(1500)
         }
         for (p in 0 until 7) {
             compose.waitUntil(5_000) { exists("obPage$p") }
