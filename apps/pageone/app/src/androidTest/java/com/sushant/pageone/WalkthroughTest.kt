@@ -137,6 +137,14 @@ class WalkthroughTest {
         problem("reader toolbars did not ${if (visible) "show" else "hide"}")
     }
 
+    private val pageMatcher = SemanticsMatcher("a page") { n ->
+        n.config.getOrNull(androidx.compose.ui.semantics.SemanticsProperties.TestTag)?.matches(Regex("page_\\d+")) == true
+    }
+    private fun page() = compose.onAllNodes(pageMatcher, useUnmergedTree = true).onFirst()
+    private fun waitPage(ms: Long = 10_000, soft: Boolean = false): Boolean =
+        runCatching { compose.waitUntil(ms) { compose.onAllNodes(pageMatcher, useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty() } }.isSuccess
+            .also { if (!it && !soft) problem("no page shown") }
+
     private fun clickTab(t: String) { if (has("tab_$t")) click("tab_$t") else { repeat(4) { if (!has("tab_$t")) back() }; click("tab_$t", soft = true) } }
 
     @Test
@@ -175,7 +183,7 @@ class WalkthroughTest {
 
         // ---------- reader
         compose.onAllNodesWithTag("pdf_row", useUnmergedTree = true).onFirst().performClick()
-        if (!waitTag("page_0", 15_000)) problem("reader did not show page 1")
+        if (!waitPage(15_000)) problem("reader did not show page 1")
         Thread.sleep(1500); shot("reader")
         chrome(false); shot("reader_fullscreen"); chrome(true)
         // pinch zoom
@@ -192,7 +200,7 @@ class WalkthroughTest {
         click("find_all"); waitTag("results_list"); shot("reader_find_results"); back()
         click("find_close")
         // selection (long press on text)
-        compose.onNodeWithTag("page_0").performTouchInput { longClick(Offset(width * 0.3f, height * 0.12f)) }
+        page().performTouchInput { longClick(Offset(width * 0.3f, height * 0.12f)) }
         if (waitTag("selection_popup", 5_000, soft = true)) { shot("reader_selection"); click("sel_highlight") } else log("no text selection on this API")
         // pages / contents / bookmarks
         click("tb_bookmark"); click("tb_pages"); waitTag("thumb_grid"); shot("sheet_pages")
@@ -212,9 +220,9 @@ class WalkthroughTest {
         // annotate + save as copy
         click("pen_fab"); waitTag("annotate_bar"); shot("annotate")
         click("tool_pen")
-        compose.onNodeWithTag("page_0").performTouchInput { swipe(Offset(width * 0.2f, height * 0.5f), Offset(width * 0.8f, height * 0.55f), 400) }
+        page().performTouchInput { swipe(Offset(width * 0.2f, height * 0.5f), Offset(width * 0.8f, height * 0.55f), 400) }
         click("tool_highlight")
-        compose.onNodeWithTag("page_0").performTouchInput { swipe(Offset(width * 0.12f, height * 0.2f), Offset(width * 0.7f, height * 0.2f), 400) }
+        page().performTouchInput { swipe(Offset(width * 0.12f, height * 0.2f), Offset(width * 0.7f, height * 0.2f), 400) }
         shot("annotate_drawn")
         click("annotate_done"); waitTag("save_copy"); shot("save_dialog")
         click("save_copy"); waitText("Saved as", 15_000, soft = true); Thread.sleep(1500); shot("after_save")
@@ -239,13 +247,13 @@ class WalkthroughTest {
             shot("password"); type("password_field", "0000"); click("password_open"); Thread.sleep(1500)
             shot("password_wrong")
             type("password_field", "1234"); click("password_open")
-            if (!waitTag("page_0", 15_000)) problem("password PDF did not open") else shot("password_opened")
+            if (!waitPage(15_000)) problem("password PDF did not open") else shot("password_opened")
         }
         back()
 
         // ---------- form PDF
         openReaderFor("Admit Card")
-        if (waitTag("page_0", 15_000)) {
+        if (waitPage(15_000)) {
             if (waitTag("field_name", 10_000, soft = true)) {
                 compose.onAllNodesWithTag("field_name", useUnmergedTree = true).onFirst().performClick()
                 compose.onAllNodesWithTag("field_name", useUnmergedTree = true).onFirst().performTextInput("Sushant Kumar")
@@ -269,7 +277,7 @@ class WalkthroughTest {
         seeded["Telegram/STET 2025 Paper 2 English.pdf"]?.let { uri ->
             app.startActivity(Intent(Intent.ACTION_VIEW).setDataAndType(uri, "application/pdf").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_GRANT_READ_URI_PERMISSION)
                 .setClass(app, MainActivity::class.java))
-            if (!waitTag("page_0", 15_000)) problem("PDF from another app did not open") else shot("opened_from_other_app")
+            if (!waitPage(15_000)) problem("PDF from another app did not open") else shot("opened_from_other_app")
             back()
         }
 
@@ -277,7 +285,7 @@ class WalkthroughTest {
         app.prefs.update { it.copy(themeMode = ThemeMode.DARK) }; suffix = "_dark"
         clickTab("home"); shot("home"); clickTab("recent"); shot("recent"); clickTab("home")
         click("open_settings"); shot("settings"); back()
-        openReaderFor("Lucent"); waitTag("page_0"); shot("reader"); back()
+        openReaderFor("Lucent"); waitPage(); shot("reader"); back()
         app.prefs.update { it.copy(pureBlack = true) }; suffix = "_black"
         clickTab("home"); shot("home"); click("open_settings"); shot("settings"); back()
         app.prefs.update { it.copy(themeMode = ThemeMode.LIGHT, pureBlack = false) }; suffix = ""
