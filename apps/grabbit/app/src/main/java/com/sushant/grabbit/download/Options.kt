@@ -20,6 +20,8 @@ data class DlOpts(
     val audioFormat: String = "mp3",
     /** File name chosen by the user ("" = use the title). */
     val name: String = "",
+    /** Folder to save into (tree uri); "" = Default. */
+    val folder: String = "",
 ) {
     val trimmed get() = trimStart >= 0 && trimEnd > trimStart
     val keepSubFiles get() = subLang.isNotEmpty() && subMode != "embed"
@@ -28,6 +30,7 @@ data class DlOpts(
         "sl=$subLang", "sa=${if (subAuto) 1 else 0}", "sm=$subMode", "ts=$trimStart", "te=$trimEnd",
         "ch=${if (splitChapters) 1 else 0}", "af=$audioFormat",
         "nm=${java.net.URLEncoder.encode(name, "UTF-8")}",
+        "fd=${java.net.URLEncoder.encode(folder, "UTF-8")}",
     ).joinToString(";")
 
     companion object {
@@ -43,6 +46,7 @@ data class DlOpts(
                 splitChapters = m["ch"] == "1",
                 audioFormat = m["af"]?.takeIf { it in AUDIO_FORMATS } ?: "mp3",
                 name = m["nm"]?.let { runCatching { java.net.URLDecoder.decode(it, "UTF-8") }.getOrNull() }.orEmpty(),
+                folder = m["fd"]?.let { runCatching { java.net.URLDecoder.decode(it, "UTF-8") }.getOrNull() }.orEmpty(),
             )
         }
 

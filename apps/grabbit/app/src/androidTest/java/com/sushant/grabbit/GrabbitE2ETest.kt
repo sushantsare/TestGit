@@ -368,7 +368,7 @@ class GrabbitE2ETest {
             var running: androidx.work.WorkInfo? = null
             compose.waitUntil(120_000) {
                 running = wm.getWorkInfosByTag(Downloads.TAG).get().firstOrNull {
-                    it.state == androidx.work.WorkInfo.State.RUNNING && it.progress.getFloat(com.sushant.grabbit.download.DownloadWorker.P_PCT, 0f) >= 8f
+                    it.state == androidx.work.WorkInfo.State.RUNNING && it.progress.getFloat(com.sushant.grabbit.download.DownloadWorker.P_PCT, 0f) >= (if (fast) 8f else 45f)
                 }
                 running != null
             }
@@ -394,6 +394,58 @@ class GrabbitE2ETest {
             "pause_$name=${partBytes > 0 && p.canContinue && survived && done.size > 10_000_000 && d > 100_000}"
         }.getOrElse { log("PAUSE $name failed: ${it.message}"); shot("pause_${name}_fail"); "pause_$name=false" }
             .also { Prefs.fasterDownloads = true }
+    }
+
+    /** Save to a folder picked with Android's folder picker, sticky choice, rename/delete there, then back to Default. */
+    private fun folderFlow(): String {
+        val ui = androidx.test.uiautomator.UiDevice.getInstance(instr)
+        instr.uiAutomation.executeShellCommand("mkdir -p /sdcard/Movies/GrabbitTest").close()
+        Thread.sleep(800)
+        com.sushant.grabbit.data.Folders.pickerStart = android.provider.DocumentsContract.buildDocumentUri(
+            "com.android.externalstorage.documents", "primary:Movies/GrabbitTest")
+        val vm = ViewModelProvider(compose.activity)[MainViewModel::class.java]
+        return runCatching {
+            compose.onNodeWithTag("nav_home").performClick()
+            compose.onNodeWithTag("urlField").performTextClearance()
+            compose.onNodeWithTag("urlField").performTextInput("https://www.w3schools.com/html/mov_bbb.mp4")
+            compose.onNodeWithTag("grabBtn").performClick()
+            compose.waitUntil(150_000) { exists("downloadBtn") }
+            compose.onNodeWithTag("saveToRow").performScrollTo().performClick()
+            // Android's folder picker: "Use this folder", then "Allow"
+            val use = ui.wait(androidx.test.uiautomator.Until.findObject(androidx.test.uiautomator.By.text(java.util.regex.Pattern.compile("(?i)use this folder"))), 20_000)
+            use!!.click()
+            val allow = ui.wait(androidx.test.uiautomator.Until.findObject(androidx.test.uiautomator.By.text(java.util.regex.Pattern.compile("(?i)allow"))), 10_000)
+            allow!!.click()
+            compose.waitUntil(20_000) { com.sushant.grabbit.data.Folders.recent.value.any { it.name == "GrabbitTest" } }
+            compose.waitForIdle()
+            compose.onNodeWithTag("saveToRow").performScrollTo()
+            shot("folder_1_picked")
+            val before = Library.items.value.size
+            compose.onNodeWithTag("downloadBtn").performScrollTo().performClick()
+            compose.waitUntil(180_000) { Library.items.value.size > before }
+            val item = Library.items.value.maxByOrNull { it.time }!!
+            val onDisk = java.io.File("/sdcard/Movies/GrabbitTest/${item.fileName}").exists() ||
+                runCatching { instr.uiAutomation.executeShellCommand("ls /sdcard/Movies/GrabbitTest").let { pfd ->
+                    android.os.ParcelFileDescriptor.AutoCloseInputStream(pfd).bufferedReader().readText() } }.getOrDefault("").contains(item.fileName)
+            val sticky = com.sushant.grabbit.data.Folders.current.value.contains("GrabbitTest")
+            // Next link starts in the same folder
+            compose.onNodeWithTag("urlField").performTextClearance()
+            compose.onNodeWithTag("urlField").performTextInput("https://www.w3schools.com/html/mov_bbb.mp4")
+            compose.onNodeWithTag("grabBtn").performClick()
+            compose.waitUntil(150_000) { exists("downloadBtn") }
+            val shownPath = compose.onNodeWithTag("saveToPath", useUnmergedTree = true).fetchSemanticsNode()
+                .config[androidx.compose.ui.semantics.SemanticsProperties.Text].joinToString { it.text }
+            compose.onNodeWithTag("saveToRow").performScrollTo()
+            shot("folder_2_sticky")
+            val renamed = vm.renameNow(item, "Folder clip") is MainViewModel.RenameResult.Done
+            val after = Library.items.value.first { it.id == item.id }
+            val deleted = vm.deleteNow(after) is MainViewModel.DeleteResult.Done
+            compose.onNodeWithTag("folderChip_default").performScrollTo().performClick()
+            compose.waitForIdle()
+            log("FOLDER saved=${item.fileName} onDisk=$onDisk sticky=$sticky path=$shownPath renamed=$renamed(${after.fileName}) deleted=$deleted")
+            "folder=${onDisk && sticky && shownPath.contains("GrabbitTest") && renamed && deleted}"
+        }.getOrElse { log("FOLDER failed: ${it.message}"); shot("folder_fail"); "folder=false" }
+            .also { com.sushant.grabbit.data.Folders.pickerStart = null; com.sushant.grabbit.data.Folders.select("") }
     }
 
     /** Same X video with Faster downloads off (one connection) and on (aria2c); the worker logs TIMING lines. */
@@ -591,8 +643,9 @@ class GrabbitE2ETest {
         val options = optionsFlow()
         val speed = speedFlow()
         val pause = pauseFlow(false) + " " + pauseFlow(true)
+        val folder = folderFlow()
 
-        log("SUMMARY direct=$direct x=$x dailymotion=$dm facebook=$fb youtube=$youtube share=$share threads=$threads $options $renamed $speed $pause")
+        log("SUMMARY direct=$direct x=$x dailymotion=$dm facebook=$fb youtube=$youtube share=$share threads=$threads $options $renamed $speed $pause $folder")
         results.forEach { Log.i("GrabbitE2E", "RESULT $it") }
         assertTrue("Downloads failed", direct && x)
         assertTrue("Share sheet download failed", share)

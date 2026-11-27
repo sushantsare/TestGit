@@ -50,6 +50,21 @@ object Prefs {
         set(v) = p.edit().putString("sub_lang", v).apply()
 
     /** "embed", "file" or "both" */
+    /** Folder (tree uri) the next download goes to; "" = Default (Movies / Music / Pictures). */
+    var saveFolder: String
+        get() = p.getString("save_folder", "") ?: ""
+        set(v) = p.edit().putString("save_folder", v).apply()
+
+    /** Up to 3 folders picked before, newest first (tree uris, one per line). */
+    var recentFolders: List<String>
+        get() = (p.getString("recent_folders", "") ?: "").lines().filter { it.isNotBlank() }
+        set(v) = p.edit().putString("recent_folders", v.joinToString("\n")).apply()
+
+    /** Start the next download in the folder used last. */
+    var keepLastFolder: Boolean
+        get() = p.getBoolean("keep_last_folder", true)
+        set(v) = p.edit().putBoolean("keep_last_folder", v).apply()
+
     var subMode: String
         get() = p.getString("sub_mode", "embed") ?: "embed"
         set(v) = p.edit().putString("sub_mode", v).apply()

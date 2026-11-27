@@ -432,6 +432,8 @@ internal fun MediaCard(info: MediaInfo, framed: Boolean = true, onDownload: (Str
             Spacer(Modifier.height(sp.m))
             DownloadOptionsRow(info, audio, st)
             Spacer(Modifier.height(sp.l))
+            SaveToSection(st.folder, { st.folder = it }, audio)
+            Spacer(Modifier.height(sp.l))
             val fmtName = AUDIO_FORMAT_LABELS.firstOrNull { it.first == st.audioFormat }?.second ?: "MP3"
             val label = when {
                 info.isPlaylist -> "Download all (${info.count})"

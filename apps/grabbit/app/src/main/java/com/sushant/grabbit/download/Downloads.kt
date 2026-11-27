@@ -23,6 +23,8 @@ object Downloads {
 
     fun enqueue(ctx: Context, job0: Job, resume: Boolean = false): UUID {
         val job = if (job0.key.isBlank()) job0.copy(key = UUID.randomUUID().toString()) else job0
+        // "Keep my last folder": the next download starts where this one goes
+        if (!resume && com.sushant.grabbit.data.Prefs.keepLastFolder) com.sushant.grabbit.data.Folders.select(job.opts.folder)
         val req = OneTimeWorkRequestBuilder<DownloadWorker>()
             .setInputData(
                 workDataOf(

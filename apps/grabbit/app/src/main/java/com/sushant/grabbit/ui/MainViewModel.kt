@@ -157,8 +157,16 @@ class MainViewModel(private val app: Application) : AndroidViewModel(app) {
     fun findMissing(items: List<SavedItem>): Set<String> = items.filterNot { fileExists(it) }.map { it.id }.toSet()
 
     /** True if the file is still on the phone. Unknown/errors count as "exists" so nothing is hidden by mistake. */
+    /** Files saved into a folder the user picked are reached through the folder picker's documents. */
+    private fun isDoc(item: SavedItem) = runCatching {
+        android.provider.DocumentsContract.isDocumentUri(app, Uri.parse(item.uri))
+    }.getOrDefault(false)
+
     fun fileExists(item: SavedItem): Boolean {
         if (item.path != null) return File(item.path).exists()
+        if (isDoc(item)) return runCatching {
+            androidx.documentfile.provider.DocumentFile.fromSingleUri(app, Uri.parse(item.uri))?.exists() ?: true
+        }.getOrDefault(true)
         return runCatching {
             app.contentResolver.query(Uri.parse(item.uri), arrayOf(MediaStore.MediaColumns._ID), null, null, null)
                 ?.use { it.count > 0 } ?: true
@@ -177,6 +185,11 @@ class MainViewModel(private val app: Application) : AndroidViewModel(app) {
         if (!fileExists(item)) {
             Library.remove(item.id)
             return DeleteResult.AlreadyGone
+        }
+        if (isDoc(item)) {
+            runCatching { android.provider.DocumentsContract.deleteDocument(app.contentResolver, Uri.parse(item.uri)) }
+            return if (!fileExists(item)) { Library.remove(item.id); DeleteResult.Done }
+            else DeleteResult.Failed("Couldn't delete the file")
         }
         if (item.path != null) {
             File(item.path).delete()
@@ -241,6 +254,22 @@ class MainViewModel(private val app: Application) : AndroidViewModel(app) {
         val ext = item.fileName.substringAfterLast('.', "").takeIf { '.' in item.fileName && it.length in 1..5 }
             ?: android.webkit.MimeTypeMap.getSingleton().getExtensionFromMimeType(item.mime).orEmpty()
         val unique = com.sushant.grabbit.download.FileNames::unique
+        if (isDoc(item)) {
+            val cr = app.contentResolver
+            var n = 1
+            while (n < 20) {
+                val newName = if (n == 1) (if (ext.isBlank()) clean else "$clean.$ext") else (if (ext.isBlank()) "$clean ($n)" else "$clean ($n).$ext")
+                if (newName == item.fileName) return RenameResult.Done(newName)
+                val newUri = runCatching { android.provider.DocumentsContract.renameDocument(cr, Uri.parse(item.uri), newName) }.getOrNull()
+                if (newUri != null) {
+                    val real = androidx.documentfile.provider.DocumentFile.fromSingleUri(app, newUri)?.name ?: newName
+                    Library.update(item.copy(title = clean, fileName = real, uri = newUri.toString()))
+                    return RenameResult.Done(real)
+                }
+                n++
+            }
+            return RenameResult.Failed("Couldn't rename the file")
+        }
         if (item.path != null) {
             val old = File(item.path)
             val newName = unique(clean, ext) { n -> n != old.name && File(old.parentFile, n).exists() }

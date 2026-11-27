@@ -167,6 +167,7 @@ class DownloadWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(c
         suspend fun grab(o: DlOpts) = withContext(Dispatchers.IO) {
             val tStart = SystemClock.elapsedRealtime()
             YoutubeDL.getInstance().execute(buildRequest(ctx, source, quality, playlist, tmp, o, multi), processId = id.toString(), callback = { p, eta, line ->
+                if (line.contains("Resuming download at byte")) timing("RESUMED $line")
                 val work = Stages.statusFor(line)
                 val item = ITEM.find(line)
                 var force = false
@@ -246,13 +247,17 @@ class DownloadWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(c
         }
         val tSave0 = SystemClock.elapsedRealtime()
         val audioOnly = tmp.walkTopDown().filter { it.isFile }.all { Saver.mimeOf(it.extension).let { m -> !m.startsWith("video") } }
+        // The chosen folder may have been deleted since: fall back to the Default folders
+        val folder = opts.folder.takeIf { it.isNotBlank() && com.sushant.grabbit.data.Folders.valid(ctx, it) }.orEmpty()
+        val folderLost = opts.folder.isNotBlank() && folder.isEmpty()
+        val where = com.sushant.grabbit.data.Folders.label(ctx, folder, audioOnly)
         stage = Stages.SAVE
-        status = "Saving to ${if (audioOnly) "Music/Grabbit" else "Movies/Grabbit"}…"
+        status = "Saving to $where…"
         publish(0f, "", 0, "", true)
         val saved = try {
-            Saver.saveAll(ctx, tmp, title, site, thumb, url, keepSubs = opts.keepSubFiles, name = opts.name) { d, t ->
-                publish(d * 100f / t, "", 0, "${Progress.bytes(d)} of ${Progress.bytes(t)}", false)
-            }
+            Saver.saveAll(ctx, tmp, title, site, thumb, url, keepSubs = opts.keepSubFiles, name = opts.name,
+                onProgress = { d, t -> publish(d * 100f / t, "", 0, "${Progress.bytes(d)} of ${Progress.bytes(t)}", false) },
+                folder = folder)
         } catch (e: Exception) {
             return fail("Couldn't save the file: ${e.message ?: e}", e.toString())
         } finally {
@@ -263,10 +268,10 @@ class DownloadWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(c
         timing("site=$site multi=${multi && Engine.aria2Ready && Prefs.fasterDownloads} bytes=${saved.sumOf { it.size }} download=${tDl}ms processing=${tWork + (tSave0 - tPost0)}ms save=${now - tSave0}ms total=${now - t0}ms")
 
         Library.add(saved)
-        val where = if (saved.first().isAudio) "Music/Grabbit" else "Movies/Grabbit"
         Notifs.done(ctx, nid + 1, title, true,
             (if (saved.size > 1) "${saved.size} files saved to $where" else "Saved to $where") +
-                (if (subsDropped) " · without subtitles (the site refused them)" else ""), saved.singleOrNull())
+                (if (subsDropped) " · without subtitles (the site refused them)" else "") +
+                (if (folderLost) " · your chosen folder was gone, so it went to the default folder" else ""), saved.singleOrNull())
         return Result.success()
     }
 }

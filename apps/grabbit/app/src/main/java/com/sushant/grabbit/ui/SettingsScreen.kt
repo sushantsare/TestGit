@@ -10,6 +10,10 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
 import androidx.compose.material.icons.rounded.ContentCut
 import androidx.compose.material.icons.rounded.Speed
+import androidx.compose.material3.IconButton
+import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.FolderOpen
+import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.BatteryChargingFull
 import androidx.compose.material.icons.rounded.MusicNote
@@ -180,11 +184,11 @@ fun SettingsScreen(vm: MainViewModel, modifier: Modifier) {
                 SettingsSwitch("Album art in MP3", "Uses the video thumbnail as the cover", Icons.Rounded.Album, thumb) {
                     thumb = it; Prefs.embedThumb = it
                 }
-                SettingsDivider()
-                SettingsItem("Saved to", "Movies/Grabbit and Music/Grabbit, so files show in your gallery and music player",
-                    Icons.Rounded.Folder)
             }
         }
+
+        item { SectionLabel("Save location") }
+        item { SettingsGroup { SaveLocationSettings() } }
 
         item { SectionLabel("Accounts") }
         item {
@@ -431,5 +435,32 @@ private fun BatteryRow() {
     ) {
         if (free) Icon(Icons.Rounded.Check, null, tint = MaterialTheme.colorScheme.primary)
         else Icon(Icons.AutoMirrored.Rounded.KeyboardArrowRight, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
+
+
+/** Default folders, "Keep my last folder", and the remembered folders (each can be forgotten). */
+@Composable
+private fun SaveLocationSettings() {
+    val ctx = androidx.compose.ui.platform.LocalContext.current
+    val recent by com.sushant.grabbit.data.Folders.recent.collectAsState()
+    var keep by remember { mutableStateOf(Prefs.keepLastFolder) }
+    SettingsItem("Default folders", "Videos › Movies/Grabbit · Audio › Music/Grabbit · Images › Pictures/Grabbit", Icons.Rounded.Folder)
+    SettingsDivider()
+    SettingsSwitch("Keep my last folder", "The next download starts where the last one was saved", Icons.Rounded.History, keep) {
+        keep = it; Prefs.keepLastFolder = it
+        if (!it) com.sushant.grabbit.data.Folders.current.value = ""
+    }
+    if (recent.isEmpty()) {
+        SettingsDivider()
+        SettingsItem("No remembered folders", "Pick a folder with Save to when you download; your last 3 show up here", Icons.Rounded.FolderOpen)
+    }
+    recent.forEach { f ->
+        SettingsDivider()
+        SettingsItem(f.name, f.path, Icons.Rounded.FolderOpen) {
+            IconButton(onClick = { com.sushant.grabbit.data.Folders.forget(ctx, f.uri) }, modifier = Modifier.testTag("forget_${f.name}")) {
+                Icon(Icons.Rounded.Close, "Forget ${f.name}", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
     }
 }

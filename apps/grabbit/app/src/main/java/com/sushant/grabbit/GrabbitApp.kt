@@ -14,6 +14,7 @@ class GrabbitApp : Application() {
         Cookies.init(this)
         Library.init(this)
         com.sushant.grabbit.data.Paused.init(this)
+        com.sushant.grabbit.data.Folders.init(this)
         Notifs.createChannels(this)
         Engine.start(this)
     }

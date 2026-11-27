@@ -68,6 +68,8 @@ class OptsState(info: MediaInfo) {
     private val defaultName = com.sushant.grabbit.download.FileNames.clean(info.title).ifBlank { "Grabbit" }
     /** File name shown on the card; the user can change it with the pen icon. */
     var name by mutableStateOf(defaultName)
+    /** Folder for this download; starts at the last one used (or Default). */
+    var folder by mutableStateOf(com.sushant.grabbit.data.Folders.current.value)
 
     val trimmed get() = duration > 0 && (trim.start > 0.5f || trim.endInclusive < duration - 0.5f)
     /** Share of the video kept (for size estimates). */
@@ -82,6 +84,7 @@ class OptsState(info: MediaInfo) {
         splitChapters = chapters,
         audioFormat = audioFormat,
         name = if (name != defaultName) name else "",
+        folder = folder,
     )
 
     companion object {
