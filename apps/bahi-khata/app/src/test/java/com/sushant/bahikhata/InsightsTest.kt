@@ -16,11 +16,32 @@ class InsightsTest {
     // ---------------- "What did you buy?"
 
     @Test fun itemsWithAndWithoutPrices() {
-        assertEquals(listOf("Milk" to 6000L, "Bread" to 4000L, "Eggs" to -1L), Insights.parseItems("milk 60, bread 40, eggs"))
-        assertEquals(listOf("Atta" to 32050L, "Sugar" to 4500L), Insights.parseItems("₹320.50 atta; sugar rs 45"))
-        assertEquals(listOf("Tea" to 1000L, "Samosa" to 2000L), Insights.parseItems("tea 10 and samosa 20/-"))
+        fun p(t: String) = Insights.parseItems(t).map { it.name to it.pricePaise }
+        assertEquals(listOf("Milk" to 6000L, "Bread" to 4000L, "Eggs" to -1L), p("milk 60, bread 40, eggs"))
+        assertEquals(listOf("Atta" to 32050L, "Sugar" to 4500L), p("₹320.50 atta; sugar rs 45"))
+        assertEquals(listOf("Tea" to 1000L, "Samosa" to 2000L), p("tea 10 and samosa 20/-"))
         assertTrue(Insights.parseItems(" , ;").isEmpty())
-        assertEquals("Milk 60, Eggs", Insights.itemsText(listOf("Milk" to 6000L, "Eggs" to -1L)))
+        assertEquals("Milk 60, Eggs", Insights.itemsText(listOf(Insights.Item("Milk", 6000), Insights.Item("Eggs"))))
+    }
+
+    @Test fun quantitiesAndPriceForOne() {
+        val l = Insights.parseItems("milk 2L 60, 3 eggs 21, rice 5kg 320, curd 500g 40, biscuit x4 40, oil 500ml")
+        assertEquals(listOf("Milk", "Eggs", "Rice", "Curd", "Biscuit", "Oil"), l.map { it.name })
+        assertEquals(listOf(2.0, 3.0, 5.0, 500.0, 4.0, 500.0), l.map { it.qty })
+        assertEquals(listOf("L", "", "kg", "g", "", "ml"), l.map { it.unit })
+        assertEquals(listOf(6000L, 2100L, 32000L, 4000L, 4000L, -1L), l.map { it.pricePaise })
+        assertEquals(3000L, l[0].unitPricePaise); assertEquals("/L", l[0].unitLabel)
+        assertEquals(700L, l[1].unitPricePaise); assertEquals("each", l[1].unitLabel)
+        assertEquals(8000L, l[3].unitPricePaise); assertEquals("/kg", l[3].unitLabel)   // ₹40 for 500 g = ₹80 per kg
+        // saved text reads back the same
+        assertEquals(l, Insights.parseItems(Insights.itemsText(l)))
+    }
+
+    @Test fun priceHistoryComparesPriceForOne() {
+        val items = listOf(EntryItem(entryId = 1, name = "Milk", pricePaise = 56_00, shopKey = "s", time = at(16), qty = 2.0, unit = "L"),
+            EntryItem(entryId = 2, name = "Milk", pricePaise = 30_00, shopKey = "s", time = at(0), qty = 1.0, unit = "L"))
+        val l = Insights.priceHistory(items, emptyMap()).single()
+        assertEquals(28_00L, l.first); assertEquals(30_00L, l.last); assertEquals("/L", l.per)
     }
 
     // ---------------- subscriptions

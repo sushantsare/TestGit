@@ -98,10 +98,15 @@ class AppNav(
     }
     fun collapsePlayer() { scope.launch { player.progress.animateTo(0f, spring(dampingRatio = 0.86f, stiffness = 380f)) } }
     fun go(route: String) = nav.navigate(route) { launchSingleTop = true }
+    /** Tapping the tab of the page you are already on: that page scrolls back to the top (no reload). */
+    val reselect = kotlinx.coroutines.flow.MutableSharedFlow<String>(extraBufferCapacity = 4)
     /** Bottom tabs always open the tab's own page (inner screens above it are closed). */
-    fun tab(route: String) = nav.navigate(route) {
-        popUpTo(R0.HOME)
-        launchSingleTop = true
+    fun tab(route: String) {
+        if (nav.currentDestination?.route == route) { reselect.tryEmit(route); return }
+        nav.navigate(route) {
+            popUpTo(R0.HOME)
+            launchSingleTop = true
+        }
     }
     fun back() { if (!nav.popBackStack()) Unit }
     fun sheet(s: Sheet?) = sheetSetter(s)

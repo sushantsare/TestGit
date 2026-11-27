@@ -41,6 +41,7 @@ fun FoldersScreen() {
         }
     }
     val listState = androidx.compose.foundation.lazy.rememberLazyListState()
+    ScrollTopOnReselect(R0.FOLDERS) { listState.animateScrollToItem(0) }
     val collapse = rememberCollapse(listState)
     Box(Modifier.fillMaxSize()) {
     LazyColumn(Modifier.fillMaxSize().testTag("folders"), state = listState, contentPadding = PaddingValues(bottom = LocalDockPadding.current)) {

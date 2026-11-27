@@ -1,5 +1,10 @@
 # Tarang changelog
 
+## 1.4.1 · 27 Nov 2026
+- Home greeting on two lines: "Good" with the time-of-day icon on the row of the Search | Settings buttons, the second word below; everything else moves up.
+- Folder, album, artist, playlist and Liked songs pages: a clear gap between the header card and the first song, and both line up at the same side edges.
+- Tapping the tab of the page you are on no longer reloads it (no fade, no replayed animations); it scrolls back to the top.
+
 ## 1.4.0 · 27 Nov 2026
 - Every song list (Library, folders, albums, artists, playlists, Liked songs, search, Most played, Top songs, Up next) uses connected cards: round at the top of the first card and the bottom of the last.
 - The song playing now is clearly marked in every list, wherever you started it: it turns into an accent pill with a round cover and dancing bars that freeze while paused.

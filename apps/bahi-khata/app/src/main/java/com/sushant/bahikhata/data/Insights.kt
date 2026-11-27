@@ -15,24 +15,68 @@ object Insights {
 
     // ---------------- "What did you buy?"
 
-    /** "milk 60, bread 40, eggs" → [(Milk, 6000), (Bread, 4000), (Eggs, -1)]. Prices are optional; "₹60 milk" works too. */
-    fun parseItems(text: String): List<Pair<String, Long>> =
+    /** One thing bought: its name, what was paid for all of it, and how much of it. */
+    data class Item(val name: String, val pricePaise: Long = -1, val qty: Double = 1.0, val unit: String = "") {
+        /** Price for one piece, or per kg / per litre for weights and volumes (grams and ml are scaled up). */
+        val unitPricePaise: Long get() = unitPrice(pricePaise, qty, unit)
+        val unitLabel: String get() = unitLabel(unit)
+        val hasQty: Boolean get() = qty != 1.0 || unit.isNotBlank()
+    }
+
+    val UNITS = listOf("", "kg", "g", "L", "ml", "pack", "dozen")
+    private val unitWords = mapOf(
+        "pc" to "", "pcs" to "", "piece" to "", "pieces" to "", "nos" to "", "no" to "",
+        "kg" to "kg", "kgs" to "kg", "kilo" to "kg", "g" to "g", "gm" to "g", "gms" to "g", "gram" to "g", "grams" to "g",
+        "l" to "L", "lt" to "L", "ltr" to "L", "litre" to "L", "liter" to "L", "ml" to "ml",
+        "pack" to "pack", "packs" to "pack", "pkt" to "pack", "packet" to "pack", "packets" to "pack", "dozen" to "dozen", "dz" to "dozen",
+    )
+
+    fun unitPrice(pricePaise: Long, qty: Double, unit: String): Long {
+        if (pricePaise <= 0 || qty <= 0) return pricePaise
+        val q = when (unit) { "g", "ml" -> qty / 1000.0; else -> qty }
+        return Math.round(pricePaise / q)
+    }
+
+    /** "each", "/kg", "/L", "/pack", "/dozen" — grams and ml are shown per kg and per litre. */
+    fun unitLabel(unit: String): String = when (unit) { "", "pcs" -> "each"; "g", "kg" -> "/kg"; "ml", "L" -> "/L"; else -> "/$unit" }
+
+    fun qtyText(qty: Double, unit: String): String {
+        val n = if (qty == Math.floor(qty)) qty.toLong().toString() else qty.toString().trimEnd('0').trimEnd('.')
+        return if (unit.isBlank()) n else if (unit == "pack" || unit == "dozen") "$n $unit" else "$n$unit"
+    }
+
+    /**
+     * "milk 2L 60, bread 40, 3 eggs 21, rice 5kg 320" → items with total price and quantity.
+     * Prices and quantities are optional; "₹60 milk" and "eggs x6 42" work too. No quantity means 1.
+     */
+    fun parseItems(text: String): List<Item> =
         text.split(',', ';', '\n', '+').flatMap { it.split(Regex("(?i)\\s+and\\s+")) }.mapNotNull { raw ->
-            var t = raw.trim().trim('.', '-', ':')
+            var t = raw.trim().trim('.', ':')
             if (t.isEmpty()) return@mapNotNull null
             var price = -1L
-            val tail = Regex("""(?i)(?:₹|rs\.?|inr)?\s*([0-9]+(?:\.[0-9]{1,2})?)\s*(?:₹|rs\.?|rupees?|/-?)?$""").find(t)
+            val tail = Regex("""(?i)(?<=^|\s)(?:₹|rs\.?|inr)?\s*([0-9]+(?:\.[0-9]{1,2})?)\s*(?:₹|rs\.?|rupees?|/-?)?$""").find(t)
             val head = Regex("""(?i)^(?:₹|rs\.?|inr)\s*([0-9]+(?:\.[0-9]{1,2})?)\s+""").find(t)
             when {
                 tail != null && tail.range.first > 0 -> { price = Money.parse(tail.groupValues[1]) ?: -1L; t = t.substring(0, tail.range.first).trim().trimEnd('-', ':', '=', '@') }
                 head != null -> { price = Money.parse(head.groupValues[1]) ?: -1L; t = t.substring(head.range.last + 1).trim() }
             }
-            val name = t.trim().replaceFirstChar { it.titlecase(Locale.ROOT) }
-            if (name.isEmpty() || name.all { it.isDigit() || it == '.' }) null else name.take(40) to price
+            var qty = 1.0; var unit = ""
+            val unitRx = unitWords.keys.sortedByDescending { it.length }.joinToString("|")
+            val withUnit = Regex("""(?i)(?:^|\s)([0-9]+(?:\.[0-9]+)?)\s*($unitRx)(?=\s|$)""").find(t)
+            val times = Regex("""(?i)(?:^|\s)(?:x\s*([0-9]+(?:\.[0-9]+)?)|([0-9]+(?:\.[0-9]+)?)\s*x)(?=\s|$)""").find(t)
+            val lead = Regex("""^([0-9]+(?:\.[0-9]+)?)\s+(?=\D)""").find(t)
+            when {
+                withUnit != null -> { qty = withUnit.groupValues[1].toDouble(); unit = unitWords[withUnit.groupValues[2].lowercase(Locale.ROOT)].orEmpty(); t = t.removeRange(withUnit.range).trim() }
+                times != null -> { qty = (times.groupValues[1].ifEmpty { times.groupValues[2] }).toDouble(); t = t.removeRange(times.range).trim() }
+                lead != null -> { qty = lead.groupValues[1].toDouble(); t = t.substring(lead.range.last + 1).trim() }
+            }
+            if (qty <= 0) qty = 1.0
+            val name = t.trim().trim('-', ':').trim().replaceFirstChar { it.titlecase(Locale.ROOT) }
+            if (name.isEmpty() || name.all { it.isDigit() || it == '.' }) null else Item(name.take(40), price, qty, unit)
         }
 
-    fun itemsText(items: List<Pair<String, Long>>): String =
-        items.joinToString(", ") { (n, p) -> if (p > 0) "$n ${Money.input(p)}" else n }
+    fun itemsText(items: List<Item>): String =
+        items.joinToString(", ") { i -> listOfNotNull(i.name, if (i.hasQty) (if (i.unit.isBlank()) "x" else "") + qtyText(i.qty, i.unit) else null, if (i.pricePaise > 0) Money.input(i.pricePaise) else null).joinToString(" ") }
 
     fun shopKey(name: String?): String = name.orEmpty().trim().lowercase(Locale.ROOT)
 
@@ -125,7 +169,7 @@ object Insights {
     // ---------------- price history
 
     data class PricePoint(val date: LocalDate, val pricePaise: Long)
-    data class PriceLine(val item: String, val shop: String, val points: List<PricePoint>) {
+    data class PriceLine(val item: String, val shop: String, val points: List<PricePoint>, val per: String = "each") {
         val first get() = points.first().pricePaise
         val last get() = points.last().pricePaise
         val change get() = last - first
@@ -133,11 +177,11 @@ object Insights {
 
     /** Same item at the same shop bought more than once with a price: how its price moved. */
     fun priceHistory(items: List<EntryItem>, shopNames: Map<String, String>): List<PriceLine> =
-        items.filter { it.pricePaise > 0 && it.shopKey.isNotBlank() }.groupBy { it.shopKey to it.name.trim().lowercase(Locale.ROOT) }
+        items.filter { it.pricePaise > 0 && it.shopKey.isNotBlank() }.groupBy { Triple(it.shopKey, it.name.trim().lowercase(Locale.ROOT), unitLabel(it.unit)) }
             .mapNotNull { (k, l) ->
                 if (l.size < 2) return@mapNotNull null
-                val pts = l.sortedBy { it.time }.map { PricePoint(Dates.date(it.time), it.pricePaise) }
-                PriceLine(l.last().name.trim(), shopNames[k.first] ?: k.first.replaceFirstChar { it.titlecase(Locale.ROOT) }, pts)
+                val pts = l.sortedBy { it.time }.map { PricePoint(Dates.date(it.time), unitPrice(it.pricePaise, it.qty, it.unit)) }
+                PriceLine(l.last().name.trim(), shopNames[k.first] ?: k.first.replaceFirstChar { it.titlecase(Locale.ROOT) }, pts, k.third)
             }.sortedWith(compareByDescending<PriceLine> { abs(it.change) * 100 / it.first.coerceAtLeast(1) }.thenBy { it.item })
 
     // ---------------- year summary

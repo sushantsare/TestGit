@@ -156,6 +156,29 @@ class WalkthroughTest {
         click("row_repeat"); waitTag("pick_Never"); shot("add_repeat_sheet"); click("pick_Never")
         click("save"); waitTag("fab_add"); if (runBlocking { app.repo.dao.entriesNow() }.none { it.merchant == "Chai point" }) problem("Chai point not saved"); shot("home_after_add")
 
+        // ---- add with items on the first screen: usual chips fill the amount, number pad steps aside for the keyboard
+        clickTo("fab_add", "key_4")
+        compose.onNodeWithTag("f_merchant").performClick(); compose.onNodeWithTag("f_merchant").performTextInput("Ravi Kirana"); Thread.sleep(700); compose.waitForIdle()
+        shot("add_keyboard_open"); hideKeyboard(); Thread.sleep(400)
+        click("usual_Milk"); click("usual_Bread"); waitTag("ae_items_left"); shot("add_with_items")
+        if (!has("amount_display") || runCatching { compose.onNodeWithTag("amount_display").assertTextEquals("₹100") }.isFailure) problem("items did not fill the amount")
+        click("next"); runCatching { compose.waitUntil(5_000) { has("save") || has("cat_Groceries") } }; if (has("cat_Groceries")) click("cat_Groceries")
+        waitTag("save"); click("acc_Cash"); click("save"); waitTag("fab_add")
+        runBlocking {
+            val e = app.repo.dao.entriesNow().filter { it.merchant == "Ravi Kirana" }.maxBy { it.id }
+            val its = app.repo.itemsOf(e.id)
+            if (e.amountPaise != 100_00L || its.size != 2 || its.none { it.name == "Milk" && it.qty == 2.0 && it.unit == "L" }) problem("items not saved with the entry")
+        }
+        // ---- quick typing: "Shop: items" fills shop, items and amount
+        clickTo("fab_add", "key_4")
+        type("f_merchant", "Sharma Store: 2 tea 40, biscuit x4 100"); waitTag("quick_items"); shot("add_quick_items")
+        click("next"); waitTag("cat_Food"); click("cat_Food"); waitTag("save"); click("acc_Cash"); click("save"); waitTag("fab_add")
+        runBlocking {
+            val e = app.repo.dao.entriesNow().firstOrNull { it.merchant == "Sharma Store" }
+            val its = e?.let { app.repo.itemsOf(it.id) }.orEmpty()
+            if (e == null || e.amountPaise != 140_00L || its.size != 2 || its.none { it.name == "Biscuit" && it.qty == 4.0 }) problem("quick items not saved: ${e?.amountPaise} ${its.size}")
+        }
+
         // ---- income + transfer chips
         go("add?type=INCOME", "key_5"); click("key_5"); click("key_0"); click("key_0"); shot("add_income"); backDiscard(); compose.waitForIdle()
 
@@ -217,7 +240,7 @@ class WalkthroughTest {
         val s6 = runBlocking { app.repo.dao.smsNow().first { it.key == "s6" } }
         val s7 = runBlocking { app.repo.dao.smsNow().first { it.key == "s7" } }
         waitTag("sms_${s6.id}"); compose.onNodeWithTag("sms_list").performScrollToNode(hasTestTag("sms_${s6.id}")); waitTag("name_upi"); shot("sms_name_upi_and_items")
-        click("sms_items_${s6.id}"); waitTag("items_save"); type("item_name_0", "Tea"); type("item_price_0", "40"); click("item_add"); type("item_name_1", "Biscuit"); type("item_price_1", "100")
+        click("sms_items_${s6.id}"); waitTag("items_save"); type("item_name_0", "Tea"); type("item_price_0", "40"); click("item_add"); type("item_name_1", "Biscuit"); type("item_qty_1", "4"); type("item_price_1", "100"); waitTag("item_each_1")
         waitTag("items_left"); shot("sms_items_dialog"); click("items_save")
         click("name_upi_open"); waitTag("f_upi_name"); type("f_upi_name", "Sharma Tea Stall"); shot("sms_name_upi_form"); click("name_upi_save")
         compose.waitUntil(5_000) { runBlocking { app.repo.dao.upiName("vpa:paytmqr28100505@paytm") != null } }
@@ -244,6 +267,13 @@ class WalkthroughTest {
         click("upi_Ravi Kirana"); waitTag("upi_edit_ok"); shot("upi_name_edit"); back()
 
         // ---- dark theme: main screens again
+        // Block screenshots off must really allow screenshots, even with App lock on
+        app.prefs.update { it.copy(lockOn = true, secureScreens = false) }; Thread.sleep(800)
+        fun secure(): Boolean { var f = 0; scenario.onActivity { a -> f = a.window.attributes.flags }; return (f and android.view.WindowManager.LayoutParams.FLAG_SECURE) != 0 }
+        if (secure()) problem("screenshots blocked with the switch off")
+        app.prefs.update { it.copy(secureScreens = true) }; Thread.sleep(800)
+        if (!secure()) problem("screenshots allowed with the switch on")
+        app.prefs.update { it.copy(lockOn = false, secureScreens = false) }; Thread.sleep(500)
         app.prefs.update { it.copy(theme = ThemeMode.DARK) }
         go("home", "net"); shot("dark_home")
         go("add?type=EXPENSE", "key_1"); click("key_7"); click("key_5"); shot("dark_add"); backDiscard()

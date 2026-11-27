@@ -28,6 +28,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
+import com.sushant.tarang.ui.theme.PageTitle
 import androidx.media3.common.util.UnstableApi
 import com.sushant.tarang.R
 import com.sushant.tarang.data.*
@@ -60,7 +66,13 @@ fun WelcomeScreen(denied: Boolean, permanentlyDenied: Boolean, onAllow: () -> Un
     }
 }
 
-private fun greeting(): String = when (Calendar.getInstance().get(Calendar.HOUR_OF_DAY)) {
+/** Hour used for the greeting (tests can pin it to check every time of day). */
+internal object GreetingClock {
+    var hourOverride by mutableStateOf<Int?>(null)
+    fun hour(): Int = hourOverride ?: Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
+}
+
+private fun greeting(): String = when (GreetingClock.hour()) {
     in 5..11 -> "Good morning"; in 12..16 -> "Good afternoon"; in 17..21 -> "Good evening"; else -> "Good night"
 }
 
@@ -79,10 +91,11 @@ fun HomeScreen() {
 
     val listState = androidx.compose.foundation.lazy.rememberLazyListState()
     val collapse = rememberCollapse(listState)
+    ScrollTopOnReselect(R0.HOME) { listState.animateScrollToItem(0) }
     Box(Modifier.fillMaxSize()) {
     LazyColumn(Modifier.fillMaxSize().testTag("home"), state = listState, contentPadding = PaddingValues(bottom = LocalDockPadding.current)) {
         item {
-            PageHeader(greeting(), Modifier.statusBarsPadding(), titleTrailing = { GreetingIcon() }) {
+            HomeGreeting {
                 TopActions(TopAction(Icons.Rounded.Search, "Search", "open_search") { nav.go(R0.SEARCH) },
                     TopAction(Icons.Rounded.Settings, "Settings", "open_settings") { nav.go(R0.SETTINGS) })
             }
@@ -147,10 +160,36 @@ fun HomeScreen() {
     }
 }
 
+/**
+ * The greeting on two lines, always "Good" / "<time of day>": row 1 is "Good", the time-of-day icon right after it,
+ * and the Search | Settings pill on the right; row 2 is the second word on its own. Both words shrink a little
+ * only when a large system font would make them touch something.
+ */
+@Composable
+private fun HomeGreeting(actions: @Composable () -> Unit) {
+    val words = greeting().split(" ", limit = 2)
+    val style = PageTitle.copy(color = MaterialTheme.colorScheme.onSurface)
+    val fit = androidx.compose.foundation.text.TextAutoSize.StepBased(minFontSize = 20.sp, maxFontSize = PageTitle.fontSize)
+    Column(Modifier.fillMaxWidth().statusBarsPadding().padding(top = 6.dp)) {
+        Row(Modifier.fillMaxWidth().heightIn(min = 56.dp).padding(start = 20.dp), verticalAlignment = Alignment.CenterVertically) {
+            Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
+                androidx.compose.foundation.text.BasicText(words[0], Modifier.weight(1f, fill = false).semantics { heading(); contentDescription = greeting() }.testTag("greet_word1"),
+                    style = style, maxLines = 1, autoSize = fit)
+                Spacer(Modifier.width(12.dp))
+                GreetingIcon()
+            }
+            Spacer(Modifier.width(12.dp))
+            actions()
+        }
+        androidx.compose.foundation.text.BasicText(words.getOrElse(1) { "" }, Modifier.testTag("greet_word2").padding(start = 20.dp, end = 20.dp).clearAndSetSemantics { },
+            style = style, maxLines = 1, autoSize = fit)
+    }
+}
+
 /** A small playful icon for the time of day, in a Pixel "cookie" shape, next to the greeting. */
 @Composable
 private fun GreetingIcon() {
-    val h = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
+    val h = GreetingClock.hour()
     val (icon, bg, fg) = when (h) {
         in 5..11 -> Triple(Icons.Rounded.WbSunny, androidx.compose.ui.graphics.Color(0xFFFFE08A), androidx.compose.ui.graphics.Color(0xFF7A4B00))
         in 12..16 -> Triple(Icons.Rounded.LightMode, androidx.compose.ui.graphics.Color(0xFFFFD49A), androidx.compose.ui.graphics.Color(0xFF7A3E00))

@@ -90,8 +90,10 @@ class MainActivity : AppCompatActivity() {
         ContextCompat.registerReceiver(this, screenOff, android.content.IntentFilter(Intent.ACTION_SCREEN_OFF), ContextCompat.RECEIVER_NOT_EXPORTED)
         lifecycleScope.launch {
             vm.settings.collect { s ->
-                if (s.secureScreens || s.lockOn) window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
+                // the switch alone decides screenshots; App lock only hides the preview in recent apps (Android 13+)
+                if (s.secureScreens) window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
                 else window.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
+                if (android.os.Build.VERSION.SDK_INT >= 33) setRecentsScreenshotEnabled(!(s.secureScreens || s.lockOn))
             }
         }
         setContent {

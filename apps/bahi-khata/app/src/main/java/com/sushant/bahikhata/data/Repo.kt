@@ -198,10 +198,10 @@ class Repo(private val context: Context, val db: AppDb, val prefs: Prefs) {
     // ---------------- items ("What did you buy?")
     suspend fun itemsOf(entryId: Long) = dao.itemsOf(entryId)
 
-    suspend fun setItems(entryId: Long, items: List<Pair<String, Long>>) = db.withTransaction {
+    suspend fun setItems(entryId: Long, items: List<Insights.Item>) = db.withTransaction {
         val e = dao.entry(entryId) ?: return@withTransaction
         dao.deleteItemsOf(entryId)
-        items.filter { it.first.isNotBlank() }.forEach { (n, p) -> dao.insertItem(EntryItem(entryId = entryId, name = n.trim(), pricePaise = p, shopKey = Insights.shopKey(e.merchant), time = e.time)) }
+        items.filter { it.name.isNotBlank() }.forEach { i -> dao.insertItem(EntryItem(entryId = entryId, name = i.name.trim(), pricePaise = i.pricePaise, shopKey = Insights.shopKey(e.merchant), time = e.time, qty = i.qty, unit = i.unit)) }
     }
 
     /** Items answered before the SMS was saved (in the notification or the SMS card). */
@@ -374,7 +374,7 @@ class Repo(private val context: Context, val db: AppDb, val prefs: Prefs) {
             dao.updateSms(item.copy(status = SmsStatus.ACCEPTED, entryId = id, accountId = accountId, categoryId = categoryId, merchant = merchant, amountPaise = amount))
             if (item.itemsText.isNotBlank()) {
                 val shop = Insights.shopKey(merchant)
-                Insights.parseItems(item.itemsText).forEach { (n, p) -> dao.insertItem(EntryItem(entryId = id, name = n, pricePaise = p, shopKey = shop, time = time)) }
+                Insights.parseItems(item.itemsText).forEach { i -> dao.insertItem(EntryItem(entryId = id, name = i.name, pricePaise = i.pricePaise, shopKey = shop, time = time, qty = i.qty, unit = i.unit)) }
             }
             // remember the last-4 for this account so the next SMS matches automatically
             if (item.last4.isNotBlank()) dao.account(accountId)?.let { a ->

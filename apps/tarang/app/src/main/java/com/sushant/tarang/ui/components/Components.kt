@@ -99,6 +99,13 @@ fun PageHeader(title: String, modifier: Modifier = Modifier, onBack: (() -> Unit
     }
 }
 
+/** When the tab of this page is tapped while you are already on it, run [toTop] (smoothly scroll back to the top). */
+@Composable
+fun ScrollTopOnReselect(route: String, toTop: suspend () -> Unit) {
+    val nav = com.sushant.tarang.ui.LocalNav.current
+    LaunchedEffect(nav) { nav.reselect.collect { if (it == route) toTop() } }
+}
+
 /** One icon button in a page's top bar. */
 data class TopAction(val icon: ImageVector, val desc: String, val tag: String? = null, val onClick: () -> Unit)
 
@@ -221,13 +228,13 @@ fun SongRow(
     Row(
         modifier.fillMaxWidth().padding(horizontal = 12.dp).padding(bottom = 3.dp)
             .graphicsLayer { val k = 1f - 0.03f * sel; scaleX = k; scaleY = k }
+            .testTag("song_${song.id}")
             .clip(shape).background(bg)
             .then(if (sel > 0f) Modifier.border(1.5.dp, cs.primary.copy(alpha = sel), shape) else Modifier)
             .combinedClickable(onClick = onClick, onLongClick = onLongClick, onClickLabel = "Play")
             .heightIn(min = if (number != null) 62.dp else 70.dp)
             .padding(start = 12.dp, end = 2.dp, top = 8.dp, bottom = 8.dp)
-            .semantics { if (isNow) stateDescription = "Playing now" }
-            .testTag("song_${song.id}"),
+            .semantics { if (isNow) stateDescription = "Playing now" },
         verticalAlignment = Alignment.CenterVertically,
     ) {
         when {

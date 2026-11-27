@@ -137,7 +137,9 @@ private fun SongsTab(songs: List<Song>, sort: SongSort, selected: Set<Long>, set
     val liked by vm.liked.collectAsState()
     val cs = MaterialTheme.colorScheme
     var longFor by remember { mutableStateOf<Long?>(null) }
-    LazyColumn(Modifier.fillMaxSize().testTag("songs_list"), contentPadding = PaddingValues(bottom = LocalDockPadding.current)) {
+    val ls = androidx.compose.foundation.lazy.rememberLazyListState()
+    ScrollTopOnReselect(R0.LIBRARY) { ls.animateScrollToItem(0) }
+    LazyColumn(Modifier.fillMaxSize().testTag("songs_list"), state = ls, contentPadding = PaddingValues(bottom = LocalDockPadding.current)) {
         if (songs.isEmpty()) { item { EmptyState(Icons.Rounded.MusicOff, "No songs yet", "Songs on your phone show up here.") }; return@LazyColumn }
         item {
             Row(Modifier.fillMaxWidth().padding(16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -186,7 +188,9 @@ private fun AlbumsTab(albums: List<Album>) {
     val nav = LocalNav.current
     val cs = MaterialTheme.colorScheme
     if (albums.isEmpty()) { EmptyState(Icons.Rounded.Album, "No albums", "Albums appear when your songs have album details."); return }
-    LazyVerticalGrid(GridCells.Adaptive(156.dp), Modifier.fillMaxSize().testTag("albums_grid"),
+    val gs = androidx.compose.foundation.lazy.grid.rememberLazyGridState()
+    ScrollTopOnReselect(R0.LIBRARY) { gs.animateScrollToItem(0) }
+    LazyVerticalGrid(GridCells.Adaptive(156.dp), Modifier.fillMaxSize().testTag("albums_grid"), state = gs,
         contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = 12.dp, bottom = LocalDockPadding.current), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
         item(span = { GridItemSpan(maxLineSpan) }) {
             Text(plural(albums.size, "album"), style = MaterialTheme.typography.bodyMedium, color = cs.onSurfaceVariant, modifier = Modifier.padding(8.dp))
@@ -206,7 +210,9 @@ private fun AlbumsTab(albums: List<Album>) {
 private fun ArtistsTab(artists: List<Artist>, sort: Int) {
     val nav = LocalNav.current
     val cs = MaterialTheme.colorScheme
-    LazyColumn(Modifier.fillMaxSize().testTag("artists_list"), contentPadding = PaddingValues(bottom = LocalDockPadding.current)) {
+    val ls = androidx.compose.foundation.lazy.rememberLazyListState()
+    ScrollTopOnReselect(R0.LIBRARY) { ls.animateScrollToItem(0) }
+    LazyColumn(Modifier.fillMaxSize().testTag("artists_list"), state = ls, contentPadding = PaddingValues(bottom = LocalDockPadding.current)) {
         if (artists.isEmpty()) { item { EmptyState(Icons.Rounded.Person, "No artists", "Artists appear when your songs have artist details.") }; return@LazyColumn }
         item {
             Text("${plural(artists.size, "artist")} · ${if (sort == 1) "Most songs" else "A–Z"}", style = MaterialTheme.typography.bodyMedium, color = cs.onSurfaceVariant,
@@ -242,7 +248,9 @@ private fun PlaylistsTab() {
     val lib by vm.library.collectAsState()
     var creating by remember { mutableStateOf(false) }
     val cs = MaterialTheme.colorScheme
-    LazyColumn(Modifier.fillMaxSize().testTag("playlists"), contentPadding = PaddingValues(bottom = LocalDockPadding.current)) {
+    val ls = androidx.compose.foundation.lazy.rememberLazyListState()
+    ScrollTopOnReselect(R0.LIBRARY) { ls.animateScrollToItem(0) }
+    LazyColumn(Modifier.fillMaxSize().testTag("playlists"), state = ls, contentPadding = PaddingValues(bottom = LocalDockPadding.current)) {
         item {
             Row(Modifier.fillMaxWidth().clickable { creating = true }.padding(horizontal = 20.dp, vertical = 14.dp).testTag("create_playlist"), verticalAlignment = Alignment.CenterVertically) {
                 Box(Modifier.size(56.dp).clip(RoundedCornerShape(16.dp)).background(cs.primary), contentAlignment = Alignment.Center) { Icon(Icons.Rounded.Add, null, tint = cs.onPrimary) }
