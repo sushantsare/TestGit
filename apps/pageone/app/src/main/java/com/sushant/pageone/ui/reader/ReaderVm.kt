@@ -48,10 +48,16 @@ class ReaderVm(app: Application, initial: DocRef) : AndroidViewModel(app) {
     var reflow by mutableStateOf(false)
     var lockRotation by mutableStateOf(false)
     var zoom by mutableFloatStateOf(1f)
+    /** The zoom the page images were last drawn sharp at; follows [zoom] once a gesture settles. */
+    var renderZoom by mutableFloatStateOf(1f)
+    /** Uptime of the last touch with two or more fingers, so a pinch is never read as a tap. */
+    var lastMultiTouch = 0L
+    fun touchIsTap() = android.os.SystemClock.uptimeMillis() - lastMultiTouch > 350
     /** Set by the screen: double-tap zoom around a point on a page. */
     /** Set by the screen: scroll to a page (0-based). */
     var goTo: ((Int) -> Unit)? = null
-    var doubleTap: ((androidx.compose.ui.geometry.Offset, Int) -> Unit)? = null
+    /** Set by the screen: double-tap zoom around a point given in root coordinates. */
+    var doubleTap: ((androidx.compose.ui.geometry.Offset) -> Unit)? = null
     private var password: String? = null
 
     // find

@@ -186,10 +186,26 @@ class WalkthroughTest {
         if (!waitPage(15_000)) problem("reader did not show page 1")
         Thread.sleep(1500); shot("reader")
         chrome(false); shot("reader_fullscreen"); chrome(true)
-        // pinch zoom
-        compose.onNodeWithTag("pages").performTouchInput { pinch(center - Offset(80f, 0f), center - Offset(240f, 0f), center + Offset(80f, 0f), center + Offset(240f, 0f)) }
-        Thread.sleep(800); shot("reader_zoomed")
-        compose.onNodeWithTag("pages").performTouchInput { doubleClick(center) }; Thread.sleep(800)
+        // ---------- zoom: pinch holds, double-tap steps 2x → 3.5x → fit, pinch is never a double-tap
+        fun area() = compose.onNodeWithTag("reader_area")
+        fun pw() = page().fetchSemanticsNode().size.width.toFloat()
+        val w0 = pw()
+        area().performTouchInput { pinch(center - Offset(80f, 0f), center - Offset(240f, 0f), center + Offset(80f, 0f), center + Offset(240f, 0f)) }
+        Thread.sleep(2000); shot("reader_zoomed")
+        val w1 = pw(); log("zoom: fit $w0 -> pinch $w1")
+        if (w1 < w0 * 2f) problem("pinch zoom did not hold")
+        area().performTouchInput { doubleClick(center) }; Thread.sleep(900)
+        val w2 = pw(); log("zoom: double-tap -> $w2")
+        if (w2 < w1 * 1.05f) problem("double tap did not zoom closer")
+        area().performTouchInput { doubleClick(center) }; Thread.sleep(900)
+        val w3 = pw(); log("zoom: double-tap -> $w3")
+        if (kotlin.math.abs(w3 - w0) > w0 * 0.05f) problem("double tap did not return to fit")
+        area().performTouchInput { doubleClick(center) }; Thread.sleep(900); shot("reader_double_tap")
+        val w4 = pw(); log("zoom: double-tap -> $w4")
+        if (w4 < w0 * 1.7f) problem("double tap from fit did not zoom")
+        area().performTouchInput { doubleClick(center) }; Thread.sleep(900)
+        area().performTouchInput { doubleClick(center) }; Thread.sleep(900)
+        if (kotlin.math.abs(pw() - w0) > w0 * 0.05f) problem("zoom not back to fit")
         chrome(true)
         // find
         click("reader_find"); type("find_field", "tense")
@@ -254,6 +270,10 @@ class WalkthroughTest {
         // ---------- form PDF
         openReaderFor("Admit Card")
         if (waitPage(15_000)) {
+            Thread.sleep(800); shot("one_page_centred")
+            val pb = page().fetchSemanticsNode().boundsInRoot; val ab = compose.onNodeWithTag("reader_area").fetchSemanticsNode().boundsInRoot
+            log("one page: page $pb area $ab")
+            if (kotlin.math.abs(pb.center.x - ab.center.x) > ab.width * 0.03f || kotlin.math.abs(pb.center.y - ab.center.y) > ab.height * 0.06f) problem("one-page PDF not centred")
             if (waitTag("field_name", 10_000, soft = true)) {
                 compose.onAllNodesWithTag("field_name", useUnmergedTree = true).onFirst().performClick()
                 compose.onAllNodesWithTag("field_name", useUnmergedTree = true).onFirst().performTextInput("Sushant Kumar")
