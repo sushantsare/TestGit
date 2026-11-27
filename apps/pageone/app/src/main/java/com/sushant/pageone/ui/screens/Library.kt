@@ -74,10 +74,10 @@ fun openAllFilesSettings(context: android.content.Context) {
 
 @Composable
 fun HomeScreen(vm: MainVm, nav: NavHostController) {
-    val wide = LocalConfigurationWidth() >= 840
+    val wide = LocalConfigurationWidth() >= WIDE_DP
     if (wide) {
         var selected by rememberSaveable { mutableStateOf<String?>(null) }
-        Row(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface)) {
+        Row(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface).sideInsets()) {
             SideRail(Tab.HOME, { nav.goTab(it) }) {
                 Box { ToolsFab(vm, nav, compact = true) }
             }
@@ -90,6 +90,34 @@ fun HomeScreen(vm: MainVm, nav: NavHostController) {
         }
     } else {
         Box(Modifier.fillMaxSize()) { HomeList(vm, nav, onFolder = { nav.navigate(Routes.folder(it)) }, selectedFolder = null, showFab = true, showNav = true) }
+    }
+}
+
+@Composable
+/** Screens wider than this (tablets, phones turned sideways) get the side rail instead of the bottom bar. */
+const val WIDE_DP = 840
+
+/** Insets on the left/right edge when the phone is sideways: the camera cut-out and side navigation buttons. */
+@Composable
+fun Modifier.sideInsets() = windowInsetsPadding(WindowInsets.navigationBars.union(WindowInsets.displayCutout).only(WindowInsetsSides.Horizontal))
+
+/**
+ * Frame shared by Home, Recent and Starred so the navigation never moves when you switch tabs:
+ * a side rail (with the tools button) on wide screens, the bottom bar otherwise.
+ */
+@Composable
+private fun TabFrame(vm: MainVm, nav: NavHostController, tab: Tab, content: @Composable ColumnScope.() -> Unit) {
+    if (LocalConfigurationWidth() >= WIDE_DP) {
+        Row(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface).sideInsets()) {
+            SideRail(tab, { nav.goTab(it) }) { Box { ToolsFab(vm, nav, compact = true) } }
+            Box(Modifier.weight(1f).fillMaxHeight(), contentAlignment = Alignment.TopCenter) {
+                // lists keep a comfortable reading width instead of stretching edge to edge
+                Column(Modifier.widthIn(max = 720.dp).fillMaxSize(), content = content)
+            }
+        }
+    } else Column(Modifier.fillMaxSize()) {
+        content()
+        BottomNav(tab) { nav.goTab(it) }
     }
 }
 
@@ -505,7 +533,7 @@ fun RecentScreen(vm: MainVm, nav: NavHostController) {
     var confirmClear by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) { vm.lib.cleanRecents() }
     val groups = remember(recents) { recents.groupBy { Format.dayGroup(it.openedAt) } }
-    Column(Modifier.fillMaxSize()) {
+    TabFrame(vm, nav, Tab.RECENT) {
         LazyColumn(Modifier.weight(1f).testTag("recent_list"), contentPadding = PaddingValues(bottom = 24.dp)) {
             item {
                 Spacer(Modifier.statusBarsPadding())
@@ -545,7 +573,6 @@ fun RecentScreen(vm: MainVm, nav: NavHostController) {
                 }
             }
         }
-        BottomNav(Tab.RECENT) { nav.goTab(it) }
     }
     if (confirmClear) AlertDialog(
         onDismissRequest = { confirmClear = false },
@@ -613,7 +640,7 @@ fun StarredScreen(vm: MainVm, nav: NavHostController) {
     var dragging by remember { mutableStateOf<String?>(null) }
     var dragY by remember { mutableFloatStateOf(0f) }
     val rowPx = with(LocalDensity.current) { 75.dp.toPx() }
-    Column(Modifier.fillMaxSize()) {
+    TabFrame(vm, nav, Tab.STARRED) {
         LazyColumn(Modifier.weight(1f).testTag("starred_list"), contentPadding = PaddingValues(bottom = 24.dp)) {
             item {
                 Spacer(Modifier.statusBarsPadding())
@@ -660,6 +687,5 @@ fun StarredScreen(vm: MainVm, nav: NavHostController) {
                 }
             }
         }
-        BottomNav(Tab.STARRED) { nav.goTab(it) }
     }
 }

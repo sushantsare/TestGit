@@ -135,7 +135,7 @@ fun AppRoot(vm: MainVm, activity: MainActivity) {
         )
         SnackbarHost(
             vm.snackbar,
-            Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(bottom = when { inTabs -> 88.dp; inReader -> 100.dp; else -> 16.dp }, start = 12.dp, end = 12.dp).testTag("snackbar"),
+            Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(bottom = when { inTabs && androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp < com.sushant.pageone.ui.screens.WIDE_DP -> 88.dp; inReader -> 100.dp; else -> 16.dp }, start = 12.dp, end = 12.dp).testTag("snackbar"),
         ) { Snackbar(it) }
         if (locked) LockScreen(activity, onUnlocked = { vm.locked.value = false }, onClose = { activity.finish() })
     }

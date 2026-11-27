@@ -309,6 +309,16 @@ class WalkthroughTest {
             back()
         }
 
+        // ---------- phone turned sideways: all three tabs keep the same side rail
+        UiDevice.getInstance(inst).setOrientationLeft(); Thread.sleep(2500); compose.waitForIdle()
+        for (t in listOf("home", "recent", "starred", "home")) {
+            clickTab(t); Thread.sleep(800); shot("landscape_$t")
+            if (!has("side_rail") || has("bottom_nav")) problem("landscape $t: navigation not in the side rail")
+        }
+        UiDevice.getInstance(inst).setOrientationNatural(); Thread.sleep(2500); compose.waitForIdle()
+        UiDevice.getInstance(inst).unfreezeRotation()
+        if (!has("bottom_nav")) problem("portrait: bottom bar missing after turning back")
+
         // ---------- dark, then pure black
         app.prefs.update { it.copy(themeMode = ThemeMode.DARK) }; suffix = "_dark"
         clickTab("home"); shot("home"); clickTab("recent"); shot("recent"); clickTab("home")

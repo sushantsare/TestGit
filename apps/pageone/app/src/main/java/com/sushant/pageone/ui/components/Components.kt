@@ -323,7 +323,7 @@ enum class Tab { HOME, RECENT, STARRED }
 
 @Composable
 fun BottomNav(current: Tab, onSelect: (Tab) -> Unit) {
-    Surface(color = MaterialTheme.colorScheme.surfaceContainer) {
+    Surface(color = MaterialTheme.colorScheme.surfaceContainer, modifier = Modifier.testTag("bottom_nav")) {
         Row(Modifier.fillMaxWidth().navigationBarsPadding().height(80.dp), horizontalArrangement = Arrangement.SpaceAround, verticalAlignment = Alignment.CenterVertically) {
             NavItem(Tab.HOME, current, Icons.Rounded.Home, Icons.Outlined.OutlinedHome, "Home", onSelect)
             NavItem(Tab.RECENT, current, Icons.Rounded.History, Icons.Rounded.History, "Recent", onSelect)
@@ -352,7 +352,7 @@ private fun NavItem(tab: Tab, current: Tab, on: ImageVector, off: ImageVector, l
 /** Navigation rail for medium/expanded windows. */
 @Composable
 fun SideRail(current: Tab, onSelect: (Tab) -> Unit, fab: @Composable () -> Unit) {
-    Column(Modifier.fillMaxHeight().width(96.dp).statusBarsPadding().padding(top = 20.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp)) {
+    Column(Modifier.fillMaxHeight().width(96.dp).testTag("side_rail").statusBarsPadding().padding(top = 20.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp)) {
         fab()
         Spacer(Modifier.height(12.dp))
         NavItem(Tab.HOME, current, Icons.Rounded.Home, Icons.Outlined.OutlinedHome, "Home", onSelect)
