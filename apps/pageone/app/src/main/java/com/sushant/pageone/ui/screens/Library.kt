@@ -93,7 +93,6 @@ fun HomeScreen(vm: MainVm, nav: NavHostController) {
     }
 }
 
-@Composable
 /** Screens wider than this (tablets, phones turned sideways) get the side rail instead of the bottom bar. */
 const val WIDE_DP = 840
 
