@@ -21,6 +21,7 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.semantics.SemanticsProperties
@@ -497,7 +498,8 @@ class GrabbitE2ETest {
             Thread.sleep(6000)
             compose.onNodeWithTag("downloadBtn").performScrollTo()
             val before = Library.items.value.size
-            compose.onNodeWithTag("downloadBtn").performClick()
+            // Click action directly: a "Download started" message from the step before may still cover the button
+            compose.onNodeWithTag("downloadBtn").performSemanticsAction(androidx.compose.ui.semantics.SemanticsActions.OnClick)
             val ok = waitSaved(before)
             val it = Library.items.value.maxByOrNull { it.time }
             log("IMAGE cover ok=$ok name=${it?.fileName} mime=${it?.mime} size=${it?.size}")
