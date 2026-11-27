@@ -228,13 +228,13 @@ fun SongRow(
     Row(
         modifier.fillMaxWidth().padding(horizontal = 12.dp).padding(bottom = 3.dp)
             .graphicsLayer { val k = 1f - 0.03f * sel; scaleX = k; scaleY = k }
+            .testTag("song_${song.id}")
             .clip(shape).background(bg)
             .then(if (sel > 0f) Modifier.border(1.5.dp, cs.primary.copy(alpha = sel), shape) else Modifier)
             .combinedClickable(onClick = onClick, onLongClick = onLongClick, onClickLabel = "Play")
             .heightIn(min = if (number != null) 62.dp else 70.dp)
             .padding(start = 12.dp, end = 2.dp, top = 8.dp, bottom = 8.dp)
-            .semantics { if (isNow) stateDescription = "Playing now" }
-            .testTag("song_${song.id}"),
+            .semantics { if (isNow) stateDescription = "Playing now" },
         verticalAlignment = Alignment.CenterVertically,
     ) {
         when {

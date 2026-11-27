@@ -486,14 +486,14 @@ class WalkthroughTest {
         if (!has("greet_word1")) problem("tapping Home at the top changed the page")
         // same on Folders and Library
         tab("folders", "folders")
-        compose.onNodeWithTag("folders").performTouchInput { swipeUp(startY = bottom * 0.8f, endY = bottom * 0.3f, durationMillis = 300) }; settle()
+        compose.onNodeWithTag("folders").performTouchInput { swipeUp(startY = bottom * 0.55f, endY = bottom * 0.15f, durationMillis = 300) }; settle()
         compose.mainClock.autoAdvance = false
         compose.onNodeWithTag("tab_folders", useUnmergedTree = true).performClick()
         most = 0; repeat(8) { compose.mainClock.advanceTimeBy(50); most = maxOf(most, compose.onAllNodesWithTag("folders").fetchSemanticsNodes().size) }
         compose.mainClock.autoAdvance = true; settle()
         if (most > 1) problem("tapping Folders on Folders reloaded the page")
         tab("library", "library"); waitTag("songs_list")
-        compose.onNodeWithTag("songs_list").performTouchInput { swipeUp(startY = bottom * 0.8f, endY = bottom * 0.2f, durationMillis = 300) }; settle()
+        compose.onNodeWithTag("songs_list").performTouchInput { swipeUp(startY = bottom * 0.55f, endY = bottom * 0.1f, durationMillis = 300) }; settle()
         compose.mainClock.autoAdvance = false
         compose.onNodeWithTag("tab_library", useUnmergedTree = true).performClick()
         most = 0; repeat(8) { compose.mainClock.advanceTimeBy(50); most = maxOf(most, compose.onAllNodesWithTag("library").fetchSemanticsNodes().size) }

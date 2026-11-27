@@ -181,7 +181,7 @@ private fun HomeGreeting(actions: @Composable () -> Unit) {
             Spacer(Modifier.width(12.dp))
             actions()
         }
-        androidx.compose.foundation.text.BasicText(words.getOrElse(1) { "" }, Modifier.padding(start = 20.dp, end = 20.dp).clearAndSetSemantics { }.testTag("greet_word2"),
+        androidx.compose.foundation.text.BasicText(words.getOrElse(1) { "" }, Modifier.testTag("greet_word2").padding(start = 20.dp, end = 20.dp).clearAndSetSemantics { },
             style = style, maxLines = 1, autoSize = fit)
     }
 }
