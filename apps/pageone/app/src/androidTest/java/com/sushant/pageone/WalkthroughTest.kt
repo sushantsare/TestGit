@@ -337,11 +337,23 @@ class WalkthroughTest {
             for (round in 1..2) {
                 dev.pressHome(); Thread.sleep(1500)
                 app.startActivity(launch)
-                val shown = dev.wait(androidx.test.uiautomator.Until.hasObject(By.textContains("Unlock PageOne")), 8_000)
+                // keep the app's frames running while waiting (in tests the screen only updates when the test lets it)
+                var shown = false
+                val until = System.currentTimeMillis() + 8_000
+                while (!shown && System.currentTimeMillis() < until) {
+                    runCatching { compose.waitForIdle() }
+                    shown = dev.hasObject(By.textContains("Unlock PageOne"))
+                    if (!shown) Thread.sleep(200)
+                }
                 log("app lock round $round: prompt shown by itself = $shown")
                 if (round == 1) shot("lock_prompt")
-                if (!shown) { problem("app lock: unlock prompt did not come up by itself (round $round)"); break }
-                dev.executeShellCommand("input text 1234"); Thread.sleep(300); dev.pressEnter(); Thread.sleep(2000)
+                if (!shown) {
+                    log("lock screen in app: ${has("lock_screen")}")
+                    val out = java.io.ByteArrayOutputStream(); dev.dumpWindowHierarchy(out)
+                    out.toString().lines().filter { "text=\"" in it && "text=\"\"" !in it }.take(30).forEach { log("ui: " + it.trim().take(160)) }
+                    problem("app lock: unlock prompt did not come up by itself (round $round)"); break
+                }
+                dev.executeShellCommand("input text 1234"); Thread.sleep(300); dev.pressEnter(); Thread.sleep(1500); runCatching { compose.waitForIdle() }
                 log("app lock round $round: unlocked = ${!has("lock_screen")}")
             }
         } finally {
