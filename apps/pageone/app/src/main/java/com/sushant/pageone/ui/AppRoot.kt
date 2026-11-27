@@ -67,6 +67,7 @@ fun AppRoot(vm: MainVm, activity: MainActivity) {
     val start = remember { if (s.setupDone) Routes.HOME else Routes.SETUP }
     val entry by nav.currentBackStackEntryAsState()
     val inTabs = entry?.destination?.route in setOf(Routes.HOME, Routes.RECENT, Routes.STARRED)
+    val inReader = entry?.destination?.route?.startsWith("reader") == true
 
     // PDFs from other apps and launcher shortcuts
     LaunchedEffect(incoming, s.setupDone, locked) {
@@ -129,7 +130,7 @@ fun AppRoot(vm: MainVm, activity: MainActivity) {
         }
         SnackbarHost(
             vm.snackbar,
-            Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(bottom = if (inTabs) 88.dp else 16.dp, start = 12.dp, end = 12.dp).testTag("snackbar"),
+            Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(bottom = when { inTabs -> 88.dp; inReader -> 100.dp; else -> 16.dp }, start = 12.dp, end = 12.dp).testTag("snackbar"),
         ) { Snackbar(it) }
         if (locked) LockScreen(activity, onUnlocked = { vm.locked.value = false }, onClose = { activity.finish() })
     }

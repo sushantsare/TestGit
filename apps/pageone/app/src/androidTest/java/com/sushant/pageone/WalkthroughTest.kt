@@ -203,7 +203,7 @@ class WalkthroughTest {
         page().performTouchInput { longClick(Offset(width * 0.3f, height * 0.12f)) }
         if (waitTag("selection_popup", 5_000, soft = true)) { shot("reader_selection"); click("sel_highlight") } else log("no text selection on this API")
         // pages / contents / bookmarks
-        click("tb_bookmark"); click("tb_pages"); waitTag("thumb_grid"); shot("sheet_pages")
+        click("tb_bookmark"); Thread.sleep(400); click("tb_pages"); waitTag("thumb_grid"); shot("sheet_pages")
         click("sheet_tab_1"); waitTag("toc", soft = true); shot("sheet_contents")
         click("sheet_tab_2"); shot("sheet_bookmarks"); back()
         // reading options
