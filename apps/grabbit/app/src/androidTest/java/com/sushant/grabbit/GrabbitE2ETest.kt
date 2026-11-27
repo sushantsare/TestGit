@@ -587,6 +587,24 @@ class GrabbitE2ETest {
         return "trimDirect=${trimOk}(${d}ms) xtrim=${xd in 8500..12500} m4a=${m4aOk && m4a?.mime == "audio/mp4"}"
     }
 
+    /** Data saved by v2.8 (library entries in the old format) must load in 3.0; the new stores start empty. */
+    private fun upgradeCheck(): String = runCatching {
+        val f = java.io.File(ctx.filesDir, "library.json")
+        val backup = if (f.exists()) f.readText() else "[]"
+        val v28 = """[{"id":"old1","title":"Old video","site":"YouTube","thumb":"","uri":"content://media/external/video/media/1",""" +
+            """"fileName":"Old video.mp4","mime":"video/mp4","size":123,"time":1700000000000,"sourceUrl":"https://youtu.be/x"},""" +
+            """{"id":"old2","title":"Old song","site":"YouTube","thumb":"","uri":"content://media/external/audio/media/2",""" +
+            """"fileName":"Old song.mp3","mime":"audio/mpeg","size":45,"time":1700000000001,"sourceUrl":"","path":"/sdcard/Music/Grabbit/Old song.mp3"}]"""
+        f.writeText(v28)
+        Library.init(ctx)
+        val items = Library.items.value
+        val ok = items.size == 2 && items[0].title == "Old video" && items[0].path == null && items[1].isAudio && items[1].path != null
+        f.writeText(backup)
+        Library.init(ctx)
+        log("UPGRADE v2.8 library loaded=$ok (${items.map { it.fileName }}) restored=${Library.items.value.size}")
+        "upgrade=$ok"
+    }.getOrElse { log("UPGRADE failed: ${it.message}"); "upgrade=false" }
+
     /** Fresh install: intro animation, then every setup page; allow notifications and battery through Android's dialogs. */
     private fun onboardingFlow(): String {
         val ui = androidx.test.uiautomator.UiDevice.getInstance(instr)
@@ -741,8 +759,9 @@ class GrabbitE2ETest {
         val pause = pauseFlow(false) + " " + pauseFlow(true)
         val folder = folderFlow()
         val images = imageFlow()
+        val upgrade = upgradeCheck()
 
-        log("SUMMARY direct=$direct x=$x dailymotion=$dm facebook=$fb youtube=$youtube share=$share threads=$threads $options $renamed $speed $pause $folder $images $onboarding")
+        log("SUMMARY direct=$direct x=$x dailymotion=$dm facebook=$fb youtube=$youtube share=$share threads=$threads $options $renamed $speed $pause $folder $images $onboarding $upgrade")
         results.forEach { Log.i("GrabbitE2E", "RESULT $it") }
         assertTrue("Downloads failed", direct && x)
         assertTrue("Share sheet download failed", share)

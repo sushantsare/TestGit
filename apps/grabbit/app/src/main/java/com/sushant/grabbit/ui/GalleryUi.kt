@@ -68,12 +68,10 @@ fun PhotoQualityRow(value: String, onChange: (String) -> Unit) {
     SectionLabel("Photo quality")
     Spacer(Modifier.height(LocalSpacing.current.xs))
     val opts = listOf(Gallery.Q_ORIGINAL to "Original", Gallery.Q_JPG to "Smaller (JPG)")
-    SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
-        opts.forEachIndexed { i, (k, l) ->
-            SegmentedButton(selected = value == k, onClick = { onChange(k) }, icon = {},
-                shape = SegmentedButtonDefaults.itemShape(i, opts.size), modifier = Modifier.testTag("pq_$k")) { FitText(l) }
-        }
-    }
+    com.sushant.grabbit.ui.components.ConnectedGroup(
+        opts.map { (k, l) -> com.sushant.grabbit.ui.components.SegOption(k, l, tag = "pq_$k") }, value, onChange, height = 48.dp,
+        color = MaterialTheme.colorScheme.surfaceContainerHigh, onColor = MaterialTheme.colorScheme.onSurface,
+    )
 }
 
 /** Photo post: grid of every item (all ticked), select all, photo quality, Save to, download. */

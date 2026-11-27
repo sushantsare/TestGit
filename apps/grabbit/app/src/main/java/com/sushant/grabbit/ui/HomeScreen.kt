@@ -292,8 +292,8 @@ private fun HowItWorks() {
         SectionLabel("How it works")
         AppCard(padding = sp.s) {
             Step(1, "Copy the link", "From any app: Share → Copy link")
-            Step(2, "Paste it above", "Then tap Grab video")
-            Step(3, "Pick a quality", "Video or MP3, saved to your gallery")
+            Step(2, "Paste it above", "Then tap Grab")
+            Step(3, "Pick what you want", "Video, audio or photos — saved where you choose")
         }
         AppCard {
             Row(verticalAlignment = Alignment.CenterVertically) {

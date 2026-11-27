@@ -132,14 +132,11 @@ fun SettingsScreen(vm: MainViewModel, modifier: Modifier) {
                     Text("Theme", style = MaterialTheme.typography.titleSmall)
                     Spacer(Modifier.size(sp.m))
                     val labels = listOf("System", "Light", "Dark")
-                    SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
-                        labels.forEachIndexed { i, l ->
-                            SegmentedButton(
-                                selected = theme == i, onClick = { Prefs.theme = i },
-                                shape = SegmentedButtonDefaults.itemShape(i, labels.size), icon = {},
-                            ) { FitText(l) }
-                        }
-                    }
+                    com.sushant.grabbit.ui.components.ConnectedGroup(
+                        labels.mapIndexed { i, l -> com.sushant.grabbit.ui.components.SegOption("$i", l, tag = "theme_$i") },
+                        "$theme", { Prefs.theme = it.toInt() }, height = 48.dp,
+                        color = MaterialTheme.colorScheme.surfaceContainerHigh, onColor = MaterialTheme.colorScheme.onSurface,
+                    )
                 }
                 if (dark) SettingsSwitch("Pure black", "Darker dark mode for OLED screens", Icons.Rounded.Contrast, amoled) {
                     Prefs.amoled = it
@@ -373,13 +370,11 @@ private fun SubtitleDefaultsSheet(
                 style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(horizontal = sp.xl))
             Spacer(Modifier.size(sp.m))
-            SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth().padding(horizontal = sp.xl)) {
-                SUB_MODES.forEachIndexed { i, (k, l) ->
-                    SegmentedButton(selected = mode == k, onClick = { onMode(k) }, shape = SegmentedButtonDefaults.itemShape(i, SUB_MODES.size), icon = {}) {
-                        FitText(l.replace("Inside the video", "Inside video"))
-                    }
-                }
-            }
+            com.sushant.grabbit.ui.components.ConnectedGroup(
+                SUB_MODES.map { (k, l) -> com.sushant.grabbit.ui.components.SegOption(k, l.replace("Inside the video", "Inside video")) },
+                mode, onMode, Modifier.padding(horizontal = sp.xl), height = 48.dp,
+                color = MaterialTheme.colorScheme.surfaceContainerHigh, onColor = MaterialTheme.colorScheme.onSurface,
+            )
             Spacer(Modifier.size(sp.s))
             Column(Modifier.heightIn(max = 380.dp).verticalScroll(rememberScrollState())) {
                 SUB_LANGS.forEach { (k, l) ->

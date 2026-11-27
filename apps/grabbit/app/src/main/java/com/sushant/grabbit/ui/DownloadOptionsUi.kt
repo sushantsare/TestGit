@@ -157,12 +157,13 @@ private fun SubtitleSheet(info: MediaInfo, st: OptsState, onClose: () -> Unit) {
             Text("Subtitles", style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(horizontal = sp.xl))
             Spacer(Modifier.height(sp.m))
             if (st.sub != null) {
-                SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth().padding(horizontal = sp.xl)) {
+                run {
                     val modes = listOf("embed" to "Inside video", "file" to "Separate file", "both" to "Both")
-                    modes.forEachIndexed { i, (k, l) ->
-                        SegmentedButton(selected = st.subMode == k, onClick = { st.subMode = k },
-                            shape = SegmentedButtonDefaults.itemShape(i, modes.size), icon = {}) { FitText(l) }
-                    }
+                    com.sushant.grabbit.ui.components.ConnectedGroup(
+                        modes.map { (k, l) -> com.sushant.grabbit.ui.components.SegOption(k, l) }, st.subMode, { st.subMode = it },
+                        Modifier.padding(horizontal = sp.xl), height = 48.dp,
+                        color = MaterialTheme.colorScheme.surfaceContainerHigh, onColor = MaterialTheme.colorScheme.onSurface,
+                    )
                 }
                 Text("Separate files go to Download/Grabbit as .srt", style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(horizontal = sp.xl, vertical = sp.s))
