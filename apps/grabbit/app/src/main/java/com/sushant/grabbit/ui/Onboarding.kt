@@ -246,7 +246,7 @@ private fun BatteryPage() {
     Badge(Icons.Rounded.BatteryChargingFull, MaterialShapes.Pill.toShape())
     Heading("Download with the screen off", "Android slows apps down in the background to save battery. Allow Grabbit so big downloads keep full speed when your screen is off.")
     if (on) Done("Allowed")
-    else Button(onClick = { BatteryAccess.request(ctx) }, modifier = Modifier.testTag("obBattery")) { Text("Allow") }
+    else Button(onClick = { BatteryAccess.request(ctx) }, modifier = Modifier.testTag("obBattery")) { Text("Allow background downloads") }
 }
 
 @Composable

@@ -618,7 +618,9 @@ class GrabbitE2ETest {
             val byText = androidx.test.uiautomator.By.text(java.util.regex.Pattern.compile("(?i)^allow$"))
             val t0 = System.currentTimeMillis()
             while (System.currentTimeMillis() - t0 < 20_000) {
-                val b = ui.findObject(byText) ?: ui.findObject(androidx.test.uiautomator.By.res("android", "button1"))
+                // Only Android's dialog, never a button inside Grabbit itself
+                val b = ui.findObjects(byText).firstOrNull { it.applicationPackage != ctx.packageName }
+                    ?: ui.findObject(androidx.test.uiautomator.By.res("android", "button1"))
                     ?: ui.findObject(androidx.test.uiautomator.By.res("com.android.permissioncontroller", "permission_allow_button"))
                 if (b != null) { b.click(); break }
                 Thread.sleep(500)
