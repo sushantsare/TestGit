@@ -292,7 +292,7 @@ class WalkthroughTest {
         clickTab("home"); shot("home"); click("open_settings"); shot("settings"); back()
         app.prefs.update { it.copy(themeMode = ThemeMode.LIGHT, pureBlack = false) }; suffix = ""
 
-        scenario.close()
+        runCatching { scenario.close() }          // the activity may already be in the background
         log("walkthrough done: $shots screenshots, ${problems.size} problems")
         assertTrue("Problems: $problems", problems.isEmpty())
     }
