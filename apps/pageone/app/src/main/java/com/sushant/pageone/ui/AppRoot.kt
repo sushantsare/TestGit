@@ -14,6 +14,8 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.testTagsAsResourceId
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
@@ -85,7 +87,7 @@ fun AppRoot(vm: MainVm, activity: MainActivity) {
 
     val fIn = fadeIn(tween(250, delayMillis = 50, easing = LinearEasing))
     val fOut = fadeOut(tween(250, easing = LinearEasing))
-    Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface)) {
+    Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface).semantics { testTagsAsResourceId = true }) {
         NavHost(
             nav, startDestination = start,
             enterTransition = { fIn }, exitTransition = { fOut },

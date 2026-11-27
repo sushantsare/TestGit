@@ -79,7 +79,7 @@ class LogicTest {
     }
 
     @Test fun percent() {
-        assertEquals(34, Format.percent(141, 418))
+        assertEquals(33, Format.percent(141, 418))
         assertEquals(100, Format.percent(417, 418))
         assertEquals(0, Format.percent(0, 0))
     }

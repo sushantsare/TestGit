@@ -127,6 +127,16 @@ class WalkthroughTest {
         waitTag("pdf_row"); compose.onAllNodesWithTag("pdf_row", useUnmergedTree = true).onFirst().performClick(); compose.waitForIdle()
     }
 
+    /** Show (true) or hide (false) the reader's toolbars by tapping the page. */
+    private fun chrome(visible: Boolean) {
+        repeat(3) {
+            if (has("reader_find") == visible) return
+            runCatching { compose.onNodeWithTag("page_0").performTouchInput { click(Offset(width * 0.5f, height * 0.6f)) } }
+            Thread.sleep(700); compose.waitForIdle()
+        }
+        if (has("reader_find") != visible) problem("reader toolbars did not ${if (visible) "show" else "hide"}")
+    }
+
     private fun clickTab(t: String) { if (has("tab_$t")) click("tab_$t") else { repeat(4) { if (!has("tab_$t")) back() }; click("tab_$t", soft = true) } }
 
     @Test
@@ -166,13 +176,13 @@ class WalkthroughTest {
         // ---------- reader
         compose.onAllNodesWithTag("pdf_row", useUnmergedTree = true).onFirst().performClick()
         if (!waitTag("page_0", 15_000)) problem("reader did not show page 1")
-        shot("reader")
-        compose.onNodeWithTag("page_0").performTouchInput { click(center) }; shot("reader_fullscreen")
-        compose.onNodeWithTag("page_0").performTouchInput { click(center) }
+        Thread.sleep(1500); shot("reader")
+        chrome(false); shot("reader_fullscreen"); chrome(true)
         // pinch zoom
         compose.onNodeWithTag("pages").performTouchInput { pinch(center - Offset(80f, 0f), center - Offset(240f, 0f), center + Offset(80f, 0f), center + Offset(240f, 0f)) }
         Thread.sleep(800); shot("reader_zoomed")
         compose.onNodeWithTag("page_0").performTouchInput { doubleClick(center) }; Thread.sleep(500)
+        chrome(true)
         // find
         click("reader_find"); type("find_field", "tense")
         compose.onNodeWithTag("find_field").performImeAction()

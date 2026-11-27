@@ -43,7 +43,7 @@ class PdfDoc private constructor(
     private val pfd: ParcelFileDescriptor,
     private val renderer: PdfRenderer,
     val pageCount: Int,
-    val sizes: List<SizeF>,
+    val sizes: androidx.compose.runtime.snapshots.SnapshotStateList<SizeF>,
     val fingerprint: String,
     val sourceFile: File,          // readable file with the same bytes (original path, or a private copy)
     val password: String?,
@@ -62,6 +62,16 @@ class PdfDoc private constructor(
     }
 
     val hasRichText get() = Build.VERSION.SDK_INT >= 35
+
+    private fun measureRest(from: Int) {
+        exec.execute {
+            for (i in from until pageCount) {
+                if (closed) return@execute
+                val sz = runCatching { renderer.openPage(i).use { SizeF(it.width.toFloat(), it.height.toFloat()) } }.getOrNull() ?: continue
+                if (sz != sizes[i]) android.os.Handler(android.os.Looper.getMainLooper()).post { if (i < sizes.size) sizes[i] = sz }
+            }
+        }
+    }
 
     /** Render [page] [widthPx] wide (after optional crop/rotation). White paper behind transparent PDFs. */
     suspend fun render(page: Int, widthPx: Int, crop: RectF? = null, rotation: Int = 0): Bitmap? = withContext(thread) {
@@ -220,10 +230,14 @@ class PdfDoc private constructor(
                 throw e
             }
             val count = renderer.pageCount
-            val sizes = ArrayList<SizeF>(count)
-            for (i in 0 until count) renderer.openPage(i).use { sizes += SizeF(it.width.toFloat(), it.height.toFloat()) }
+            // first pages now (so the first screen is right), the rest in the background: big books open instantly
+            val first = minOf(count, 25)
+            val sizes = androidx.compose.runtime.mutableStateListOf<SizeF>()
+            for (i in 0 until first) renderer.openPage(i).use { sizes += SizeF(it.width.toFloat(), it.height.toFloat()) }
+            val guess = sizes.lastOrNull() ?: SizeF(595f, 842f)
+            for (i in first until count) sizes += guess
             val fp = FileInputStream(src).use { Library.fingerprintStream(it, src.length()) }
-            return PdfDoc(ref, pfd, renderer, count, sizes, fp, src, password)
+            return PdfDoc(ref, pfd, renderer, count, sizes, fp, src, password).also { if (count > first) it.measureRest(first) }
         }
 
         @RequiresApi(35)
