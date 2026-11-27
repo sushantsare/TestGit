@@ -55,11 +55,11 @@ data class GlobalOpts(
     /** 0 = most compatible (H.264/AAC in MP4), 1 = highest quality (VP9/AV1 allowed). */
     val videoFormat: Int = 0,
     val faster: Boolean = true,
-    /** Use aria2c (many connections per file) for whole-file downloads. */
-    val multiConn: Boolean = false,
     val embedThumb: Boolean = true,
     /** SponsorBlock categories to remove from YouTube videos (empty = off). */
     val sponsorCats: Set<String> = emptySet(),
+    /** Use aria2c (many connections per file) for whole-file downloads. */
+    val multiConn: Boolean = false,
 )
 
 /** Builds the yt-dlp options for one download. Pure, so it is unit-tested. */
