@@ -167,6 +167,12 @@ class WalkthroughTest {
         shot("home")
         compose.onNodeWithTag("home_list").performTouchInput { swipeUp() }; shot("home_scrolled")
         compose.onNodeWithTag("home_list").performTouchInput { swipeDown() }
+        run {   // the sort arrow sits on the same line as Name / Date / Size
+            val a = compose.onNodeWithTag("folder_sort_0", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+            val b = compose.onNodeWithTag("folder_sort_dir", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+            log("sort row: chip $a arrow $b")
+            if (kotlin.math.abs(a.center.y - b.center.y) > 2f || kotlin.math.abs(a.height - b.height) > 2f) problem("sort arrow not in line")
+        }
         click("folder_sort_1"); shot("home_sort_date"); click("folder_sort_0")
 
         // ---------- + tools menu
