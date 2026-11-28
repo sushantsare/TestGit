@@ -120,7 +120,10 @@ object Media {
         }
         if (!Engine.awaitReady()) throw IllegalStateException(Engine.failMessage())
         val channel = isChannel(url)
-        val target = if (channel && !url.contains("/videos")) url.substringBefore('?').trimEnd('/') + "/videos" else url
+        // YouTube Music playlists: read them through the normal YouTube playlist page, which yt-dlp parses reliably
+        val music = Regex("""^https?://music\.youtube\.com/playlist\?list=([\w-]+)""").find(url)
+        val base = if (music != null) "https://www.youtube.com/playlist?list=${music.groupValues[1]}" else url
+        val target = if (channel && !base.contains("/videos")) base.substringBefore('?').trimEnd('/') + "/videos" else base
         val req = YoutubeDLRequest(target).apply {
             addOption("-J")
             addOption("--flat-playlist")
