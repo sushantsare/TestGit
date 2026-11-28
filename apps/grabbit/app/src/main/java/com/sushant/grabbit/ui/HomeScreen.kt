@@ -110,6 +110,7 @@ fun HomeScreen(vm: MainViewModel, modifier: Modifier) {
     val ctx = LocalContext.current
     val list = rememberLazyListState()
     val loaded = vm.fetchState is FetchState.Loaded
+    PlaylistPicker(vm)
 
     // Permissions are asked here, the first time the user downloads, never at app start.
     var pending by remember { mutableStateOf<Triple<MediaInfo, String, DlOpts>?>(null) }
@@ -453,7 +454,7 @@ internal fun MediaCard(info: MediaInfo, framed: Boolean = true, onDownload: (Med
                 Spacer(Modifier.height(sp.l))
                 val fmtName = AUDIO_FORMAT_LABELS.firstOrNull { it.first == st.audioFormat }?.second ?: "MP3"
                 val label = when {
-                    info.isPlaylist -> "Download all (${info.count})"
+                    info.isPlaylist -> "Choose videos (${info.count})"
                     audio && (chosenAudio == null || chosenAudio.key == "audio") -> "Download $fmtName · best"
                     audio -> "Download $fmtName · ${chosenAudio!!.label}" + fmtSize((chosenAudio.size * st.keptShare).toLong()).let { if (it.isEmpty()) "" else " · $it" }
                     chosen == null || chosen.key == "best" -> if (st.trimmed) "Download best quality · trimmed" else "Download best quality"

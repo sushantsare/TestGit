@@ -51,6 +51,7 @@ object Paused {
                     url = o.getString("url"), title = o.optString("title"), thumb = o.optString("thumb"),
                     site = o.optString("site"), quality = o.optString("quality", "best"), playlist = o.optBoolean("playlist"),
                     opts = DlOpts.decode(o.optString("opts")), key = o.getString("key"), gallery = o.optBoolean("gal"),
+                    subfolder = o.optString("sf"), gated = o.optBoolean("gt"),
                 ),
                 pct = o.optDouble("pct", 0.0).toFloat(), size = o.optString("size"),
                 canContinue = o.optBoolean("cont", true), time = o.optLong("time"),
@@ -66,6 +67,7 @@ object Paused {
                 put("quality", p.job.quality); put("playlist", p.job.playlist); put("opts", p.job.opts.encode())
                 put("key", p.job.key); put("pct", p.pct.toDouble()); put("size", p.size); put("cont", p.canContinue)
                 put("time", p.time); put("gal", p.job.gallery)
+                put("sf", p.job.subfolder); put("gt", p.job.gated)
             })
         }
         runCatching { file.writeText(arr.toString()) }

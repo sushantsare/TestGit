@@ -49,6 +49,12 @@ class MainViewModel(private val app: Application) : AndroidViewModel(app) {
         private set
     var loginSite by mutableStateOf<LoginSite?>(null)
 
+    /** Playlist / channel being picked from, with the quality and options chosen for it. */
+    var picker by mutableStateOf<MediaInfo?>(null)
+    var pickerChecking by mutableStateOf(false)
+    var pickerQuality = "best"
+    var pickerOpts = com.sushant.grabbit.download.DlOpts()
+
     /** The header mark's drop-in animation plays once per app open. */
     var playIntro = false
 
@@ -105,12 +111,61 @@ class MainViewModel(private val app: Application) : AndroidViewModel(app) {
     }
 
     fun download(info: MediaInfo, quality: String, opts: com.sushant.grabbit.download.DlOpts = com.sushant.grabbit.download.DlOpts()) {
+        if (info.isPlaylist) {
+            // Playlists and channels: the user picks the videos first
+            picker = info; pickerQuality = quality; pickerOpts = opts
+            return
+        }
         Downloads.enqueue(
             app,
             Downloads.Job(info.url, info.title, info.thumbnail, info.site, quality, info.isPlaylist, opts, items = info.gallery),
         )
         app.toast(if (info.isPlaylist) "Added ${info.count} videos to downloads" else "Download started")
         // The job is queued: start the Grab tab fresh for the next link
+        url = ""
+        resetFetch()
+        tab = 1
+    }
+
+    /** Looks at the playlist or channel again: new uploads show up for picking. */
+    fun refreshPicker() {
+        val cur = picker ?: return
+        if (pickerChecking) return
+        pickerChecking = true
+        fetchJob = viewModelScope.launch {
+            try {
+                val fresh = Media.fetchInfo(app, cur.url)
+                if (picker?.url == cur.url) picker = fresh
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Throwable) {
+                app.toast("Couldn't check for new videos: ${Errors.friendly(e.message ?: e.toString())}")
+            } finally {
+                pickerChecking = false
+            }
+        }
+    }
+
+    fun closePicker() { picker = null }
+
+    /** Queues each picked video as its own download, skipping ones already downloaded or queued. */
+    fun downloadPicked(chosen: List<com.sushant.grabbit.engine.PlaylistEntry>) {
+        val info = picker ?: return
+        val known = com.sushant.grabbit.download.Archive.known(app)
+        val todo = chosen.filter { com.sushant.grabbit.download.Archive.keyOf(it) !in known }
+        val folder = com.sushant.grabbit.download.FileNames.clean(info.title).ifBlank { "Playlist" }.take(60)
+        todo.forEach { e ->
+            Downloads.enqueue(
+                app,
+                Downloads.Job(
+                    e.url, e.title, e.thumb, info.site, pickerQuality, false, pickerOpts.copy(name = ""),
+                    subfolder = folder, gated = true,
+                ),
+            )
+        }
+        com.sushant.grabbit.download.Archive.add(app, todo.map { com.sushant.grabbit.download.Archive.keyOf(it) })
+        app.toast(if (todo.isEmpty()) "Nothing new to download" else "Added ${todo.size} videos to downloads")
+        picker = null
         url = ""
         resetFetch()
         tab = 1

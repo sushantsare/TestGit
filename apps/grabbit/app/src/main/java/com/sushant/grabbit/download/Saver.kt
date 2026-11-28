@@ -64,6 +64,7 @@ object Saver {
         onProgress: (done: Long, total: Long) -> Unit = { _, _ -> },
         folder: String = "",
         images: Boolean = false,
+        sub: String = "",
     ): List<SavedItem> {
         val all = dir.walkTopDown().filter { it.isFile && it.length() > 0 }.sortedBy { it.name }.toList()
         val files = all.filter { val e = it.extension.lowercase(); e !in SKIP || (images && e in IMAGE_EXT) }
@@ -83,16 +84,16 @@ object Saver {
             }
             val len = f.length()
             val report: (Long) -> Unit = { d -> onProgress(before + d, grand) }
-            (if (folder.isNotBlank()) saveToFolder(ctx, f, base, folder, site, thumb, url, report)
-            else save(ctx, f, base, base, site, thumb, url, report)).also { before += len }
+            (if (folder.isNotBlank()) saveToFolder(ctx, f, base, folder, sub, site, thumb, url, report)
+            else save(ctx, f, base, base, site, thumb, url, report, sub)).also { before += len }
         }
         if (keepSubs) all.filter { it.extension.lowercase() in SUBS && it.exists() }.forEach { f ->
             // "title [id].en.srt" -> "<name>.en.srt"
             val lang = f.nameWithoutExtension.substringAfterLast('.', "").takeIf { it.length in 2..8 && ' ' !in it }
             val subBase = if (lang != null) "$mainBase.$lang" else mainBase
             runCatching {
-                if (folder.isNotBlank()) saveToFolder(ctx, f, subBase, folder, site, thumb, url) {}
-                else save(ctx, f, mainBase, subBase, site, thumb, url)
+                if (folder.isNotBlank()) saveToFolder(ctx, f, subBase, folder, sub, site, thumb, url) {}
+                else save(ctx, f, mainBase, subBase, site, thumb, url, sub = sub)
             }
         }
         return items
@@ -100,14 +101,17 @@ object Saver {
 
     /** Saves into a folder the user picked (Android's folder picker / SAF). */
     private fun saveToFolder(
-        ctx: Context, f: File, base: String, folder: String, site: String, thumb: String, url: String, onBytes: (Long) -> Unit,
+        ctx: Context, f: File, base: String, folder: String, sub: String, site: String, thumb: String, url: String, onBytes: (Long) -> Unit,
     ): SavedItem {
         val treeUri = Uri.parse(folder)
         val tree = androidx.documentfile.provider.DocumentFile.fromTreeUri(ctx, treeUri)?.takeIf { it.canWrite() }
             ?: throw IOException("The chosen folder isn't available any more. Pick it again in Save to.")
+        // Playlist videos go into a sub-folder named after the playlist
+        val target = if (sub.isBlank()) tree else (tree.findFile(sub)?.takeIf { it.isDirectory } ?: tree.createDirectory(sub)
+            ?: throw IOException("Couldn't make the playlist folder"))
         val mime = mimeOf(f.extension)
-        val wanted = FileNames.unique(base, f.extension) { tree.findFile(it) != null }
-        val doc = tree.createFile(mime, wanted) ?: throw IOException("Couldn't create the file in that folder")
+        val wanted = FileNames.unique(base, f.extension) { target.findFile(it) != null }
+        val doc = target.createFile(mime, wanted) ?: throw IOException("Couldn't create the file in that folder")
         try {
             (ctx.contentResolver.openOutputStream(doc.uri, "w") ?: throw IOException("Couldn't open that folder")).use { copy(f, it, onBytes) }
         } catch (e: Exception) {
@@ -150,7 +154,9 @@ object Saver {
         onBytes(done)
     }
 
-    private fun save(ctx: Context, f: File, title: String, base: String, site: String, thumb: String, url: String, onBytes: (Long) -> Unit = {}): SavedItem {
+    private fun subPath(sub: String) = if (sub.isBlank()) "" else "/$sub"
+
+    private fun save(ctx: Context, f: File, title: String, base: String, site: String, thumb: String, url: String, onBytes: (Long) -> Unit = {}, sub: String = ""): SavedItem {
         val mime = mimeOf(f.extension)
         val isAudio = mime.startsWith("audio")
         val isVideo = mime.startsWith("video")
@@ -174,11 +180,11 @@ object Saver {
                 else -> MediaStore.Downloads.getContentUri(vol)
             }
             val cr = ctx.contentResolver
-            name = FileNames.unique(base, f.extension) { n -> taken(ctx, n, "$dirType/Grabbit/") }
+            name = FileNames.unique(base, f.extension) { n -> taken(ctx, n, "$dirType/Grabbit${subPath(sub)}/") }
             val values = ContentValues().apply {
                 put(MediaStore.MediaColumns.DISPLAY_NAME, name)
                 put(MediaStore.MediaColumns.MIME_TYPE, mime)
-                put(MediaStore.MediaColumns.RELATIVE_PATH, "$dirType/Grabbit")
+                put(MediaStore.MediaColumns.RELATIVE_PATH, "$dirType/Grabbit${subPath(sub)}")
                 put(MediaStore.MediaColumns.IS_PENDING, 1)
             }
             uri = cr.insert(coll, values) ?: throw IOException("Couldn't create the file in phone storage")

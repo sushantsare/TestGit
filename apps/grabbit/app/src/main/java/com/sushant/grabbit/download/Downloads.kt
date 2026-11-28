@@ -22,6 +22,10 @@ object Downloads {
         /** Photo-post items to download (kept in a file by key, not in job data). */
         val items: List<com.sushant.grabbit.engine.GalleryItem> = emptyList(),
         val gallery: Boolean = items.isNotEmpty(),
+        /** Playlist videos: folder for this playlist ("" = none). */
+        val subfolder: String = "",
+        /** Playlist videos: wait for one of the three playlist download slots. */
+        val gated: Boolean = false,
     )
 
     fun enqueue(ctx: Context, job0: Job, resume: Boolean = false): UUID {
@@ -42,6 +46,8 @@ object Downloads {
                     DownloadWorker.K_KEY to job.key,
                     DownloadWorker.K_RESUME to resume,
                     DownloadWorker.K_GALLERY to job.gallery,
+                    DownloadWorker.K_SUB to job.subfolder,
+                    DownloadWorker.K_GATED to job.gated,
                 )
             )
             .setExpedited(OutOfQuotaPolicy.RUN_AS_NON_EXPEDITED_WORK_REQUEST)
@@ -55,6 +61,8 @@ object Downloads {
             .addTag("o:${job.opts.encode()}")
             .addTag("k:${job.key}")
             .addTag("g:${if (job.gallery) 1 else 0}")
+            .addTag("sf:${job.subfolder}")
+            .addTag("gt:${if (job.gated) 1 else 0}")
             .addTag("c:${System.currentTimeMillis()}")
             .build()
         WorkManager.getInstance(ctx).enqueue(req)
@@ -76,6 +84,8 @@ object Downloads {
         opts = DlOpts.decode(w.tag("o:")),
         key = w.tag("k:"),
         gallery = w.tag("g:") == "1",
+        subfolder = w.tag("sf:"),
+        gated = w.tag("gt:") == "1",
     )
 
     /** Folder holding a job's half-finished files. */

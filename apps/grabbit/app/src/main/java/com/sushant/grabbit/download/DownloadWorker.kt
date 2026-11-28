@@ -21,6 +21,7 @@ import com.sushant.grabbit.engine.Threads
 import com.yausername.youtubedl_android.YoutubeDL
 import com.yausername.youtubedl_android.YoutubeDLRequest
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import java.io.File
 
@@ -37,6 +38,10 @@ class DownloadWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(c
         const val K_KEY = "key"
         const val K_RESUME = "resume"
         const val K_GALLERY = "gallery"
+        const val K_SUB = "sub"
+        const val K_GATED = "gated"
+        /** Playlist videos download three at a time. */
+        val gate = kotlinx.coroutines.sync.Semaphore(3)
         const val K_ERROR = "error"
         const val K_RAW = "raw"
         const val P_PCT = "p"
@@ -97,7 +102,7 @@ class DownloadWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(c
         runCatching { wake.acquire(6 * 60 * 60 * 1000L) }
         runCatching { wifi?.acquire() }
         try {
-            return work()
+            return if (inputData.getBoolean(K_GATED, false)) gate.withPermit { work() } else work()
         } finally {
             runCatching { if (wake.isHeld) wake.release() }
             runCatching { if (wifi?.isHeld == true) wifi.release() }
@@ -320,7 +325,7 @@ class DownloadWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(c
         val saved = try {
             Saver.saveAll(ctx, tmp, title, site, thumb, url, keepSubs = opts.keepSubFiles, name = opts.name,
                 onProgress = { d, t -> publish(d * 100f / t, "", 0, "${Progress.bytes(d)} of ${Progress.bytes(t)}", false) },
-                folder = folder)
+                folder = folder, sub = inputData.getString(K_SUB).orEmpty())
         } catch (e: Exception) {
             return fail("Couldn't save the file: ${e.message ?: e}", e.toString())
         } finally {

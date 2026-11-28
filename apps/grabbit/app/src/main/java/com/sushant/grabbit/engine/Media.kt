@@ -9,6 +9,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
 
+/** One video inside a playlist or channel listing. */
+data class PlaylistEntry(val id: String, val title: String, val url: String, val duration: Long, val thumb: String)
+
 data class MediaInfo(
     val url: String,
     val title: String,
@@ -31,6 +34,8 @@ data class MediaInfo(
     val chapters: Int = 0,
     /** Photo post (carousel, gallery, tweet photos): every item, photos and videos. Empty for normal videos. */
     val gallery: List<GalleryItem> = emptyList(),
+    /** Playlist or channel videos to pick from (empty for single videos). */
+    val entries: List<PlaylistEntry> = emptyList(),
 )
 
 data class SubLang(val code: String, val name: String, val auto: Boolean)
@@ -114,9 +119,13 @@ object Media {
             )
         }
         if (!Engine.awaitReady()) throw IllegalStateException(Engine.failMessage())
-        val req = YoutubeDLRequest(url).apply {
+        val channel = isChannel(url)
+        val target = if (channel && !url.contains("/videos")) url.substringBefore('?').trimEnd('/') + "/videos" else url
+        val req = YoutubeDLRequest(target).apply {
             addOption("-J")
             addOption("--flat-playlist")
+            // Channels: only their latest 20 videos
+            if (channel) addOption("--playlist-end", "20")
             addOption("--no-warnings")
         }
         Cookies.apply(ctx, req)
@@ -137,6 +146,10 @@ object Media {
         parse(url, JSONObject(json))
     }
 
+    /** Channel pages (@name, /channel/, /c/, /user/): their latest 20 videos are listed. */
+    fun isChannel(url: String): Boolean = CHANNEL.containsMatchIn(url.substringBefore('?').substringBefore('#'))
+    private val CHANNEL = Regex('''youtube\.com/(@[^/]+|channel/[^/]+|c/[^/]+|user/[^/]+)(/(videos|featured|shorts|streams))?/?$''')
+
     private fun JSONObject.str(k: String): String = if (isNull(k)) "" else optString(k, "")
 
     private fun parse(url: String, j: JSONObject): MediaInfo {
@@ -155,9 +168,26 @@ object Media {
                     if (th != null && th.length() > 0) thumb = th.optJSONObject(th.length() - 1)?.str("url").orEmpty()
                 }
             }
+            val picks = buildList {
+                for (i in 0 until (entries?.length() ?: 0)) {
+                    val e = entries?.optJSONObject(i) ?: continue
+                    val id = e.str("id")
+                    val eu = e.str("url")
+                    val link = when {
+                        eu.startsWith("http") -> eu
+                        id.isNotBlank() -> "https://www.youtube.com/watch?v=$id"
+                        else -> continue
+                    }
+                    val thumbOf = e.str("thumbnail").ifBlank {
+                        e.optJSONArray("thumbnails")?.let { t -> t.optJSONObject(t.length() - 1)?.str("url") }.orEmpty()
+                    }
+                    val len = e.optDouble("duration", 0.0).let { if (it.isNaN()) 0L else it.toLong() }
+                    add(PlaylistEntry(id, e.str("title").ifBlank { id.ifBlank { "Video ${i + 1}" } }, link, len, thumbOf))
+                }
+            }
             return MediaInfo(
-                url, title, uploader, thumb, 0, site, true, entries?.length() ?: 0,
-                listOf(1080, 720, 480, 360), emptyMap(), true,
+                url, title, uploader, thumb, 0, site, true, picks.size,
+                listOf(1080, 720, 480, 360), emptyMap(), true, entries = picks,
             )
         }
 
