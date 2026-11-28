@@ -52,7 +52,7 @@ class DownloadWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(c
 
         fun buildRequest(
             ctx: Context, url: String, quality: String, playlist: Boolean, dir: File, opts: DlOpts,
-            multiConnAllowed: Boolean = true,
+            multiConnAllowed: Boolean = true, youtubeLogin: Boolean = false,
         ): YoutubeDLRequest {
             val r = YoutubeDLRequest(url)
             val g = GlobalOpts(if (opts.videoFormat >= 0) opts.videoFormat else Prefs.videoFormat, Prefs.fasterDownloads, Prefs.embedThumb, Prefs.sponsorCats,
@@ -61,7 +61,7 @@ class DownloadWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(c
             DownloadArgs.build(quality, playlist, dir.absolutePath, opts, g, yt).forEach { (k, v) ->
                 if (v == null) r.addOption(k) else r.addOption(k, v)
             }
-            Cookies.apply(ctx, r)
+            Cookies.apply(ctx, r, url, youtubeLogin)
             return r
         }
     }
@@ -230,9 +230,10 @@ class DownloadWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(c
             nm.notify(nid, Notifs.progress(ctx, title, text, pct.toInt(), busy, id))
         }
 
-        suspend fun grab(o: DlOpts) = withContext(Dispatchers.IO) {
+        var ytLogin = false
+        suspend fun grabOnce(o: DlOpts) = withContext(Dispatchers.IO) {
             val tStart = SystemClock.elapsedRealtime()
-            YoutubeDL.getInstance().execute(buildRequest(ctx, source, quality, playlist, tmp, o, multi), processId = id.toString(), callback = { p, eta, line ->
+            YoutubeDL.getInstance().execute(buildRequest(ctx, source, quality, playlist, tmp, o, multi, ytLogin), processId = id.toString(), callback = { p, eta, line ->
                 if (line.contains("esuming") || line.contains("already been downloaded")) timing("RESUMED $line")
                 val work = Stages.statusFor(line)
                 val item = ITEM.find(line)
@@ -253,6 +254,20 @@ class DownloadWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(c
             })
             val end = SystemClock.elapsedRealtime() - tStart
             if (tDl == 0L) tDl = end else tWork = end - tDl
+        }
+
+        /** YouTube downloads go logged out first; only if YouTube asks for a login is the saved one used. */
+        suspend fun grab(o: DlOpts) {
+            try {
+                grabOnce(o)
+            } catch (e: Exception) {
+                val raw = e.message ?: e.toString()
+                if (isStopped || ytLogin || !Cookies.youtubeLoggedIn() || Sites.siteName(source) != "YouTube" || !Errors.needsLogin(raw)) throw e
+                ytLogin = true
+                timing("YouTube wants a login, retrying with it")
+                tmp.listFiles()?.forEach { it.deleteRecursively() }
+                grabOnce(o)
+            }
         }
 
         try {

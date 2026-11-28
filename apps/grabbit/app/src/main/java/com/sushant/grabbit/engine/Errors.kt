@@ -6,6 +6,13 @@ object Errors {
     fun isSubtitleError(raw: String?): Boolean =
         raw != null && Regex("(?i)unable to download (video )?subtitles|subtitles? .*http error|timedtext|embedsubtitle").containsMatchIn(raw)
 
+    /** The site refused because it wants a logged-in user (age, private, members, bot check, Premium). */
+    fun needsLogin(raw: String?): Boolean {
+        val l = raw.orEmpty().lowercase()
+        return listOf("sign in", "not a bot", "private video", "members-only", "join this channel", "confirm your age",
+            "age-restricted", "login required", "requires login", "use --cookies", "premium", "this content isn't available").any { it in l }
+    }
+
     fun friendly(raw: String?): String {
         val m = raw?.trim().orEmpty()
         if (m.isEmpty()) return "Something went wrong. Please try again."

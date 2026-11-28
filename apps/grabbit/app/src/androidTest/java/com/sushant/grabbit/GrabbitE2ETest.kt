@@ -707,6 +707,23 @@ class GrabbitE2ETest {
         val apiOk = forced[0].second?.let { it.isPlaylist && it.count == engineN && it.entries.isNotEmpty() } == true
         val ownOk = forced[1].second?.let { com.sushant.grabbit.engine.Media.lastPlaylistVia.startsWith("grabbit") && it.entries.size == engineN } == true
         log("YTPL engineCount=$engineN ownDirect=$ownN apiOk=$apiOk ownOk=$ownOk")
+        // What 3.2 sent when any login was saved: the phone browser's identity. Does YouTube's page break with it?
+        val webUa = "Mozilla/5.0 (Linux; Android 16; Pixel 9 Build/BP2A; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/131.0.0.0 Mobile Safari/537.36"
+        val old = runCatching {
+            val req = com.yausername.youtubedl_android.YoutubeDLRequest("https://www.youtube.com/playlist?list=PLAdFiDLf78fc").apply {
+                addOption("-J"); addOption("--flat-playlist"); addOption("--playlist-items", "1:5"); addOption("--user-agent", webUa)
+            }
+            com.yausername.youtubedl_android.YoutubeDL.getInstance().execute(req, processId = "oldua", callback = null).out.length
+        }
+        log("YTPL oldWay(webview UA) -> ${old.getOrNull()?.let { "ok $it bytes" } ?: "ERR ${old.exceptionOrNull()?.message?.lines()?.lastOrNull { it.contains("ERROR") }?.take(200)}"}")
+        // Now: a saved (stale) YouTube login plus an Instagram login must not get in the way
+        com.sushant.grabbit.data.Cookies.testLogin("youtube", ".youtube.com\tTRUE\t/\tTRUE\t9999999999\tLOGIN_INFO\tstale\n.youtube.com\tTRUE\t/\tTRUE\t9999999999\tSID\tstale\n", webUa)
+        com.sushant.grabbit.data.Cookies.testLogin("instagram", ".instagram.com\tTRUE\t/\tTRUE\t9999999999\tsessionid\tstale\n", webUa)
+        val withLogin = runCatching { kotlinx.coroutines.runBlocking { com.sushant.grabbit.engine.Media.fetchInfo(ctx, "https://www.youtube.com/playlist?list=PLAdFiDLf78fc") } }
+        com.sushant.grabbit.data.Cookies.testLogin("youtube", "", "")
+        com.sushant.grabbit.data.Cookies.testLogin("instagram", "", "")
+        val loginOk = withLogin.getOrNull()?.let { it.isPlaylist && it.entries.isNotEmpty() && com.sushant.grabbit.engine.Media.lastPlaylistVia == "engine" } == true
+        log("YTPL withSavedLogins -> ${withLogin.getOrNull()?.let { "via=${com.sushant.grabbit.engine.Media.lastPlaylistVia} n=${it.entries.size}" } ?: "ERR ${withLogin.exceptionOrNull()?.message?.take(200)}"}")
         shown?.let { info ->
             compose.onNodeWithTag("nav_home").performClick()
             compose.activity.runOnUiThread { vm.show(info) }
@@ -715,7 +732,7 @@ class GrabbitE2ETest {
             shot("ytpl_1_picker")
             compose.activity.runOnUiThread { vm.show(null) }
         }
-        "ytplaylist=${oks.all { it }} ytApi=$apiOk ytOwn=$ownOk"
+        "ytplaylist=${oks.all { it }} ytApi=$apiOk ytLogins=$loginOk"
     }.getOrElse { log("YTPL failed: ${it.message}"); "ytplaylist=false" }
 
     /** Data saved by v2.8 (library entries in the old format) must load in 3.0; the new stores start empty. */

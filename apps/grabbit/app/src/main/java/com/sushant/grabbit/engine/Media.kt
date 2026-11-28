@@ -154,12 +154,12 @@ object Media {
     /** Test hook: pretend the engine failed, to check the fallbacks (0 = off, 1 = engine API, 2 = own reader only). */
     @Volatile var testFallback: Int = 0
 
-    private fun runJson(ctx: Context, url: String, pid: String, extra: List<Pair<String, String?>>): JSONObject {
+    private fun runJson(ctx: Context, url: String, pid: String, extra: List<Pair<String, String?>>, login: Boolean = false): JSONObject {
         val req = YoutubeDLRequest(url).apply {
             addOption("-J"); addOption("--flat-playlist"); addOption("--no-warnings")
             extra.forEach { (k, v) -> if (v == null) addOption(k) else addOption(k, v) }
         }
-        Cookies.apply(ctx, req)
+        Cookies.apply(ctx, req, url, login)
         val out = YoutubeDL.getInstance().execute(req, processId = pid, callback = null).out.trim()
         return JSONObject(out.lineSequence().lastOrNull { it.trimStart().startsWith("{") } ?: out)
     }
@@ -193,7 +193,15 @@ object Media {
         val first = listOf("--playlist-items" to "1:${PlaylistParser.PAGE}")
         try {
             if (testFallback > 0) throw IllegalStateException("ERROR: [youtube:tab] test: Unable to recognize tab page")
-            val info = parse(url, runJson(ctx, url, pid, first))
+            val info = try {
+                parse(url, runJson(ctx, url, pid, first))
+            } catch (e: Throwable) {
+                // YouTube said "log in": try again with the saved YouTube login
+                if (currentPid != pid || e is kotlinx.coroutines.CancellationException || !Cookies.youtubeLoggedIn() ||
+                    Sites.siteName(url) != "YouTube" || !Errors.needsLogin(e.message)) throw e
+                Log.w("Grabbit", "YouTube wants a login, retrying with it: ${e.message?.take(200)}")
+                parse(url, runJson(ctx, url, pid, first, login = true))
+            }
             if (info.isPlaylist) lastPlaylistVia = "engine"
             info
         } catch (e: Throwable) {
@@ -236,7 +244,11 @@ object Media {
             add("--playlist-items" to "$from:${from + PlaylistParser.PAGE - 1}")
             if (api) add("--extractor-args" to "youtubetab:skip=webpage")
         }
-        PlaylistParser.entries(runJson(ctx, target, "page-${System.nanoTime()}", extra), from - 1, site)
+        val j = try { runJson(ctx, target, "page-${System.nanoTime()}", extra) } catch (e: Throwable) {
+            if (!Cookies.youtubeLoggedIn() || !Errors.needsLogin(e.message)) throw e
+            runJson(ctx, target, "page-${System.nanoTime()}", extra, login = true)
+        }
+        PlaylistParser.entries(j, from - 1, site)
     }
 
     private fun JSONObject.str(k: String): String = if (isNull(k)) "" else optString(k, "")

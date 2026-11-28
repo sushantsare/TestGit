@@ -114,7 +114,34 @@ object Cookies {
     fun headerFor(host: String): String =
         if (!hasAny()) "" else CookieText.header(combined().readText(), host)
 
-    fun apply(@Suppress("UNUSED_PARAMETER") ctx: Context, req: YoutubeDLRequest) {
+    private val youtube get() = Sites.logins.first { it.key == "youtube" }
+
+    /** Test hook: saves login cookies for [key] as if the user had logged in ("" = log out). */
+    fun testLogin(key: String, text: String, ua: String) {
+        val s = Sites.logins.first { it.key == key }
+        if (text.isEmpty()) siteFile(s).delete() else siteFile(s).writeText(text)
+        Prefs.loginUserAgent = ua
+        rebuild()
+    }
+
+    fun youtubeLoggedIn(): Boolean = ::app.isInitialized && isLoggedIn(youtube)
+
+    /**
+     * Adds the saved logins to an engine request for [url].
+     * YouTube is special: public videos and playlists work best logged out (a saved login goes stale as
+     * YouTube rotates it, and the phone browser's identity makes YouTube send pages the engine can't read).
+     * So YouTube gets its login only when [youtubeLogin] is true — used as a retry when a video needs it —
+     * and never the phone browser's user agent.
+     */
+    fun apply(@Suppress("UNUSED_PARAMETER") ctx: Context, req: YoutubeDLRequest, url: String, youtubeLogin: Boolean = false) {
+        if (Sites.siteName(url) == "YouTube") {
+            if (youtubeLogin && youtubeLoggedIn()) {
+                val f = File(app.noBackupFilesDir, "youtube_cookies.txt")
+                f.writeText("# Netscape HTTP Cookie File\n" + siteFile(youtube).readText())
+                req.addOption("--cookies", f.absolutePath)
+            }
+            return
+        }
         val f = combined()
         if (f.exists() && f.length() > 0) {
             req.addOption("--cookies", f.absolutePath)
