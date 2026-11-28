@@ -151,6 +151,9 @@ object Media {
     /** How the last playlist was read: "engine", "engine-api" or "grabbit-web" / "grabbit-music" / "grabbit-watch". */
     @Volatile var lastPlaylistVia: String = ""
 
+    /** Test hook: pretend the engine failed, to check the fallbacks (0 = off, 1 = engine API, 2 = own reader only). */
+    @Volatile var testFallback: Int = 0
+
     private fun runJson(ctx: Context, url: String, pid: String, extra: List<Pair<String, String?>>): JSONObject {
         val req = YoutubeDLRequest(url).apply {
             addOption("-J"); addOption("--flat-playlist"); addOption("--no-warnings")
@@ -189,6 +192,7 @@ object Media {
         // Playlists: first 100 videos; more load as the user scrolls
         val first = listOf("--playlist-items" to "1:${PlaylistParser.PAGE}")
         try {
+            if (testFallback > 0) throw IllegalStateException("ERROR: [youtube:tab] test: Unable to recognize tab page")
             val info = parse(url, runJson(ctx, url, pid, first))
             if (info.isPlaylist) lastPlaylistVia = "engine"
             info
@@ -205,7 +209,7 @@ object Media {
     /** 1) the engine again, reading YouTube's API instead of the web page; 2) Grabbit's own playlist reader. */
     private fun youtubeFallback(ctx: Context, url: String, id: String, pid: String, first: List<Pair<String, String?>>): MediaInfo? {
         val plUrl = "https://www.youtube.com/playlist?list=$id"
-        runCatching {
+        if (testFallback != 2) runCatching {
             val info = parse(url, runJson(ctx, plUrl, pid, first + ("--extractor-args" to "youtubetab:skip=webpage")))
             if (info.isPlaylist && info.entries.isNotEmpty()) {
                 apiOnly += id; lastPlaylistVia = "engine-api"

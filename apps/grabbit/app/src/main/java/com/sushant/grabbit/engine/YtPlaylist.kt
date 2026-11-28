@@ -33,6 +33,7 @@ object YtPlaylist {
 
     /** Debug trail of the last read, shown in test logs. */
     @Volatile var lastTrail: String = ""
+    @Volatile var lastPages: String = ""
 
     fun read(id: String): Result {
         val trail = StringBuilder()
@@ -63,17 +64,26 @@ object YtPlaylist {
     private fun browse(c: Client, id: String): Result {
         val first = post(c, "browse", JSONObject().put("context", context(c)).put("browseId", "VL$id"))
         val head = YtPlaylistParser.header(first)
-        val all = YtPlaylistParser.videos(first).toMutableList()
-        var token = YtPlaylistParser.continuation(first)
-        val seen = HashSet<String>()
-        while (token != null && all.size < MAX && seen.add(token)) {
-            val more = post(c, "browse", JSONObject().put("context", context(c)).put("continuation", token))
-            val got = YtPlaylistParser.videos(more)
-            if (got.isEmpty()) break
-            all += got
-            token = YtPlaylistParser.continuation(more)
+        val all = LinkedHashMap<String, YtPlaylistParser.Vid>()
+        YtPlaylistParser.videos(first).forEach { all.putIfAbsent(it.id, it) }
+        var tokens = YtPlaylistParser.continuations(first)
+        val used = HashSet<String>()
+        val log = StringBuilder("p1=${all.size} t=${tokens.size}")
+        page@ while (all.size < MAX) {
+            // Try each "load more" token on the page until one brings new videos
+            var moved = false
+            for (t in tokens) {
+                if (!used.add(t)) continue
+                val more = runCatching { post(c, "browse", JSONObject().put("context", context(c)).put("continuation", t)) }.getOrNull() ?: continue
+                val before = all.size
+                YtPlaylistParser.videos(more).forEach { all.putIfAbsent(it.id, it) }
+                log.append(" +${all.size - before}")
+                if (all.size > before) { tokens = YtPlaylistParser.continuations(more); moved = true; break }
+            }
+            if (!moved) break@page
         }
-        return Result(id, head.first, head.second, YtPlaylistParser.toEntries(all), "")
+        lastPages = log.toString()
+        return Result(id, head.first, head.second, YtPlaylistParser.toEntries(all.values.toList()), "")
     }
 
     /** Watch-page queue (works for mixes and some music lists; up to about 200 videos). */
@@ -195,6 +205,16 @@ object YtPlaylistParser {
             if (out.isNotEmpty()) return out.values.toList()
         }
         return emptyList()
+    }
+
+    /** Every "load more" token on the page; the playlist's own one usually comes last. */
+    fun continuations(j: JSONObject): List<String> {
+        val out = mutableListOf<String>()
+        walk(j) { k, v ->
+            if (k == "continuationCommand") v.optString("token").takeIf { it.isNotBlank() }?.let { out += it }
+            if (k == "nextContinuationData") v.optString("continuation").takeIf { it.isNotBlank() }?.let { out += it }
+        }
+        return out.distinct().reversed()
     }
 
     /** Token for the next 100 videos, or null at the end. */

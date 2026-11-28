@@ -679,7 +679,8 @@ class GrabbitE2ETest {
     private fun ytPlaylistFlow(): String = runCatching {
         val vm = ViewModelProvider(compose.activity)[MainViewModel::class.java]
         val own = runCatching { com.sushant.grabbit.engine.YtPlaylist.read("PLAdFiDLf78fc") }
-        log("YTPL own reader: ${own.getOrNull()?.let { "via=${it.via} n=${it.entries.size} title='${it.title}' owner='${it.owner}' first='${it.entries.firstOrNull()?.title}'" } ?: "ERR ${own.exceptionOrNull()?.message}"} trail=${com.sushant.grabbit.engine.YtPlaylist.lastTrail}")
+        log("YTPL own reader: ${own.getOrNull()?.let { "via=${it.via} n=${it.entries.size} title='${it.title}' owner='${it.owner}' first='${it.entries.firstOrNull()?.title}'" } ?: "ERR ${own.exceptionOrNull()?.message}"} trail=${com.sushant.grabbit.engine.YtPlaylist.lastTrail} pages=${com.sushant.grabbit.engine.YtPlaylist.lastPages}")
+        val ownN = own.getOrNull()?.entries?.size ?: 0
         val links = listOf(
             "https://youtube.com/playlist?list=PLAdFiDLf78fc&si=5tZiibOpAgsX8JQC",
             "https://music.youtube.com/playlist?list=PLAdFiDLf78fc&si=la54-Alb-V48oB53&drli=1",
@@ -693,6 +694,19 @@ class GrabbitE2ETest {
             if (info != null && shown == null) shown = info
             info != null && info.isPlaylist && info.entries.isNotEmpty()
         }
+        // Force each fallback the phone may need and check the whole list comes back
+        val engineN = shown?.count ?: 0
+        val forced = listOf(1, 2).map { mode ->
+            com.sushant.grabbit.engine.Media.testFallback = mode
+            val r = runCatching { kotlinx.coroutines.runBlocking { com.sushant.grabbit.engine.Media.fetchInfo(ctx, "https://www.youtube.com/playlist?list=PLAdFiDLf78fc") } }
+            com.sushant.grabbit.engine.Media.testFallback = 0
+            val i = r.getOrNull()
+            log("YTPL forced$mode -> ${i?.let { "via=${com.sushant.grabbit.engine.Media.lastPlaylistVia} n=${it.entries.size} count=${it.count} more=${it.hasMore}" } ?: "ERR ${r.exceptionOrNull()?.message?.take(200)}"}")
+            mode to i
+        }
+        val apiOk = forced[0].second?.let { it.isPlaylist && it.count == engineN && it.entries.isNotEmpty() } == true
+        val ownOk = forced[1].second?.let { com.sushant.grabbit.engine.Media.lastPlaylistVia.startsWith("grabbit") && it.entries.size == engineN } == true
+        log("YTPL engineCount=$engineN ownDirect=$ownN apiOk=$apiOk ownOk=$ownOk")
         shown?.let { info ->
             compose.onNodeWithTag("nav_home").performClick()
             compose.activity.runOnUiThread { vm.show(info) }
@@ -701,7 +715,7 @@ class GrabbitE2ETest {
             shot("ytpl_1_picker")
             compose.activity.runOnUiThread { vm.show(null) }
         }
-        "ytplaylist=${oks.all { it }}"
+        "ytplaylist=${oks.all { it }} ytApi=$apiOk ytOwn=$ownOk"
     }.getOrElse { log("YTPL failed: ${it.message}"); "ytplaylist=false" }
 
     /** Data saved by v2.8 (library entries in the old format) must load in 3.0; the new stores start empty. */
