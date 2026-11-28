@@ -202,6 +202,9 @@ object Media {
                 Log.w("Grabbit", "YouTube wants a login, retrying with it: ${e.message?.take(200)}")
                 parse(url, runJson(ctx, url, pid, first, login = true))
             }
+            // An empty YouTube playlist from the engine means it misread the page: use the fallbacks
+            if (info.isPlaylist && info.entries.isEmpty() && YtPlaylist.idFrom(url) != null)
+                throw IllegalStateException("ERROR: [youtube:tab] playlist came back empty")
             if (info.isPlaylist) lastPlaylistVia = "engine"
             info
         } catch (e: Throwable) {
