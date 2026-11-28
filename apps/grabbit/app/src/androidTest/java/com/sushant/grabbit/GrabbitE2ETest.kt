@@ -175,7 +175,7 @@ class GrabbitE2ETest {
         }
         val before = Library.items.value.size
         val failedBefore = failedCount()
-        compose.onNodeWithTag("downloadBtn").performScrollTo().performClick()
+        compose.onNodeWithTag("downloadBtn").performScrollTo().performSemanticsAction(androidx.compose.ui.semantics.SemanticsActions.OnClick)
         val start = System.currentTimeMillis()
         var shotProgress = false
         while (System.currentTimeMillis() - start < 300_000) {
@@ -424,7 +424,7 @@ class GrabbitE2ETest {
             compose.onNodeWithTag("saveToRow").performScrollTo()
             shot("folder_1_picked")
             val before = Library.items.value.size
-            compose.onNodeWithTag("downloadBtn").performScrollTo().performClick()
+            compose.onNodeWithTag("downloadBtn").performScrollTo().performSemanticsAction(androidx.compose.ui.semantics.SemanticsActions.OnClick)
             compose.waitUntil(180_000) { Library.items.value.size > before }
             val item = Library.items.value.maxByOrNull { it.time }!!
             val onDisk = java.io.File("/sdcard/Movies/GrabbitTest/${item.fileName}").exists() ||
@@ -466,7 +466,7 @@ class GrabbitE2ETest {
             compose.waitUntil(60_000) { exists("downloadBtn") || exists("fetchError") }
             shot("img_1_direct_card")
             val before = Library.items.value.size
-            compose.onNodeWithTag("downloadBtn").performScrollTo().performClick()
+            compose.onNodeWithTag("downloadBtn").performScrollTo().performSemanticsAction(androidx.compose.ui.semantics.SemanticsActions.OnClick)
             val ok = waitSaved(before)
             val it = Library.items.value.maxByOrNull { it.time }
             log("IMAGE direct ok=$ok name=${it?.fileName} mime=${it?.mime} size=${it?.size}")
@@ -626,7 +626,11 @@ class GrabbitE2ETest {
         val t0 = System.currentTimeMillis()
         while (System.currentTimeMillis() - t0 < 300_000) {
             val infos = wm.getWorkInfosByTag(Downloads.TAG).get().filter { Downloads.jobOf(it).opts.gt == "Test Playlist" }
-            val running = infos.count { it.state == androidx.work.WorkInfo.State.RUNNING || it.state == androidx.work.WorkInfo.State.ENQUEUED }
+            // Videos really downloading: a finishing video (already saving) hands over to the next one
+            val running = infos.count {
+                (it.state == androidx.work.WorkInfo.State.RUNNING || it.state == androidx.work.WorkInfo.State.ENQUEUED) &&
+                    it.progress.getString(com.sushant.grabbit.download.DownloadWorker.P_STAGE) != com.sushant.grabbit.download.Stages.SAVE
+            }
             maxRunning = maxOf(maxRunning, running)
             if (!shotTaken && running > 0) { Thread.sleep(1500); compose.waitForIdle(); shot("pl_3_downloading"); shotTaken = true }
             val done = Library.items.value.size - savedBefore
