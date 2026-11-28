@@ -12,7 +12,7 @@ object PlaylistStart {
         val total = maxOf(info.count, info.entries.maxOfOrNull { it.index } ?: 0)
         val title = opts.gt.ifBlank { info.title }
         val jobs = info.entries.map { e ->
-            Job(
+            Downloads.Job(
                 url = e.url, title = e.title, thumb = e.thumb, site = info.site, quality = quality, playlist = false,
                 opts = opts.copy(
                     name = FileNames.clean(PlaylistPick.fileName(e.index, total, e.title)),
