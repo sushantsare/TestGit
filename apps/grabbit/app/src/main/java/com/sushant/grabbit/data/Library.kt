@@ -18,6 +18,10 @@ data class SavedItem(
     val time: Long,
     val sourceUrl: String,
     val path: String?,
+    /** Playlist download run this file came from ("" = a single download), and the playlist's name. */
+    val group: String = "",
+    val groupTitle: String = "",
+    val groupIndex: Int = 0,
 ) {
     val isAudio get() = mime.startsWith("audio")
     val isImage get() = mime.startsWith("image")
@@ -68,6 +72,7 @@ object Library {
                 time = o.optLong("time"),
                 sourceUrl = o.optString("sourceUrl"),
                 path = if (o.has("path")) o.optString("path") else null,
+                group = o.optString("group"), groupTitle = o.optString("groupTitle"), groupIndex = o.optInt("groupIndex"),
             )
         }
     }.getOrDefault(emptyList())
@@ -80,6 +85,7 @@ object Library {
                 put("uri", s.uri); put("fileName", s.fileName); put("mime", s.mime); put("size", s.size)
                 put("time", s.time); put("sourceUrl", s.sourceUrl)
                 if (s.path != null) put("path", s.path)
+                if (s.group.isNotEmpty()) { put("group", s.group); put("groupTitle", s.groupTitle); put("groupIndex", s.groupIndex) }
             })
         }
         runCatching { file.writeText(arr.toString()) }

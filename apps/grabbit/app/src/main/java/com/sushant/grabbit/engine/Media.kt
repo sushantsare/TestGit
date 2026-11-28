@@ -31,7 +31,58 @@ data class MediaInfo(
     val chapters: Int = 0,
     /** Photo post (carousel, gallery, tweet photos): every item, photos and videos. Empty for normal videos. */
     val gallery: List<GalleryItem> = emptyList(),
+    /** Playlist: the videos loaded so far (100 at a time). */
+    val entries: List<PlEntry> = emptyList(),
+    /** Playlist id from the site, used to remember which videos were already downloaded. */
+    val playlistId: String = "",
+    /** True when the playlist has more videos than loaded so far. */
+    val hasMore: Boolean = false,
 )
+
+/** One video in a playlist. [index] is its number in the playlist (1-based). */
+data class PlEntry(
+    val index: Int, val id: String, val url: String, val title: String,
+    val duration: Long, val thumb: String, val timestamp: Long = 0, val available: Boolean = true,
+)
+
+/** Reads playlist entries from yt-dlp's flat-playlist JSON (pure, unit-tested). */
+object PlaylistParser {
+    const val PAGE = 100
+
+    private fun JSONObject.s(k: String): String = if (isNull(k)) "" else optString(k, "")
+
+    fun entries(j: JSONObject, offset: Int, site: String): List<PlEntry> {
+        val arr = j.optJSONArray("entries") ?: return emptyList()
+        return (0 until arr.length()).mapNotNull { i ->
+            val e = arr.optJSONObject(i) ?: return@mapNotNull null
+            val id = e.s("id")
+            var url = e.s("url").ifBlank { e.s("webpage_url") }
+            if (url.isNotBlank() && !url.startsWith("http")) url = ""
+            if (url.isBlank() && id.isNotBlank() && site == "YouTube") url = "https://www.youtube.com/watch?v=$id"
+            var thumb = e.s("thumbnail")
+            if (thumb.isBlank()) e.optJSONArray("thumbnails")?.let { th ->
+                // Smallest thumbnail that's still clear on a list row
+                val list = (0 until th.length()).mapNotNull { th.optJSONObject(it) }
+                thumb = (list.firstOrNull { it.optInt("width", 0) >= 240 } ?: list.lastOrNull())?.s("url").orEmpty()
+            }
+            val title = e.s("title")
+            val avail = e.s("availability")
+            val gone = url.isBlank() || title in setOf("[Private video]", "[Deleted video]", "[Unavailable video]") ||
+                avail in setOf("private", "needs_auth", "subscriber_only", "premium_only")
+            PlEntry(
+                index = e.optInt("playlist_index", 0).takeIf { it > 0 } ?: (offset + i + 1),
+                id = id, url = url, title = title.ifBlank { id.ifBlank { "Video ${offset + i + 1}" } },
+                duration = e.optDouble("duration", 0.0).let { if (it.isNaN()) 0L else it.toLong() },
+                thumb = thumb,
+                timestamp = e.optLong("timestamp", 0).takeIf { it > 0 } ?: e.s("upload_date").toLongOrNull() ?: 0,
+                available = !gone,
+            )
+        }
+    }
+
+    /** Total videos in the playlist, or -1 if the site didn't say. */
+    fun total(j: JSONObject): Int = j.optInt("playlist_count", -1)
+}
 
 data class SubLang(val code: String, val name: String, val auto: Boolean)
 
@@ -118,6 +169,8 @@ object Media {
             addOption("-J")
             addOption("--flat-playlist")
             addOption("--no-warnings")
+            // Playlists: first 100 videos; more load as the user scrolls
+            addOption("--playlist-items", "1:${PlaylistParser.PAGE}")
         }
         Cookies.apply(ctx, req)
         val pid = "info-${System.nanoTime()}"
@@ -127,6 +180,19 @@ object Media {
         val out = resp.out.trim()
         val json = out.lineSequence().lastOrNull { it.trimStart().startsWith("{") } ?: out
         parse(url, JSONObject(json))
+    }
+
+    /** Next 100 videos of a playlist, starting at number [from]. */
+    suspend fun playlistPage(ctx: Context, url: String, from: Int, site: String): List<PlEntry> = withContext(Dispatchers.IO) {
+        if (!Engine.awaitReady()) throw IllegalStateException(Engine.failMessage())
+        val req = YoutubeDLRequest(url).apply {
+            addOption("-J"); addOption("--flat-playlist"); addOption("--no-warnings")
+            addOption("--playlist-items", "$from:${from + PlaylistParser.PAGE - 1}")
+        }
+        Cookies.apply(ctx, req)
+        val out = YoutubeDL.getInstance().execute(req, processId = "page-${System.nanoTime()}", callback = null).out.trim()
+        val json = out.lineSequence().lastOrNull { it.trimStart().startsWith("{") } ?: out
+        PlaylistParser.entries(JSONObject(json), from - 1, site)
     }
 
     private fun JSONObject.str(k: String): String = if (isNull(k)) "" else optString(k, "")
@@ -147,9 +213,13 @@ object Media {
                     if (th != null && th.length() > 0) thumb = th.optJSONObject(th.length() - 1)?.str("url").orEmpty()
                 }
             }
+            val list = PlaylistParser.entries(j, 0, site)
+            val total = PlaylistParser.total(j)
             return MediaInfo(
-                url, title, uploader, thumb, 0, site, true, entries?.length() ?: 0,
+                url, title, uploader, thumb, 0, site, true, if (total > 0) total else list.size,
                 listOf(1080, 720, 480, 360), emptyMap(), true,
+                entries = list, playlistId = j.str("id").ifBlank { url },
+                hasMore = if (total > 0) list.size < total else list.size >= PlaylistParser.PAGE,
             )
         }
 

@@ -96,9 +96,12 @@ class DownloadWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(c
             ?.createWifiLock(android.net.wifi.WifiManager.WIFI_MODE_FULL_HIGH_PERF, "Grabbit:download")
         runCatching { wake.acquire(6 * 60 * 60 * 1000L) }
         runCatching { wifi?.acquire() }
+        val grp = DlOpts.decode(inputData.getString(K_OPTS)).grp
         try {
             return work()
         } finally {
+            // Playlist: let the next waiting video start
+            if (grp.isNotBlank()) runCatching { com.sushant.grabbit.data.PlaylistQueue.afterJob(applicationContext, grp, id) }
             runCatching { if (wake.isHeld) wake.release() }
             runCatching { if (wifi?.isHeld == true) wifi.release() }
         }
@@ -313,14 +316,14 @@ class DownloadWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(c
         // The chosen folder may have been deleted since: fall back to the Default folders
         val folder = opts.folder.takeIf { it.isNotBlank() && com.sushant.grabbit.data.Folders.valid(ctx, it) }.orEmpty()
         val folderLost = opts.folder.isNotBlank() && folder.isEmpty()
-        val where = com.sushant.grabbit.data.Folders.label(ctx, folder, audioOnly)
+        val where = com.sushant.grabbit.data.Folders.label(ctx, folder, audioOnly) + if (opts.sub.isNotBlank()) "/${opts.sub}" else ""
         stage = Stages.SAVE
         status = "Saving to $where…"
         publish(0f, "", 0, "", true)
         val saved = try {
             Saver.saveAll(ctx, tmp, title, site, thumb, url, keepSubs = opts.keepSubFiles, name = opts.name,
                 onProgress = { d, t -> publish(d * 100f / t, "", 0, "${Progress.bytes(d)} of ${Progress.bytes(t)}", false) },
-                folder = folder)
+                folder = folder, sub = opts.sub)
         } catch (e: Exception) {
             return fail("Couldn't save the file: ${e.message ?: e}", e.toString())
         } finally {
@@ -330,6 +333,15 @@ class DownloadWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(c
         val now = SystemClock.elapsedRealtime()
         timing("site=$site multi=${multi && Engine.aria2Ready && Prefs.fasterDownloads} bytes=${saved.sumOf { it.size }} download=${tDl}ms processing=${tWork + (tSave0 - tPost0)}ms save=${now - tSave0}ms total=${now - t0}ms")
 
+        if (opts.grp.isNotBlank()) {
+            // Playlist video: tag it with its playlist, remember it for "Only new", one summary notification per playlist
+            Library.add(saved.map { it.copy(group = opts.grp, groupTitle = opts.gt, groupIndex = opts.gi) })
+            com.sushant.grabbit.data.PlaylistQueue.Archive.add(opts.plId, opts.vid)
+            val done = Library.items.value.count { it.group == opts.grp }
+            Notifs.done(ctx, opts.grp.hashCode(), opts.gt.ifBlank { "Playlist" }, true,
+                "$done saved to $where · last: $title", null)
+            return Result.success()
+        }
         Library.add(saved)
         Notifs.done(ctx, nid + 1, title, true,
             (if (saved.size > 1) "${saved.size} files saved to $where" else "Saved to $where") +

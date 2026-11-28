@@ -64,6 +64,8 @@ object Saver {
         onProgress: (done: Long, total: Long) -> Unit = { _, _ -> },
         folder: String = "",
         images: Boolean = false,
+        /** Subfolder (playlist name) inside the folder. */
+        sub: String = "",
     ): List<SavedItem> {
         val all = dir.walkTopDown().filter { it.isFile && it.length() > 0 }.sortedBy { it.name }.toList()
         val files = all.filter { val e = it.extension.lowercase(); e !in SKIP || (images && e in IMAGE_EXT) }
@@ -83,16 +85,16 @@ object Saver {
             }
             val len = f.length()
             val report: (Long) -> Unit = { d -> onProgress(before + d, grand) }
-            (if (folder.isNotBlank()) saveToFolder(ctx, f, base, folder, site, thumb, url, report)
-            else save(ctx, f, base, base, site, thumb, url, report)).also { before += len }
+            (if (folder.isNotBlank()) saveToFolder(ctx, f, base, folder, site, thumb, url, report, sub)
+            else save(ctx, f, base, base, site, thumb, url, report, sub)).also { before += len }
         }
         if (keepSubs) all.filter { it.extension.lowercase() in SUBS && it.exists() }.forEach { f ->
             // "title [id].en.srt" -> "<name>.en.srt"
             val lang = f.nameWithoutExtension.substringAfterLast('.', "").takeIf { it.length in 2..8 && ' ' !in it }
             val subBase = if (lang != null) "$mainBase.$lang" else mainBase
             runCatching {
-                if (folder.isNotBlank()) saveToFolder(ctx, f, subBase, folder, site, thumb, url) {}
-                else save(ctx, f, mainBase, subBase, site, thumb, url)
+                if (folder.isNotBlank()) saveToFolder(ctx, f, subBase, folder, site, thumb, url, {}, sub)
+                else save(ctx, f, mainBase, subBase, site, thumb, url, {}, sub)
             }
         }
         return items
@@ -101,10 +103,15 @@ object Saver {
     /** Saves into a folder the user picked (Android's folder picker / SAF). */
     private fun saveToFolder(
         ctx: Context, f: File, base: String, folder: String, site: String, thumb: String, url: String, onBytes: (Long) -> Unit,
+        sub: String = "",
     ): SavedItem {
         val treeUri = Uri.parse(folder)
-        val tree = androidx.documentfile.provider.DocumentFile.fromTreeUri(ctx, treeUri)?.takeIf { it.canWrite() }
+        val root = androidx.documentfile.provider.DocumentFile.fromTreeUri(ctx, treeUri)?.takeIf { it.canWrite() }
             ?: throw IOException("The chosen folder isn't available any more. Pick it again in Save to.")
+        val tree = if (sub.isBlank()) root else synchronized(this) {
+            root.findFile(sub)?.takeIf { it.isDirectory } ?: root.createDirectory(sub)
+                ?: throw IOException("Couldn't create the playlist folder")
+        }
         val mime = mimeOf(f.extension)
         val wanted = FileNames.unique(base, f.extension) { tree.findFile(it) != null }
         val doc = tree.createFile(mime, wanted) ?: throw IOException("Couldn't create the file in that folder")
@@ -120,7 +127,8 @@ object Saver {
             val docId = android.provider.DocumentsContract.getTreeDocumentId(treeUri)
             if (docId.startsWith("primary:")) {
                 val dir = docId.removePrefix("primary:")
-                val path = File(Environment.getExternalStorageDirectory(), if (dir.isBlank()) name else "$dir/$name").absolutePath
+                val rel = listOf(dir, sub, name).filter { it.isNotBlank() }.joinToString("/")
+                val path = File(Environment.getExternalStorageDirectory(), rel).absolutePath
                 MediaScannerConnection.scanFile(ctx, arrayOf(path), arrayOf(mime), null)
             }
         }
@@ -150,7 +158,8 @@ object Saver {
         onBytes(done)
     }
 
-    private fun save(ctx: Context, f: File, title: String, base: String, site: String, thumb: String, url: String, onBytes: (Long) -> Unit = {}): SavedItem {
+    private fun save(ctx: Context, f: File, title: String, base: String, site: String, thumb: String, url: String, onBytes: (Long) -> Unit = {}, sub: String = ""): SavedItem {
+        val grab = if (sub.isBlank()) "Grabbit" else "Grabbit/$sub"
         val mime = mimeOf(f.extension)
         val isAudio = mime.startsWith("audio")
         val isVideo = mime.startsWith("video")
@@ -174,11 +183,11 @@ object Saver {
                 else -> MediaStore.Downloads.getContentUri(vol)
             }
             val cr = ctx.contentResolver
-            name = FileNames.unique(base, f.extension) { n -> taken(ctx, n, "$dirType/Grabbit/") }
+            name = FileNames.unique(base, f.extension) { n -> taken(ctx, n, "$dirType/$grab/") }
             val values = ContentValues().apply {
                 put(MediaStore.MediaColumns.DISPLAY_NAME, name)
                 put(MediaStore.MediaColumns.MIME_TYPE, mime)
-                put(MediaStore.MediaColumns.RELATIVE_PATH, "$dirType/Grabbit")
+                put(MediaStore.MediaColumns.RELATIVE_PATH, "$dirType/$grab")
                 put(MediaStore.MediaColumns.IS_PENDING, 1)
             }
             uri = cr.insert(coll, values) ?: throw IOException("Couldn't create the file in phone storage")
@@ -199,7 +208,7 @@ object Saver {
             }
         } else {
             @Suppress("DEPRECATION")
-            val folder = File(Environment.getExternalStoragePublicDirectory(dirType), "Grabbit").apply { mkdirs() }
+            val folder = File(Environment.getExternalStoragePublicDirectory(dirType), grab).apply { mkdirs() }
             name = FileNames.unique(base, f.extension) { File(folder, it).exists() }
             val dest = File(folder, name)
             dest.outputStream().use { copy(f, it, onBytes) }

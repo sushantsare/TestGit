@@ -41,6 +41,7 @@ import androidx.lifecycle.ViewModelProvider
 import com.sushant.grabbit.data.Library
 import com.sushant.grabbit.data.SavedItem
 import com.sushant.grabbit.ui.MainViewModel
+import com.sushant.grabbit.ui.FetchState
 import com.sushant.grabbit.data.Prefs
 import com.sushant.grabbit.download.DownloadWorker
 import com.sushant.grabbit.download.Downloads
@@ -587,6 +588,81 @@ class GrabbitE2ETest {
         return "trimDirect=${trimOk}(${d}ms) xtrim=${xd in 8500..12500} m4a=${m4aOk && m4a?.mime == "audio/mp4"}"
     }
 
+    /** Playlist: picker (range, untick, order), 2 at a time, own folder, one card, failure + retry, "Downloaded ✓" / Only new. */
+    private fun playlistFlow(): String = runCatching {
+        val vm = ViewModelProvider(compose.activity)[MainViewModel::class.java]
+        val wm = WorkManager.getInstance(ctx)
+        val base = "https://www.w3schools.com/html/"
+        fun e(i: Int, url: String, t: String) = com.sushant.grabbit.engine.PlEntry(i, "vid$i", url, t, 10, "", available = true)
+        val entries = listOf(
+            e(1, base + "mov_bbb.mp4", "Bunny clip"), e(2, base + "movie.mp4", "Bear clip"),
+            e(3, base + "mov_bbb.mp4?copy=2", "Bunny again"), e(4, base + "no_such_video_404.mp4", "Broken link"),
+            com.sushant.grabbit.engine.PlEntry(5, "vid5", "", "[Private video]", 0, "", available = false),
+        )
+        val info = com.sushant.grabbit.engine.MediaInfo(
+            base + "playlist", "Test Playlist", "W3Schools", "", 0, "W3schools", true, 5,
+            listOf(720, 480), emptyMap(), true, entries = entries, playlistId = "PLTEST",
+        )
+        compose.onNodeWithTag("nav_home").performClick()
+        compose.activity.runOnUiThread { vm.fetchState = FetchState.Loaded(info) }
+        compose.waitUntil(10_000) { exists("plCount") }
+        shot("pl_1_picker")
+        // Range 1-4, untick 3 and tick it again, reversed order
+        compose.onNodeWithTag("rangeField").performScrollTo().performTextInput("1-4")
+        compose.onNodeWithTag("rangeApply").performClick()
+        val c1 = compose.onNodeWithTag("plCount", useUnmergedTree = true).fetchSemanticsNode().config[androidx.compose.ui.semantics.SemanticsProperties.Text].joinToString { it.text }
+        compose.onNodeWithTag("plRow_3").performScrollTo().performClick()
+        val c2 = compose.onNodeWithTag("plCount", useUnmergedTree = true).fetchSemanticsNode().config[androidx.compose.ui.semantics.SemanticsProperties.Text].joinToString { it.text }
+        compose.onNodeWithTag("plRow_3").performClick()
+        compose.onNodeWithTag("order_1").performScrollTo().performClick()
+        compose.onNodeWithTag("downloadBtn").performScrollTo()
+        shot("pl_2_picker_bottom")
+        log("PLAYLIST counts after range=$c1 afterUntick=$c2")
+        val savedBefore = Library.items.value.size
+        compose.onNodeWithTag("downloadBtn").performSemanticsAction(androidx.compose.ui.semantics.SemanticsActions.OnClick)
+        compose.onNodeWithTag("nav_downloads").performClick()
+        var maxRunning = 0
+        var shotTaken = false
+        val t0 = System.currentTimeMillis()
+        while (System.currentTimeMillis() - t0 < 300_000) {
+            val infos = wm.getWorkInfosByTag(Downloads.TAG).get().filter { Downloads.jobOf(it).opts.gt == "Test Playlist" }
+            val running = infos.count { it.state == androidx.work.WorkInfo.State.RUNNING || it.state == androidx.work.WorkInfo.State.ENQUEUED }
+            maxRunning = maxOf(maxRunning, running)
+            if (!shotTaken && running > 0) { Thread.sleep(1500); compose.waitForIdle(); shot("pl_3_downloading"); shotTaken = true }
+            val done = Library.items.value.size - savedBefore
+            val failed = infos.count { it.state == androidx.work.WorkInfo.State.FAILED }
+            if (done >= 3 && failed >= 1 && running == 0) break
+            Thread.sleep(700)
+        }
+        compose.waitForIdle()
+        shot("pl_4_finished")
+        val mine = Library.items.value.filter { it.groupTitle == "Test Playlist" }
+        val names = mine.sortedBy { it.groupIndex }.map { it.fileName }
+        val ls = runCatching { android.os.ParcelFileDescriptor.AutoCloseInputStream(
+            instr.uiAutomation.executeShellCommand("ls /sdcard/Movies/Grabbit/Test\\ Playlist")).bufferedReader().readText() }.getOrDefault("")
+        val inFolder = names.isNotEmpty() && names.all { ls.contains(it) }
+        val failedNow = wm.getWorkInfosByTag(Downloads.TAG).get().filter { Downloads.jobOf(it).opts.gt == "Test Playlist" && it.state == androidx.work.WorkInfo.State.FAILED }
+        val archived = com.sushant.grabbit.data.PlaylistQueue.Archive.has("PLTEST", "vid1") && com.sushant.grabbit.data.PlaylistQueue.Archive.has("PLTEST", "vid2")
+        // Retry failed runs the broken one again (it fails again: the link really is broken)
+        val before = wm.getWorkInfosByTag(Downloads.TAG).get().size
+        if (exists("retryFailed")) compose.onNodeWithTag("retryFailed").performScrollTo().performClick()
+        compose.waitUntil(60_000) { wm.getWorkInfosByTag(Downloads.TAG).get().size > before }
+        val retried = wm.getWorkInfosByTag(Downloads.TAG).get().size > before
+        Thread.sleep(8000)
+        // Open the playlist again: downloaded videos show "Downloaded ✓", Only new picks just the rest
+        compose.onNodeWithTag("nav_home").performClick()
+        compose.activity.runOnUiThread { vm.fetchState = FetchState.Idle }
+        compose.waitForIdle()
+        compose.activity.runOnUiThread { vm.fetchState = FetchState.Loaded(info) }
+        compose.waitUntil(10_000) { exists("plCount") }
+        val again = compose.onNodeWithTag("plCount", useUnmergedTree = true).fetchSemanticsNode().config[androidx.compose.ui.semantics.SemanticsProperties.Text].joinToString { it.text }
+        shot("pl_5_reopened")
+        compose.activity.runOnUiThread { vm.fetchState = FetchState.Idle }
+        log("PLAYLIST maxRunning=$maxRunning saved=${mine.size} names=$names inFolder=$inFolder failed=${failedNow.size} archived=$archived retried=$retried reopenCount=$again")
+        "playlist=${c1.startsWith("4 of") && c2.startsWith("3 of") && maxRunning <= 2 && mine.size == 3 && inFolder &&
+            names.firstOrNull()?.startsWith("01 - ") == true && failedNow.size == 1 && archived && retried && again.startsWith("1 of")}"
+    }.getOrElse { log("PLAYLIST failed: ${it.message}"); shot("pl_fail"); "playlist=false" }
+
     /** Data saved by v2.8 (library entries in the old format) must load in 3.0; the new stores start empty. */
     private fun upgradeCheck(): String = runCatching {
         val f = java.io.File(ctx.filesDir, "library.json")
@@ -770,8 +846,9 @@ class GrabbitE2ETest {
         val folder = folderFlow()
         val images = imageFlow()
         val upgrade = upgradeCheck()
+        val playlist = playlistFlow()
 
-        log("SUMMARY direct=$direct x=$x dailymotion=$dm facebook=$fb youtube=$youtube share=$share threads=$threads $options $renamed $speed $pause $folder $images $onboarding $upgrade")
+        log("SUMMARY direct=$direct x=$x dailymotion=$dm facebook=$fb youtube=$youtube share=$share threads=$threads $options $renamed $speed $pause $folder $images $onboarding $upgrade $playlist")
         results.forEach { Log.i("GrabbitE2E", "RESULT $it") }
         assertTrue("Downloads failed", direct && x)
         assertTrue("Share sheet download failed", share)

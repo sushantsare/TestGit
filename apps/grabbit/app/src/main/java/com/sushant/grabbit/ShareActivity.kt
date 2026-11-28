@@ -157,11 +157,12 @@ class ShareViewModel(app: android.app.Application) : AndroidViewModel(app) {
 
     /** Queues the download and returns the confirmation text. */
     fun download(info: MediaInfo, quality: String, opts: DlOpts): String {
-        Downloads.enqueue(
+        if (info.isPlaylist && info.entries.isNotEmpty()) com.sushant.grabbit.download.PlaylistStart.start(getApplication(), info, quality, opts)
+        else Downloads.enqueue(
             getApplication(),
             Downloads.Job(info.url, info.title, info.thumbnail, info.site, quality, info.isPlaylist, opts, items = info.gallery),
         )
-        return if (info.isPlaylist) "Downloading ${info.count} videos" else "Download started"
+        return if (info.isPlaylist) "Downloading ${info.entries.size} videos" else "Download started"
     }
 }
 

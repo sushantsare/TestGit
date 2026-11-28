@@ -15,6 +15,7 @@ class GrabbitApp : Application() {
         Library.init(this)
         com.sushant.grabbit.data.Paused.init(this)
         com.sushant.grabbit.data.Folders.init(this)
+        com.sushant.grabbit.data.PlaylistQueue.init(this)
         Notifs.createChannels(this)
         Engine.start(this)
     }

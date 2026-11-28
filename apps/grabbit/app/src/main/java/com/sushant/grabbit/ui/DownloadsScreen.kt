@@ -60,6 +60,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material.icons.rounded.KeyboardArrowDown
+import androidx.compose.material.icons.rounded.KeyboardArrowUp
 import com.sushant.grabbit.ui.components.groupShape
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.material3.Surface
@@ -101,7 +104,8 @@ fun DownloadsScreen(vm: MainViewModel, modifier: Modifier) {
     val sp = LocalSpacing.current
     val works by vm.works.collectAsState()
     val library by vm.library.collectAsState()
-    val paused by vm.paused.collectAsState()
+    val paused0 by vm.paused.collectAsState()
+    val runs by com.sushant.grabbit.data.PlaylistQueue.runs.collectAsState()
     var filter by rememberSaveable { mutableStateOf("All") }
     var query by rememberSaveable { mutableStateOf("") }
     var sort by rememberSaveable { mutableIntStateOf(0) }
@@ -110,10 +114,15 @@ fun DownloadsScreen(vm: MainViewModel, modifier: Modifier) {
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { vm.checkMissing() }
     LaunchedEffect(library.size) { vm.checkMissing() }
 
-    val active = works
+    val active0 = works
         .filter { it.state != WorkInfo.State.SUCCEEDED && it.state != WorkInfo.State.CANCELLED }
         .filter { it.id.toString() !in vm.hidden }
         .sortedByDescending { Downloads.created(it) }
+    // Playlist videos are shown inside one card per playlist
+    fun grpOf(w: WorkInfo) = Downloads.jobOf(w).opts.grp
+    val active = active0.filter { grpOf(it).isBlank() }
+    val paused = paused0.filter { it.job.opts.grp.isBlank() }
+    val groups = (runs.keys + active0.map(::grpOf) + paused0.map { it.job.opts.grp }).filter { it.isNotBlank() }.distinct()
     val sites = listOf("All") + library.map { it.site }.filter { it.isNotBlank() }.distinct().sorted() +
         (if (library.any { it.isAudio }) listOf("Audio") else emptyList())
     val byChip = when (filter) {
@@ -144,7 +153,7 @@ fun DownloadsScreen(vm: MainViewModel, modifier: Modifier) {
             }
         }
 
-        if (active.isEmpty() && paused.isEmpty() && library.isEmpty()) {
+        if (active.isEmpty() && paused.isEmpty() && groups.isEmpty() && library.isEmpty()) {
             item(key = "empty") {
                 EmptyState(
                     EmptyType.FIRST_TIME, "No downloads yet", "Videos you grab show up here and in your gallery",
@@ -155,17 +164,21 @@ fun DownloadsScreen(vm: MainViewModel, modifier: Modifier) {
             return@LazyColumn
         }
 
-        if (active.isNotEmpty() || paused.isNotEmpty()) {
-            val running = active.filter { !it.state.isFinished }
+        if (active.isNotEmpty() || paused.isNotEmpty() || groups.isNotEmpty()) {
+            val running = active0.filter { !it.state.isFinished }
             item(key = "activeLabel") {
                 Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = sp.s, bottom = sp.xs)) {
-                    SectionLabel("In progress · ${active.size + paused.size}", Modifier.weight(1f))
+                    SectionLabel("In progress · ${active.size + paused.size + groups.size}", Modifier.weight(1f))
                     if (active.any { it.state == WorkInfo.State.FAILED }) TextButton(onClick = { vm.clearFinished() }) { Text("Clear failed") }
-                    if (running.size + paused.size >= 2) {
+                    if (running.size + paused0.size >= 2) {
                         if (running.isNotEmpty()) TextButton(onClick = { vm.pauseAll(running) }, modifier = Modifier.testTag("pauseAll")) { Text("Pause all") }
                         else TextButton(onClick = { vm.resumeAll() }, modifier = Modifier.testTag("resumeAll")) { Text("Resume all") }
                     }
                 }
+            }
+            items(groups, key = { "grp_$it" }) { g ->
+                PlaylistGroupCard(g, runs[g], active0.filter { grpOf(it) == g }, paused0.filter { it.job.opts.grp == g },
+                    library.filter { it.group == g }, vm, Modifier.animateItem().padding(bottom = sp.s))
             }
             val total = active.size + paused.size
             itemsIndexed(active, key = { _, w -> w.id.toString() }) { i, w -> ActiveCard(w, vm, Modifier.animateItem(), groupShape(i, total)) }
@@ -197,9 +210,15 @@ fun DownloadsScreen(vm: MainViewModel, modifier: Modifier) {
                 )
             }
             item(key = "chipsGap") { Spacer(Modifier.height(sp.xs)) }
-            itemsIndexed(shown, key = { _, it -> it.id }) { i, item ->
-                SavedRow(item, item.id in vm.missing, vm,
-                    Modifier.animateItem().clip(groupShape(i, shown.size)).background(MaterialTheme.colorScheme.surfaceContainerLow))
+            // A playlist shows as one row (tap to see its videos); searching lists the videos one by one
+            val rows: List<Any> = if (q.isNotEmpty()) shown else buildList {
+                val seen = HashSet<String>()
+                shown.forEach { if (it.group.isBlank()) add(it) else if (seen.add(it.group)) add(it.group) }
+            }
+            itemsIndexed(rows, key = { _, r -> if (r is String) "sg_$r" else (r as SavedItem).id }) { i, r ->
+                val m = Modifier.animateItem().clip(groupShape(i, rows.size)).background(MaterialTheme.colorScheme.surfaceContainerLow)
+                if (r is String) SavedPlaylistRow(r, library.filter { it.group == r }.sortedBy { it.groupIndex }, vm, m)
+                else SavedRow(r as SavedItem, r.id in vm.missing, vm, m)
             }
         }
     }
@@ -448,5 +467,132 @@ private fun PausedCard(p: com.sushant.grabbit.data.PausedItem, vm: MainViewModel
         )
         Spacer(Modifier.height(sp.s))
         com.sushant.grabbit.ui.components.WavyProgress(if (p.canContinue) p.pct / 100f else 0f, color = MaterialTheme.colorScheme.outline)
+    }
+}
+
+
+/** One card per playlist download: progress of the whole playlist and every video inside. */
+@Composable
+private fun PlaylistGroupCard(
+    grp: String, run: com.sushant.grabbit.data.PlaylistRun?, works: List<WorkInfo>,
+    paused: List<com.sushant.grabbit.data.PausedItem>, saved: List<SavedItem>, vm: MainViewModel, modifier: Modifier,
+) {
+    val sp = LocalSpacing.current
+    var open by rememberSaveable(grp) { mutableStateOf(true) }
+    val running = works.filter { !it.state.isFinished }
+    val failed = works.filter { it.state == WorkInfo.State.FAILED }
+    val waiting = run?.pending.orEmpty()
+    val title = run?.title?.ifBlank { null } ?: works.firstOrNull()?.let { Downloads.jobOf(it).opts.gt }
+        ?: paused.firstOrNull()?.job?.opts?.gt ?: saved.firstOrNull()?.groupTitle ?: "Playlist"
+    val total = maxOf(run?.total ?: 0, saved.size + failed.size + running.size + waiting.size + paused.size)
+    val isPaused = run?.paused == true || (running.isEmpty() && waiting.isNotEmpty() && paused.isNotEmpty())
+    val runPct = running.sumOf { it.progress.getFloat(com.sushant.grabbit.download.DownloadWorker.P_PCT, 0f).toDouble() } / 100.0
+    val frac = if (total > 0) ((saved.size + runPct) / total).toFloat() else 0f
+    val thumb = run?.thumb?.ifBlank { null } ?: saved.firstOrNull()?.thumb ?: works.firstOrNull()?.let { Downloads.jobOf(it).thumb }.orEmpty()
+    AppCard(modifier.testTag("playlistCard"), padding = sp.m) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            VideoThumb(thumb, false, Modifier.width(LocalSizes.current.rowThumbW).height(LocalSizes.current.rowThumbH))
+            Spacer(Modifier.width(sp.m))
+            Column(Modifier.weight(1f)) {
+                Text(title, style = MaterialTheme.typography.titleSmall, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                Text(
+                    listOfNotNull("${saved.size} of $total saved", if (failed.isNotEmpty()) "${failed.size} failed" else null,
+                        if (isPaused) "paused" else if (waiting.isNotEmpty()) "${waiting.size} waiting" else null).joinToString(" · "),
+                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.testTag("playlistStatus"),
+                )
+            }
+            if (running.isNotEmpty() || waiting.isNotEmpty() || paused.isNotEmpty()) {
+                if (isPaused || running.isEmpty() && paused.isNotEmpty())
+                    IconButton(onClick = { vm.resumeGroup(grp) }, modifier = Modifier.testTag("plResume")) { Icon(Icons.Rounded.PlayArrow, "Resume playlist") }
+                else IconButton(onClick = { vm.pauseGroup(grp) }, modifier = Modifier.testTag("plPause")) { Icon(Icons.Rounded.Pause, "Pause playlist") }
+            }
+            IconButton(onClick = { vm.cancelGroup(grp, works) }, modifier = Modifier.testTag("plCancel")) {
+                Icon(Icons.Rounded.Close, if (running.isEmpty() && waiting.isEmpty() && paused.isEmpty()) "Remove from list" else "Cancel playlist")
+            }
+        }
+        Spacer(Modifier.height(sp.m))
+        com.sushant.grabbit.ui.components.WavyProgress(if (isPaused) frac else frac.coerceAtLeast(0.01f),
+            color = if (isPaused) MaterialTheme.colorScheme.outline else MaterialTheme.colorScheme.primary)
+        val speed = running.mapNotNull { it.progress.getString(com.sushant.grabbit.download.DownloadWorker.P_SPEED)?.takeIf { s -> s.isNotBlank() } }
+        if (speed.isNotEmpty()) Text("${running.size} downloading · ${speed.joinToString(" + ")}", style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = sp.xs))
+        Row(horizontalArrangement = Arrangement.spacedBy(sp.s), modifier = Modifier.padding(top = sp.s)) {
+            if (failed.isNotEmpty()) FilledTonalButton(onClick = { vm.retryFailed(grp, failed) }, modifier = Modifier.testTag("retryFailed")) {
+                Text("Retry failed (${failed.size})")
+            }
+            OutlinedButton(onClick = { open = !open }) { Text(if (open) "Hide list" else "Show list") }
+        }
+        if (open) {
+            Spacer(Modifier.height(sp.s))
+            data class Line(val index: Int, val title: String, val status: String, val pct: Float?, val kind: Int, val work: WorkInfo?, val pausedItem: com.sushant.grabbit.data.PausedItem?)
+            val lines = buildList {
+                running.forEach { w ->
+                    val j = Downloads.jobOf(w)
+                    val p = w.progress
+                    val pct = p.getFloat(com.sushant.grabbit.download.DownloadWorker.P_PCT, 0f)
+                    val st = p.getString(com.sushant.grabbit.download.DownloadWorker.P_STATUS).orEmpty().ifBlank { "Starting…" }
+                    add(Line(j.opts.gi, j.title, if (pct > 0) "$st ${pct.toInt()}%" else st, pct / 100f, 0, w, null))
+                }
+                failed.forEach { w ->
+                    val j = Downloads.jobOf(w)
+                    add(Line(j.opts.gi, j.title, "Failed · " + w.outputData.getString(com.sushant.grabbit.download.DownloadWorker.K_ERROR).orEmpty().ifBlank { "couldn't download" }, null, 1, w, null))
+                }
+                paused.forEach { add(Line(it.job.opts.gi, it.job.title, "Paused" + if (it.pct > 0) " · ${it.pct.toInt()}%" else "", null, 2, null, it)) }
+                waiting.take(30).forEach { add(Line(it.opts.gi, it.title, "Waiting", null, 3, null, null)) }
+                saved.forEach { add(Line(it.groupIndex, it.title, "Saved · ${fmtSize(it.size)}", null, 4, null, null)) }
+            }.sortedWith(compareBy({ it.kind == 4 }, { it.index }))
+            val pad = if (total >= 100) 3 else 2
+            lines.take(60).forEachIndexed { i, l ->
+                Surface(shape = groupShape(i, minOf(lines.size, 60), 18.dp, 6.dp), color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 3.dp)) {
+                    Column(Modifier.padding(horizontal = sp.m, vertical = sp.s)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(l.index.toString().padStart(pad, '0'), Modifier.width(28.dp), style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Column(Modifier.weight(1f)) {
+                                Text(l.title.substringAfter(" - ").ifBlank { l.title }, style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                Text(l.status, style = MaterialTheme.typography.bodySmall, maxLines = 2,
+                                    color = when (l.kind) { 1 -> MaterialTheme.colorScheme.error; 4 -> MaterialTheme.colorScheme.tertiary; else -> MaterialTheme.colorScheme.onSurfaceVariant })
+                            }
+                            when (l.kind) {
+                                0 -> IconButton(onClick = { l.work?.let { vm.pause(it) } }) { Icon(Icons.Rounded.Pause, "Pause video") }
+                                1 -> TextButton(onClick = { l.work?.let { vm.retryFailed(grp, listOf(it)) } }) { Text("Retry") }
+                                2 -> IconButton(onClick = { l.pausedItem?.let { vm.resume(it) } }) { Icon(Icons.Rounded.PlayArrow, "Resume video") }
+                                else -> {}
+                            }
+                        }
+                        if (l.kind == 0) com.sushant.grabbit.ui.components.WavyProgress(if ((l.pct ?: 0f) > 0f) l.pct else null, Modifier.padding(top = 4.dp))
+                    }
+                }
+            }
+            if (waiting.size > 30) Text("…and ${waiting.size - 30} more waiting", style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = sp.xs, start = sp.s))
+        }
+    }
+}
+
+/** A finished playlist in Saved: one row; tap to see its videos. */
+@Composable
+private fun SavedPlaylistRow(grp: String, items: List<SavedItem>, vm: MainViewModel, modifier: Modifier) {
+    val sp = LocalSpacing.current
+    var open by rememberSaveable(grp) { mutableStateOf(false) }
+    Column(modifier.testTag("savedPlaylist")) {
+        Row(
+            Modifier.fillMaxWidth().clickable { open = !open }.padding(horizontal = sp.m, vertical = sp.m),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            VideoThumb(items.firstOrNull()?.thumb.orEmpty(), items.all { it.isAudio },
+                Modifier.width(LocalSizes.current.rowThumbW).height(LocalSizes.current.rowThumbH))
+            Spacer(Modifier.width(sp.m))
+            Column(Modifier.weight(1f)) {
+                Text(items.firstOrNull()?.groupTitle?.ifBlank { null } ?: "Playlist", style = MaterialTheme.typography.titleSmall,
+                    maxLines = 2, overflow = TextOverflow.Ellipsis)
+                Text("${items.size} video${if (items.size > 1) "s" else ""} · ${fmtSize(items.sumOf { it.size })} · ${if (open) "tap to hide" else "tap to see them"}",
+                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            Icon(if (open) Icons.Rounded.KeyboardArrowUp else Icons.Rounded.KeyboardArrowDown, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        if (open) items.forEach { SavedRow(it, it.id in vm.missing, vm, Modifier.padding(start = sp.m)) }
     }
 }

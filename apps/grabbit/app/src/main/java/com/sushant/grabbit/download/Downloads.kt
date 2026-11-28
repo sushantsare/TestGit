@@ -24,10 +24,10 @@ object Downloads {
         val gallery: Boolean = items.isNotEmpty(),
     )
 
-    fun enqueue(ctx: Context, job0: Job, resume: Boolean = false): UUID {
+    fun enqueue(ctx: Context, job0: Job, resume: Boolean = false, keepFolder: Boolean = true): UUID {
         val job = if (job0.key.isBlank()) job0.copy(key = UUID.randomUUID().toString()) else job0
         // "Keep my last folder": the next download starts where this one goes
-        if (!resume && com.sushant.grabbit.data.Prefs.keepLastFolder) com.sushant.grabbit.data.Folders.select(job.opts.folder)
+        if (!resume && keepFolder && com.sushant.grabbit.data.Prefs.keepLastFolder) com.sushant.grabbit.data.Folders.select(job.opts.folder)
         if (job.items.isNotEmpty()) Gallery.save(ctx, job.key, job.items)
         val req = OneTimeWorkRequestBuilder<DownloadWorker>()
             .setInputData(
@@ -56,6 +56,7 @@ object Downloads {
             .addTag("k:${job.key}")
             .addTag("g:${if (job.gallery) 1 else 0}")
             .addTag("c:${System.currentTimeMillis()}")
+            .apply { if (job.opts.grp.isNotBlank()) addTag(com.sushant.grabbit.data.PlaylistQueue.tagOf(job.opts.grp)) }
             .build()
         WorkManager.getInstance(ctx).enqueue(req)
         return req.id
@@ -101,6 +102,11 @@ object Downloads {
 
     /** Starts a paused download again; yt-dlp continues from the part file. */
     fun resume(ctx: Context, item: com.sushant.grabbit.data.PausedItem): UUID {
+        // A playlist video waits its turn with the rest of its playlist
+        if (item.job.opts.grp.isNotBlank() && com.sushant.grabbit.data.PlaylistQueue.runs.value.containsKey(item.job.opts.grp)) {
+            com.sushant.grabbit.data.PlaylistQueue.resume(ctx, item.job.opts.grp)
+            return UUID.randomUUID()
+        }
         com.sushant.grabbit.data.Paused.remove(item.job.key)
         return enqueue(ctx, item.job, resume = true)
     }

@@ -24,6 +24,13 @@ data class DlOpts(
     val folder: String = "",
     /** Video format for this download only; -1 = the Settings choice. */
     val videoFormat: Int = -1,
+    /** Playlist download: run key (one card in Downloads), playlist id, title, video number and id, subfolder. */
+    val grp: String = "",
+    val plId: String = "",
+    val gt: String = "",
+    val gi: Int = 0,
+    val vid: String = "",
+    val sub: String = "",
 ) {
     val trimmed get() = trimStart >= 0 && trimEnd > trimStart
     val keepSubFiles get() = subLang.isNotEmpty() && subMode != "embed"
@@ -34,6 +41,11 @@ data class DlOpts(
         "nm=${java.net.URLEncoder.encode(name, "UTF-8")}",
         "fd=${java.net.URLEncoder.encode(folder, "UTF-8")}",
         "vf=$videoFormat",
+        "gr=$grp", "gi=$gi",
+        "pl=${java.net.URLEncoder.encode(plId, "UTF-8")}",
+        "gt=${java.net.URLEncoder.encode(gt, "UTF-8")}",
+        "vi=${java.net.URLEncoder.encode(vid, "UTF-8")}",
+        "sb=${java.net.URLEncoder.encode(sub, "UTF-8")}",
     ).joinToString(";")
 
     companion object {
@@ -51,6 +63,12 @@ data class DlOpts(
                 name = m["nm"]?.let { runCatching { java.net.URLDecoder.decode(it, "UTF-8") }.getOrNull() }.orEmpty(),
                 folder = m["fd"]?.let { runCatching { java.net.URLDecoder.decode(it, "UTF-8") }.getOrNull() }.orEmpty(),
                 videoFormat = m["vf"]?.toIntOrNull() ?: -1,
+                grp = m["gr"].orEmpty(),
+                gi = m["gi"]?.toIntOrNull() ?: 0,
+                plId = m["pl"]?.let { runCatching { java.net.URLDecoder.decode(it, "UTF-8") }.getOrNull() }.orEmpty(),
+                gt = m["gt"]?.let { runCatching { java.net.URLDecoder.decode(it, "UTF-8") }.getOrNull() }.orEmpty(),
+                vid = m["vi"]?.let { runCatching { java.net.URLDecoder.decode(it, "UTF-8") }.getOrNull() }.orEmpty(),
+                sub = m["sb"]?.let { runCatching { java.net.URLDecoder.decode(it, "UTF-8") }.getOrNull() }.orEmpty(),
             )
         }
 

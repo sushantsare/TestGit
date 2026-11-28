@@ -388,6 +388,11 @@ internal fun MediaCard(info: MediaInfo, framed: Boolean = true, onDownload: (Med
         GalleryCard(info, framed, onDownload)
         return
     }
+    // Playlists get the video picker
+    if (info.isPlaylist && info.entries.isNotEmpty()) {
+        PlaylistCard(info, framed, onDownload)
+        return
+    }
     val sp = LocalSpacing.current
     val sz = LocalSizes.current
     val opts = remember(info) { videoOptions(info) }
@@ -537,7 +542,7 @@ internal fun StorageBlockedDialog(ctx: android.content.Context, onClose: () -> U
 
 /** The split button's menu: audio format (MP3, M4A…) or video format (most compatible / highest quality) for this download. */
 @Composable
-private fun FormatMenu(audio: Boolean, st: OptsState, close: () -> Unit) {
+internal fun FormatMenu(audio: Boolean, st: OptsState, close: () -> Unit) {
     Text(if (audio) "Audio format" else "Video format", style = MaterialTheme.typography.labelLarge,
         color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
     val items = if (audio) AUDIO_FORMAT_LABELS.map { (k, l) -> Triple("af_$k", l, st.audioFormat == k) to { st.audioFormat = k } }

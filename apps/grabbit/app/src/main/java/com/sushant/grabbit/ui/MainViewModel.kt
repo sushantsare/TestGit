@@ -105,11 +105,12 @@ class MainViewModel(private val app: Application) : AndroidViewModel(app) {
     }
 
     fun download(info: MediaInfo, quality: String, opts: com.sushant.grabbit.download.DlOpts = com.sushant.grabbit.download.DlOpts()) {
-        Downloads.enqueue(
+        if (info.isPlaylist && info.entries.isNotEmpty()) com.sushant.grabbit.download.PlaylistStart.start(app, info, quality, opts)
+        else Downloads.enqueue(
             app,
             Downloads.Job(info.url, info.title, info.thumbnail, info.site, quality, info.isPlaylist, opts, items = info.gallery),
         )
-        app.toast(if (info.isPlaylist) "Added ${info.count} videos to downloads" else "Download started")
+        app.toast(if (info.isPlaylist) "Added ${info.entries.size} videos to downloads" else "Download started")
         // The job is queued: start the Grab tab fresh for the next link
         url = ""
         resetFetch()
@@ -135,7 +136,22 @@ class MainViewModel(private val app: Application) : AndroidViewModel(app) {
     fun pause(w: WorkInfo) = Downloads.pause(app, w)
     fun resume(p: com.sushant.grabbit.data.PausedItem) { Downloads.resume(app, p) }
     fun discard(p: com.sushant.grabbit.data.PausedItem) = Downloads.discard(app, p)
-    fun pauseAll(running: List<WorkInfo>) = running.forEach { Downloads.pause(app, it) }
+    fun pauseAll(running: List<WorkInfo>) {
+        // Playlists stop starting new videos too
+        com.sushant.grabbit.data.PlaylistQueue.runs.value.keys.forEach { com.sushant.grabbit.data.PlaylistQueue.pause(app, it) }
+        running.forEach { Downloads.pause(app, it) }
+    }
+
+    fun pauseGroup(grp: String) = com.sushant.grabbit.data.PlaylistQueue.pause(app, grp)
+    fun resumeGroup(grp: String) = com.sushant.grabbit.data.PlaylistQueue.resume(app, grp)
+    fun cancelGroup(grp: String, works: List<WorkInfo>) {
+        com.sushant.grabbit.data.PlaylistQueue.cancel(app, grp)
+        works.forEach { hide(it.id) }
+    }
+    fun retryFailed(grp: String, failed: List<WorkInfo>) {
+        failed.forEach { hide(it.id) }
+        com.sushant.grabbit.data.PlaylistQueue.retry(app, grp, failed.map { Downloads.jobOf(it) })
+    }
     fun resumeAll() = paused.value.forEach { Downloads.resume(app, it) }
 
     fun hide(id: UUID) {
