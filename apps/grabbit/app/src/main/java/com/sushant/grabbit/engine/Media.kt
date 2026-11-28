@@ -148,7 +148,7 @@ object Media {
 
     /** Channel pages (@name, /channel/, /c/, /user/): their latest 20 videos are listed. */
     fun isChannel(url: String): Boolean = CHANNEL.containsMatchIn(url.substringBefore('?').substringBefore('#'))
-    private val CHANNEL = Regex('''youtube\.com/(@[^/]+|channel/[^/]+|c/[^/]+|user/[^/]+)(/(videos|featured|shorts|streams))?/?$''')
+    private val CHANNEL = Regex("""youtube\.com/(@[^/]+|channel/[^/]+|c/[^/]+|user/[^/]+)(/(videos|featured|shorts|streams))?/?$""")
 
     private fun JSONObject.str(k: String): String = if (isNull(k)) "" else optString(k, "")
 
