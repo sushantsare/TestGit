@@ -123,7 +123,15 @@ object Media {
         val pid = "info-${System.nanoTime()}"
         cancelFetch()
         currentPid = pid
-        val resp = YoutubeDL.getInstance().execute(req, processId = pid, callback = null)
+        val resp = try {
+            YoutubeDL.getInstance().execute(req, processId = pid, callback = null)
+        } catch (e: Exception) {
+            // Playlist / mix pages change often: update the engine once and try again
+            val msg = e.message.orEmpty()
+            if (!msg.contains("Unable to recognize", ignoreCase = true) && !msg.contains("tab page", ignoreCase = true)) throw e
+            Engine.update(ctx)
+            YoutubeDL.getInstance().execute(req, processId = pid, callback = null)
+        }
         val out = resp.out.trim()
         val json = out.lineSequence().lastOrNull { it.trimStart().startsWith("{") } ?: out
         parse(url, JSONObject(json))
