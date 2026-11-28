@@ -39,7 +39,9 @@ object Engine {
                 aria2Ready = runCatching { com.yausername.aria2c.Aria2c.getInstance().init(app) }.isSuccess
                 version.value = runCatching { YoutubeDL.getInstance().version(app) }.getOrNull()
                 state.value = State.Ready
-                if (Prefs.autoUpdate && System.currentTimeMillis() - Prefs.lastUpdate > 24L * 3600 * 1000) {
+                // Daily check, or straight away if the chosen channel (Nightly / Stable) isn't the installed one
+                if (Prefs.autoUpdate && (Prefs.engineChannel != Prefs.engineChannelInstalled ||
+                        System.currentTimeMillis() - Prefs.lastUpdate > 24L * 3600 * 1000)) {
                     runCatching { update(app) }
                 }
             } catch (e: Throwable) {
@@ -59,8 +61,10 @@ object Engine {
         if (!awaitReady()) return@withContext failMessage()
         updating.value = true
         try {
-            val status = YoutubeDL.getInstance().updateYoutubeDL(ctx.applicationContext)
+            val channel = if (Prefs.engineChannel == "stable") YoutubeDL.UpdateChannel.STABLE else YoutubeDL.UpdateChannel.NIGHTLY
+            val status = YoutubeDL.getInstance().updateYoutubeDL(ctx.applicationContext, channel)
             Prefs.lastUpdate = System.currentTimeMillis()
+            Prefs.engineChannelInstalled = Prefs.engineChannel
             val v = runCatching { YoutubeDL.getInstance().version(ctx.applicationContext) }.getOrNull()
             version.value = v
             if ("$status".contains("DONE")) "Engine updated to $v" else "Engine is already up to date ($v)"

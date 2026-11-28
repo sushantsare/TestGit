@@ -102,6 +102,16 @@ object Prefs {
         get() = p.getBoolean("embed_thumb", true)
         set(v) = p.edit().putBoolean("embed_thumb", v).apply()
 
+    /** Download engine updates: "nightly" (YouTube fixes within a day or two, default) or "stable". */
+    var engineChannel: String
+        get() = p.getString("engine_channel", "nightly") ?: "nightly"
+        set(v) = p.edit().putString("engine_channel", v).apply()
+
+    /** Channel the installed engine came from; a different one means update now. */
+    var engineChannelInstalled: String
+        get() = p.getString("engine_channel_installed", "stable") ?: "stable"
+        set(v) = p.edit().putString("engine_channel_installed", v).apply()
+
     var autoUpdate: Boolean
         get() = p.getBoolean("auto_update", true)
         set(v) = p.edit().putBoolean("auto_update", v).apply()

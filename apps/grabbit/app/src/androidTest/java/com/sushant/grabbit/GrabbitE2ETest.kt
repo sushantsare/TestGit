@@ -858,8 +858,10 @@ class GrabbitE2ETest {
         val images = imageFlow()
         val upgrade = upgradeCheck()
         val playlist = playlistFlow()
+        val engine = "engine=${Prefs.engineChannel}/${Prefs.engineChannelInstalled}"
+        log("ENGINE channel=${Prefs.engineChannel} installed=${Prefs.engineChannelInstalled} version=${com.sushant.grabbit.engine.Engine.version.value}")
 
-        log("SUMMARY direct=$direct x=$x dailymotion=$dm facebook=$fb youtube=$youtube share=$share threads=$threads $options $renamed $speed $pause $folder $images $onboarding $upgrade $playlist")
+        log("SUMMARY direct=$direct x=$x dailymotion=$dm facebook=$fb youtube=$youtube share=$share threads=$threads $options $renamed $speed $pause $folder $images $onboarding $upgrade $playlist $engine")
         results.forEach { Log.i("GrabbitE2E", "RESULT $it") }
         assertTrue("Downloads failed", direct && x)
         assertTrue("Share sheet download failed", share)

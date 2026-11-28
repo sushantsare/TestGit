@@ -116,6 +116,7 @@ fun SettingsScreen(vm: MainViewModel, modifier: Modifier) {
     var sheet by remember { mutableStateOf<String?>(null) }
     var thumb by remember { mutableStateOf(Prefs.embedThumb) }
     var auto by remember { mutableStateOf(Prefs.autoUpdate) }
+    var channel by remember { mutableStateOf(Prefs.engineChannel) }
     var qualitySheet by remember { mutableStateOf(false) }
 
     LazyColumn(
@@ -224,14 +225,27 @@ fun SettingsScreen(vm: MainViewModel, modifier: Modifier) {
         item { SectionLabel("Download engine") }
         item {
             SettingsGroup {
-                SettingsItem("yt-dlp", version ?: "Starting…", Icons.Rounded.Memory)
+                SettingsItem("yt-dlp", (version ?: "Starting…") + engineUpdatedText(), Icons.Rounded.Memory)
+                SettingsDivider()
+                Column(Modifier.padding(horizontal = sp.l, vertical = sp.m)) {
+                    Text("Updates from", style = MaterialTheme.typography.titleSmall)
+                    Text("Nightly gets YouTube fixes within a day or two. Stable updates less often.",
+                        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Spacer(Modifier.height(sp.s))
+                    com.sushant.grabbit.ui.components.ConnectedGroup(
+                        listOf(com.sushant.grabbit.ui.components.SegOption("nightly", "Nightly", tag = "ch_nightly"),
+                            com.sushant.grabbit.ui.components.SegOption("stable", "Stable", tag = "ch_stable")),
+                        channel, { c -> if (c != channel) { channel = c; Prefs.engineChannel = c; vm.updateEngine() } },
+                        height = 48.dp, color = MaterialTheme.colorScheme.surfaceContainerHigh, onColor = MaterialTheme.colorScheme.onSurface,
+                    )
+                }
                 SettingsDivider()
                 SettingsSwitch("Auto-update daily", "Keeps downloads working when sites change", Icons.Rounded.Update, auto) {
                     auto = it; Prefs.autoUpdate = it
                 }
                 SettingsDivider()
                 SettingsItem(
-                    if (updating) "Updating…" else "Update engine now", "Get the latest site fixes",
+                    if (updating) "Updating…" else "Update now", "Get the latest site fixes",
                     Icons.Rounded.SystemUpdate, onClick = if (updating) null else ({ vm.updateEngine() }),
                 ) { if (updating) CircularProgressIndicator(Modifier.size(LocalSizes.current.icon), strokeWidth = 2.5.dp) }
             }
@@ -256,8 +270,8 @@ fun SettingsScreen(vm: MainViewModel, modifier: Modifier) {
                     runCatching { ctx.startActivity(Intent(Intent.ACTION_SENDTO, Uri.parse("mailto:sushant.sare@gmail.com"))) }
                 })
                 SettingsDivider()
-                SettingsItem("Your data stays on this phone",
-                    "Download only content you have the right to save. Powered by yt-dlp and FFmpeg.", Icons.Rounded.Info)
+                SettingsItem("Powered by yt-dlp and FFmpeg",
+                    "Download only content you have the right to save.", Icons.Rounded.Info)
             }
         }
     }
@@ -471,4 +485,19 @@ private fun SaveLocationSettings() {
             }
         }
     }
+}
+
+
+/** " · updated 2 h ago" after the engine version. */
+private fun engineUpdatedText(): String {
+    val t = Prefs.lastUpdate
+    if (t <= 0) return ""
+    val min = (System.currentTimeMillis() - t) / 60_000
+    val ago = when {
+        min < 1 -> "just now"
+        min < 60 -> "$min min ago"
+        min < 48 * 60 -> "${min / 60} h ago"
+        else -> "${min / 1440} days ago"
+    }
+    return " · ${if (Prefs.engineChannelInstalled == "stable") "Stable" else "Nightly"} · updated $ago"
 }

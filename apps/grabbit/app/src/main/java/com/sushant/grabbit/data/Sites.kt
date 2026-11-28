@@ -28,7 +28,29 @@ object Sites {
 
     /** Pulls the first link out of shared text like "Watch this! https://youtu.be/xyz" */
     fun extractUrl(text: String): String? =
-        URL_RE.find(text)?.value?.trimEnd(')', ']', '.', ',', '!', '?', ';')
+        URL_RE.find(text)?.value?.trimEnd(')', ']', '.', ',', '!', '?', ';')?.let(::cleanUrl)
+
+    /** Tracking parts that change nothing about the video. */
+    private val TRACKING = setOf("si", "drli", "pp", "feature", "utm_source", "utm_medium", "utm_campaign", "igsh", "igshid")
+
+    /**
+     * Tidies a link before fetching: YouTube Music playlists become normal YouTube playlist links
+     * (the engine reads those more reliably) and share-tracking parts are dropped.
+     * Pure string work, so it is unit-tested.
+     */
+    fun cleanUrl(url: String): String {
+        val hashIdx = url.indexOf('#')
+        val noHash = if (hashIdx >= 0) url.substring(0, hashIdx) else url
+        val q = noHash.indexOf('?')
+        val base = if (q >= 0) noHash.substring(0, q) else noHash
+        val params = if (q >= 0) noHash.substring(q + 1).split('&').filter { it.isNotBlank() } else emptyList()
+        val kept = params.filter { it.substringBefore('=').lowercase() !in TRACKING }
+        val host = base.substringAfter("://").substringBefore('/').lowercase()
+        val path = "/" + base.substringAfter("://").substringAfter('/', "")
+        var newBase = base
+        if (host == "music.youtube.com" && path.startsWith("/playlist")) newBase = "https://www.youtube.com/playlist"
+        return if (kept.isEmpty()) newBase else newBase + "?" + kept.joinToString("&")
+    }
 
     fun siteName(url: String): String {
         val host = (runCatching { Uri.parse(url).host }.getOrNull() ?: return "Web")
