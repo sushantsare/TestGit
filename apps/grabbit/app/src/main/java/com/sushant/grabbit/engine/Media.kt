@@ -1,6 +1,7 @@
 package com.sushant.grabbit.engine
 
 import android.content.Context
+import android.util.Log
 import com.sushant.grabbit.data.Cookies
 import com.sushant.grabbit.data.Sites
 import com.yausername.youtubedl_android.YoutubeDL
@@ -141,6 +142,23 @@ object Media {
 
     fun cancelFetch() {
         currentPid?.let { runCatching { YoutubeDL.getInstance().destroyProcessById(it) } }
+        currentPid = null
+    }
+
+    /** YouTube playlists the engine could only read through YouTube's API (skip the web page). */
+    private val apiOnly = java.util.Collections.synchronizedSet(HashSet<String>())
+
+    /** How the last playlist was read: "engine", "engine-api" or "grabbit-web" / "grabbit-music" / "grabbit-watch". */
+    @Volatile var lastPlaylistVia: String = ""
+
+    private fun runJson(ctx: Context, url: String, pid: String, extra: List<Pair<String, String?>>): JSONObject {
+        val req = YoutubeDLRequest(url).apply {
+            addOption("-J"); addOption("--flat-playlist"); addOption("--no-warnings")
+            extra.forEach { (k, v) -> if (v == null) addOption(k) else addOption(k, v) }
+        }
+        Cookies.apply(ctx, req)
+        val out = YoutubeDL.getInstance().execute(req, processId = pid, callback = null).out.trim()
+        return JSONObject(out.lineSequence().lastOrNull { it.trimStart().startsWith("{") } ?: out)
     }
 
     suspend fun fetchInfo(ctx: Context, url: String): MediaInfo = withContext(Dispatchers.IO) {
@@ -165,34 +183,56 @@ object Media {
             )
         }
         if (!Engine.awaitReady()) throw IllegalStateException(Engine.failMessage())
-        val req = YoutubeDLRequest(url).apply {
-            addOption("-J")
-            addOption("--flat-playlist")
-            addOption("--no-warnings")
-            // Playlists: first 100 videos; more load as the user scrolls
-            addOption("--playlist-items", "1:${PlaylistParser.PAGE}")
-        }
-        Cookies.apply(ctx, req)
         val pid = "info-${System.nanoTime()}"
         cancelFetch()
         currentPid = pid
-        val resp = YoutubeDL.getInstance().execute(req, processId = pid, callback = null)
-        val out = resp.out.trim()
-        val json = out.lineSequence().lastOrNull { it.trimStart().startsWith("{") } ?: out
-        parse(url, JSONObject(json))
+        // Playlists: first 100 videos; more load as the user scrolls
+        val first = listOf("--playlist-items" to "1:${PlaylistParser.PAGE}")
+        try {
+            val info = parse(url, runJson(ctx, url, pid, first))
+            if (info.isPlaylist) lastPlaylistVia = "engine"
+            info
+        } catch (e: Throwable) {
+            val id = YtPlaylist.idFrom(url)
+            // Only YouTube playlists get the fallbacks, and never after the user tapped cancel
+            val listErr = "/playlist" in url || e.message.orEmpty().let { "tab" in it.lowercase() || "playlist" in it.lowercase() }
+            if (id == null || !listErr || currentPid != pid || e is kotlinx.coroutines.CancellationException) throw e
+            Log.w("Grabbit", "Engine couldn't open playlist $id: ${e.message?.take(200)}")
+            youtubeFallback(ctx, url, id, pid, first) ?: throw e
+        }
+    }
+
+    /** 1) the engine again, reading YouTube's API instead of the web page; 2) Grabbit's own playlist reader. */
+    private fun youtubeFallback(ctx: Context, url: String, id: String, pid: String, first: List<Pair<String, String?>>): MediaInfo? {
+        val plUrl = "https://www.youtube.com/playlist?list=$id"
+        runCatching {
+            val info = parse(url, runJson(ctx, plUrl, pid, first + ("--extractor-args" to "youtubetab:skip=webpage")))
+            if (info.isPlaylist && info.entries.isNotEmpty()) {
+                apiOnly += id; lastPlaylistVia = "engine-api"
+                return info
+            }
+        }.onFailure { Log.w("Grabbit", "Engine API read failed $id: ${it.message?.take(200)}") }
+        if (currentPid != pid) return null
+        val r = runCatching { YtPlaylist.read(id) }.getOrElse { Log.w("Grabbit", "Own reader failed $id: ${it.message}"); return null }
+        lastPlaylistVia = "grabbit-${r.via}"
+        return MediaInfo(
+            url, r.title.ifBlank { "YouTube playlist" }, r.owner, r.entries.firstOrNull()?.thumb.orEmpty(), 0, "YouTube",
+            true, r.entries.size, listOf(1080, 720, 480, 360), emptyMap(), true,
+            entries = r.entries, playlistId = id, hasMore = false,
+        )
     }
 
     /** Next 100 videos of a playlist, starting at number [from]. */
     suspend fun playlistPage(ctx: Context, url: String, from: Int, site: String): List<PlEntry> = withContext(Dispatchers.IO) {
         if (!Engine.awaitReady()) throw IllegalStateException(Engine.failMessage())
-        val req = YoutubeDLRequest(url).apply {
-            addOption("-J"); addOption("--flat-playlist"); addOption("--no-warnings")
-            addOption("--playlist-items", "$from:${from + PlaylistParser.PAGE - 1}")
+        val id = YtPlaylist.idFrom(url)
+        val api = id != null && id in apiOnly
+        val target = if (api) "https://www.youtube.com/playlist?list=$id" else url
+        val extra = buildList<Pair<String, String?>> {
+            add("--playlist-items" to "$from:${from + PlaylistParser.PAGE - 1}")
+            if (api) add("--extractor-args" to "youtubetab:skip=webpage")
         }
-        Cookies.apply(ctx, req)
-        val out = YoutubeDL.getInstance().execute(req, processId = "page-${System.nanoTime()}", callback = null).out.trim()
-        val json = out.lineSequence().lastOrNull { it.trimStart().startsWith("{") } ?: out
-        PlaylistParser.entries(JSONObject(json), from - 1, site)
+        PlaylistParser.entries(runJson(ctx, target, "page-${System.nanoTime()}", extra), from - 1, site)
     }
 
     private fun JSONObject.str(k: String): String = if (isNull(k)) "" else optString(k, "")

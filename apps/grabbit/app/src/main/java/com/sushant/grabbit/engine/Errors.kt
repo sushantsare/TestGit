@@ -19,7 +19,7 @@ object Errors {
                 "connection refused" in l || "timed out" in l || "no address associated" in l ->
                 "No internet connection (or it is too slow). Check your network and try again."
             "unable to recognize tab page" in l || "the playlist does not exist" in l || "playlist does not exist" in l ->
-                "This playlist couldn't be opened. It may be private, deleted, or the link was cut short. Open it in YouTube and share it again. Still failing? Tap Update now in Settings → Download engine."
+                "This playlist couldn't be opened. If it's private, log in to YouTube in Settings → Accounts. Otherwise check your internet and try again."
             "confirm you are on the latest version" in l || "please report this issue" in l ->
                 "YouTube changed something. Tap Update now in Settings → Download engine, then try again."
             "unsupported url" in l ->

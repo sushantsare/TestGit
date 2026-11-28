@@ -674,6 +674,36 @@ class GrabbitE2ETest {
             names.firstOrNull()?.startsWith("01 - ") == true && failedNow.size == 1 && archived && retried && again.startsWith("1 of")}"
     }.getOrElse { log("PLAYLIST failed: ${it.message}"); shot("pl_fail"); "playlist=false" }
 
+
+    /** Sushant's playlist that the engine couldn't open ("Unable to recognize tab page"). */
+    private fun ytPlaylistFlow(): String = runCatching {
+        val vm = ViewModelProvider(compose.activity)[MainViewModel::class.java]
+        val own = runCatching { com.sushant.grabbit.engine.YtPlaylist.read("PLAdFiDLf78fc") }
+        log("YTPL own reader: ${own.getOrNull()?.let { "via=${it.via} n=${it.entries.size} title='${it.title}' owner='${it.owner}' first='${it.entries.firstOrNull()?.title}'" } ?: "ERR ${own.exceptionOrNull()?.message}"} trail=${com.sushant.grabbit.engine.YtPlaylist.lastTrail}")
+        val links = listOf(
+            "https://youtube.com/playlist?list=PLAdFiDLf78fc&si=5tZiibOpAgsX8JQC",
+            "https://music.youtube.com/playlist?list=PLAdFiDLf78fc&si=la54-Alb-V48oB53&drli=1",
+        )
+        var shown: com.sushant.grabbit.engine.MediaInfo? = null
+        val oks = links.map { raw ->
+            val url = com.sushant.grabbit.data.Sites.extractUrl(raw) ?: raw
+            val r = runCatching { kotlinx.coroutines.runBlocking { com.sushant.grabbit.engine.Media.fetchInfo(ctx, url) } }
+            val info = r.getOrNull()
+            log("YTPL fetch $url -> ${info?.let { "via=${com.sushant.grabbit.engine.Media.lastPlaylistVia} playlist=${it.isPlaylist} n=${it.entries.size} title='${it.title}'" } ?: "ERR ${r.exceptionOrNull()?.message?.take(300)}"}")
+            if (info != null && shown == null) shown = info
+            info != null && info.isPlaylist && info.entries.isNotEmpty()
+        }
+        shown?.let { info ->
+            compose.onNodeWithTag("nav_home").performClick()
+            compose.activity.runOnUiThread { vm.show(info) }
+            compose.waitUntil(10_000) { exists("plCount") }
+            Thread.sleep(1500)
+            shot("ytpl_1_picker")
+            compose.activity.runOnUiThread { vm.show(null) }
+        }
+        "ytplaylist=${oks.all { it }}"
+    }.getOrElse { log("YTPL failed: ${it.message}"); "ytplaylist=false" }
+
     /** Data saved by v2.8 (library entries in the old format) must load in 3.0; the new stores start empty. */
     private fun upgradeCheck(): String = runCatching {
         val f = java.io.File(ctx.filesDir, "library.json")
@@ -858,10 +888,11 @@ class GrabbitE2ETest {
         val images = imageFlow()
         val upgrade = upgradeCheck()
         val playlist = playlistFlow()
+        val ytPlaylist = ytPlaylistFlow()
         val engine = "engine=${Prefs.engineChannel}/${Prefs.engineChannelInstalled}"
         log("ENGINE channel=${Prefs.engineChannel} installed=${Prefs.engineChannelInstalled} version=${com.sushant.grabbit.engine.Engine.version.value}")
 
-        log("SUMMARY direct=$direct x=$x dailymotion=$dm facebook=$fb youtube=$youtube share=$share threads=$threads $options $renamed $speed $pause $folder $images $onboarding $upgrade $playlist $engine")
+        log("SUMMARY direct=$direct x=$x dailymotion=$dm facebook=$fb youtube=$youtube share=$share threads=$threads $options $renamed $speed $pause $folder $images $onboarding $upgrade $playlist $ytPlaylist $engine")
         results.forEach { Log.i("GrabbitE2E", "RESULT $it") }
         assertTrue("Downloads failed", direct && x)
         assertTrue("Share sheet download failed", share)
