@@ -611,9 +611,9 @@ class GrabbitE2ETest {
         compose.onNodeWithTag("rangeField").performScrollTo().performTextInput("1-4")
         compose.onNodeWithTag("rangeApply").performClick()
         val c1 = compose.onNodeWithTag("plCount", useUnmergedTree = true).fetchSemanticsNode().config[androidx.compose.ui.semantics.SemanticsProperties.Text].joinToString { it.text }
-        compose.onNodeWithTag("plRow_3").performScrollTo().performClick()
+        compose.onNodeWithTag("plCheck_3").performScrollTo().performSemanticsAction(androidx.compose.ui.semantics.SemanticsActions.OnClick)
         val c2 = compose.onNodeWithTag("plCount", useUnmergedTree = true).fetchSemanticsNode().config[androidx.compose.ui.semantics.SemanticsProperties.Text].joinToString { it.text }
-        compose.onNodeWithTag("plRow_3").performClick()
+        compose.onNodeWithTag("plCheck_3").performSemanticsAction(androidx.compose.ui.semantics.SemanticsActions.OnClick)
         compose.onNodeWithTag("order_1").performScrollTo().performClick()
         compose.onNodeWithTag("downloadBtn").performScrollTo()
         shot("pl_2_picker_bottom")
@@ -634,13 +634,20 @@ class GrabbitE2ETest {
             if (done >= 3 && failed >= 1 && running == 0) break
             Thread.sleep(700)
         }
+        Thread.sleep(4000)
         compose.waitForIdle()
         shot("pl_4_finished")
         val mine = Library.items.value.filter { it.groupTitle == "Test Playlist" }
         val names = mine.sortedBy { it.groupIndex }.map { it.fileName }
-        val ls = runCatching { android.os.ParcelFileDescriptor.AutoCloseInputStream(
-            instr.uiAutomation.executeShellCommand("ls /sdcard/Movies/Grabbit/Test\\ Playlist")).bufferedReader().readText() }.getOrDefault("")
-        val inFolder = names.isNotEmpty() && names.all { ls.contains(it) }
+        // Each file sits in Movies/Grabbit/Test Playlist (asked from Android's media store)
+        val folders = mine.map { item ->
+            runCatching {
+                ctx.contentResolver.query(android.net.Uri.parse(item.uri), arrayOf(android.provider.MediaStore.MediaColumns.RELATIVE_PATH), null, null, null)
+                    ?.use { c -> if (c.moveToFirst()) c.getString(0) else "" }.orEmpty()
+            }.getOrDefault("")
+        }
+        log("PLAYLIST folders=$folders")
+        val inFolder = folders.isNotEmpty() && folders.all { it.trimEnd('/') == "Movies/Grabbit/Test Playlist" }
         val failedNow = wm.getWorkInfosByTag(Downloads.TAG).get().filter { Downloads.jobOf(it).opts.gt == "Test Playlist" && it.state == androidx.work.WorkInfo.State.FAILED }
         val archived = com.sushant.grabbit.data.PlaylistQueue.Archive.has("PLTEST", "vid1") && com.sushant.grabbit.data.PlaylistQueue.Archive.has("PLTEST", "vid2")
         // Retry failed runs the broken one again (it fails again: the link really is broken)

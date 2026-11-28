@@ -329,7 +329,7 @@ private fun PlRow(e: PlEntry, on: Boolean, done: Boolean, total: Int, shape: and
                     )
                 }
             }
-            Checkbox(on, { onToggle() }, enabled = e.available)
+            Checkbox(on, { onToggle() }, enabled = e.available, modifier = Modifier.testTag("plCheck_${e.index}"))
         }
     }
 }
