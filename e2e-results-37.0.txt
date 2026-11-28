@@ -1,0 +1,5 @@
+== Saveo e2e on Android 17 (API 37.0) ==
+Performing Streamed Install
+Success
+launch=PASSED
+monkey_crashes_37.0=0

@@ -1,0 +1,502 @@
+  bash arg: -p
+  bash arg: com.sushant.saveo
+  bash arg: -s
+  bash arg: 42
+  bash arg: --throttle
+  bash arg: 80
+  bash arg: --pct-syskeys
+  bash arg: 0
+  bash arg: -v
+  bash arg: 5000
+args: [-p, com.sushant.saveo, -s, 42, --throttle, 80, --pct-syskeys, 0, -v, 5000]
+ arg: "-p"
+ arg: "com.sushant.saveo"
+ arg: "-s"
+ arg: "42"
+ arg: "--throttle"
+ arg: "80"
+ arg: "--pct-syskeys"
+ arg: "0"
+ arg: "-v"
+ arg: "5000"
+data="com.sushant.saveo"
+data="42"
+arg="--throttle" mCurArgData="null" mNextArg=5 argwas="--throttle" nextarg="80"
+data="80"
+arg="--pct-syskeys" mCurArgData="null" mNextArg=7 argwas="--pct-syskeys" nextarg="0"
+data="0"
+:Monkey: seed=42 count=5000
+:AllowPackage: com.sushant.saveo
+:IncludeCategory: android.intent.category.LAUNCHER
+:IncludeCategory: android.intent.category.MONKEY
+// Event percentages:
+//   0: 15.306122%
+//   1: 10.204082%
+//   2: 2.0408163%
+//   3: 15.306122%
+//   4: -0.0%
+//   5: -0.0%
+//   6: 25.510204%
+//   7: 15.306122%
+//   8: -0.0%
+//   9: 2.0408163%
+//   10: 1.0204082%
+//   11: 13.265306%
+:Switch: #Intent;action=android.intent.action.MAIN;category=android.intent.category.LAUNCHER;launchFlags=0x10200000;component=com.sushant.saveo/leakcanary.internal.activity.LeakLauncherActivity;end
+    // Allowing start of Intent { act=android.intent.action.MAIN cat=[android.intent.category.LAUNCHER] cmp=com.sushant.saveo/leakcanary.internal.activity.LeakLauncherActivity } in package com.sushant.saveo
+:Sending Trackball (ACTION_MOVE): 0:(-3.0,1.0)
+:Sending Trackball (ACTION_MOVE): 0:(-5.0,-2.0)
+:Sending Trackball (ACTION_MOVE): 0:(4.0,-2.0)
+:Sending Trackball (ACTION_MOVE): 0:(0.0,-4.0)
+:Sending Trackball (ACTION_MOVE): 0:(-4.0,-3.0)
+    //[calendar_time:2026-11-28 08:00:43.408  system_uptime:135342]
+    // Sending event #100
+    //[calendar_time:2026-11-28 08:00:43.495  system_uptime:135429]
+    // Sending event #100
+:Switch: #Intent;action=android.intent.action.MAIN;category=android.intent.category.LAUNCHER;launchFlags=0x10200000;component=com.sushant.saveo/.MainActivity;end
+    // Allowing start of Intent { act=android.intent.action.MAIN cat=[android.intent.category.LAUNCHER] cmp=com.sushant.saveo/.MainActivity } in package com.sushant.saveo
+:Sending Trackball (ACTION_MOVE): 0:(-2.0,-1.0)
+:Sending Trackball (ACTION_MOVE): 0:(2.0,-2.0)
+    //[calendar_time:2026-11-28 08:00:49.605  system_uptime:141538]
+    // Sending event #200
+:Sending Trackball (ACTION_MOVE): 0:(-1.0,4.0)
+:Sending Trackball (ACTION_UP): 0:(0.0,0.0)
+:Switch: #Intent;action=android.intent.action.MAIN;category=android.intent.category.LAUNCHER;launchFlags=0x10200000;component=com.sushant.saveo/.MainActivity;end
+    // Allowing start of Intent { act=android.intent.action.MAIN cat=[android.intent.category.LAUNCHER] cmp=com.sushant.saveo/.MainActivity } in package com.sushant.saveo
+:Sending Trackball (ACTION_MOVE): 0:(-1.0,-4.0)
+:Sending Trackball (ACTION_UP): 0:(0.0,0.0)
+:Sending Trackball (ACTION_MOVE): 0:(0.0,-5.0)
+:Sending Trackball (ACTION_MOVE): 0:(2.0,-2.0)
+    //[calendar_time:2026-11-28 08:00:53.278  system_uptime:145211]
+    // Sending event #300
+:Sending Trackball (ACTION_MOVE): 0:(-4.0,2.0)
+:Sending Trackball (ACTION_MOVE): 0:(1.0,3.0)
+:Sending Trackball (ACTION_MOVE): 0:(3.0,4.0)
+:Sending Trackball (ACTION_MOVE): 0:(-5.0,2.0)
+:Sending Trackball (ACTION_MOVE): 0:(-5.0,-4.0)
+    //[calendar_time:2026-11-28 08:00:57.014  system_uptime:148947]
+    // Sending event #400
+:Sending Trackball (ACTION_MOVE): 0:(4.0,3.0)
+:Sending Trackball (ACTION_MOVE): 0:(-2.0,1.0)
+:Sending Trackball (ACTION_MOVE): 0:(-4.0,0.0)
+:Sending Trackball (ACTION_MOVE): 0:(3.0,0.0)
+:Switch: #Intent;action=android.intent.action.MAIN;category=android.intent.category.LAUNCHER;launchFlags=0x10200000;component=com.sushant.saveo/leakcanary.internal.activity.LeakLauncherActivity;end
+    // Allowing start of Intent { act=android.intent.action.MAIN cat=[android.intent.category.LAUNCHER] cmp=com.sushant.saveo/leakcanary.internal.activity.LeakLauncherActivity } in package com.sushant.saveo
+:Sending Trackball (ACTION_MOVE): 0:(3.0,3.0)
+:Sending Trackball (ACTION_MOVE): 0:(2.0,-3.0)
+    //[calendar_time:2026-11-28 08:00:59.478  system_uptime:151411]
+    // Sending event #500
+:Sending Trackball (ACTION_MOVE): 0:(2.0,-1.0)
+:Sending Trackball (ACTION_MOVE): 0:(-1.0,-4.0)
+:Sending Trackball (ACTION_MOVE): 0:(-1.0,-4.0)
+:Sending Trackball (ACTION_MOVE): 0:(3.0,1.0)
+:Sending Trackball (ACTION_MOVE): 0:(2.0,-4.0)
+:Sending Trackball (ACTION_MOVE): 0:(-2.0,0.0)
+    //[calendar_time:2026-11-28 08:01:01.065  system_uptime:152998]
+    // Sending event #600
+:Sending Trackball (ACTION_MOVE): 0:(-4.0,-4.0)
+:Sending Trackball (ACTION_MOVE): 0:(2.0,3.0)
+:Sending Trackball (ACTION_MOVE): 0:(-5.0,-1.0)
+:Sending Trackball (ACTION_MOVE): 0:(-5.0,0.0)
+:Switch: #Intent;action=android.intent.action.MAIN;category=android.intent.category.LAUNCHER;launchFlags=0x10200000;component=com.sushant.saveo/.MainActivity;end
+    // Allowing start of Intent { act=android.intent.action.MAIN cat=[android.intent.category.LAUNCHER] cmp=com.sushant.saveo/.MainActivity } in package com.sushant.saveo
+:Sending Trackball (ACTION_MOVE): 0:(-3.0,-4.0)
+:Switch: #Intent;action=android.intent.action.MAIN;category=android.intent.category.LAUNCHER;launchFlags=0x10200000;component=com.sushant.saveo/leakcanary.internal.activity.LeakLauncherActivity;end
+    // Allowing start of Intent { act=android.intent.action.MAIN cat=[android.intent.category.LAUNCHER] cmp=com.sushant.saveo/leakcanary.internal.activity.LeakLauncherActivity } in package com.sushant.saveo
+    //[calendar_time:2026-11-28 08:01:04.110  system_uptime:156043]
+    // Sending event #700
+    //[calendar_time:2026-11-28 08:01:04.190  system_uptime:156123]
+    // Sending event #700
+:Sending Trackball (ACTION_MOVE): 0:(-3.0,-4.0)
+:Sending Trackball (ACTION_UP): 0:(0.0,0.0)
+:Sending Trackball (ACTION_MOVE): 0:(0.0,-2.0)
+:Sending Trackball (ACTION_MOVE): 0:(-2.0,3.0)
+:Sending Trackball (ACTION_MOVE): 0:(-4.0,0.0)
+:Switch: #Intent;action=android.intent.action.MAIN;category=android.intent.category.LAUNCHER;launchFlags=0x10200000;component=com.sushant.saveo/leakcanary.internal.activity.LeakLauncherActivity;end
+    // Allowing start of Intent { act=android.intent.action.MAIN cat=[android.intent.category.LAUNCHER] cmp=com.sushant.saveo/leakcanary.internal.activity.LeakLauncherActivity } in package com.sushant.saveo
+    //[calendar_time:2026-11-28 08:01:07.101  system_uptime:159035]
+    // Sending event #800
+:Sending Trackball (ACTION_MOVE): 0:(-4.0,0.0)
+:Sending Trackball (ACTION_MOVE): 0:(2.0,-2.0)
+    // Rejecting start of Intent { act=android.intent.action.VIEW dat=https://twitter.com/... cmp=com.android.chrome/com.google.android.apps.chrome.IntentDispatcher } in package com.android.chrome
+:Switch: #Intent;action=android.intent.action.MAIN;category=android.intent.category.LAUNCHER;launchFlags=0x10200000;component=com.sushant.saveo/.MainActivity;end
+    // Allowing start of Intent { act=android.intent.action.MAIN cat=[android.intent.category.LAUNCHER] cmp=com.sushant.saveo/.MainActivity } in package com.sushant.saveo
+:Switch: #Intent;action=android.intent.action.MAIN;category=android.intent.category.LAUNCHER;launchFlags=0x10200000;component=com.sushant.saveo/leakcanary.internal.activity.LeakLauncherActivity;end
+    // Allowing start of Intent { act=android.intent.action.MAIN cat=[android.intent.category.LAUNCHER] cmp=com.sushant.saveo/leakcanary.internal.activity.LeakLauncherActivity } in package com.sushant.saveo
+:Sending Trackball (ACTION_MOVE): 0:(3.0,0.0)
+:Sending Trackball (ACTION_MOVE): 0:(4.0,4.0)
+:Sending Trackball (ACTION_MOVE): 0:(-3.0,1.0)
+:Sending Trackball (ACTION_MOVE): 0:(-2.0,0.0)
+:Sending Trackball (ACTION_UP): 0:(0.0,0.0)
+    // Rejecting start of Intent { act=android.intent.action.VIEW dat=https://twitter.com/... cmp=com.android.chrome/com.google.android.apps.chrome.IntentDispatcher } in package com.android.chrome
+:Sending Trackball (ACTION_MOVE): 0:(-4.0,-5.0)
+    //[calendar_time:2026-11-28 08:01:09.778  system_uptime:161711]
+    // Sending event #900
+:Sending Trackball (ACTION_MOVE): 0:(-5.0,2.0)
+    // Rejecting start of Intent { act=android.intent.action.VIEW dat=https://squ.re/... cmp=com.android.chrome/com.google.android.apps.chrome.IntentDispatcher } in package com.android.chrome
+:Sending Trackball (ACTION_MOVE): 0:(2.0,1.0)
+    // Rejecting start of Intent { act=android.intent.action.VIEW dat=https://squ.re/... cmp=com.android.chrome/com.google.android.apps.chrome.IntentDispatcher } in package com.android.chrome
+:Sending Trackball (ACTION_MOVE): 0:(-3.0,2.0)
+    //[calendar_time:2026-11-28 08:01:12.035  system_uptime:163968]
+    // Sending event #1000
+:Sending Trackball (ACTION_MOVE): 0:(-3.0,-1.0)
+    //[calendar_time:2026-11-28 08:01:15.928  system_uptime:167861]
+    // Sending event #1100
+    //[calendar_time:2026-11-28 08:01:16.009  system_uptime:167942]
+    // Sending event #1100
+:Sending Trackball (ACTION_MOVE): 0:(0.0,-2.0)
+:Sending Trackball (ACTION_MOVE): 0:(0.0,2.0)
+:Sending Trackball (ACTION_MOVE): 0:(-5.0,-3.0)
+:Sending Trackball (ACTION_MOVE): 0:(1.0,4.0)
+:Sending Trackball (ACTION_MOVE): 0:(-1.0,-4.0)
+:Sending Trackball (ACTION_MOVE): 0:(4.0,-2.0)
+    //[calendar_time:2026-11-28 08:01:18.274  system_uptime:170207]
+    // Sending event #1200
+:Switch: #Intent;action=android.intent.action.MAIN;category=android.intent.category.LAUNCHER;launchFlags=0x10200000;component=com.sushant.saveo/.MainActivity;end
+    // Allowing start of Intent { act=android.intent.action.MAIN cat=[android.intent.category.LAUNCHER] cmp=com.sushant.saveo/.MainActivity } in package com.sushant.saveo
+:Sending Trackball (ACTION_MOVE): 0:(-2.0,-4.0)
+:Sending Trackball (ACTION_MOVE): 0:(2.0,3.0)
+:Sending Trackball (ACTION_MOVE): 0:(1.0,-2.0)
+    // Rejecting start of Intent { act=android.settings.SETTINGS cmp=com.android.settings/.homepage.SettingsHomepageActivity } in package com.android.settings
+:Sending Trackball (ACTION_MOVE): 0:(-2.0,2.0)
+    //[calendar_time:2026-11-28 08:01:23.723  system_uptime:175656]
+    // Sending event #1300
+:Sending Trackball (ACTION_MOVE): 0:(4.0,1.0)
+:Sending Trackball (ACTION_MOVE): 0:(-5.0,-1.0)
+:Switch: #Intent;action=android.intent.action.MAIN;category=android.intent.category.LAUNCHER;launchFlags=0x10200000;component=com.sushant.saveo/.MainActivity;end
+    // Allowing start of Intent { act=android.intent.action.MAIN cat=[android.intent.category.LAUNCHER] cmp=com.sushant.saveo/.MainActivity } in package com.sushant.saveo
+:Sending Trackball (ACTION_MOVE): 0:(4.0,1.0)
+:Sending Trackball (ACTION_MOVE): 0:(-2.0,2.0)
+    //[calendar_time:2026-11-28 08:01:27.002  system_uptime:178934]
+    // Sending event #1400
+:Sending Trackball (ACTION_UP): 0:(0.0,0.0)
+:Sending Trackball (ACTION_MOVE): 0:(-4.0,-4.0)
+:Sending Trackball (ACTION_UP): 0:(0.0,0.0)
+    // Rejecting start of Intent { act=android.intent.action.OPEN_DOCUMENT_TREE cmp=com.google.android.documentsui/com.android.documentsui.picker.PickActivity } in package com.google.android.documentsui
+:Sending Trackball (ACTION_MOVE): 0:(-1.0,4.0)
+:Sending Trackball (ACTION_MOVE): 0:(2.0,1.0)
+:Sending Trackball (ACTION_MOVE): 0:(1.0,-1.0)
+:Switch: #Intent;action=android.intent.action.MAIN;category=android.intent.category.LAUNCHER;launchFlags=0x10200000;component=com.sushant.saveo/leakcanary.internal.activity.LeakLauncherActivity;end
+    // Allowing start of Intent { act=android.intent.action.MAIN cat=[android.intent.category.LAUNCHER] cmp=com.sushant.saveo/leakcanary.internal.activity.LeakLauncherActivity } in package com.sushant.saveo
+    // Rejecting start of Intent { act=android.intent.action.MAIN cat=[android.intent.category.LAUNCHER] pkg=com.android.chrome cmp=com.android.chrome/com.google.android.apps.chrome.Main } in package com.android.chrome
+    //[calendar_time:2026-11-28 08:01:30.000  system_uptime:181934]
+    // Sending event #1500
+:Switch: #Intent;action=android.intent.action.MAIN;category=android.intent.category.LAUNCHER;launchFlags=0x10200000;component=com.sushant.saveo/.MainActivity;end
+    // Allowing start of Intent { act=android.intent.action.MAIN cat=[android.intent.category.LAUNCHER] cmp=com.sushant.saveo/.MainActivity } in package com.sushant.saveo
+:Sending Trackball (ACTION_MOVE): 0:(1.0,-2.0)
+:Sending Trackball (ACTION_MOVE): 0:(-2.0,1.0)
+:Sending Trackball (ACTION_MOVE): 0:(-4.0,2.0)
+:Switch: #Intent;action=android.intent.action.MAIN;category=android.intent.category.LAUNCHER;launchFlags=0x10200000;component=com.sushant.saveo/leakcanary.internal.activity.LeakLauncherActivity;end
+    // Allowing start of Intent { act=android.intent.action.MAIN cat=[android.intent.category.LAUNCHER] cmp=com.sushant.saveo/leakcanary.internal.activity.LeakLauncherActivity } in package com.sushant.saveo
+:Sending Trackball (ACTION_MOVE): 0:(-2.0,0.0)
+:Sending Trackball (ACTION_UP): 0:(0.0,0.0)
+:Sending Trackball (ACTION_MOVE): 0:(1.0,4.0)
+:Switch: #Intent;action=android.intent.action.MAIN;category=android.intent.category.LAUNCHER;launchFlags=0x10200000;component=com.sushant.saveo/leakcanary.internal.activity.LeakLauncherActivity;end
+    // Allowing start of Intent { act=android.intent.action.MAIN cat=[android.intent.category.LAUNCHER] cmp=com.sushant.saveo/leakcanary.internal.activity.LeakLauncherActivity } in package com.sushant.saveo
+:Sending Trackball (ACTION_MOVE): 0:(1.0,-3.0)
+    //[calendar_time:2026-11-28 08:01:33.204  system_uptime:185136]
+    // Sending event #1600
+:Sending Trackball (ACTION_MOVE): 0:(2.0,-1.0)
+:Sending Trackball (ACTION_MOVE): 0:(-3.0,-4.0)
+:Sending Trackball (ACTION_MOVE): 0:(-1.0,0.0)
+:Switch: #Intent;action=android.intent.action.MAIN;category=android.intent.category.LAUNCHER;launchFlags=0x10200000;component=com.sushant.saveo/leakcanary.internal.activity.LeakLauncherActivity;end
+    // Allowing start of Intent { act=android.intent.action.MAIN cat=[android.intent.category.LAUNCHER] cmp=com.sushant.saveo/leakcanary.internal.activity.LeakLauncherActivity } in package com.sushant.saveo
+:Sending Trackball (ACTION_MOVE): 0:(-5.0,3.0)
+:Sending Trackball (ACTION_MOVE): 0:(3.0,3.0)
+    //[calendar_time:2026-11-28 08:01:35.426  system_uptime:187359]
+    // Sending event #1700
+:Sending Trackball (ACTION_MOVE): 0:(-5.0,4.0)
+:Sending Trackball (ACTION_MOVE): 0:(0.0,1.0)
+    // Rejecting start of Intent { act=android.intent.action.VIEW dat=https://square.github.io/... cmp=com.android.chrome/com.google.android.apps.chrome.IntentDispatcher } in package com.android.chrome
+:Sending Trackball (ACTION_MOVE): 0:(2.0,-3.0)
+    // Rejecting start of Intent { act=android.intent.action.VIEW dat=https://square.github.io/... cmp=com.android.chrome/com.google.android.apps.chrome.IntentDispatcher } in package com.android.chrome
+:Sending Trackball (ACTION_MOVE): 0:(4.0,-3.0)
+    //[calendar_time:2026-11-28 08:01:38.207  system_uptime:190140]
+    // Sending event #1800
+:Sending Trackball (ACTION_MOVE): 0:(-3.0,3.0)
+:Sending Trackball (ACTION_MOVE): 0:(-3.0,3.0)
+:Sending Trackball (ACTION_MOVE): 0:(-3.0,1.0)
+:Sending Trackball (ACTION_MOVE): 0:(1.0,3.0)
+    // Rejecting start of Intent { act=android.settings.SETTINGS cmp=com.android.settings/.homepage.SettingsHomepageActivity } in package com.android.settings
+:Sending Trackball (ACTION_MOVE): 0:(0.0,-5.0)
+:Sending Trackball (ACTION_UP): 0:(0.0,0.0)
+    //[calendar_time:2026-11-28 08:01:39.864  system_uptime:191797]
+    // Sending event #1900
+:Sending Trackball (ACTION_MOVE): 0:(1.0,-4.0)
+:Sending Trackball (ACTION_MOVE): 0:(-3.0,-5.0)
+:Sending Trackball (ACTION_MOVE): 0:(-5.0,-5.0)
+:Sending Trackball (ACTION_MOVE): 0:(-4.0,4.0)
+:Sending Trackball (ACTION_MOVE): 0:(-1.0,2.0)
+:Switch: #Intent;action=android.intent.action.MAIN;category=android.intent.category.LAUNCHER;launchFlags=0x10200000;component=com.sushant.saveo/leakcanary.internal.activity.LeakLauncherActivity;end
+    // Allowing start of Intent { act=android.intent.action.MAIN cat=[android.intent.category.LAUNCHER] cmp=com.sushant.saveo/leakcanary.internal.activity.LeakLauncherActivity } in package com.sushant.saveo
+:Switch: #Intent;action=android.intent.action.MAIN;category=android.intent.category.LAUNCHER;launchFlags=0x10200000;component=com.sushant.saveo/.MainActivity;end
+    // Allowing start of Intent { act=android.intent.action.MAIN cat=[android.intent.category.LAUNCHER] cmp=com.sushant.saveo/.MainActivity } in package com.sushant.saveo
+:Sending Trackball (ACTION_MOVE): 0:(0.0,-2.0)
+    //[calendar_time:2026-11-28 08:01:45.505  system_uptime:197438]
+    // Sending event #2000
+    //[calendar_time:2026-11-28 08:01:49.555  system_uptime:201488]
+    // Sending event #2100
+    //[calendar_time:2026-11-28 08:01:49.639  system_uptime:201572]
+    // Sending event #2100
+:Sending Trackball (ACTION_MOVE): 0:(1.0,1.0)
+:Sending Trackball (ACTION_MOVE): 0:(-2.0,-5.0)
+:Sending Trackball (ACTION_MOVE): 0:(-4.0,-2.0)
+:Sending Trackball (ACTION_MOVE): 0:(0.0,-5.0)
+:Sending Trackball (ACTION_MOVE): 0:(-4.0,0.0)
+    //[calendar_time:2026-11-28 08:01:52.187  system_uptime:204120]
+    // Sending event #2200
+:Sending Trackball (ACTION_MOVE): 0:(0.0,3.0)
+:Sending Trackball (ACTION_MOVE): 0:(3.0,0.0)
+:Sending Trackball (ACTION_MOVE): 0:(-5.0,-1.0)
+:Sending Trackball (ACTION_MOVE): 0:(3.0,3.0)
+:Switch: #Intent;action=android.intent.action.MAIN;category=android.intent.category.LAUNCHER;launchFlags=0x10200000;component=com.sushant.saveo/.MainActivity;end
+    // Allowing start of Intent { act=android.intent.action.MAIN cat=[android.intent.category.LAUNCHER] cmp=com.sushant.saveo/.MainActivity } in package com.sushant.saveo
+:Sending Trackball (ACTION_MOVE): 0:(-1.0,4.0)
+    //[calendar_time:2026-11-28 08:01:56.807  system_uptime:208740]
+    // Sending event #2300
+:Sending Trackball (ACTION_MOVE): 0:(2.0,-5.0)
+:Sending Trackball (ACTION_UP): 0:(0.0,0.0)
+:Sending Trackball (ACTION_MOVE): 0:(-4.0,-3.0)
+:Sending Trackball (ACTION_UP): 0:(0.0,0.0)
+:Switch: #Intent;action=android.intent.action.MAIN;category=android.intent.category.LAUNCHER;launchFlags=0x10200000;component=com.sushant.saveo/leakcanary.internal.activity.LeakLauncherActivity;end
+    // Allowing start of Intent { act=android.intent.action.MAIN cat=[android.intent.category.LAUNCHER] cmp=com.sushant.saveo/leakcanary.internal.activity.LeakLauncherActivity } in package com.sushant.saveo
+    //[calendar_time:2026-11-28 08:02:01.729  system_uptime:213662]
+    // Sending event #2400
+:Sending Trackball (ACTION_MOVE): 0:(4.0,-4.0)
+:Sending Trackball (ACTION_MOVE): 0:(3.0,-1.0)
+:Sending Trackball (ACTION_MOVE): 0:(1.0,0.0)
+:Switch: #Intent;action=android.intent.action.MAIN;category=android.intent.category.LAUNCHER;launchFlags=0x10200000;component=com.sushant.saveo/.MainActivity;end
+    // Allowing start of Intent { act=android.intent.action.MAIN cat=[android.intent.category.LAUNCHER] cmp=com.sushant.saveo/.MainActivity } in package com.sushant.saveo
+:Switch: #Intent;action=android.intent.action.MAIN;category=android.intent.category.LAUNCHER;launchFlags=0x10200000;component=com.sushant.saveo/leakcanary.internal.activity.LeakLauncherActivity;end
+    // Allowing start of Intent { act=android.intent.action.MAIN cat=[android.intent.category.LAUNCHER] cmp=com.sushant.saveo/leakcanary.internal.activity.LeakLauncherActivity } in package com.sushant.saveo
+:Sending Trackball (ACTION_MOVE): 0:(-5.0,-4.0)
+:Sending Trackball (ACTION_MOVE): 0:(0.0,-4.0)
+    //[calendar_time:2026-11-28 08:02:04.836  system_uptime:216769]
+    // Sending event #2500
+    // Rejecting start of Intent { act=android.intent.action.VIEW dat=https://github.com/... cmp=com.android.chrome/com.google.android.apps.chrome.IntentDispatcher } in package com.android.chrome
+    // Rejecting start of Intent { act=android.intent.action.VIEW dat=https://github.com/... cmp=com.android.chrome/com.google.android.apps.chrome.IntentDispatcher } in package com.android.chrome
+    // Rejecting start of Intent { act=android.intent.action.VIEW dat=https://github.com/... cmp=com.android.chrome/com.google.android.apps.chrome.IntentDispatcher } in package com.android.chrome
+:Sending Flip keyboardOpen=false
+Got IOException performing flipjava.io.FileNotFoundException: /dev/input/event0: open failed: EACCES (Permission denied)
+    // Injection Failed
+:Sending Trackball (ACTION_MOVE): 0:(-4.0,-4.0)
+:Sending Trackball (ACTION_MOVE): 0:(1.0,3.0)
+    //[calendar_time:2026-11-28 08:02:08.946  system_uptime:220879]
+    // Sending event #2600
+:Sending Trackball (ACTION_MOVE): 0:(2.0,-3.0)
+    // Allowing start of Intent { act=android.intent.action.MAIN cat=[android.intent.category.LAUNCHER] cmp=com.sushant.saveo/.MainActivity } in package com.sushant.saveo
+:Sending Trackball (ACTION_MOVE): 0:(-1.0,3.0)
+:Sending Flip keyboardOpen=true
+Got IOException performing flipjava.io.FileNotFoundException: /dev/input/event0: open failed: EACCES (Permission denied)
+    // Injection Failed
+    //[calendar_time:2026-11-28 08:02:13.624  system_uptime:225557]
+    // Sending event #2700
+:Sending Trackball (ACTION_MOVE): 0:(-3.0,-1.0)
+:Sending Trackball (ACTION_MOVE): 0:(-3.0,-3.0)
+:Sending Trackball (ACTION_MOVE): 0:(-4.0,-1.0)
+:Sending Trackball (ACTION_MOVE): 0:(-1.0,-2.0)
+:Sending Trackball (ACTION_MOVE): 0:(-1.0,-1.0)
+:Sending Trackball (ACTION_MOVE): 0:(0.0,-4.0)
+    //[calendar_time:2026-11-28 08:02:14.436  system_uptime:226369]
+    // Sending event #2800
+:Sending Trackball (ACTION_MOVE): 0:(3.0,-4.0)
+    //[calendar_time:2026-11-28 08:02:16.793  system_uptime:228725]
+    // Sending event #2900
+    //[calendar_time:2026-11-28 08:02:16.873  system_uptime:228806]
+    // Sending event #2900
+:Sending Trackball (ACTION_MOVE): 0:(-4.0,2.0)
+:Sending Trackball (ACTION_MOVE): 0:(-1.0,-2.0)
+:Sending Trackball (ACTION_MOVE): 0:(3.0,2.0)
+:Sending Trackball (ACTION_MOVE): 0:(4.0,0.0)
+:Sending Trackball (ACTION_MOVE): 0:(2.0,4.0)
+:Sending Trackball (ACTION_MOVE): 0:(-5.0,2.0)
+    //[calendar_time:2026-11-28 08:02:18.794  system_uptime:230727]
+    // Sending event #3000
+:Sending Trackball (ACTION_MOVE): 0:(-5.0,4.0)
+:Sending Trackball (ACTION_MOVE): 0:(4.0,3.0)
+:Sending Trackball (ACTION_UP): 0:(0.0,0.0)
+    //[calendar_time:2026-11-28 08:02:22.149  system_uptime:234082]
+    // Sending event #3100
+    //[calendar_time:2026-11-28 08:02:22.230  system_uptime:234162]
+    // Sending event #3100
+:Sending Trackball (ACTION_MOVE): 0:(3.0,2.0)
+:Sending Trackball (ACTION_MOVE): 0:(-2.0,-4.0)
+:Sending Trackball (ACTION_MOVE): 0:(-2.0,1.0)
+:Sending Trackball (ACTION_MOVE): 0:(-1.0,-1.0)
+    //[calendar_time:2026-11-28 08:02:24.563  system_uptime:236495]
+    // Sending event #3200
+:Sending Trackball (ACTION_MOVE): 0:(-2.0,-3.0)
+:Sending Trackball (ACTION_MOVE): 0:(2.0,-4.0)
+    //[calendar_time:2026-11-28 08:02:27.110  system_uptime:239043]
+    // Sending event #3300
+:Sending Trackball (ACTION_MOVE): 0:(3.0,-3.0)
+:Sending Trackball (ACTION_MOVE): 0:(1.0,4.0)
+:Sending Trackball (ACTION_MOVE): 0:(-4.0,-2.0)
+:Sending Trackball (ACTION_MOVE): 0:(-4.0,2.0)
+:Sending Trackball (ACTION_MOVE): 0:(-4.0,4.0)
+:Sending Trackball (ACTION_MOVE): 0:(-4.0,-2.0)
+:Sending Trackball (ACTION_MOVE): 0:(-1.0,2.0)
+    //[calendar_time:2026-11-28 08:02:28.719  system_uptime:240652]
+    // Sending event #3400
+:Sending Flip keyboardOpen=false
+Got IOException performing flipjava.io.FileNotFoundException: /dev/input/event0: open failed: EACCES (Permission denied)
+    // Injection Failed
+:Switch: #Intent;action=android.intent.action.MAIN;category=android.intent.category.LAUNCHER;launchFlags=0x10200000;component=com.sushant.saveo/.MainActivity;end
+    // Allowing start of Intent { act=android.intent.action.MAIN cat=[android.intent.category.LAUNCHER] cmp=com.sushant.saveo/.MainActivity } in package com.sushant.saveo
+:Switch: #Intent;action=android.intent.action.MAIN;category=android.intent.category.LAUNCHER;launchFlags=0x10200000;component=com.sushant.saveo/.MainActivity;end
+    // Allowing start of Intent { act=android.intent.action.MAIN cat=[android.intent.category.LAUNCHER] cmp=com.sushant.saveo/.MainActivity } in package com.sushant.saveo
+:Sending Trackball (ACTION_MOVE): 0:(3.0,-2.0)
+:Sending Flip keyboardOpen=true
+Got IOException performing flipjava.io.FileNotFoundException: /dev/input/event0: open failed: EACCES (Permission denied)
+    // Injection Failed
+:Sending Trackball (ACTION_MOVE): 0:(2.0,4.0)
+    // activityResuming(com.sushant.saveo)
+:Sending Trackball (ACTION_MOVE): 0:(4.0,-1.0)
+:Sending Trackball (ACTION_UP): 0:(0.0,0.0)
+:Sending Trackball (ACTION_MOVE): 0:(3.0,-3.0)
+:Sending Trackball (ACTION_MOVE): 0:(2.0,-1.0)
+    //[calendar_time:2026-11-28 08:02:31.464  system_uptime:243397]
+    // Sending event #3500
+    //[calendar_time:2026-11-28 08:02:31.545  system_uptime:243478]
+    // Sending event #3500
+:Sending Trackball (ACTION_MOVE): 0:(-5.0,4.0)
+:Sending Trackball (ACTION_MOVE): 0:(2.0,2.0)
+:Sending Trackball (ACTION_MOVE): 0:(-3.0,-3.0)
+:Sending Trackball (ACTION_MOVE): 0:(-2.0,-1.0)
+:Sending Flip keyboardOpen=false
+Got IOException performing flipjava.io.FileNotFoundException: /dev/input/event0: open failed: EACCES (Permission denied)
+    // Injection Failed
+    // Rejecting start of Intent { act=android.intent.action.MAIN cat=[android.intent.category.LAUNCHER] cmp=com.google.android.youtube/.app.honeycomb.Shell$HomeActivity } in package com.google.android.youtube
+    //[calendar_time:2026-11-28 08:02:36.243  system_uptime:248178]
+    // Sending event #3600
+:Sending Trackball (ACTION_MOVE): 0:(1.0,-1.0)
+:Sending Flip keyboardOpen=true
+Got IOException performing flipjava.io.FileNotFoundException: /dev/input/event0: open failed: EACCES (Permission denied)
+    // Injection Failed
+:Sending Trackball (ACTION_MOVE): 0:(0.0,3.0)
+:Sending Trackball (ACTION_MOVE): 0:(-5.0,-5.0)
+:Sending Trackball (ACTION_MOVE): 0:(1.0,2.0)
+:Sending Trackball (ACTION_MOVE): 0:(4.0,2.0)
+:Sending Trackball (ACTION_MOVE): 0:(-2.0,3.0)
+    //[calendar_time:2026-11-28 08:02:38.214  system_uptime:250147]
+    // Sending event #3700
+:Sending Trackball (ACTION_MOVE): 0:(3.0,4.0)
+:Sending Trackball (ACTION_MOVE): 0:(0.0,-5.0)
+:Sending Trackball (ACTION_MOVE): 0:(1.0,-1.0)
+:Sending Trackball (ACTION_MOVE): 0:(4.0,1.0)
+:Sending Trackball (ACTION_MOVE): 0:(3.0,-2.0)
+:Sending Trackball (ACTION_MOVE): 0:(2.0,3.0)
+    //[calendar_time:2026-11-28 08:02:40.214  system_uptime:252147]
+    // Sending event #3800
+:Sending Trackball (ACTION_MOVE): 0:(-5.0,0.0)
+:Sending Trackball (ACTION_MOVE): 0:(1.0,3.0)
+:Sending Trackball (ACTION_MOVE): 0:(-4.0,3.0)
+:Sending Trackball (ACTION_MOVE): 0:(3.0,0.0)
+    //[calendar_time:2026-11-28 08:02:42.822  system_uptime:254755]
+    // Sending event #3900
+    //[calendar_time:2026-11-28 08:02:42.905  system_uptime:254838]
+    // Sending event #3900
+:Sending Trackball (ACTION_MOVE): 0:(-2.0,-5.0)
+    // activityResuming(com.sushant.saveo)
+:Sending Trackball (ACTION_MOVE): 0:(-1.0,-4.0)
+:Sending Trackball (ACTION_MOVE): 0:(-4.0,3.0)
+:Sending Trackball (ACTION_MOVE): 0:(2.0,0.0)
+    //[calendar_time:2026-11-28 08:02:45.659  system_uptime:257592]
+    // Sending event #4000
+:Sending Trackball (ACTION_MOVE): 0:(2.0,3.0)
+:Switch: #Intent;action=android.intent.action.MAIN;category=android.intent.category.LAUNCHER;launchFlags=0x10200000;component=com.sushant.saveo/leakcanary.internal.activity.LeakLauncherActivity;end
+    // Allowing start of Intent { act=android.intent.action.MAIN cat=[android.intent.category.LAUNCHER] cmp=com.sushant.saveo/leakcanary.internal.activity.LeakLauncherActivity } in package com.sushant.saveo
+:Sending Trackball (ACTION_MOVE): 0:(-3.0,-5.0)
+:Sending Trackball (ACTION_MOVE): 0:(0.0,-3.0)
+    //[calendar_time:2026-11-28 08:02:49.439  system_uptime:261374]
+    // Sending event #4100
+:Sending Trackball (ACTION_MOVE): 0:(3.0,-5.0)
+:Switch: #Intent;action=android.intent.action.MAIN;category=android.intent.category.LAUNCHER;launchFlags=0x10200000;component=com.sushant.saveo/.MainActivity;end
+    // Allowing start of Intent { act=android.intent.action.MAIN cat=[android.intent.category.LAUNCHER] cmp=com.sushant.saveo/.MainActivity } in package com.sushant.saveo
+:Sending Trackball (ACTION_MOVE): 0:(-3.0,-5.0)
+:Sending Trackball (ACTION_MOVE): 0:(0.0,-1.0)
+:Switch: #Intent;action=android.intent.action.MAIN;category=android.intent.category.LAUNCHER;launchFlags=0x10200000;component=com.sushant.saveo/.MainActivity;end
+    // Allowing start of Intent { act=android.intent.action.MAIN cat=[android.intent.category.LAUNCHER] cmp=com.sushant.saveo/.MainActivity } in package com.sushant.saveo
+:Sending Trackball (ACTION_MOVE): 0:(-4.0,-1.0)
+    //[calendar_time:2026-11-28 08:02:52.830  system_uptime:264763]
+    // Sending event #4200
+:Sending Trackball (ACTION_MOVE): 0:(0.0,3.0)
+:Sending Trackball (ACTION_UP): 0:(0.0,0.0)
+:Switch: #Intent;action=android.intent.action.MAIN;category=android.intent.category.LAUNCHER;launchFlags=0x10200000;component=com.sushant.saveo/leakcanary.internal.activity.LeakLauncherActivity;end
+    // Allowing start of Intent { act=android.intent.action.MAIN cat=[android.intent.category.LAUNCHER] cmp=com.sushant.saveo/leakcanary.internal.activity.LeakLauncherActivity } in package com.sushant.saveo
+:Sending Trackball (ACTION_MOVE): 0:(-4.0,-2.0)
+:Sending Trackball (ACTION_MOVE): 0:(-1.0,0.0)
+    //[calendar_time:2026-11-28 08:02:57.258  system_uptime:269191]
+    // Sending event #4300
+:Sending Trackball (ACTION_MOVE): 0:(-1.0,0.0)
+:Sending Trackball (ACTION_MOVE): 0:(4.0,-3.0)
+:Sending Trackball (ACTION_MOVE): 0:(1.0,-2.0)
+:Switch: #Intent;action=android.intent.action.MAIN;category=android.intent.category.LAUNCHER;launchFlags=0x10200000;component=com.sushant.saveo/leakcanary.internal.activity.LeakLauncherActivity;end
+    // Allowing start of Intent { act=android.intent.action.MAIN cat=[android.intent.category.LAUNCHER] cmp=com.sushant.saveo/leakcanary.internal.activity.LeakLauncherActivity } in package com.sushant.saveo
+:Switch: #Intent;action=android.intent.action.MAIN;category=android.intent.category.LAUNCHER;launchFlags=0x10200000;component=com.sushant.saveo/.MainActivity;end
+    // Allowing start of Intent { act=android.intent.action.MAIN cat=[android.intent.category.LAUNCHER] cmp=com.sushant.saveo/.MainActivity } in package com.sushant.saveo
+    //[calendar_time:2026-11-28 08:03:00.426  system_uptime:272359]
+    // Sending event #4400
+    //[calendar_time:2026-11-28 08:03:00.507  system_uptime:272440]
+    // Sending event #4400
+:Sending Trackball (ACTION_MOVE): 0:(2.0,-3.0)
+:Sending Trackball (ACTION_MOVE): 0:(-5.0,1.0)
+:Sending Trackball (ACTION_MOVE): 0:(1.0,-3.0)
+:Sending Trackball (ACTION_MOVE): 0:(-5.0,-2.0)
+:Switch: #Intent;action=android.intent.action.MAIN;category=android.intent.category.LAUNCHER;launchFlags=0x10200000;component=com.sushant.saveo/leakcanary.internal.activity.LeakLauncherActivity;end
+    // Allowing start of Intent { act=android.intent.action.MAIN cat=[android.intent.category.LAUNCHER] cmp=com.sushant.saveo/leakcanary.internal.activity.LeakLauncherActivity } in package com.sushant.saveo
+:Sending Trackball (ACTION_MOVE): 0:(-4.0,0.0)
+    //[calendar_time:2026-11-28 08:03:02.226  system_uptime:274159]
+    // Sending event #4500
+:Sending Trackball (ACTION_MOVE): 0:(-5.0,-4.0)
+:Sending Trackball (ACTION_MOVE): 0:(-2.0,-2.0)
+:Sending Trackball (ACTION_MOVE): 0:(-5.0,3.0)
+:Sending Trackball (ACTION_UP): 0:(0.0,0.0)
+:Sending Trackball (ACTION_MOVE): 0:(-2.0,-2.0)
+    // Rejecting start of Intent { act=android.intent.action.VIEW dat=https://square.github.io/... cmp=com.android.chrome/com.google.android.apps.chrome.IntentDispatcher } in package com.android.chrome
+    //[calendar_time:2026-11-28 08:03:04.238  system_uptime:276171]
+    // Sending event #4600
+:Sending Trackball (ACTION_MOVE): 0:(0.0,-3.0)
+:Sending Trackball (ACTION_MOVE): 0:(-3.0,-4.0)
+:Switch: #Intent;action=android.intent.action.MAIN;category=android.intent.category.LAUNCHER;launchFlags=0x10200000;component=com.sushant.saveo/leakcanary.internal.activity.LeakLauncherActivity;end
+    // Allowing start of Intent { act=android.intent.action.MAIN cat=[android.intent.category.LAUNCHER] cmp=com.sushant.saveo/leakcanary.internal.activity.LeakLauncherActivity } in package com.sushant.saveo
+:Sending Trackball (ACTION_MOVE): 0:(-3.0,3.0)
+:Sending Flip keyboardOpen=false
+Got IOException performing flipjava.io.FileNotFoundException: /dev/input/event0: open failed: EACCES (Permission denied)
+    // Injection Failed
+:Sending Trackball (ACTION_MOVE): 0:(-4.0,-3.0)
+:Sending Trackball (ACTION_UP): 0:(0.0,0.0)
+    // Rejecting start of Intent { act=android.intent.action.VIEW dat=https://square.github.io/... cmp=com.android.chrome/com.google.android.apps.chrome.IntentDispatcher } in package com.android.chrome
+    // Rejecting start of Intent { act=android.intent.action.VIEW dat=https://square.github.io/... cmp=com.android.chrome/com.google.android.apps.chrome.IntentDispatcher } in package com.android.chrome
+:Sending Trackball (ACTION_MOVE): 0:(-5.0,-3.0)
+:Sending Trackball (ACTION_MOVE): 0:(3.0,-5.0)
+:Sending Trackball (ACTION_MOVE): 0:(2.0,-1.0)
+    //[calendar_time:2026-11-28 08:03:05.912  system_uptime:277845]
+    // Sending event #4700
+:Sending Trackball (ACTION_MOVE): 0:(-4.0,1.0)
+    //[calendar_time:2026-11-28 08:03:07.778  system_uptime:279710]
+    // Sending event #4800
+:Sending Flip keyboardOpen=true
+Got IOException performing flipjava.io.FileNotFoundException: /dev/input/event0: open failed: EACCES (Permission denied)
+    // Injection Failed
+:Sending Trackball (ACTION_MOVE): 0:(3.0,0.0)
+:Sending Trackball (ACTION_MOVE): 0:(4.0,-3.0)
+:Sending Trackball (ACTION_MOVE): 0:(2.0,-1.0)
+:Sending Trackball (ACTION_MOVE): 0:(2.0,-5.0)
+:Sending Trackball (ACTION_UP): 0:(0.0,0.0)
+    // Rejecting start of Intent { act=android.intent.action.VIEW dat=https://squ.re/... cmp=com.android.chrome/com.google.android.apps.chrome.IntentDispatcher } in package com.android.chrome
+:Sending Trackball (ACTION_MOVE): 0:(2.0,-2.0)
+    //[calendar_time:2026-11-28 08:03:09.669  system_uptime:281602]
+    // Sending event #4900
+:Switch: #Intent;action=android.intent.action.MAIN;category=android.intent.category.LAUNCHER;launchFlags=0x10200000;component=com.sushant.saveo/.MainActivity;end
+    // Allowing start of Intent { act=android.intent.action.MAIN cat=[android.intent.category.LAUNCHER] cmp=com.sushant.saveo/.MainActivity } in package com.sushant.saveo
+:Sending Trackball (ACTION_MOVE): 0:(1.0,3.0)
+:Sending Trackball (ACTION_UP): 0:(0.0,0.0)
+:Sending Trackball (ACTION_MOVE): 0:(3.0,-3.0)
+:Switch: #Intent;action=android.intent.action.MAIN;category=android.intent.category.LAUNCHER;launchFlags=0x10200000;component=com.sushant.saveo/.MainActivity;end
+    // Allowing start of Intent { act=android.intent.action.MAIN cat=[android.intent.category.LAUNCHER] cmp=com.sushant.saveo/.MainActivity } in package com.sushant.saveo
+Events injected: 5000
+:Sending rotation degree=0, persist=false
+:Dropped: keys=0 pointers=0 trackballs=0 flips=8 rotations=0
+## Network stats: elapsed time=151950ms (0ms mobile, 0ms wifi, 151950ms not connected)
+// Monkey finished

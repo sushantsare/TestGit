@@ -1,0 +1,174 @@
+  bash arg: -p
+  bash arg: com.sushant.saveo
+  bash arg: -s
+  bash arg: 7
+  bash arg: --throttle
+  bash arg: 60
+  bash arg: --pct-syskeys
+  bash arg: 0
+  bash arg: -v
+  bash arg: 1500
+args: [-p, com.sushant.saveo, -s, 7, --throttle, 60, --pct-syskeys, 0, -v, 1500]
+ arg: "-p"
+ arg: "com.sushant.saveo"
+ arg: "-s"
+ arg: "7"
+ arg: "--throttle"
+ arg: "60"
+ arg: "--pct-syskeys"
+ arg: "0"
+ arg: "-v"
+ arg: "1500"
+data="com.sushant.saveo"
+data="7"
+arg="--throttle" mCurArgData="null" mNextArg=5 argwas="--throttle" nextarg="60"
+data="60"
+arg="--pct-syskeys" mCurArgData="null" mNextArg=7 argwas="--pct-syskeys" nextarg="0"
+data="0"
+:Monkey: seed=7 count=1500
+:AllowPackage: com.sushant.saveo
+:IncludeCategory: android.intent.category.LAUNCHER
+:IncludeCategory: android.intent.category.MONKEY
+// Event percentages:
+//   0: 15.306122%
+//   1: 10.204082%
+//   2: 2.0408163%
+//   3: 15.306122%
+//   4: -0.0%
+//   5: -0.0%
+//   6: 25.510204%
+//   7: 15.306122%
+//   8: -0.0%
+//   9: 2.0408163%
+//   10: 1.0204082%
+//   11: 13.265306%
+:Switch: #Intent;action=android.intent.action.MAIN;category=android.intent.category.LAUNCHER;launchFlags=0x10200000;component=com.sushant.saveo/.MainActivity;end
+    // Allowing start of Intent { act=android.intent.action.MAIN cat=[android.intent.category.LAUNCHER] cmp=com.sushant.saveo/.MainActivity } in package com.sushant.saveo
+:Sending Trackball (ACTION_MOVE): 0:(-3.0,3.0)
+:Sending Trackball (ACTION_MOVE): 0:(-5.0,-1.0)
+:Sending Trackball (ACTION_UP): 0:(0.0,0.0)
+:Sending Trackball (ACTION_MOVE): 0:(2.0,1.0)
+:Switch: #Intent;action=android.intent.action.MAIN;category=android.intent.category.LAUNCHER;launchFlags=0x10200000;component=com.sushant.saveo/.MainActivity;end
+    // Allowing start of Intent { act=android.intent.action.MAIN cat=[android.intent.category.LAUNCHER] cmp=com.sushant.saveo/.MainActivity } in package com.sushant.saveo
+:Sending Trackball (ACTION_MOVE): 0:(0.0,-5.0)
+:Sending Trackball (ACTION_MOVE): 0:(-1.0,-3.0)
+    //[calendar_time:2026-11-28 07:59:15.569  system_uptime:79072]
+    // Sending event #100
+:Sending Trackball (ACTION_MOVE): 0:(-3.0,2.0)
+:Sending Trackball (ACTION_MOVE): 0:(3.0,-5.0)
+:Sending Trackball (ACTION_MOVE): 0:(-5.0,1.0)
+:Sending Trackball (ACTION_MOVE): 0:(2.0,-5.0)
+    //[calendar_time:2026-11-28 07:59:18.063  system_uptime:81565]
+    // Sending event #200
+:Sending Trackball (ACTION_MOVE): 0:(-3.0,-2.0)
+:Sending Trackball (ACTION_MOVE): 0:(0.0,-5.0)
+:Sending Trackball (ACTION_MOVE): 0:(2.0,0.0)
+:Sending Trackball (ACTION_MOVE): 0:(-4.0,3.0)
+:Sending Trackball (ACTION_MOVE): 0:(2.0,4.0)
+:Sending Trackball (ACTION_MOVE): 0:(2.0,3.0)
+:Sending Trackball (ACTION_MOVE): 0:(4.0,2.0)
+    //[calendar_time:2026-11-28 07:59:19.594  system_uptime:83096]
+    // Sending event #300
+:Sending Trackball (ACTION_MOVE): 0:(0.0,3.0)
+:Sending Trackball (ACTION_MOVE): 0:(-3.0,4.0)
+:Switch: #Intent;action=android.intent.action.MAIN;category=android.intent.category.LAUNCHER;launchFlags=0x10200000;component=com.sushant.saveo/.MainActivity;end
+    // Allowing start of Intent { act=android.intent.action.MAIN cat=[android.intent.category.LAUNCHER] cmp=com.sushant.saveo/.MainActivity } in package com.sushant.saveo
+:Sending Trackball (ACTION_MOVE): 0:(-3.0,-5.0)
+:Sending Flip keyboardOpen=false
+Got IOException performing flipjava.io.FileNotFoundException: /dev/input/event0: open failed: EACCES (Permission denied)
+    // Injection Failed
+:Sending Trackball (ACTION_MOVE): 0:(-3.0,3.0)
+    //[calendar_time:2026-11-28 07:59:23.456  system_uptime:86958]
+    // Sending event #400
+:Sending Trackball (ACTION_MOVE): 0:(3.0,-3.0)
+:Sending Trackball (ACTION_MOVE): 0:(0.0,3.0)
+:Sending Trackball (ACTION_UP): 0:(0.0,0.0)
+    //[calendar_time:2026-11-28 07:59:26.676  system_uptime:90177]
+    // Sending event #500
+    //[calendar_time:2026-11-28 07:59:26.736  system_uptime:90238]
+    // Sending event #500
+:Switch: #Intent;action=android.intent.action.MAIN;category=android.intent.category.LAUNCHER;launchFlags=0x10200000;component=com.sushant.saveo/.MainActivity;end
+    // Allowing start of Intent { act=android.intent.action.MAIN cat=[android.intent.category.LAUNCHER] cmp=com.sushant.saveo/.MainActivity } in package com.sushant.saveo
+:Sending Trackball (ACTION_MOVE): 0:(3.0,3.0)
+:Sending Trackball (ACTION_MOVE): 0:(4.0,-1.0)
+:Sending Trackball (ACTION_MOVE): 0:(-4.0,-1.0)
+:Sending Trackball (ACTION_MOVE): 0:(3.0,3.0)
+:Sending Trackball (ACTION_UP): 0:(0.0,0.0)
+:Sending Trackball (ACTION_MOVE): 0:(0.0,-2.0)
+:Sending Trackball (ACTION_MOVE): 0:(-5.0,-3.0)
+    //[calendar_time:2026-11-28 07:59:29.762  system_uptime:93264]
+    // Sending event #600
+:Sending Trackball (ACTION_MOVE): 0:(-1.0,-5.0)
+:Sending Trackball (ACTION_MOVE): 0:(-5.0,2.0)
+:Sending Trackball (ACTION_UP): 0:(0.0,0.0)
+:Sending Trackball (ACTION_MOVE): 0:(3.0,-2.0)
+:Sending Trackball (ACTION_MOVE): 0:(2.0,2.0)
+:Sending Trackball (ACTION_MOVE): 0:(2.0,4.0)
+    //[calendar_time:2026-11-28 07:59:33.105  system_uptime:96606]
+    // Sending event #700
+    //[calendar_time:2026-11-28 07:59:33.171  system_uptime:96673]
+    // Sending event #700
+:Sending Trackball (ACTION_MOVE): 0:(2.0,-4.0)
+    //[calendar_time:2026-11-28 07:59:36.671  system_uptime:100173]
+    // Sending event #800
+    //[calendar_time:2026-11-28 07:59:36.732  system_uptime:100233]
+    // Sending event #800
+:Sending Trackball (ACTION_MOVE): 0:(-3.0,-5.0)
+:Sending Trackball (ACTION_MOVE): 0:(2.0,2.0)
+:Sending Trackball (ACTION_UP): 0:(0.0,0.0)
+:Sending Trackball (ACTION_MOVE): 0:(-4.0,-1.0)
+:Switch: #Intent;action=android.intent.action.MAIN;category=android.intent.category.LAUNCHER;launchFlags=0x10200000;component=com.sushant.saveo/.MainActivity;end
+    // Allowing start of Intent { act=android.intent.action.MAIN cat=[android.intent.category.LAUNCHER] cmp=com.sushant.saveo/.MainActivity } in package com.sushant.saveo
+:Sending Trackball (ACTION_MOVE): 0:(3.0,3.0)
+    //[calendar_time:2026-11-28 07:59:39.733  system_uptime:103235]
+    // Sending event #900
+:Sending Trackball (ACTION_MOVE): 0:(-3.0,3.0)
+:Sending Trackball (ACTION_MOVE): 0:(4.0,0.0)
+:Sending Trackball (ACTION_MOVE): 0:(3.0,2.0)
+:Sending Trackball (ACTION_UP): 0:(0.0,0.0)
+:Sending Trackball (ACTION_MOVE): 0:(-4.0,2.0)
+:Sending Trackball (ACTION_MOVE): 0:(1.0,3.0)
+    //[calendar_time:2026-11-28 07:59:42.041  system_uptime:105542]
+    // Sending event #1000
+    //[calendar_time:2026-11-28 07:59:42.102  system_uptime:105604]
+    // Sending event #1000
+:Sending Trackball (ACTION_MOVE): 0:(2.0,-3.0)
+:Sending Trackball (ACTION_MOVE): 0:(-3.0,-4.0)
+:Sending Trackball (ACTION_MOVE): 0:(-5.0,1.0)
+:Sending Trackball (ACTION_MOVE): 0:(2.0,-5.0)
+    //[calendar_time:2026-11-28 07:59:45.717  system_uptime:109220]
+    // Sending event #1100
+:Sending Trackball (ACTION_UP): 0:(0.0,0.0)
+:Sending Trackball (ACTION_MOVE): 0:(0.0,1.0)
+:Sending Trackball (ACTION_MOVE): 0:(-5.0,-3.0)
+:Sending Trackball (ACTION_MOVE): 0:(2.0,-3.0)
+:Sending Trackball (ACTION_MOVE): 0:(4.0,-3.0)
+:Sending Trackball (ACTION_MOVE): 0:(-5.0,-3.0)
+    //[calendar_time:2026-11-28 07:59:48.219  system_uptime:111720]
+    // Sending event #1200
+:Sending Trackball (ACTION_MOVE): 0:(4.0,1.0)
+:Sending Trackball (ACTION_MOVE): 0:(1.0,2.0)
+:Sending Trackball (ACTION_MOVE): 0:(1.0,1.0)
+:Sending Flip keyboardOpen=true
+Got IOException performing flipjava.io.FileNotFoundException: /dev/input/event0: open failed: EACCES (Permission denied)
+    // Injection Failed
+:Sending Trackball (ACTION_MOVE): 0:(-5.0,4.0)
+    //[calendar_time:2026-11-28 07:59:51.542  system_uptime:115044]
+    // Sending event #1300
+:Sending Trackball (ACTION_MOVE): 0:(3.0,-1.0)
+:Sending Trackball (ACTION_MOVE): 0:(1.0,0.0)
+    // activityResuming(com.sushant.saveo)
+:Switch: #Intent;action=android.intent.action.MAIN;category=android.intent.category.LAUNCHER;launchFlags=0x10200000;component=com.sushant.saveo/.MainActivity;end
+    // Allowing start of Intent { act=android.intent.action.MAIN cat=[android.intent.category.LAUNCHER] cmp=com.sushant.saveo/.MainActivity } in package com.sushant.saveo
+:Sending Trackball (ACTION_MOVE): 0:(4.0,1.0)
+:Sending Trackball (ACTION_MOVE): 0:(-2.0,-1.0)
+    //[calendar_time:2026-11-28 07:59:53.804  system_uptime:117306]
+    // Sending event #1400
+    // activityResuming(com.sushant.saveo)
+:Sending Trackball (ACTION_MOVE): 0:(-2.0,-3.0)
+:Sending Trackball (ACTION_MOVE): 0:(-3.0,2.0)
+Events injected: 1500
+:Sending rotation degree=0, persist=false
+:Dropped: keys=0 pointers=0 trackballs=0 flips=2 rotations=0
+## Network stats: elapsed time=45023ms (0ms mobile, 0ms wifi, 45023ms not connected)
+// Monkey finished

@@ -1,0 +1,41 @@
+WARNING: A restricted method in java.lang.System has been called
+WARNING: java.lang.System::loadLibrary has been called by org.conscrypt.NativeLibraryUtil in an unnamed module (file:/usr/local/lib/android/sdk/build-tools/37.0.0/lib/apksigner.jar)
+WARNING: Use --enable-native-access=ALL-UNNAMED to avoid a warning for callers in this module
+WARNING: Restricted methods will be blocked in a future release unless native access is enabled
+
+Verifies
+Verified using v1 scheme (JAR signing): false
+Verified using v2 scheme (APK Signature Scheme v2): true
+Verified using v3 scheme (APK Signature Scheme v3): false
+Verified using v3.1 scheme (APK Signature Scheme v3.1): false
+Verified using v3.2 scheme (APK Signature Scheme v3.2): false
+Verified using v4 scheme (APK Signature Scheme v4): false
+Verified for SourceStamp: false
+Number of signers: 1
+V2 Signer: certificate DN: CN=Sushant
+V2 Signer: certificate SHA-256 digest: d4752692cf607253a322fba47eed9b7c8c532789eca4135908f1ba8a357a0c63
+V2 Signer: certificate SHA-1 digest: 88f13f559513b46a9c3717061829ec483c419f84
+V2 Signer: certificate MD5 digest: 57f3e867152fd7d56493924309035b70
+V2 Signer: key algorithm: RSA
+V2 Signer: key size (bits): 2048
+V2 Signer: public key SHA-256 digest: 62baef128beeeed2a37248573c2ce7790f463fb4fd3d90b9f7612e105df11b82
+V2 Signer: public key SHA-1 digest: c75d97e39ee11595fdf2fbfd7badb82b2a43462d
+V2 Signer: public key MD5 digest: 91e5f1fcf33bda923e9123604a9e0a72
+WARNING: A restricted method in java.lang.System has been called
+WARNING: java.lang.System::loadLibrary has been called by org.conscrypt.NativeLibraryUtil in an unnamed module (file:/usr/local/lib/android/sdk/build-tools/37.0.0/lib/apksigner.jar)
+WARNING: Use --enable-native-access=ALL-UNNAMED to avoid a warning for callers in this module
+WARNING: Restricted methods will be blocked in a future release unless native access is enabled
+
+Verifies
+Verified using v1 scheme (JAR signing): false
+Verified using v2 scheme (APK Signature Scheme v2): true
+Verified using v3 scheme (APK Signature Scheme v3): false
+Verified using v3.1 scheme (APK Signature Scheme v3.1): false
+Verified using v3.2 scheme (APK Signature Scheme v3.2): false
+Verified using v4 scheme (APK Signature Scheme v4): false
+Verified for SourceStamp: false
+Number of signers: 1
+total 15460
+drwxr-xr-x 2 runner runner     4096 Nov 28 07:56 .
+drwxr-xr-x 5 runner runner     4096 Nov 28 07:59 ..
+-rw-r--r-- 1 runner runner 15819076 Nov 28 07:56 app-release.apk

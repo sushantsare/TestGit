@@ -1,0 +1,2 @@
+release=success debug=success
+unit=success lint=success emulators=success
