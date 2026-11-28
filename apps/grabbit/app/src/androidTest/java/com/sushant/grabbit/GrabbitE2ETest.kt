@@ -604,7 +604,7 @@ class GrabbitE2ETest {
             listOf(720, 480), emptyMap(), true, entries = entries, playlistId = "PLTEST",
         )
         compose.onNodeWithTag("nav_home").performClick()
-        compose.activity.runOnUiThread { vm.fetchState = FetchState.Loaded(info) }
+        compose.activity.runOnUiThread { vm.show(info) }
         compose.waitUntil(10_000) { exists("plCount") }
         shot("pl_1_picker")
         // Range 1-4, untick 3 and tick it again, reversed order
@@ -651,13 +651,13 @@ class GrabbitE2ETest {
         Thread.sleep(8000)
         // Open the playlist again: downloaded videos show "Downloaded ✓", Only new picks just the rest
         compose.onNodeWithTag("nav_home").performClick()
-        compose.activity.runOnUiThread { vm.fetchState = FetchState.Idle }
+        compose.activity.runOnUiThread { vm.show(null) }
         compose.waitForIdle()
-        compose.activity.runOnUiThread { vm.fetchState = FetchState.Loaded(info) }
+        compose.activity.runOnUiThread { vm.show(info) }
         compose.waitUntil(10_000) { exists("plCount") }
         val again = compose.onNodeWithTag("plCount", useUnmergedTree = true).fetchSemanticsNode().config[androidx.compose.ui.semantics.SemanticsProperties.Text].joinToString { it.text }
         shot("pl_5_reopened")
-        compose.activity.runOnUiThread { vm.fetchState = FetchState.Idle }
+        compose.activity.runOnUiThread { vm.show(null) }
         log("PLAYLIST maxRunning=$maxRunning saved=${mine.size} names=$names inFolder=$inFolder failed=${failedNow.size} archived=$archived retried=$retried reopenCount=$again")
         "playlist=${c1.startsWith("4 of") && c2.startsWith("3 of") && maxRunning <= 2 && mine.size == 3 && inFolder &&
             names.firstOrNull()?.startsWith("01 - ") == true && failedNow.size == 1 && archived && retried && again.startsWith("1 of")}"

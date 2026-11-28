@@ -104,6 +104,9 @@ class MainViewModel(private val app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /** Shows a result card for [info] (null = clear). Used by tests. */
+    fun show(info: MediaInfo?) { fetchState = if (info == null) FetchState.Idle else FetchState.Loaded(info) }
+
     fun download(info: MediaInfo, quality: String, opts: com.sushant.grabbit.download.DlOpts = com.sushant.grabbit.download.DlOpts()) {
         if (info.isPlaylist && info.entries.isNotEmpty()) com.sushant.grabbit.download.PlaylistStart.start(app, info, quality, opts)
         else Downloads.enqueue(
